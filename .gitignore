@@ -1,0 +1,29 @@
+# Файлы Python/OC
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+.DS_Store
+Thumbs.db
+
+# Конфиги/настройки/ключи
+.env
+
+# Базы данных и сессии
+# ...
+
+# Локальные модели
+# ...
+
+# Логи
+logs/
+
+# Утилиты
+docs/
+scripts/
+tests/
+TODO.md
+copy_all_code.py
+all_code.txt
