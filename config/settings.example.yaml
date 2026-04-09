@@ -1,0 +1,21 @@
+identity:
+  agent_name: AgentName
+
+llm:
+  model_name: model_name
+  temperature: 0.7
+  max_react_steps: 15
+
+system:
+  # Интервал между тиками (в секундах)
+  tick_interval_sec: 30
+
+  context_depth:
+    event_driven:
+      ticks: 20
+
+    proactivity:
+      ticks: 25
+
+    consolidation:
+      ticks: 30

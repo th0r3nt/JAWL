@@ -10,6 +10,9 @@ Thumbs.db
 
 # Конфиги/настройки/ключи
 .env
+SOUL.md
+EXAMPLES_OF_STYLE.md
+settings.yaml
 
 # Базы данных и сессии
 # ...
@@ -27,3 +30,4 @@ tests/
 TODO.md
 copy_all_code.py
 all_code.txt
+architecture.canvas
