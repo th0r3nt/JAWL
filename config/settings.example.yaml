@@ -7,6 +7,10 @@ llm:
   max_react_steps: 15
 
 system:
+
+  vector_db:
+    embedding_model: ...
+    
   # Интервал между тиками (в секундах)
   tick_interval_sec: 30
 

@@ -1,5 +1,17 @@
 import asyncio
+import os
+
+# utils
 from src.utils.logger import system_logger
+
+# l0_state
+
+# l1_databases
+from src.l1_databases.vector.db import VectorDB
+
+# l2_interfaces
+
+# l3_agent
 
 
 class System:
@@ -24,7 +36,11 @@ class System:
         """
         Инициализирует первый слой: базы данных.
         """
-        pass
+        # 1. Читаем конфиг/путь (например, 'local_data/vector_storage')
+        db_path = os.path.join(os.getcwd(), "src", "utils", "local", "data", "vector_storage")
+        
+        # 2. Инициализируем БД (Инжектим путь)
+        self.vector_db = VectorDB(storage_path=db_path)
 
     # l2_interfaces
     def setup_l2_interfaces(self):
