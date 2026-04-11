@@ -27,6 +27,8 @@ class TelethonState:
     """
 
     def __init__(self, number_of_last_chats: int = 10):
+        self.is_online = False
+
         self.number_of_last_chats = number_of_last_chats  # Количество хранимых последних чатов
 
         # Хранилище последних чатов
@@ -50,6 +52,8 @@ class AiogramState:
     """
 
     def __init__(self, number_of_last_chats: int = 10):
+        self.is_online = False
+
         self.number_of_last_chats = number_of_last_chats
 
         self.last_chats = "Список диалогов пуст."
@@ -69,14 +73,18 @@ class HostOSState:
     """
 
     def __init__(self):
+        self.is_online = False
+
         self.datetime = ""  # Время
         self.uptime = ""  # Аптайм хост-пк
         self.telemetry = ""  # CPU, ОЗУ, процессы
         self.sandbox_files = ""  # Текущие файлы в Sandbox
 
+
 # =======================================
 # Host Terminal
 # =======================================
+
 
 class HostTerminalState:
     """
@@ -85,5 +93,8 @@ class HostTerminalState:
     """
 
     def __init__(self, number_of_last_messages: int = 15):
+        self.is_online = False        # TCP-сервер
+        self.is_ui_connected = False  # Окно терминала
+
         self.number_of_last_messages = number_of_last_messages
         self.messages = ""

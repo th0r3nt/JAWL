@@ -83,7 +83,7 @@ async def test_react_empty_actions_exit(mock_execute_skill, mock_dependencies):
     )
     deps["llm_client"].get_session = AsyncMock(return_value=mock_session)
 
-    await loop.run("PROACTIVITY", {})
+    await loop.run("HEARTBEAT", {})
 
     # Проверки
     assert deps["agent_state"].state == AgentStatus.IDLE

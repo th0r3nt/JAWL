@@ -35,7 +35,7 @@ class PromptBuilder:
 
         return "\n\n".join(parts)
 
-    def build(self, skills_docs: str) -> str:
+    def build(self) -> str:
         """
         Собирает итоговый системный промпт.
         Порядок важен: Характер -> Инструкции -> Описание доступных функций.
@@ -51,8 +51,5 @@ class PromptBuilder:
 {personality}
 
 {system_rules}
-
-## SKILLS LIBRARY
-{skills_docs}
 """
         ).strip()

@@ -4,6 +4,7 @@ from pathlib import Path
 
 from src.utils.logger import system_logger
 from src.utils.settings import HostOSConfig
+from src.l0_state.interfaces.state import HostOSState
 
 
 class MadnessLevel(IntEnum):
@@ -19,8 +20,9 @@ class HostOSClient:
     Выступает в роли Гейткипера (проверка прав доступа).
     """
 
-    def __init__(self, base_dir: Path | str, config: HostOSConfig):
+    def __init__(self, base_dir: Path | str, config: HostOSConfig, state: HostOSState):
         self.config = config
+        self.state = state
 
         try:
             self.madness_level = MadnessLevel(self.config.madness_level)
@@ -41,9 +43,15 @@ class HostOSClient:
         system_logger.info(
             f"[Host OS] Клиент инициализирован (ОС: {self.os_platform}, Madness: {self.madness_level.name})."
         )
+        self.state.is_online = True
 
     def validate_path(self, target_path: str | Path, is_write: bool = False) -> Path:
         resolved_path = Path(target_path).resolve()
+
+        if not self.config.env_access and ".env" in resolved_path.name.lower():
+            raise PermissionError(
+                f"SYSTEM DENIED: Доступ к файлам конфигурации ({resolved_path.name}) строго запрещен настройками безопасности."
+            )
 
         if self.madness_level == MadnessLevel.GOD_MODE:
             return resolved_path

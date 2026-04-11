@@ -6,6 +6,6 @@
 *(action)* execute_skill("tool_name": "habr.search_articles", "parameters": {"query": "ИИ нейросети"})
 
 ### Примеры проактивности
-[PROACTIVITY]
-*(thoughts)* "Сработал таймер проактивности. Текущих задач нет. Проверю почту и уведомления на GitHub, чтобы убедиться, что система работает стабильно и нет срочных дел."
+[HEARTBEAT]
+*(thoughts)* "Текущих задач нет. Проверю почту и уведомления на GitHub, чтобы убедиться, что система работает стабильно и нет срочных дел."
 *(action)* execute_skill("tool_name": "email.get_recent_emails", "parameters": {"limit": 5, "unread_only": true})

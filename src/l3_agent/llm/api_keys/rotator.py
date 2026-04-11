@@ -60,12 +60,14 @@ class APIKeyRotator:
                 self._current_index = self._current_index % len(self.keys)
 
     def cooldown_key(self, key: str, seconds: int = 60):
-        """Временно блокирует ключ (например, при HTTP 429)."""
+        """Временно блокирует ключ."""
         if key in self.keys:
             self._cooldowns[key] = time.time() + seconds
             masked = key[:6] + "***" if len(key) > 6 else "***"
+
+            reason = "Quota Exceeded" if seconds > 3600 else "Rate Limit"
             system_logger.warning(
-                f"[LLM] Ключ {masked} ушел в кулдаун на {seconds} сек (Rate Limit)."
+                f"[LLM] Ключ {masked} ушел в кулдаун на {seconds} сек ({reason})."
             )
 
     def total_keys(self) -> int:

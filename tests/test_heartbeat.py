@@ -53,10 +53,10 @@ def test_heartbeat_wake_up_low(mock_react_loop):
 
 
 @pytest.mark.asyncio
-async def test_heartbeat_loop_proactivity(mock_react_loop):
+async def test_heartbeat_loop_heartbeat(mock_react_loop):
     """
     Тест: если событий не было, Heartbeat должен проснуться по таймауту
-    с причиной PROACTIVITY и вызвать ReactLoop.
+    с причиной HEARTBEAT и вызвать ReactLoop.
     """
     hb = Heartbeat(mock_react_loop, tick_interval_sec=0)  # Мгновенный таймаут
 
@@ -68,7 +68,7 @@ async def test_heartbeat_loop_proactivity(mock_react_loop):
 
     await hb.start()
 
-    mock_react_loop.run.assert_called_once_with(event_name="PROACTIVITY", payload={})
+    mock_react_loop.run.assert_called_once_with(event_name="HEARTBEAT", payload={})
 
 
 @pytest.mark.asyncio

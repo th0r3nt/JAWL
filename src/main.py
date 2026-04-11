@@ -1,5 +1,6 @@
 import os
 import asyncio
+import traceback
 from pathlib import Path
 from dotenv import load_dotenv
 
@@ -109,6 +110,8 @@ class System:
 
     def setup_l0_state(self):
         """Создает стейты. Создаем все, даже если интерфейс выключен (во избежание NoneType)."""
+        system_logger.info("[System] Инициализация L0 State.")
+
         self.agent_state = AgentState(
             llm_model=self.settings.llm.model_name,
             temperature=self.settings.llm.temperature,
@@ -121,8 +124,10 @@ class System:
 
     async def setup_l1_databases(self):
         """Поднимает базы данных и регистрирует их CRUD-скиллы."""
+        system_logger.info("[System] Инициализация L1 Databases.")
+
         # SQL DB
-        self.sql = SQLManager(db_path=self.local_data_dir / "agent.db")
+        self.sql = SQLManager(db_path=self.local_data_dir / "sql_db" / "agent.db")
         await self.sql.connect()
 
         register_instance(self.sql.tasks)
@@ -133,6 +138,7 @@ class System:
             db_path=self.local_data_dir / "vector_db",
             embedding_model_path=self.local_data_dir / "embeddings",
             embedding_model_name=self.settings.system.vector_db.embedding_model,
+            vector_size=self.settings.system.vector_db.vector_size,
         )
         await self.vector.connect()
 
@@ -146,13 +152,18 @@ class System:
         aiogram_bot_token: str = None,
     ):
         """Читает конфиг, поднимает нужные интерфейсы и регистрирует их скиллы."""
+        system_logger.info("[System] Инициализация L2 Interfaces.")
 
         # HOST OS
         if self.interfaces_config.host.os.enabled:
             os_client = HostOSClient(
-                base_dir=self.root_dir, config=self.interfaces_config.host.os
+                base_dir=self.root_dir,
+                config=self.interfaces_config.host.os,
+                state=self.os_state,
             )
-            os_events = HostOSEvents(os_client, self.os_state, self.event_bus)
+            os_events = HostOSEvents(
+                host_os_client=os_client, state=self.os_state, event_bus=self.event_bus
+            )
 
             register_instance(HostOSExecution(os_client))
             register_instance(HostOSFiles(os_client))
@@ -164,12 +175,18 @@ class System:
 
         # HOST TERMINAL
         if self.interfaces_config.host.terminal.enabled:
-            term_client = HostTerminalClient(config=self.interfaces_config.host.terminal)
-            term_events = HostTerminalEvents(term_client, self.terminal_state, self.event_bus)
+            term_client = HostTerminalClient(
+                config=self.interfaces_config.host.terminal, state=self.terminal_state
+            )
+            term_events = HostTerminalEvents(
+                client=term_client, state=self.terminal_state, event_bus=self.event_bus
+            )
 
             register_instance(
                 HostTerminalMessages(
-                    term_client, self.terminal_state, self.settings.identity.agent_name
+                    client=term_client,
+                    state=self.terminal_state,
+                    agent_name=self.settings.identity.agent_name,
                 )
             )
 
@@ -188,9 +205,12 @@ class System:
                     self.local_data_dir / self.interfaces_config.telegram.telethon.session_name
                 )
                 tel_client = TelethonClient(
-                    int(telethon_api_id), telethon_api_hash, session_path
+                    state=self.telethon_state,
+                    api_id=telethon_api_id,
+                    api_hash=telethon_api_hash,
+                    session_path=session_path,
                 )
-                tel_events = TelethonEvents(tel_client, self.telethon_state, self.event_bus)
+                tel_events = TelethonEvents(tg_client=tel_client, state=self.telethon_state, event_bus=self.event_bus)
 
                 register_instance(TelethonAccount(tel_client))
                 register_instance(TelethonChats(tel_client))
@@ -209,8 +229,8 @@ class System:
                     "[System] AIOGRAM_BOT_TOKEN не найден в .env. Aiogram отключен."
                 )
             else:
-                aio_client = AiogramClient(aiogram_bot_token)
-                aio_events = AiogramEvents(aio_client, self.aiogram_state, self.event_bus)
+                aio_client = AiogramClient(bot_token=aiogram_bot_token, state=self.aiogram_state)
+                aio_events = AiogramEvents(aiogram_client=aio_client, state=self.aiogram_state, event_bus=self.event_bus)
 
                 register_instance(AiogramChats(aio_client, self.aiogram_state))
                 register_instance(AiogramMessages(aio_client))
@@ -221,6 +241,8 @@ class System:
 
     def setup_l3_agent(self, llm_api_url: str, llm_api_keys: list[str]):
         """Сборка мозга агента."""
+        system_logger.info("[System] Инициализация L3 Agent.")
+
         rotator = APIKeyRotator(keys=llm_api_keys)
         llm_client = LLMClient(api_url=llm_api_url, api_keys_rotator=rotator)
 
@@ -237,6 +259,7 @@ class System:
             sql_tasks=self.sql.tasks,
             sql_traits=self.sql.personality_traits,
             depth_config=self.settings.system.context_depth,
+            interfaces_config=self.interfaces_config,
         )
 
         token_tracker = TokenTracker()
@@ -379,6 +402,7 @@ async def main():
 
     except Exception as e:
         system_logger.error(f"[System] Критическая ошибка: {e}")
+        system_logger.error(traceback.format_exc())
 
     finally:
         await system.stop()

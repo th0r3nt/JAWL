@@ -52,6 +52,7 @@ class HostOSEvents:
             self._monitoring_task = None
 
         system_logger.info("[System] Host OS мониторинг остановлен.")
+        self.state.is_online = False
 
     async def _loop(self):
         """Бесконечный цикл поллинга."""
@@ -61,7 +62,7 @@ class HostOSEvents:
                 self._update_datetime_and_uptime()
                 self._update_telemetry()
                 await self._update_network()
-                await self._check_sandbox()
+                self._check_sandbox()
 
             except asyncio.CancelledError:
                 break
@@ -95,7 +96,7 @@ class HostOSEvents:
 
         # Собираем топ процессов по ОЗУ
         processes = []
-        for p in psutil.process_iter(["name", "memory_percent"]):
+        for p in psutil.process_iter(["pid", "name", "memory_percent"]):
             try:
                 if p.info["memory_percent"]:
                     processes.append(p.info)
@@ -105,7 +106,11 @@ class HostOSEvents:
         limit = self.host_os.config.top_processes_limit
         top_procs = sorted(processes, key=lambda x: x["memory_percent"], reverse=True)[:limit]
 
-        proc_strings = [f"{p['name']} ({round(p['memory_percent'], 1)}%)" for p in top_procs]
+        # Внедряем PID в итоговую строку
+        proc_strings = [
+            f"{p['name']} (PID: {p['pid']}, {round(p['memory_percent'], 1)}%)"
+            for p in top_procs
+        ]
         top_str = ", ".join(proc_strings) if proc_strings else "Нет данных"
 
         # Записываем в стейт агента

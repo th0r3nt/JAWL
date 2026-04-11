@@ -8,12 +8,13 @@ host:
     # 2 - surgeon   (Read для всей ОС-системы, Write только для файлов фреймворка (агент может переписать собственный код))
     # 3 - god_mode  (Полный доступ: Read/Write всей системы)
     madness_level: 1
+    env_access: false # Запрещает агенту читать и изменять файлы *.env
 
   terminal:
     enabled: true
 
   # Лимиты и таймауты
-  monitoring_interval_sec: 30 # Интервал мониторинга метрик хост-пк: datetime, uptime, telemetry, network, sandbox/
+  monitoring_interval_sec: 20 # Интервал мониторинга метрик хост-пк: datetime, uptime, telemetry, network, sandbox/
   execution_timeout_sec: 60 # Таймаут на выполнение скриптов агентом
   file_read_max_lines: 5000 
   file_list_limit: 100

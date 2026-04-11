@@ -43,10 +43,16 @@ def _build_skill_name(func: Callable, override: str = None, instance: Any = None
 def _register_callable(func: Callable, override: str = None, instance: Any = None):
     """Ядро регистрации. Формирует докстринги и сохраняет ссылку на вызов."""
     skill_name = _build_skill_name(func, override, instance)
-    sig = inspect.signature(func)
-    doc = inspect.getdoc(func) or "Без описания."
 
-    _SKILL_DOCS.append(f"`{skill_name}{sig}` - {doc}")
+    # Убираем аннотацию возвращаемого типа (-> SkillResult), чтобы не мусорить в промпте
+    sig = inspect.signature(func)
+    clean_sig = sig.replace(return_annotation=inspect.Signature.empty)
+
+    # Убираем переносы строк из докстринга: сворачиваем всё в одну красивую строку
+    raw_doc = inspect.getdoc(func) or "Без описания."
+    clean_doc = " ".join(raw_doc.split())
+
+    _SKILL_DOCS.append(f"`{skill_name}{clean_sig}` - {clean_doc}")
     _REGISTRY[skill_name] = func
     system_logger.info(f"[System] Зарегистрирован скилл: {skill_name}")
 
@@ -89,7 +95,8 @@ def get_skills_library() -> str:
 
 async def execute_skill(thoughts: str, actions: list[dict]) -> str:
     system_logger.info(f"[Thoughts]: {thoughts}")
-    
+    # TODO: Логгировать действия [Agent Action]
+
     if not actions:
         return "Цикл завершен: действий не передано."
 

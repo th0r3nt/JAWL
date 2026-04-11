@@ -1,6 +1,6 @@
 from aiogram import Bot
 from src.utils.logger import system_logger
-
+from src.l0_state.interfaces.state import AiogramState
 
 class AiogramClient:
     """
@@ -8,7 +8,9 @@ class AiogramClient:
     Хранит инстанс бота и управляет его сессией.
     """
 
-    def __init__(self, bot_token: str):
+    def __init__(self, bot_token: str, state: AiogramState):
+        self.state = state
+
         if not bot_token:
             raise ValueError("Для работы Aiogram необходим bot_token.")
 
@@ -33,6 +35,7 @@ class AiogramClient:
             # Делаем тестовый запрос для проверки токена
             me = await self._bot.get_me()
             system_logger.info(f"[System] Aiogram успешно авторизован как бот: @{me.username}")
+            self.state.is_online = True
 
         except Exception as e:
             system_logger.error(f"[System] Критическая ошибка при запуске Aiogram: {e}")
@@ -43,3 +46,4 @@ class AiogramClient:
         if self._bot:
             await self._bot.session.close()
             system_logger.info("[System] Aiogram клиент отключен.")
+            self.state.is_online = False

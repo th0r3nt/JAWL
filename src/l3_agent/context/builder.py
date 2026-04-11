@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Any, Dict
 from src.l3_agent.skills.registry import get_skills_library
 
 if TYPE_CHECKING:
-    from src.utils.settings import ContextDepthConfig
+    from src.utils.settings import ContextDepthConfig, InterfacesConfig
 
     from src.l0_state.interfaces.state import (
         HostOSState,
@@ -36,6 +36,7 @@ class ContextBuilder:
         sql_tasks: "SQLTasks",
         sql_traits: "SQLPersonalityTraits",
         depth_config: "ContextDepthConfig",
+        interfaces_config: "InterfacesConfig",
     ):
         # Статус интерфейсов
         self.host_os_state = host_os_state
@@ -53,6 +54,7 @@ class ContextBuilder:
 
         # Конфиг
         self.depth_config = depth_config
+        self.interfaces_config = interfaces_config
 
     async def build(self, event_name: str, payload: Dict[str, Any]) -> str:
         """Собирает готовый контекст для агента."""
@@ -111,28 +113,61 @@ class ContextBuilder:
 
     def _build_state(self) -> str:
         """Собирает блок текущего состояния интерфейсов/агента."""
+
+        # Читаем реальное состояние, а не конфиг
+        os_status = "ON" if self.host_os_state.is_online else "OFF"
+        tel_status = "ON" if self.telethon_state.is_online else "OFF"
+        aio_status = "ON" if self.aiogram_state.is_online else "OFF"
+
+        # Для терминала даем агенту понять точную картину
+        if self.terminal_state.is_online:
+            term_status = "ON" if self.terminal_state.is_ui_connected else "WAITING_FOR_UI"
+        else:
+            term_status = "OFF"
+
+        # Форматируем данные (если выключено - прячем мусор)
+        os_data = self.host_os_state.telemetry if os_status == "ON" else "Интерфейс отключен."
+        sandbox_data = self.host_os_state.sandbox_files if os_status == "ON" else ""
+        term_data = (
+            self.terminal_state.messages
+            if term_status == "ON"
+            else "Интерфейс отключен/ожидает подключения."
+        )
+        tel_data = (
+            self.telethon_state.last_chats
+            if tel_status == "ON"
+            else "Интерфейс отключен (нет ключей или выключен)."
+        )
+        aio_data = (
+            self.aiogram_state.last_chats
+            if aio_status == "ON"
+            else "Интерфейс отключен (нет ключей или выключен)."
+        )
+
         return f"""
-### [AGENT]
-* Status: {self.agent_state.state.value}
+### AGENT
 * LLM Model: {self.agent_state.llm_model}
 * Temperature: {self.agent_state.temperature}
 * Uptime: {self.agent_state.get_uptime()}
-* ReAct Step: {self.agent_state.current_step}/{self.agent_state.max_react_steps} (при превышении лимита - ReAct-цикл принудительно завершается)
+* ReAct Step: {self.agent_state.current_step}/{self.agent_state.max_react_steps}
 
-### [HOST OS]
+### HOST OS [{os_status}]
 * Datetime: {self.host_os_state.datetime}
 * Uptime: {self.host_os_state.uptime}
 * Network: {getattr(self.host_os_state, 'network', 'Неизвестно')}
-{self.host_os_state.telemetry}
+{os_data}
 
-### [HOST TERMINAL]
-{self.terminal_state.messages}
+* Sandbox Directory:
+{sandbox_data}
 
-### [TELETHON]
-{self.telethon_state.last_chats}
+### [HOST TERMINAL] [{term_status}]
+{term_data}
 
-### [AIOGRAM]
-{self.aiogram_state.last_chats}
+### [TELETHON] [{tel_status}]
+{tel_data}
+
+### [AIOGRAM] [{aio_status}]
+{aio_data}
         """.strip()
 
     async def _build_recent_ticks(self, limit: int) -> str:
@@ -143,22 +178,38 @@ class ContextBuilder:
             return "Нет предыдущих тиков."
 
         blocks = []
+        max_chars = self.depth_config.tick_result_max_chars
+
         for i, t in enumerate(ticks, 1):
 
-            # Превращаем массив действий в читаемую строку: func_name({"param": "val"})
+            # Форматируем действия в красивые inline-code блоки: `tool_name`({"param": "val"})
             actions_list = [
-                f"{a.get('tool_name')}({json.dumps(a.get('parameters', {}), ensure_ascii=False)})"
+                f"`{a.get('tool_name')}`({json.dumps(a.get('parameters', {}), ensure_ascii=False)})"
                 for a in t.actions
             ]
             actions_str = ", ".join(actions_list) if actions_list else "None"
 
-            res_str = json.dumps(t.results, ensure_ascii=False) if t.results else "None"
+            # Достаем сырую строку из execution_report (без экранирования \n от json.dumps)
+            if t.results and "execution_report" in t.results:
+                res_str = str(t.results["execution_report"])
+            elif t.results:
+                res_str = json.dumps(t.results, ensure_ascii=False)
+            else:
+                res_str = "None"
 
+            # Обрезаем результат для сохранения контекста
+            if len(res_str) > max_chars:
+                res_str = (
+                    res_str[:max_chars]
+                    + f"\n... [Результат обрезан. Превышен лимит в {max_chars} символов]"
+                )
+
+            # Собираем красивый Markdown-блок для тика
             blocks.append(
                 f"#### [Tick {i}]\n"
                 f"*Thoughts*: {t.thoughts}\n"
                 f"*Actions*: {actions_str}\n"
-                f"*Result*: {res_str}"
+                f"*Result*:\n```\n{res_str}\n```"
             )
 
         return "\n\n".join(blocks)

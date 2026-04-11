@@ -1,6 +1,7 @@
 import asyncio
 from src.utils.logger import system_logger
 from src.utils.settings import HostTerminalConfig
+from src.l0_state.interfaces.state import HostTerminalState
 
 
 class HostTerminalClient:
@@ -10,8 +11,15 @@ class HostTerminalClient:
     подключается к нему для двустороннего обмена сообщениями.
     """
 
-    def __init__(self, config: HostTerminalConfig, host: str = "127.0.0.1", port: int = 49152):
+    def __init__(
+        self,
+        config: HostTerminalConfig,
+        state: HostTerminalState,
+        host: str = "127.0.0.1",
+        port: int = 50505,
+    ):
         self.config = config
+        self.state = state
         self.host = host
         self.port = port
 
@@ -31,6 +39,7 @@ class HostTerminalClient:
             self._handle_connection, self.host, self.port
         )
         system_logger.info(f"[Terminal] Сервер интерфейса запущен на {self.host}:{self.port}")
+        self.state.is_online = True
 
     async def stop(self):
         """Корректно закрывает соединения."""
@@ -44,6 +53,7 @@ class HostTerminalClient:
             await self._server.wait_closed()
 
         system_logger.info("[Terminal] Сервер интерфейса остановлен.")
+        self.state.is_online = False
 
     async def _handle_connection(
         self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter
@@ -57,6 +67,7 @@ class HostTerminalClient:
         self._writer = writer
         peer = writer.get_extra_info("peername")
         system_logger.info(f"[Terminal] Окно терминала подключено: {peer}")
+        self.state.is_ui_connected = True
 
         try:
             while True:
@@ -77,6 +88,7 @@ class HostTerminalClient:
         finally:
             system_logger.info("[Terminal] Окно терминала отключено.")
             self._writer = None
+            self.state.is_ui_connected = False
 
     async def send_message(self, text: str) -> bool:
         """Отправляет сообщение агента в подключенное UI-окно."""

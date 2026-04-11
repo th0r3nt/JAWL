@@ -27,7 +27,7 @@ class Heartbeat:
         self._is_running = False
 
         self._next_tick_time = 0.0
-        self._wake_reason = "PROACTIVITY"
+        self._wake_reason = "HEARTBEAT"
         self._wake_payload: Dict[str, Any] = {}
 
     def wake_up(self, level: EventLevel, event_name: str, payload: Dict[str, Any] = None):
@@ -86,7 +86,7 @@ class Heartbeat:
                 except asyncio.TimeoutError:
                     # Таймаут истек естественным путем - время для проактивности
                     if self._next_tick_time <= time.time():
-                        self._wake_reason = "PROACTIVITY"
+                        self._wake_reason = "HEARTBEAT"
                         self._wake_payload = {}
 
             # Если время пришло (или было сброшено на 'now' из-за HIGH события)
@@ -101,7 +101,7 @@ class Heartbeat:
 
                 # Сбрасываем таймер и причину для следующего тика
                 self._next_tick_time = time.time() + self.tick_interval_sec
-                self._wake_reason = "PROACTIVITY"
+                self._wake_reason = "HEARTBEAT"
                 self._wake_payload = {}
 
     def stop(self):

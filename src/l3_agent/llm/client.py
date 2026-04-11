@@ -28,7 +28,7 @@ class LLMClient:
         else:
             system_logger.info("[LLM] Клиент инициализирован (Default OpenAI URL).")
 
-    async def get_session(self) -> AsyncOpenAI:
+    def get_session(self) -> AsyncOpenAI:
         """
         Генерирует свежую сессию OpenAI с актуальным ключом.
         Использовать так:
@@ -36,7 +36,7 @@ class LLMClient:
         response = await client.chat.completions.create(...)
         """
         # Просим у ротатора следующий живой ключ
-        api_key = await self.rotator.get_next_key()
+        api_key = self.rotator.get_next_key()
 
         if not api_key:
             raise RuntimeError("[LLM] Нет доступных API ключей. Лимиты исчерпаны.")

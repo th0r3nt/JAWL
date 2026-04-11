@@ -1,5 +1,6 @@
 from telethon import TelegramClient
 from src.utils.logger import system_logger
+from src.l0_state.interfaces.state import TelethonState
 
 class TelethonClient:
     """
@@ -7,7 +8,9 @@ class TelethonClient:
     Хранит сессию локально в файле.
     """
 
-    def __init__(self, api_id: int, api_hash: str, session_path: str):
+    def __init__(self, state: TelethonState, api_id: int, api_hash: str, session_path: str):
+        self.state = state
+
         self.api_id = api_id
         self.api_hash = api_hash
         self.session_path = session_path # В идеале это src/utils/local/data/agent_telethon.session
@@ -36,6 +39,7 @@ class TelethonClient:
             name = me.username or me.first_name or "Unknown"
             
             system_logger.info(f"[System] Telethon успешно авторизован как: {name}")
+            self.state.is_online = True
             
         except Exception as e:
             system_logger.error(f"[System] Критическая ошибка при запуске Telethon: {e}")
@@ -46,3 +50,4 @@ class TelethonClient:
         if self._client and self._client.is_connected():
             await self._client.disconnect()
             system_logger.info("[System] Telethon клиент отключен.")
+            self.state.is_online = False

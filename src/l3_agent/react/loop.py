@@ -13,7 +13,7 @@ from src.l3_agent.prompt.builder import PromptBuilder
 from src.l3_agent.context.builder import ContextBuilder
 
 # Импортируем готовый роутер скиллов
-from src.l3_agent.skills.registry import get_skills_library, execute_skill
+from src.l3_agent.skills.registry import execute_skill
 
 
 class ReactLoop:
@@ -69,9 +69,8 @@ class ReactLoop:
             f"[Thoughts] ReAct-цикл инициирован (LLM Model: {self.agent_state.llm_model})."
         )
 
-        # 1. Сборка промпта и контекста
-        skills_docs = get_skills_library()
-        prompt = self.prompt_builder.build(skills_docs)
+        # Сборка промпта и контекста
+        prompt = self.prompt_builder.build()
         context = await self.context_builder.build(event_name, payload)
 
         self.tracker.add_input_record(prompt=prompt, context=context)
@@ -92,7 +91,7 @@ class ReactLoop:
                 self._dump_context_to_file(messages)
 
             try:
-                session = await self.llm.get_session()
+                session = self.llm.get_session()
                 response = await session.chat.completions.create(
                     model=self.agent_state.llm_model,
                     messages=messages,
@@ -101,12 +100,23 @@ class ReactLoop:
                     temperature=self.agent_state.temperature,
                 )
 
-                raw_answer = response.choices[0].message.content or ""
+                message_obj = response.choices[0].message
+                raw_answer = message_obj.content or ""
+
+                if message_obj.tool_calls:
+                    raw_answer += str(message_obj.tool_calls[0].function.arguments)
+
                 self.tracker.add_output_record(raw_answer)
 
-            except openai.RateLimitError:
-                system_logger.warning("[LLM] Rate Limit (429). Ключ отправлен в кулдаун.")
-                self.llm.rotator.cooldown_key(session.api_key, 60)
+            except openai.RateLimitError as e:
+                err_msg = str(e).lower()
+
+                # Разделяем временный Rate Limit и дневную квоту (Quota)
+                if "quota" in err_msg or "exhausted" in err_msg or "billing" in err_msg:
+                    self.llm.rotator.cooldown_key(session.api_key, 86400)  # Бан на 24 часа
+                else:
+                    self.llm.rotator.cooldown_key(session.api_key, 60)  # Пауза 60 сек
+
                 continue  # Повторяем тот же шаг с новым ключом
 
             except openai.AuthenticationError:

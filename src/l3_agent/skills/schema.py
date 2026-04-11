@@ -15,7 +15,7 @@ ACTION_SCHEMA = [
                 "properties": {
                     "thoughts": {
                         "type": "string",
-                        "description": "Цепочка рассуждений/мыслей перед действием."
+                        "description": "Цепочка рассуждений/мыслей перед действием.",
                     },
                     "actions": {
                         "type": "array",
@@ -25,20 +25,22 @@ ACTION_SCHEMA = [
                             "properties": {
                                 "tool_name": {
                                     "type": "string",
-                                    "description": "Точное имя функции."
+                                    "description": "Точное имя функции (например: 'HostTerminalMessages.send_to_terminal').",
                                 },
                                 "parameters": {
                                     "type": "object",
-                                    "description": "Аргументы функции в формате ключ-значение.",
-                                    "additionalProperties": False
-                                }
+                                    "description": "Словарь с аргументами функции. ОБЯЗАТЕЛЬНО передавай сюда нужные ключи и значения!",
+                                    "additionalProperties": True,
+                                },
                             },
-                            "required": ["tool_name", "parameters"]
-                        }
-                    }
+                            "required": ["tool_name", "parameters"],
+                            "additionalProperties": False,
+                        },
+                    },
                 },
-                "required": ["thoughts", "actions"]
-            }
-        }
+                "required": ["thoughts", "actions"],
+                "additionalProperties": False,
+            },
+        },
     }
 ]

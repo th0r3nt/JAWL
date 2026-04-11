@@ -50,7 +50,7 @@ class SQLPersonalityTraits:
             reason_str = f" | Причина: {t.reason}" if t.reason else ""
             ctx_str = f" | Контекст: {t.context}" if t.context else ""
             lines.append(
-                f"- [ID: `{t.id}`] **{t.name}**: {t.description}{reason_str}{ctx_str}"
+                f"- [ID: `{t.id}`] '{t.name}': {t.description}{reason_str}{ctx_str}"
             )
 
         return SkillResult.ok("\n".join(lines))

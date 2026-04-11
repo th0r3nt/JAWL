@@ -11,6 +11,7 @@ from pydantic import BaseModel
 class HostOSConfig(BaseModel):
     enabled: bool = True
     madness_level: int = 1
+    env_access: bool = False
     monitoring_interval_sec: int = 30
     execution_timeout_sec: int = 60
     file_read_max_lines: int = 5000
@@ -65,10 +66,12 @@ class LLMConfig(BaseModel):
 class VectorDBConfig(BaseModel):
     similarity_threshold: float = 0.43
     embedding_model: str = "intfloat/multilingual-e5-small"
+    vector_size: int = 384
 
 
 class ContextDepthConfig(BaseModel):
     ticks: int = 20
+    tick_result_max_chars: int = 10000  # Лимит на размер результата тулза в контексте
 
 
 class SystemConfig(BaseModel):
