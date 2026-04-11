@@ -1,5 +1,6 @@
 import json
 import openai
+import asyncio
 from typing import Dict, Any
 
 from src.utils.logger import system_logger
@@ -109,15 +110,25 @@ class ReactLoop:
                 self.tracker.add_output_record(raw_answer)
 
             except openai.RateLimitError as e:
+                # Пытаемся получить технический код ошибки из API
+                # Обычно это 'insufficient_quota' для денег и 'rate_limit_exceeded' для минут
+                err_code = getattr(e.body, 'get', lambda x: None)('code')
                 err_msg = str(e).lower()
 
-                # Разделяем временный Rate Limit и дневную квоту (Quota)
-                if "quota" in err_msg or "exhausted" in err_msg or "billing" in err_msg:
-                    self.llm.rotator.cooldown_key(session.api_key, 86400)  # Бан на 24 часа
+                # Проверяем на жесткий лимит (деньги/квота)
+                if err_code == 'insufficient_quota' or "billing" in err_msg or "check your plan" in err_msg:
+                    system_logger.error(f"[LLM] Квота исчерпана или нет денег. Бан ключа {session.api_key[:8]} на 24ч")
+                    self.llm.rotator.cooldown_key(session.api_key, 86400)
+                
+                # Во всех остальных случаях - это временный лимит (минутный)
                 else:
-                    self.llm.rotator.cooldown_key(session.api_key, 60)  # Пауза 60 сек
+                    # Можно попробовать вытащить время ожидания из ошибки, 
+                    # но 60 сек — надежная стандартная пауза
+                    system_logger.info(f"[LLM] Рейт-лимит (RPM/TPM). Пауза 60с для {session.api_key[:8]}")
+                    self.llm.rotator.cooldown_key(session.api_key, 60)
 
-                continue  # Повторяем тот же шаг с новым ключом
+                await asyncio.sleep(1) 
+                continue
 
             except openai.AuthenticationError:
                 system_logger.warning("[LLM] Ключ невалиден (401). Удаляем из пула.")

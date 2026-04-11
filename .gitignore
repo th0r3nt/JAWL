@@ -24,6 +24,9 @@ src/utils/local/
 # Логи
 logs/
 
+# Sandbox
+sandbox/*
+
 # Утилиты
 docs/
 scripts/
