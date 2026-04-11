@@ -10,6 +10,7 @@ from src.l0_state.interfaces.state import (
 )
 from src.l0_state.agent.state import AgentState
 from src.l3_agent.skills.registry import SkillResult
+from src.utils.settings import ContextDepthConfig
 
 
 @pytest.fixture
@@ -59,15 +60,19 @@ async def test_context_builder_build(mock_states, mock_dbs):
     os_state, telethon_state, aiogram_state, terminal_state, agent_state = mock_states
     sql_ticks, sql_tasks, sql_traits = mock_dbs
 
+    # Фейковый конфиг глубины контекста
+    depth_config = ContextDepthConfig(ticks=5)
+
     builder = ContextBuilder(
-        os_state,
-        telethon_state,
-        aiogram_state,
-        terminal_state,
-        agent_state,
-        sql_ticks,
-        sql_tasks,
-        sql_traits,
+        host_os_state=os_state,
+        telethon_state=telethon_state,
+        aiogram_state=aiogram_state,
+        terminal_state=terminal_state,
+        agent_state=agent_state,
+        sql_ticks=sql_ticks,
+        sql_tasks=sql_tasks,
+        sql_traits=sql_traits,
+        depth_config=depth_config,
     )
 
     payload = {"chat_id": 123, "text": "Hello Agent"}

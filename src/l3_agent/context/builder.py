@@ -5,6 +5,8 @@ from typing import TYPE_CHECKING, Any, Dict
 from src.l3_agent.skills.registry import get_skills_library
 
 if TYPE_CHECKING:
+    from src.utils.settings import ContextDepthConfig
+
     from src.l0_state.interfaces.state import (
         HostOSState,
         TelethonState,
@@ -33,6 +35,7 @@ class ContextBuilder:
         sql_ticks: "SQLTicks",
         sql_tasks: "SQLTasks",
         sql_traits: "SQLPersonalityTraits",
+        depth_config: "ContextDepthConfig",
     ):
         # Статус интерфейсов
         self.host_os_state = host_os_state
@@ -48,15 +51,16 @@ class ContextBuilder:
         self.sql_tasks = sql_tasks
         self.sql_traits = sql_traits
 
-    async def build(
-        self, event_name: str, payload: Dict[str, Any], tick_limit: int = 5
-    ) -> str:
+        # Конфиг
+        self.depth_config = depth_config
+
+    async def build(self, event_name: str, payload: Dict[str, Any]) -> str:
         """Собирает готовый контекст для агента."""
 
         # Собираем данные из БД параллельно для ускорения работы
         traits_task = self._build_personality_traits()
         tasks_task = self._build_tasks()
-        ticks_task = self._build_recent_ticks(tick_limit)
+        ticks_task = self._build_recent_ticks(limit=self.depth_config.ticks)
 
         personality_traits, tasks, recent_ticks = await asyncio.gather(
             traits_task, tasks_task, ticks_task

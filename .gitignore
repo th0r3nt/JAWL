@@ -19,7 +19,7 @@ interfaces.yaml
 # ...
 
 # Локальные модели
-# ...
+src/utils/local/
 
 # Логи
 logs/
