@@ -60,7 +60,7 @@ class AiogramChats:
                 lines.append(f"Количество участников: {count}")
 
             system_logger.info(
-                f"[Agent Action] Запрошена информация о чате {chat_id} (Aiogram)"
+                f"Запрошена информация о чате {chat_id} (Aiogram)"
             )
             return SkillResult.ok("\n".join(lines))
 

@@ -27,7 +27,7 @@ class TelethonAccount:
             )
 
             system_logger.info(
-                f"[Agent Action] Имя Telegram профиля изменено: {name} {surname}"
+                f"Имя Telegram профиля изменено: {name} {surname}"
             )
             return SkillResult.ok(f"Имя профиля успешно изменено на '{name} {surname}'.")
 
@@ -40,7 +40,7 @@ class TelethonAccount:
         try:
             await self.tg_client.client(UpdateProfileRequest(about=text))
 
-            system_logger.info(f"[Agent Action] Био ТГ профиля изменено на: {text}")
+            system_logger.info(f"Био ТГ профиля изменено на: {text}")
             return SkillResult.ok("Биография успешно изменена.")
 
         except Exception as e:
@@ -60,7 +60,7 @@ class TelethonAccount:
             await self.tg_client.client(UploadProfilePhotoRequest(file=uploaded_file))
 
             system_logger.info(
-                f"[Agent Action] Аватар Telegram профиля обновлен файлом: {filepath}"
+                f"Аватар Telegram профиля обновлен файлом: {filepath}"
             )
             return SkillResult.ok("Аватар профиля успешно изменен.")
 

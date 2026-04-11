@@ -27,7 +27,7 @@ class AiogramMessages:
                 reply_to_message_id=reply_to_message_id and int(reply_to_message_id),
             )
 
-            system_logger.info(f"[Agent Action] Отправлено сообщение в {chat_id} (Aiogram)")
+            system_logger.info(f"Отправлено сообщение в {chat_id} (Aiogram)")
             return SkillResult.ok(f"Сообщение успешно отправлено. ID: {msg.message_id}")
 
         except ValueError:
@@ -48,7 +48,7 @@ class AiogramMessages:
             bot = self.client.bot()
             await bot.delete_message(chat_id=int(chat_id), message_id=int(message_id))
 
-            system_logger.info(f"[Agent Action] Удалено сообщение {message_id} в {chat_id}")
+            system_logger.info(f"Удалено сообщение {message_id} в {chat_id}")
             return SkillResult.ok(f"Сообщение {message_id} успешно удалено.")
 
         except Exception as e:
@@ -64,7 +64,7 @@ class AiogramMessages:
                 chat_id=int(chat_id), message_id=int(message_id), text=new_text
             )
 
-            system_logger.info(f"[Agent Action] Сообщение {message_id} отредактировано")
+            system_logger.info(f"Сообщение {message_id} отредактировано")
             return SkillResult.ok(f"Текст сообщения {message_id} успешно изменен.")
 
         except Exception as e:

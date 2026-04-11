@@ -68,15 +68,25 @@ class Heartbeat:
         elif level == EventLevel.MEDIUM:
             remaining = self._next_tick_time - now
             if remaining > 0:
-                self._next_tick_time = now + (remaining * self.accel_config.medium_multiplier)
+                new_remaining = remaining * self.accel_config.medium_multiplier
+                saved_seconds = remaining - new_remaining
+                self._next_tick_time = now + new_remaining
+
+                system_logger.info(
+                    f"[System] Событие {event_name} (Level: MEDIUM). Следующий вызов LLM ускорен на {saved_seconds:.1f} сек."
+                )
                 self._wake_event.set()
 
         elif level <= EventLevel.LOW:
             # Незначительно сокращаем время сна
             remaining = self._next_tick_time - now
             if remaining > 0:
-                self._next_tick_time = now + (
-                    remaining * self.accel_config.low_background_multiplier
+                new_remaining = remaining * self.accel_config.low_background_multiplier
+                saved_seconds = remaining - new_remaining
+                self._next_tick_time = now + new_remaining
+
+                system_logger.info(
+                    f"[System] Событие {event_name} (Level: {level.name}). Следующий вызов LLM ускорен на {saved_seconds:.1f} сек."
                 )
                 self._wake_event.set()
 

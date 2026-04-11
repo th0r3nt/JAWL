@@ -56,7 +56,6 @@ class HostOSSystem:
                 f"- Uptime: {uptime}"
             )
 
-            system_logger.info("[Agent Action] Запрошена телеметрия системы.")
             return SkillResult.ok(report)
 
         except Exception as e:
@@ -93,7 +92,7 @@ class HostOSSystem:
                 mem_pct = round(p["memory_percent"] or 0, 1)
                 lines.append(f"- PID: `{p['pid']}` | RAM: {mem_pct}% | Имя: {p['name']}")
 
-            system_logger.info(f"[Agent Action] Запрошен список топ-{limit} процессов.")
+            system_logger.info(f"Запрошен список топ-{limit} процессов.")
             return SkillResult.ok("\n".join(lines))
 
         except Exception as e:

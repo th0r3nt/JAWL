@@ -409,8 +409,8 @@ async def main():
     except KeyboardInterrupt:
         system_logger.info("[System] Получен сигнал прерывания.")
 
-    except Exception as e:
-        system_logger.error(f"[System] Критическая ошибка: {e}")
+    except BaseException as e:
+        system_logger.error(f"[System] Критическая ошибка: {type(e).__name__} - {e}")
         system_logger.error(traceback.format_exc())
 
     finally:

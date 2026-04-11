@@ -36,7 +36,7 @@ class TelethonModeration:
                 await client(BlockRequest(id=target_user))
                 msg = f"Пользователь {target_user} добавлен в глобальный ЧС."
 
-            system_logger.info(f"[Agent Action] {msg}")
+            system_logger.info({msg})
             return SkillResult.ok(msg)
 
         except ValueError:
@@ -65,7 +65,7 @@ class TelethonModeration:
                 await client(UnblockRequest(id=target_user))
                 msg = f"Пользователь {target_user} удален из глобального ЧС."
 
-            system_logger.info(f"[Agent Action] {msg}")
+            system_logger.info({msg})
             return SkillResult.ok(msg)
 
         except ValueError:

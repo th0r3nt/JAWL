@@ -49,7 +49,7 @@ class TelethonMessages:
             schedule_info = f" (отложено на {time_delay} сек)" if time_delay else ""
             msg = f"Сообщение успешно отправлено{schedule_info}. ID: {sent_msg.id}"
 
-            system_logger.info(f"[Agent Action] Отправлено сообщение в {to_id}")
+            system_logger.info(f"Отправлено сообщение в {to_id}")
             return SkillResult.ok(msg)
 
         except ValueError:
@@ -69,7 +69,7 @@ class TelethonMessages:
                 entity=int(to_id), messages=int(msg_id), from_peer=int(from_id)
             )
 
-            system_logger.info(f"[Agent Action] Пересылка сообщения {msg_id} в {to_id}")
+            system_logger.info(f"Пересылка сообщения {msg_id} в {to_id}")
             return SkillResult.ok(f"Сообщение {msg_id} успешно переслано.")
 
         except Exception as e:
@@ -83,7 +83,7 @@ class TelethonMessages:
             # Telethon принимает ID чата и список ID сообщений
             await client.delete_messages(entity=int(chat_id), message_ids=[int(msg_id)])
 
-            system_logger.info(f"[Agent Action] Сообщение {msg_id} удалено в чате {chat_id}")
+            system_logger.info(f"Сообщение {msg_id} удалено в чате {chat_id}")
             return SkillResult.ok(f"Сообщение {msg_id} успешно удалено.")
 
         except Exception as e:
@@ -96,7 +96,7 @@ class TelethonMessages:
             client = self.tg_client.client()
             await client.edit_message(entity=int(chat_id), message=int(msg_id), text=new_text)
 
-            system_logger.info(f"[Agent Action] Сообщение {msg_id} отредактировано")
+            system_logger.info(f"Сообщение {msg_id} отредактировано")
             return SkillResult.ok(f"Текст сообщения {msg_id} успешно изменен.")
 
         except Exception as e:

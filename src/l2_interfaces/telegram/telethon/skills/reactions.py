@@ -26,7 +26,7 @@ class TelethonReactions:
             )
 
             system_logger.info(
-                f"[Agent Action] Реакция '{reaction}' поставлена на сообщение {message_id} в чате {chat_id}"
+                f"Реакция '{reaction}' поставлена на сообщение {message_id} в чате {chat_id}"
             )
             return SkillResult.ok(f"Реакция '{reaction}' успешно установлена.")
 
@@ -56,7 +56,7 @@ class TelethonReactions:
             )
 
             system_logger.info(
-                f"[Agent Action] Реакция снята с сообщения {message_id} в чате {chat_id}"
+                f"Реакция снята с сообщения {message_id} в чате {chat_id}"
             )
             return SkillResult.ok("Реакция успешно удалена.")
 

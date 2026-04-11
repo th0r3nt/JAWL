@@ -155,7 +155,7 @@ class TelethonChats:
 
             await client.send_read_acknowledge(target_entity)
 
-            system_logger.info(f"[Agent Action] Чат {chat_id} помечен как прочитанный.")
+            system_logger.info(f"Чат {chat_id} помечен как прочитанный.")
             return SkillResult.ok(f"Чат {chat_id} успешно помечен как прочитанный.")
 
         except Exception as e:

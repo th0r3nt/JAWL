@@ -127,7 +127,7 @@ class ReactLoop:
                     system_logger.info(f"[LLM] Рейт-лимит (RPM/TPM). Пауза 60с для {session.api_key[:8]}")
                     self.llm.rotator.cooldown_key(session.api_key, 60)
 
-                await asyncio.sleep(1) 
+                await asyncio.sleep(5) 
                 continue
 
             except openai.AuthenticationError:

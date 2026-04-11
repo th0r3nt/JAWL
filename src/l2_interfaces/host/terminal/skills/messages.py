@@ -36,7 +36,7 @@ class HostTerminalMessages:
 
         if success:
             self._update_state(text)
-            system_logger.info("[Agent Action] Сообщение отправлено в терминал.")
+            system_logger.info("Сообщение отправлено в терминал.")
             return SkillResult.ok("Сообщение успешно выведено на экран терминала.")
         else:
             # Даем агенту понять, что окно сейчас в пиве

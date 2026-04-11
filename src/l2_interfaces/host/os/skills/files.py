@@ -42,7 +42,7 @@ class HostOSFiles:
                         break
                     lines.append(line.rstrip("\n"))
 
-            system_logger.info(f"[Agent Action] Прочитан файл: {safe_path.name}")
+            system_logger.info(f"Прочитан файл: {safe_path.name}")
             return SkillResult.ok("\n".join(lines))
 
         except PermissionError as e:
@@ -75,7 +75,7 @@ class HostOSFiles:
                 f.write(content)
 
             action_type = "Перезаписан" if mode == "w" else "Обновлен"
-            system_logger.info(f"[Agent Action] {action_type} файл: {safe_path.name}")
+            system_logger.info(f"{action_type} файл: {safe_path.name}")
             return SkillResult.ok(f"Файл {safe_path.name} успешно сохранен.")
 
         except PermissionError as e:
@@ -108,7 +108,7 @@ class HostOSFiles:
             if not items:
                 return SkillResult.ok(f"Директория '{safe_path.name}' пуста.")
 
-            system_logger.info(f"[Agent Action] Просмотр директории: {safe_path.name}")
+            system_logger.info(f"Просмотр директории: {safe_path.name}")
             return SkillResult.ok("\n".join(items))
 
         except PermissionError as e:
@@ -144,7 +144,7 @@ class HostOSFiles:
             if not found:
                 return SkillResult.ok(f"По маске '{pattern}' ничего не найдено.")
 
-            system_logger.info(f"[Agent Action] Поиск файлов '{pattern}' в {safe_path.name}")
+            system_logger.info(f"Поиск файлов '{pattern}' в {safe_path.name}")
             return SkillResult.ok("\n".join(found))
 
         except PermissionError as e:
@@ -168,7 +168,7 @@ class HostOSFiles:
 
             safe_path.unlink()
 
-            system_logger.info(f"[Agent Action] Удален файл: {safe_path.name}")
+            system_logger.info(f"Удален файл: {safe_path.name}")
             return SkillResult.ok(f"Файл {safe_path.name} успешно удален.")
 
         except PermissionError as e:
@@ -202,7 +202,7 @@ class HostOSFiles:
             # Выполняем I/O-операцию в отдельном потоке, чтобы не блокировать event loop
             await asyncio.to_thread(shutil.rmtree, safe_path)
 
-            system_logger.info(f"[Agent Action] Удалена директория: {safe_path.name}")
+            system_logger.info(f"Удалена директория: {safe_path.name}")
             return SkillResult.ok(
                 f"Директория {safe_path.name} и всё её содержимое успешно удалены."
             )

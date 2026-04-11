@@ -102,7 +102,7 @@ async def execute_skill(actions: list[dict]) -> str:
         name = act.get("tool_name", "unknown_tool")
         params = act.get("parameters", {})
 
-        system_logger.info(f"[Agent Action] Вызов: {name}({params})")
+        system_logger.info(f"Вызов: {name}({params})")
 
         tasks.append(_run_single_skill(name, params))
 

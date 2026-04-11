@@ -24,7 +24,7 @@ class AiogramModeration:
             await bot.ban_chat_member(chat_id=int(chat_id), user_id=int(user_id))
 
             msg = f"Пользователь {user_id} забанен в чате {chat_id} (Aiogram)."
-            system_logger.info(f"[Agent Action] {msg}")
+            system_logger.info({msg})
             return SkillResult.ok(msg)
 
         except ValueError:
@@ -42,7 +42,6 @@ class AiogramModeration:
             await bot.unban_chat_member(chat_id=int(chat_id), user_id=int(user_id))
 
             msg = f"Пользователь {user_id} разбанен в чате {chat_id} (Aiogram)."
-            system_logger.info(f"[Agent Action] {msg}")
             return SkillResult.ok(msg)
 
         except Exception as e:

@@ -44,7 +44,7 @@ class HostOSNetwork:
 
             output = stdout.decode("utf-8", errors="replace").strip()
 
-            system_logger.info(f"[Agent Action] Пинг узла {clean_host} (Код: {exit_code})")
+            system_logger.info(f"Пинг узла {clean_host} (Код: {exit_code})")
 
             if exit_code == 0:
                 return SkillResult.ok(f"Узел {clean_host} доступен.\nВывод:\n{output}")
@@ -73,7 +73,7 @@ class HostOSNetwork:
             writer.close()
             await writer.wait_closed()
 
-            system_logger.info(f"[Agent Action] Проверен порт {host}:{port} (Открыт)")
+            system_logger.info(f"Проверен порт {host}:{port} (Открыт)")
             return SkillResult.ok(
                 f"Порт {port} на хосте {host} открыт и принимает соединения."
             )
@@ -120,7 +120,7 @@ class HostOSNetwork:
         try:
             status_code, content = await asyncio.to_thread(_make_request)
             system_logger.info(
-                f"[Agent Action] HTTP {method.upper()} запрос к {url} (Статус: {status_code})"
+                f"HTTP {method.upper()} запрос к {url} (Статус: {status_code})"
             )
 
             return SkillResult.ok(f"Статус: {status_code}\n\nТело ответа:\n{content}")
@@ -146,7 +146,7 @@ class HostOSNetwork:
                 pid_info = f" (PID: {conn.pid})" if conn.pid else ""
                 lines.append(f"- Локальный: {laddr} | Удаленный: {raddr}{pid_info}")
 
-            system_logger.info(f"[Agent Action] Запрошены активные соединения ({state})")
+            system_logger.info(f"Запрошены активные соединения ({state})")
             return SkillResult.ok("\n".join(lines))
 
         except psutil.AccessDenied:
@@ -165,7 +165,7 @@ class HostOSNetwork:
             # socket.gethostbyname_ex возвращает: (hostname, aliaslist, ipaddrlist)
             _, aliases, ips = await asyncio.to_thread(socket.gethostbyname_ex, domain)
 
-            system_logger.info(f"[Agent Action] DNS запрос для {domain}")
+            system_logger.info(f"DNS запрос для {domain}")
 
             report = f"DNS записи для '{domain}':\n- IP адреса: {', '.join(ips)}"
             if aliases:
@@ -199,7 +199,7 @@ class HostOSNetwork:
 
             await asyncio.to_thread(_download)
 
-            system_logger.info(f"[Agent Action] Файл {safe_path.name} скачан из {url}")
+            system_logger.info(f"Файл {safe_path.name} скачан из {url}")
             return SkillResult.ok(f"Файл успешно скачан и сохранен по пути: {safe_path.name}")
 
         except PermissionError as e:

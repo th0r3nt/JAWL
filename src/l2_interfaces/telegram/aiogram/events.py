@@ -58,7 +58,11 @@ class AiogramEvents:
             self._polling_task = None
 
         # Корректно закрываем Dispatcher
-        await self.dp.stop_polling()
+        try:
+            await self.dp.stop_polling()
+        except RuntimeError:
+            pass  # Игнорируем ошибку "Polling is not started", если он не успел запуститься
+
         system_logger.info("[System] AiogramEvents: Поллинг остановлен.")
 
     async def _update_state(self, message: Message):

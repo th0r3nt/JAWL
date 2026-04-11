@@ -105,7 +105,7 @@ class HostOSExecution:
 
             exit_code = process.returncode
             system_logger.info(
-                f"[Agent Action] Выполнен скрипт {safe_path.name} (Код: {exit_code})"
+                f"Выполнен скрипт {safe_path.name} (Код: {exit_code})"
             )
 
             # Формируем красивый вывод
@@ -164,7 +164,7 @@ class HostOSExecution:
             )
 
             exit_code = process.returncode
-            system_logger.info(f"[Agent Action] Выполнена shell-команда (Код: {exit_code})")
+            system_logger.info(f"Выполнена shell-команда (Код: {exit_code})")
 
             report = f"Команда завершилась с кодом {exit_code}."
             if stdout_str:
@@ -197,7 +197,7 @@ class HostOSExecution:
             process.terminate()
             process.wait(timeout=3)  # Даем 3 секунды на корректное завершение
 
-            system_logger.info(f"[Agent Action] Убит процесс {pid} ({process_name})")
+            system_logger.info(f"Убит процесс {pid} ({process_name})")
             return SkillResult.ok(f"Процесс {pid} ({process_name}) успешно завершен.")
 
         except psutil.NoSuchProcess:
