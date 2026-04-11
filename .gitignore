@@ -13,6 +13,7 @@ Thumbs.db
 SOUL.md
 EXAMPLES_OF_STYLE.md
 settings.yaml
+interfaces.yaml
 
 # Базы данных и сессии
 # ...
@@ -26,7 +27,6 @@ logs/
 # Утилиты
 docs/
 scripts/
-tests/
 TODO.md
 copy_all_code.py
 all_code.txt

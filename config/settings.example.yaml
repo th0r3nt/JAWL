@@ -9,17 +9,11 @@ llm:
 system:
 
   vector_db:
-    embedding_model: ...
+    similarity_threshold: 0.43
+    embedding_model: "intfloat/multilingual-e5-small"
     
-  # Интервал между тиками (в секундах)
-  tick_interval_sec: 30
+  # Интервал между циклами (в секундах)
+  loop_interval_sec: 60
 
   context_depth:
-    event_driven:
-      ticks: 20
-
-    proactivity:
-      ticks: 25
-
-    consolidation:
-      ticks: 30
+    ticks: 20 # Tick у LLM = Наблюдение > Мысли > Действие > Результат
