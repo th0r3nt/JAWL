@@ -1,5 +1,7 @@
 import asyncio
 import time
+from datetime import datetime
+from collections import deque
 from typing import Dict, Any, TYPE_CHECKING
 
 from src.utils.logger import system_logger
@@ -7,6 +9,7 @@ from src.utils.event.registry import EventLevel
 
 if TYPE_CHECKING:
     from src.l3_agent.react.loop import ReactLoop
+    from src.utils.settings import EventAccelerationConfig
 
 
 class Heartbeat:
@@ -19,9 +22,15 @@ class Heartbeat:
     - LOW/BACKGROUND: незначительное сокращение времени сна (на 20%).
     """
 
-    def __init__(self, react_loop: "ReactLoop", tick_interval_sec: int):
+    def __init__(
+        self,
+        react_loop: "ReactLoop",
+        tick_interval_sec: int,
+        accel_config: "EventAccelerationConfig",
+    ):
         self.react_loop = react_loop
         self.tick_interval_sec = tick_interval_sec
+        self.accel_config = accel_config
 
         self._wake_event = asyncio.Event()
         self._is_running = False
@@ -29,6 +38,9 @@ class Heartbeat:
         self._next_tick_time = 0.0
         self._wake_reason = "HEARTBEAT"
         self._wake_payload: Dict[str, Any] = {}
+
+        # Кольцевой буфер для событий во время сна
+        self._sleep_memory = deque(maxlen=20)
 
     def wake_up(self, level: EventLevel, event_name: str, payload: Dict[str, Any] = None):
         """
@@ -39,6 +51,13 @@ class Heartbeat:
         now = time.time()
         payload = payload or {}
 
+        # Записываем ВСЕ события в память сна
+        time_str = datetime.now().strftime("%H:%M:%S")
+        payload_str = ", ".join(f"{k}={v}" for k, v in payload.items()) if payload else "empty"
+        self._sleep_memory.append(
+            f"[{time_str}] [{level.name}] {event_name} | Payload: {payload_str}"
+        )
+
         if level >= EventLevel.HIGH:
             # Моментальное пробуждение
             self._wake_reason = event_name
@@ -47,17 +66,18 @@ class Heartbeat:
             self._wake_event.set()
 
         elif level == EventLevel.MEDIUM:
-            # Сокращаем оставшееся время сна наполовину
             remaining = self._next_tick_time - now
             if remaining > 0:
-                self._next_tick_time = now + (remaining / 2)
+                self._next_tick_time = now + (remaining * self.accel_config.medium_multiplier)
                 self._wake_event.set()
 
         elif level <= EventLevel.LOW:
             # Незначительно сокращаем время сна
             remaining = self._next_tick_time - now
             if remaining > 0:
-                self._next_tick_time = now + (remaining * 0.8)
+                self._next_tick_time = now + (
+                    remaining * self.accel_config.low_background_multiplier
+                )
                 self._wake_event.set()
 
     async def start(self):
@@ -91,10 +111,15 @@ class Heartbeat:
 
             # Если время пришло (или было сброшено на 'now' из-за HIGH события)
             if time.time() >= self._next_tick_time:
+                # Извлекаем накопленную память и очищаем буфер
+                missed_events = list(self._sleep_memory)
+                self._sleep_memory.clear()
+
                 try:
                     await self.react_loop.run(
                         event_name=self._wake_reason,
                         payload=self._wake_payload,
+                        missed_events=missed_events,
                     )
                 except Exception as e:
                     system_logger.error(f"[System] Критическая ошибка в ReAct-цикле: {e}")

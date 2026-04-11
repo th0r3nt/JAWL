@@ -74,9 +74,15 @@ class ContextDepthConfig(BaseModel):
     tick_result_max_chars: int = 10000  # Лимит на размер результата тулза в контексте
 
 
+class EventAccelerationConfig(BaseModel):
+    medium_multiplier: float = 0.5
+    low_background_multiplier: float = 0.8
+
+
 class SystemConfig(BaseModel):
     vector_db: VectorDBConfig
     tick_interval_sec: int = 10
+    event_acceleration: EventAccelerationConfig = EventAccelerationConfig()
     context_depth: ContextDepthConfig
 
 

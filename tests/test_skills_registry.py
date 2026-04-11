@@ -97,7 +97,7 @@ async def test_execute_skill_success(mock_plain_func):
         {"tool_name": "mock.class_func", "parameters": {"text": "World"}},
     ]
 
-    report = await execute_skill(thoughts="Проверка", actions=actions)
+    report = await execute_skill(actions=actions)
 
     assert "Action [mock.plain_func]: OK - Plain: Hello" in report
     assert "Action [mock.class_func]: OK - Agent: World" in report
@@ -105,15 +105,10 @@ async def test_execute_skill_success(mock_plain_func):
 
 @pytest.mark.asyncio
 async def test_execute_skill_ignores_extra_kwargs(mock_plain_func):
-    """
-    Тест: если LLM сгаллюцинирует и передаст лишние аргументы,
-    система должна их отфильтровать, а не крашить функцию.
-    """
     actions = [
         {"tool_name": "mock.plain_func", "parameters": {"text": "Valid", "hallucination": 123}}
     ]
 
-    report = await execute_skill(thoughts="Лишние данные", actions=actions)
+    report = await execute_skill(actions=actions)
 
-    # Функция должна успешно отработать, проигнорировав "hallucination"
     assert "Action [mock.plain_func]: OK - Plain: Valid" in report

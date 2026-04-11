@@ -81,9 +81,9 @@ async def test_react_empty_actions_exit(mock_execute_skill, mock_dependencies):
     mock_session.chat.completions.create.return_value = create_mock_openai_response(
         '{"thoughts": "Мне нечего делать.", "actions": []}'
     )
-    deps["llm_client"].get_session = AsyncMock(return_value=mock_session)
+    deps["llm_client"].get_session = MagicMock(return_value=mock_session)
 
-    await loop.run("HEARTBEAT", {})
+    await loop.run("HEARTBEAT", {}, missed_events=[]) 
 
     # Проверки
     assert deps["agent_state"].state == AgentStatus.IDLE
@@ -111,9 +111,9 @@ async def test_react_invalid_json_retry(mock_execute_skill, mock_dependencies):
         create_mock_openai_response("{broken json"),
         create_mock_openai_response('{"thoughts": "Починил.", "actions": []}'),
     ]
-    deps["llm_client"].get_session = AsyncMock(return_value=mock_session)
+    deps["llm_client"].get_session = MagicMock(return_value=mock_session)
 
-    await loop.run("TEST", {})
+    await loop.run("TEST", {}, missed_events=[])
 
     # LLM была вызвана 2 раза
     assert mock_session.chat.completions.create.call_count == 2
@@ -136,10 +136,10 @@ async def test_react_max_steps_limit(mock_execute_skill, mock_dependencies):
     mock_session.chat.completions.create.return_value = create_mock_openai_response(
         '{"thoughts": "Делаю шаг", "actions": [{"tool_name": "test", "parameters": {}}]}'
     )
-    deps["llm_client"].get_session = AsyncMock(return_value=mock_session)
+    deps["llm_client"].get_session = MagicMock(return_value=mock_session)
     mock_execute_skill.return_value = "Result"
 
-    await loop.run("TEST", {})
+    await loop.run("TEST", {}, missed_events=[])
 
     # LLM должна быть вызвана ровно max_react_steps раз (2 раза)
     assert mock_session.chat.completions.create.call_count == 2
@@ -169,9 +169,9 @@ async def test_react_rate_limit(mock_dependencies):
     )
 
     # Ротатор выдает сначала session1, затем session2
-    deps["llm_client"].get_session = AsyncMock(side_effect=[mock_session1, mock_session2])
+    deps["llm_client"].get_session = MagicMock(side_effect=[mock_session1, mock_session2])
 
-    await loop.run("TEST", {})
+    await loop.run("TEST", {}, missed_events=[])
 
     # Проверяем, что первый ключ ушел в кулдаун
     deps["llm_client"].rotator.cooldown_key.assert_called_once_with("key_1", 60)
@@ -195,9 +195,9 @@ async def test_react_auth_error_ban_key(mock_dependencies):
         auth_err,
         create_mock_openai_response('{"thoughts": "ok", "actions": []}'),
     ]
-    deps["llm_client"].get_session = AsyncMock(return_value=mock_session)
+    deps["llm_client"].get_session = MagicMock(return_value=mock_session)
 
-    await loop.run("TEST", {})
+    await loop.run("TEST", {}, missed_events=[])
 
     # Проверяем, что ключ был забанен
     deps["llm_client"].rotator.ban_key.assert_called_once_with("dead_key")
@@ -217,9 +217,9 @@ async def test_react_no_tool_calls(mock_dependencies):
     mock_session.chat.completions.create.return_value = create_mock_openai_response(
         "Я просто хочу поболтать.", finish_reason="stop"
     )
-    deps["llm_client"].get_session = AsyncMock(return_value=mock_session)
+    deps["llm_client"].get_session = MagicMock(return_value=mock_session)
 
-    await loop.run("TEST", {})
+    await loop.run("TEST", {}, missed_events=[])
 
     # Стейт должен вернуться в IDLE без ошибок и без вызова функций
     assert deps["agent_state"].state == AgentStatus.IDLE

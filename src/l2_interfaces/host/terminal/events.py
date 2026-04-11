@@ -65,7 +65,7 @@ class HostTerminalEvents:
 
                 # Публикуем событие, чтобы разбудить агента
                 await self.bus.publish(
-                    Events.TERMINAL_MESSAGE_INCOMING,
+                    Events.HOST_TERMINAL_MESSAGE_INCOMING,
                     message=message,
                     sender_name="Admin",
                 )

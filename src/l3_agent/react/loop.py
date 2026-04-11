@@ -62,7 +62,7 @@ class ReactLoop:
         except Exception as e:
             system_logger.error(f"[System] Не удалось сохранить промпт: {e}")
 
-    async def run(self, event_name: str, payload: Dict[str, Any]):
+    async def run(self, event_name: str, payload: Dict[str, Any], missed_events: list[str]):
 
         self.agent_state.reset_step()
         system_logger.info(
@@ -71,7 +71,7 @@ class ReactLoop:
 
         # Сборка промпта и контекста
         prompt = self.prompt_builder.build()
-        context = await self.context_builder.build(event_name, payload)
+        context = await self.context_builder.build(event_name, payload, missed_events)
 
         self.tracker.add_input_record(prompt=prompt, context=context)
 
@@ -163,12 +163,14 @@ class ReactLoop:
             thoughts = args.get("thoughts", "")
             actions = args.get("actions", [])
 
+            if thoughts:
+                system_logger.info(f"[Thoughts]: {thoughts}")
+
             # Выход из цикла по запросу LLM
             if not actions:
                 system_logger.info(
                     "[ReAct] Агент передал пустой массив действий. ReAct-цикл завершен."
                 )
-                # Сохраняем финальную мысль в БД, даже если действий не было
                 await self.sql_ticks.save_tick(
                     thoughts=thoughts, actions=[], results={"status": "completed"}
                 )
@@ -177,7 +179,7 @@ class ReactLoop:
             # Исполнение скиллов
             self.agent_state.update_state(AgentStatus.ACTING)
 
-            results_str = await execute_skill(thoughts=thoughts, actions=actions)
+            results_str = await execute_skill(actions=actions)
 
             # Сохранение тика в SQL для следующего контекста
             await self.sql_ticks.save_tick(

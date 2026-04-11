@@ -90,11 +90,36 @@ class Events:
     )
 
     # ============================================
+    # Host OS (Файловая система)
+    # ============================================
+
+    HOST_OS_FILE_CREATED = EventConfig(
+        name="OS_FILE_CREATED",
+        description="В песочнице (sandbox) появился новый файл.",
+        level=EventLevel.MEDIUM,
+        requires_attention=True,
+    )
+
+    HOST_OS_FILE_MODIFIED = EventConfig(
+        name="OS_FILE_MODIFIED",
+        description="Файл в песочнице был изменен.",
+        level=EventLevel.LOW,
+        requires_attention=False,
+    )
+
+    HOST_OS_FILE_DELETED = EventConfig(
+        name="HOST_OS_FILE_DELETED",
+        description="Файл в песочнице был удален.",
+        level=EventLevel.LOW, # Фоновое уведомление
+        requires_attention=False,
+    )
+
+    # ============================================
     # Host Terminal
     # ============================================
     
-    TERMINAL_MESSAGE_INCOMING = EventConfig(
-        name="TERMINAL_MESSAGE_INCOMING",
+    HOST_TERMINAL_MESSAGE_INCOMING = EventConfig(
+        name="HOST_TERMINAL_MESSAGE_INCOMING",
         description="Входящее сообщение от админа из локального терминала.",
         level=EventLevel.HIGH,
         requires_attention=True,

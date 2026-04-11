@@ -1,20 +1,73 @@
 import asyncio
 import time
 import socket
+from pathlib import Path
 from datetime import datetime
 import psutil
 
+from watchdog.observers import Observer
+from watchdog.events import FileSystemEventHandler
+
 from src.utils.event.bus import EventBus
+from src.utils.event.registry import Events
 from src.utils.logger import system_logger
 
 from src.l0_state.interfaces.state import HostOSState
 from src.l2_interfaces.host.os.client import HostOSClient
 
 
+class _SandboxWatchdogHandler(FileSystemEventHandler):
+    """
+    Обработчик событий watchdog.
+    Так как watchdog работает в отдельном синхронном потоке,
+    мы пробрасываем события в асинхронную очередь через run_coroutine_threadsafe.
+    """
+
+    def __init__(self, os_events_instance: "HostOSEvents", loop: asyncio.AbstractEventLoop):
+        self.os_events = os_events_instance
+        self.loop = loop
+
+    def _trigger_event(self, event, sys_event_config):
+        if event.is_directory:
+            return
+
+        # Игнорируем скрытые и временные файлы (например .DS_Store, .tmp)
+        filename = Path(event.src_path).name
+        if filename.startswith(".") or filename.endswith("~"):
+            return
+
+        # Безопасный вызов асинхронного метода из синхронного потока
+        asyncio.run_coroutine_threadsafe(
+            self.os_events.handle_file_system_event(sys_event_config, event.src_path),
+            self.loop,
+        )
+
+    def on_created(self, event):
+        self._trigger_event(event, Events.HOST_OS_FILE_CREATED)
+
+    def on_modified(self, event):
+        self._trigger_event(event, Events.HOST_OS_FILE_MODIFIED)
+
+    def on_deleted(self, event):
+        self._trigger_event(event, Events.HOST_OS_FILE_DELETED)
+
+    def on_moved(self, event):
+        # Если файл переместили/переименовали, считаем это "созданием" по новому пути
+        if not event.is_directory:
+            filename = Path(event.dest_path).name
+            if not (filename.startswith(".") or filename.endswith("~")):
+                asyncio.run_coroutine_threadsafe(
+                    self.os_events.handle_file_system_event(
+                        Events.HOST_OS_FILE_CREATED, event.dest_path
+                    ),
+                    self.loop,
+                )
+
+
 class HostOSEvents:
     """
     Фоновый мониторинг состояния ПК.
-    Обновляет приборную панель агента (HostOSState) каждые 30 секунд.
+    Обновляет приборную панель агента (HostOSState).
     """
 
     def __init__(self, host_os_client: HostOSClient, state: HostOSState, event_bus: EventBus):
@@ -25,52 +78,75 @@ class HostOSEvents:
         self._is_running = False
         self._monitoring_task: asyncio.Task | None = None
 
-        # Храним предыдущий список файлов для поиска изменений
-        self._last_sandbox_files = set()
+        # Инструменты Watchdog
+        self._observer: Observer | None = None # type: ignore
 
-        # Инициализируем CPU счетчик
+        self._last_sandbox_files = set()
         psutil.cpu_percent(interval=None)
 
     async def start(self):
-        """Запускает фоновый цикл мониторинга."""
-
         if self._is_running:
             return
 
         self._is_running = True
+
+        # 1. Запуск регулярного поллинга (Телеметрия, Сеть, Время)
         self._monitoring_task = asyncio.create_task(self._loop())
 
-        system_logger.info("[System] Host OS мониторинг запущен.")
+        # 2. Запуск Watchdog (Моментальная реакция на файлы)
+        self._observer = Observer()
+        handler = _SandboxWatchdogHandler(self, asyncio.get_running_loop())
+        # Натравливаем наблюдателя на песочницу
+        self._observer.schedule(handler, str(self.host_os.sandbox_dir), recursive=True)
+        self._observer.start()
+
+        system_logger.info("[System] Host OS мониторинг и файловый радар запущены.")
 
     async def stop(self):
-        """Останавливает цикл."""
-
         self._is_running = False
 
         if self._monitoring_task:
             self._monitoring_task.cancel()
             self._monitoring_task = None
 
+        # Остановка Watchdog
+        if self._observer:
+            self._observer.stop()
+            # Для корректного закрытия потока (to_thread чтобы не блочить Event Loop)
+            await asyncio.to_thread(self._observer.join)
+            self._observer = None
+
         system_logger.info("[System] Host OS мониторинг остановлен.")
         self.state.is_online = False
 
-    async def _loop(self):
-        """Бесконечный цикл поллинга."""
+    async def handle_file_system_event(self, sys_event_config, filepath: str):
+        """Вызывается мгновенно при любом изменении файла (создание/удаление/изменение)."""
+        # Сразу перестраиваем ASCII-дерево в стейте, чтобы агент увидел актуальную картину
+        self._check_sandbox()
 
+        try:
+            rel_path = str(Path(filepath).relative_to(self.host_os.sandbox_dir))
+        except ValueError:
+            rel_path = str(filepath)  # Фолбэк, если путь почему-то вне песочницы
+
+        # Публикуем событие
+        await self.bus.publish(sys_event_config, filepath=rel_path)
+
+    async def _loop(self):
+        """Бесконечный цикл поллинга для телеметрии (раз в 20-30 сек)."""
         while self._is_running:
             try:
                 self._update_datetime_and_uptime()
                 self._update_telemetry()
                 await self._update_network()
+                # Мы всё равно периодически чекаем песочницу на случай, если watchdog что-то пропустил
                 self._check_sandbox()
 
             except asyncio.CancelledError:
                 break
-
             except Exception as e:
                 system_logger.error(f"[System] Ошибка в цикле мониторинга Host OS: {e}")
 
-            # Спим перед следующим тиком
             await asyncio.sleep(self.host_os.config.monitoring_interval_sec)
 
     def _update_datetime_and_uptime(self):

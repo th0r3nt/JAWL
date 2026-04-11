@@ -93,17 +93,17 @@ def get_skills_library() -> str:
     return "\n".join(_SKILL_DOCS)
 
 
-async def execute_skill(thoughts: str, actions: list[dict]) -> str:
-    system_logger.info(f"[Thoughts]: {thoughts}")
-    # TODO: Логгировать действия [Agent Action]
-
+async def execute_skill(actions: list[dict]) -> str:
     if not actions:
         return "Цикл завершен: действий не передано."
 
     tasks = []
     for act in actions:
-        name = act.get("tool_name")
+        name = act.get("tool_name", "unknown_tool")
         params = act.get("parameters", {})
+
+        system_logger.info(f"[Agent Action] Вызов: {name}({params})")
+
         tasks.append(_run_single_skill(name, params))
 
     results = await asyncio.gather(*tasks)
@@ -111,7 +111,11 @@ async def execute_skill(thoughts: str, actions: list[dict]) -> str:
     report = []
     for i, res in enumerate(results):
         status = "OK" if res.is_success else "ERROR"
-        report.append(f"Action [{actions[i].get('tool_name')}]: {status} - {res.message}")
+        tool_name = actions[i].get("tool_name")
+        report.append(f"Action [{tool_name}]: {status} - {res.message}")
+
+        # Можно опционально логировать и результат
+        system_logger.info(f"[Agent Action Result] {tool_name}: {status}")
 
     return "\n".join(report)
 

@@ -1,5 +1,5 @@
 import pytest
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import MagicMock
 
 from src.l3_agent.llm.client import LLMClient
 from src.l3_agent.llm.api_keys.rotator import APIKeyRotator
@@ -8,7 +8,7 @@ from src.l3_agent.llm.api_keys.rotator import APIKeyRotator
 @pytest.fixture
 def mock_rotator():
     rotator = MagicMock(spec=APIKeyRotator)
-    rotator.get_next_key = AsyncMock(return_value="fake_key_123")
+    rotator.get_next_key = MagicMock(return_value="fake_key_123")
     return rotator
 
 
@@ -31,9 +31,9 @@ async def test_llm_client_get_session(mock_rotator):
     """Тест: получение валидной сессии с ключом от ротатора."""
     client = LLMClient(api_url="localhost:8000", api_keys_rotator=mock_rotator)
 
-    session = await client.get_session()
+    session = client.get_session()
 
-    mock_rotator.get_next_key.assert_awaited_once()
+    mock_rotator.get_next_key.assert_called_once()
     assert session.api_key == "fake_key_123"
     assert str(session.base_url) == "http://localhost:8000"
 
@@ -41,8 +41,8 @@ async def test_llm_client_get_session(mock_rotator):
 @pytest.mark.asyncio
 async def test_llm_client_no_key_raises_error(mock_rotator):
     """Тест: если ротатор не выдал ключ, должна быть ошибка."""
-    mock_rotator.get_next_key = AsyncMock(return_value=None)
+    mock_rotator.get_next_key = MagicMock(return_value=None)
     client = LLMClient(api_url="", api_keys_rotator=mock_rotator)
 
     with pytest.raises(RuntimeError, match="Нет доступных API ключей"):
-        await client.get_session()
+        client.get_session()

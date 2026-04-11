@@ -84,8 +84,9 @@ def create_mock_message(chat_id, chat_type, text, from_user_name="John"):
 
 def test_client_missing_token():
     """Тест: клиент не должен инициализироваться без токена."""
+    state = AiogramState()
     with pytest.raises(ValueError, match="необходим bot_token"):
-        AiogramClient(bot_token="")
+        AiogramClient(bot_token="", state=state)
 
 
 # ===================================================================

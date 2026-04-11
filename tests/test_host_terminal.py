@@ -51,8 +51,8 @@ def mock_writer():
 
 
 @pytest.fixture
-def terminal_client(config):
-    return HostTerminalClient(config=config)
+def terminal_client(config, state):
+    return HostTerminalClient(config=config, state=state)
 
 
 # ===================================================================
@@ -142,7 +142,7 @@ async def test_events_loop_publishes_event(terminal_client, state, mock_bus):
 
     # Проверяем, что событие ушло в шину
     mock_bus.publish.assert_called_once_with(
-        Events.TERMINAL_MESSAGE_INCOMING,
+        Events.HOST_TERMINAL_MESSAGE_INCOMING,
         message="Ping",
         sender_name="Admin",
     )

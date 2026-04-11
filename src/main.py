@@ -210,7 +210,9 @@ class System:
                     api_hash=telethon_api_hash,
                     session_path=session_path,
                 )
-                tel_events = TelethonEvents(tg_client=tel_client, state=self.telethon_state, event_bus=self.event_bus)
+                tel_events = TelethonEvents(
+                    tg_client=tel_client, state=self.telethon_state, event_bus=self.event_bus
+                )
 
                 register_instance(TelethonAccount(tel_client))
                 register_instance(TelethonChats(tel_client))
@@ -229,8 +231,14 @@ class System:
                     "[System] AIOGRAM_BOT_TOKEN не найден в .env. Aiogram отключен."
                 )
             else:
-                aio_client = AiogramClient(bot_token=aiogram_bot_token, state=self.aiogram_state)
-                aio_events = AiogramEvents(aiogram_client=aio_client, state=self.aiogram_state, event_bus=self.event_bus)
+                aio_client = AiogramClient(
+                    bot_token=aiogram_bot_token, state=self.aiogram_state
+                )
+                aio_events = AiogramEvents(
+                    aiogram_client=aio_client,
+                    state=self.aiogram_state,
+                    event_bus=self.event_bus,
+                )
 
                 register_instance(AiogramChats(aio_client, self.aiogram_state))
                 register_instance(AiogramMessages(aio_client))
@@ -277,6 +285,7 @@ class System:
         self.heartbeat = Heartbeat(
             react_loop=react_loop,
             tick_interval_sec=self.settings.system.tick_interval_sec,
+            accel_config=self.settings.system.event_acceleration,
         )
 
         # Связываем шину событий с пульсом агента (мост между L2 и L3)

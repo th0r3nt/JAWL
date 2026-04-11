@@ -56,7 +56,9 @@ class ContextBuilder:
         self.depth_config = depth_config
         self.interfaces_config = interfaces_config
 
-    async def build(self, event_name: str, payload: Dict[str, Any]) -> str:
+    async def build(
+        self, event_name: str, payload: Dict[str, Any], missed_events: list[str]
+    ) -> str:
         """Собирает готовый контекст для агента."""
 
         # Собираем данные из БД параллельно для ускорения работы
@@ -70,7 +72,7 @@ class ContextBuilder:
 
         skills = self._build_skills()
         state = self._build_state()
-        wake_up_reason = self._build_wake_up_reason(event_name, payload)
+        wake_up_reason = self._build_wake_up_reason(event_name, payload, missed_events)
 
         return f"""
 ## PERSONALITY TRAITS
@@ -214,13 +216,21 @@ class ContextBuilder:
 
         return "\n\n".join(blocks)
 
-    def _build_wake_up_reason(self, event_name: str, payload: Dict[str, Any]) -> str:
-        """Собирает причины пробуждения агента."""
+    def _build_wake_up_reason(
+        self, event_name: str, payload: Dict[str, Any], missed_events: list[str]
+    ) -> str:
+        """Собирает причины пробуждения агента и лог событий во время сна."""
 
-        # Разбираем полезную нагрузку (кто написал, какой текст и т.д.)
         payload_lines = [f"{k}: {v}" for k, v in payload.items()]
         payload_str = (
             "\n".join(payload_lines) if payload_lines else "Нет дополнительных данных"
         )
 
-        return f"EVENT - {event_name}\n{payload_str}"
+        main_trigger = f"{event_name}\n{payload_str}"
+
+        # Если были события, добавляем их списком
+        if missed_events:
+            events_log = "\n".join(missed_events)
+            return f"{main_trigger}\n\nEvent Log:\n{events_log}"
+
+        return main_trigger
