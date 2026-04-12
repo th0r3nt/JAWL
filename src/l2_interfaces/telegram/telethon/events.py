@@ -1,4 +1,4 @@
-from telethon import events
+from telethon import events, utils
 from telethon.tl.types import UpdateMessageReactions
 
 from src.utils.logger import system_logger
@@ -78,7 +78,9 @@ class TelethonEvents:
         await self._update_state()
 
         sender = await event.get_sender()
-        sender_name = getattr(sender, "first_name", "Unknown") if sender else "Unknown"
+        # utils.get_display_name сам поймет: это User (имя+фамилия) или Channel (title)
+        sender_name = utils.get_display_name(sender) if sender else "Unknown"
+        sender_name = sender_name or "Unknown"  # Фолбэк, если вернется пустая строка
 
         await self.bus.publish(
             Events.TELETHON_MESSAGE_INCOMING,
@@ -89,18 +91,17 @@ class TelethonEvents:
 
     async def _on_group_message(self, event: events.NewMessage.Event):
         """Триггерится при сообщениях в группах."""
-
+        
         await self._update_state()
 
-        # Если нас тегнули (@username) или ответили на наше сообщение - это повод проснуться
         if event.mentioned:
             event_type = Events.TELETHON_GROUP_MENTION
         else:
-            # Иначе это просто фоновый шум, агент спать не перестанет
             event_type = Events.TELETHON_GROUP_MESSAGE
 
         sender = await event.get_sender()
-        sender_name = getattr(sender, "first_name", "Unknown") if sender else "Unknown"
+        sender_name = utils.get_display_name(sender) if sender else "Unknown"
+        sender_name = sender_name or "Unknown"
 
         await self.bus.publish(
             event_type,

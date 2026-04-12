@@ -47,7 +47,6 @@ class TelethonPolls:
 
         except Exception as e:
             msg = f"Ошибка при создании опроса: {e}"
-            system_logger.error(f"[Agent Action Result] {msg}")
             return SkillResult.fail(msg)
 
     @skill()
@@ -127,7 +126,6 @@ class TelethonPolls:
 
         except Exception as e:
             msg = f"Ошибка при голосовании: {e}"
-            system_logger.error(f"[Agent Action Result] {msg}")
             return SkillResult.fail(msg)
 
     @skill()

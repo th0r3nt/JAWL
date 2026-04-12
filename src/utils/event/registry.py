@@ -115,17 +115,6 @@ class Events:
     )
 
     # ============================================
-    # Host Terminal
-    # ============================================
-    
-    HOST_TERMINAL_MESSAGE_INCOMING = EventConfig(
-        name="HOST_TERMINAL_MESSAGE_INCOMING",
-        description="Входящее сообщение от админа из локального терминала.",
-        level=EventLevel.HIGH,
-        requires_attention=True,
-    )
-
-    # ============================================
     # Общие системные события
     # ============================================
 

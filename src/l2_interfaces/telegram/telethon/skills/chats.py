@@ -1,4 +1,8 @@
+import re
 from telethon import utils
+from telethon.tl.functions.contacts import SearchRequest
+from telethon.tl.functions.channels import JoinChannelRequest, LeaveChannelRequest
+from telethon.tl.functions.messages import ImportChatInviteRequest
 
 from src.l2_interfaces.telegram.telethon.client import TelethonClient
 from src.l3_agent.skills.registry import SkillResult, skill
@@ -40,7 +44,6 @@ class TelethonChats:
 
         except Exception as e:
             msg = f"Ошибка при получении списка чатов: {e}"
-            system_logger.error(f"[Agent Action Result] {msg}")
             return SkillResult.fail(msg)
 
     @skill()
@@ -140,10 +143,9 @@ class TelethonChats:
 
         except ValueError:
             return SkillResult.fail(f"Ошибка: Некорректный ID чата ({chat_id}).")
-        
+
         except Exception as e:
             msg = f"Ошибка при чтении чата {chat_id}: {e}"
-            system_logger.error(f"[Agent Action Result] {msg}")
             return SkillResult.fail(msg)
 
     @skill()
@@ -160,3 +162,86 @@ class TelethonChats:
 
         except Exception as e:
             return SkillResult.fail(f"Ошибка при пометке чата {chat_id} как прочитанного: {e}")
+
+    @skill()
+    async def search_public_chats(self, query: str, limit: int = 5) -> SkillResult:
+        """Ищет публичные группы и каналы в глобальном поиске Telegram по запросу."""
+        try:
+            client = self.tg_client.client()
+
+            # Выполняем запрос к глобальному поиску
+            result = await client(SearchRequest(q=query, limit=limit))
+
+            chats = []
+            # result.chats содержит найденные публичные сущности (каналы/группы)
+            for chat in result.chats:
+                chat_type = "Channel" if getattr(chat, "broadcast", False) else "Group"
+                username = f"@{chat.username}" if getattr(chat, "username", None) else "Нет"
+                chats.append(
+                    f"- {chat_type} | ID: `{chat.id}` | Название: {chat.title} | Юзернейм: {username}"
+                )
+
+            if not chats:
+                return SkillResult.ok(f"По глобальному запросу '{query}' ничего не найдено.")
+
+            system_logger.info(f"Глобальный поиск чатов по запросу '{query}'")
+            return SkillResult.ok("\n".join(chats))
+
+        except Exception as e:
+            return SkillResult.fail(f"Ошибка при поиске чатов: {e}")
+
+    @skill()
+    async def join_chat(self, link_or_username: str) -> SkillResult:
+        """
+        Вступает в канал или группу.
+        Принимает публичный юзернейм или закрытую пригласительную ссылку.
+        """
+        try:
+            client = self.tg_client.client()
+            target = link_or_username.strip()
+
+            # Проверяем, является ли это приватной ссылкой-приглашением
+            if "t.me/+" in target or "t.me/joinchat/" in target or target.startswith("+"):
+                # Извлекаем уникальный хэш ссылки
+                hash_match = re.search(r"(?:joinchat/|\+)([\w-]+)", target)
+                if not hash_match:
+                    return SkillResult.fail(
+                        "Ошибка: Не удалось извлечь хэш из пригласительной ссылки."
+                    )
+
+                invite_hash = hash_match.group(1)
+                await client(ImportChatInviteRequest(invite_hash))
+
+            else:
+                # Это публичный канал или группа
+                await client(JoinChannelRequest(target))
+
+            system_logger.info(f"Агент вступил в чат: {target}")
+            return SkillResult.ok(f"Успешно вступили в чат: {target}")
+
+        except Exception as e:
+            msg = str(e)
+            if "UserAlreadyParticipant" in msg or "USER_ALREADY_PARTICIPANT" in msg:
+                return SkillResult.ok(f"Вы уже состоите в этом чате ({target}).")
+            return SkillResult.fail(f"Ошибка при вступлении в чат: {e}")
+
+    @skill()
+    async def leave_chat(self, chat_id: int) -> SkillResult:
+        """Покидает канал или группу по её числовому ID."""
+        try:
+            client = self.tg_client.client()
+
+            # Получаем сущность чата (чтобы Telethon сформировал правильный запрос к API)
+            entity = await client.get_input_entity(int(chat_id))
+
+            await client(LeaveChannelRequest(entity))
+
+            system_logger.info(f"Агент покинул чат: {chat_id}")
+            return SkillResult.ok(f"Успешно покинули чат {chat_id}.")
+
+        except ValueError:
+            return SkillResult.fail(
+                f"Ошибка: Некорректный ID чата ({chat_id}). Убедитесь, что передаете число."
+            )
+        except Exception as e:
+            return SkillResult.fail(f"Ошибка при выходе из чата: {e}")

@@ -13,7 +13,7 @@ class TelethonClient:
 
         self.api_id = api_id
         self.api_hash = api_hash
-        self.session_path = session_path # В идеале это src/utils/local/data/agent_telethon.session
+        self.session_path = session_path # В идеале это src/utils/local/data/telethon/agent_telethon.session
         self._client: TelegramClient | None = None
 
     def client(self) -> TelegramClient:
@@ -47,7 +47,7 @@ class TelethonClient:
 
     async def stop(self) -> None:
         """Корректно закрывает соединение."""
-        
+
         if self._client and self._client.is_connected():
             await self._client.disconnect()
             system_logger.info("[System] Telethon клиент отключен.")

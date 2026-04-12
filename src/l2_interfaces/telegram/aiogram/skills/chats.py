@@ -33,7 +33,6 @@ class AiogramChats:
 
         except Exception as e:
             msg = f"Ошибка при получении списка чатов (Aiogram): {e}"
-            system_logger.error(f"[Agent Action Result] {msg}")
             return SkillResult.fail(msg)
 
     @skill()
@@ -68,7 +67,6 @@ class AiogramChats:
             return SkillResult.fail(f"Ошибка: Некорректный ID чата ({chat_id}).")
         except Exception as e:
             msg = f"Ошибка при получении информации о чате {chat_id} (Aiogram): {e}"
-            system_logger.error(f"[Agent Action Result] {msg}")
 
             if "chat not found" in str(e).lower():
                 return SkillResult.fail(

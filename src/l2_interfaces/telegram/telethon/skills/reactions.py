@@ -1,3 +1,6 @@
+from telethon.tl.functions.messages import SendReactionRequest
+from telethon.tl.types import ReactionEmoji
+
 from src.l2_interfaces.telegram.telethon.client import TelethonClient
 from src.l3_agent.skills.registry import SkillResult, skill
 from src.utils.logger import system_logger
@@ -20,9 +23,13 @@ class TelethonReactions:
         try:
             client = self.tg_client.client()
 
-            # Telethon сам разберется с преобразованием строки в нужный тип ReactionEmoji
-            await client.send_reaction(
-                entity=int(chat_id), message=int(message_id), reaction=reaction
+            # Используем сырой API-вызов Telegram
+            await client(
+                SendReactionRequest(
+                    peer=int(chat_id),
+                    msg_id=int(message_id),
+                    reaction=[ReactionEmoji(emoticon=reaction)],
+                )
             )
 
             system_logger.info(
@@ -32,14 +39,10 @@ class TelethonReactions:
 
         except Exception as e:
             msg = f"Ошибка при установке реакции: {e}"
-            system_logger.error(f"[Agent Action Result] {msg}")
-
-            # Подсказка для агента, если в чате запрещены конкретные эмодзи
             if "ReactionInvalidError" in str(e) or "REACTION_INVALID" in str(e):
                 return SkillResult.fail(
                     "Ошибка: Данный эмодзи не поддерживается или запрещен настройками этого чата."
                 )
-
             return SkillResult.fail(msg)
 
     @skill()
@@ -50,14 +53,12 @@ class TelethonReactions:
         try:
             client = self.tg_client.client()
 
-            # Передача None снимает текущую реакцию пользователя
-            await client.send_reaction(
-                entity=int(chat_id), message=int(message_id), reaction=None
+            # Пустой список снимает все установленные пользователем реакции
+            await client(
+                SendReactionRequest(peer=int(chat_id), msg_id=int(message_id), reaction=[])
             )
 
-            system_logger.info(
-                f"Реакция снята с сообщения {message_id} в чате {chat_id}"
-            )
+            system_logger.info(f"Реакция снята с сообщения {message_id} в чате {chat_id}")
             return SkillResult.ok("Реакция успешно удалена.")
 
         except Exception as e:

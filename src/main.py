@@ -46,11 +46,6 @@ from src.l2_interfaces.host.os.skills.files import HostOSFiles
 from src.l2_interfaces.host.os.skills.network import HostOSNetwork
 from src.l2_interfaces.host.os.skills.system import HostOSSystem
 
-# Host Terminal
-from src.l2_interfaces.host.terminal.client import HostTerminalClient
-from src.l2_interfaces.host.terminal.events import HostTerminalEvents
-from src.l2_interfaces.host.terminal.skills.messages import HostTerminalMessages
-
 # Telethon
 from src.l2_interfaces.telegram.telethon.client import TelethonClient
 from src.l2_interfaces.telegram.telethon.events import TelethonEvents
@@ -174,26 +169,6 @@ class System:
             self._lifecycle_components.append(os_events)
             system_logger.info("[System] Интерфейс Host OS загружен.")
 
-        # HOST TERMINAL
-        if self.interfaces_config.host.terminal.enabled:
-            term_client = HostTerminalClient(
-                config=self.interfaces_config.host.terminal, state=self.terminal_state
-            )
-            term_events = HostTerminalEvents(
-                client=term_client, state=self.terminal_state, event_bus=self.event_bus
-            )
-
-            register_instance(
-                HostTerminalMessages(
-                    client=term_client,
-                    state=self.terminal_state,
-                    agent_name=self.settings.identity.agent_name,
-                )
-            )
-
-            self._lifecycle_components.extend([term_client, term_events])
-            system_logger.info("[System] Интерфейс Host Terminal загружен.")
-
         # TELEGRAM: TELETHON
         if self.interfaces_config.telegram.telethon.enabled:
 
@@ -203,7 +178,9 @@ class System:
                 )
             else:
                 session_path = str(
-                    self.local_data_dir / self.interfaces_config.telegram.telethon.session_name
+                    self.local_data_dir
+                    / "telethon"
+                    / self.interfaces_config.telegram.telethon.session_name
                 )
                 tel_client = TelethonClient(
                     state=self.telethon_state,
@@ -267,6 +244,9 @@ class System:
             sql_ticks=self.sql.ticks,
             sql_tasks=self.sql.tasks,
             sql_traits=self.sql.personality_traits,
+            vector_knowledge=self.vector.knowledge,
+            vector_thoughts=self.vector.thoughts,
+            vector_db_config=self.settings.system.vector_db,
             depth_config=self.settings.system.context_depth,
             interfaces_config=self.interfaces_config,
         )

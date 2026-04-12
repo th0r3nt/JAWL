@@ -118,21 +118,25 @@ async def execute_skill(actions: list[dict]) -> str:
         tool_name = actions[i].get("tool_name")
         report.append(f"Action [{tool_name}]: {status} - {res.message}")
 
-        # Можно опционально логировать и результат
-        system_logger.info(f"[Agent Action Result] {tool_name}: {status}")
-
     return "\n".join(report)
 
 
 async def _run_single_skill(name: str, params: dict) -> SkillResult:
     func = _REGISTRY.get(name)
     if not func:
+        system_logger.info(f"[Agent Action Result] Скилл '{name}' не найден.")
         return SkillResult.fail(f"Скилл '{name}' не найден.")
     try:
         # Убираем возможный мусор, который LLM может попытаться скормить вместо параметров
         valid_params = {
             k: v for k, v in params.items() if k in inspect.signature(func).parameters
         }
-        return await func(**valid_params)
+
+        result = await func(**valid_params)
+        system_logger.info(f"[Agent Action Result] {name}: {result}")
+        
+        return result
+    
     except Exception as e:
+        system_logger.info(f"[Agent Action Result] Ошибка в скилле {name}: {str(e)}")
         return SkillResult.fail(f"Ошибка: {str(e)}")

@@ -35,7 +35,6 @@ class AiogramMessages:
             return SkillResult.fail("Ошибка: ID чата должен быть числом.")
         except Exception as e:
             msg = f"Ошибка при отправке сообщения (Aiogram): {e}"
-            system_logger.error(f"[Agent Action Result] {msg}")
 
             if "bot was blocked" in str(e).lower():
                 return SkillResult.fail("Пользователь заблокировал бота. Отправка невозможна.")

@@ -5,7 +5,6 @@ from telethon.tl.functions.photos import UploadProfilePhotoRequest
 from src.utils.logger import system_logger
 
 from src.l2_interfaces.telegram.telethon.client import TelethonClient
-
 from src.l3_agent.skills.registry import SkillResult, skill
 
 
@@ -21,10 +20,10 @@ class TelethonAccount:
     async def change_username(self, name: str, surname: str = "") -> SkillResult:
         """Меняет имя и (опционально) фамилию профиля."""
         try:
+            client = self.tg_client.client()
+
             # В Telegram "name" - это first_name, а "surname" - last_name
-            await self.tg_client.client(  # type: ignore[call-arg]
-                UpdateProfileRequest(first_name=name, last_name=surname)
-            )
+            await client(UpdateProfileRequest(first_name=name, last_name=surname))
 
             system_logger.info(f"Имя Telegram профиля изменено: {name} {surname}")
             return SkillResult.ok(f"Имя профиля успешно изменено на '{name} {surname}'.")
@@ -34,9 +33,11 @@ class TelethonAccount:
 
     @skill()
     async def change_bio(self, text: str) -> SkillResult:
-        """Изменяет описание (био) профиля."""
+        """Изменяет описание (био) профиля. Макс. длина - 70 символов."""
         try:
-            await self.tg_client.client(UpdateProfileRequest(about=text))
+            client = self.tg_client.client()
+
+            await client(UpdateProfileRequest(about=text))
 
             system_logger.info(f"Био ТГ профиля изменено на: {text}")
             return SkillResult.ok("Биография успешно изменена.")
@@ -51,11 +52,13 @@ class TelethonAccount:
             return SkillResult.fail(f"Ошибка: Файл для аватара не найден ({filepath}).")
 
         try:
+            client = self.tg_client.client()
+
             # Сначала загружаем файл на сервера Telegram
-            uploaded_file = await self.tg_client.client.upload_file(filepath)
+            uploaded_file = await client.upload_file(filepath)
 
             # Затем устанавливаем загруженный файл как фото профиля
-            await self.tg_client.client(UploadProfilePhotoRequest(file=uploaded_file))
+            await client(UploadProfilePhotoRequest(file=uploaded_file))
 
             system_logger.info(f"Аватар Telegram профиля обновлен файлом: {filepath}")
             return SkillResult.ok("Аватар профиля успешно изменен.")

@@ -16,6 +16,7 @@ system:
     similarity_threshold: 0.43
     embedding_model: "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
     vector_size: 384
+    auto_rag_top_k: 3
     
   # Интервал между циклами (в секундах)
   loop_interval_sec: 60

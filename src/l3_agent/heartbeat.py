@@ -75,7 +75,7 @@ class Heartbeat:
                 self._next_tick_time = now + new_remaining
 
                 system_logger.info(
-                    f"[System] Событие {event_name} (Level: MEDIUM). Следующий вызов LLM ускорен на {saved_seconds:.1f} сек."
+                    f"[System] Событие {event_name} (Level: MEDIUM). Следующий вызов LLM ускорен на {saved_seconds:.1f} сек. (До вызова: {new_remaining:.1f} сек)"
                 )
                 self._wake_event.set()
 
@@ -88,7 +88,7 @@ class Heartbeat:
                 self._next_tick_time = now + new_remaining
 
                 system_logger.info(
-                    f"[System] Событие {event_name} (Level: {level.name}). Следующий вызов LLM ускорен на {saved_seconds:.1f} сек."
+                    f"[System] Событие {event_name} (Level: {level.name}). Следующий вызов LLM ускорен на {saved_seconds:.1f} сек. (До вызова: {new_remaining:.1f} сек)"
                 )
                 self._wake_event.set()
 
@@ -143,7 +143,7 @@ class Heartbeat:
 
     def stop(self) -> None:
         """Остановка пульса."""
-        
+
         self._is_running = False
         self._wake_event.set()
         system_logger.info("[System] Heartbeat остановлен.")

@@ -20,13 +20,8 @@ class HostOSConfig(BaseModel):
     top_processes_limit: int = 10
 
 
-class HostTerminalConfig(BaseModel):
-    enabled: bool = True
-
-
 class HostConfig(BaseModel):
     os: HostOSConfig
-    terminal: HostTerminalConfig
 
 
 class TelethonConfig(BaseModel):
@@ -54,11 +49,11 @@ class InterfacesConfig(BaseModel):
 
 
 class IdentityConfig(BaseModel):
-    agent_name: str = "E.X.E."
+    agent_name: str
 
 
 class LLMConfig(BaseModel):
-    model_name: str = "gemini-1.5-pro"
+    model_name: str
     temperature: float = 0.7
     max_react_steps: int = 15
 
@@ -67,6 +62,7 @@ class VectorDBConfig(BaseModel):
     similarity_threshold: float = 0.43
     embedding_model: str = "intfloat/multilingual-e5-small"
     vector_size: int = 384
+    auto_rag_top_k: int = 5
 
 
 class ContextDepthConfig(BaseModel):
