@@ -82,6 +82,7 @@ async def test_context_builder_build(mock_states, mock_dbs):
         vector_db_config=vector_db_config,
         depth_config=depth_config,
         interfaces_config=interfaces_config,
+        timezone=3,
     )
 
     payload = {"chat_id": 123, "text": "Hello Agent"}

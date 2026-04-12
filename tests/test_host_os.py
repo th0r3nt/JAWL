@@ -29,7 +29,8 @@ def os_client(tmp_path: Path):
     # Создаем конфиг с нужным уровнем доступа
     config = HostOSConfig(madness_level=1)
     state = HostOSState()
-    client = HostOSClient(base_dir=tmp_path, config=config, state=state) 
+    # Добавляем timezone=3 вот сюда:
+    client = HostOSClient(base_dir=tmp_path, config=config, state=state, timezone=3)
     return client
 
 

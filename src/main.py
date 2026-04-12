@@ -63,6 +63,12 @@ from src.l2_interfaces.telegram.aiogram.skills.chats import AiogramChats
 from src.l2_interfaces.telegram.aiogram.skills.messages import AiogramMessages
 from src.l2_interfaces.telegram.aiogram.skills.moderation import AiogramModeration
 
+# Web
+from src.l2_interfaces.web.client import WebClient
+from src.l2_interfaces.web.skills.search import WebSearch
+from src.l2_interfaces.web.skills.webpages import WebPages
+from src.l2_interfaces.web.skills.research import WebResearch
+
 # ==========================================
 # L3 Agent
 # ==========================================
@@ -226,6 +232,28 @@ class System:
 
                 self._lifecycle_components.extend([aio_client, aio_events])
                 system_logger.info("[System] Интерфейс Aiogram загружен.")
+
+        # WEB
+        if self.interfaces_config.web.enabled:
+            web_config = self.interfaces_config.web
+            web_client = WebClient(
+                request_timeout=web_config.request_timeout_sec,
+                max_page_chars=web_config.max_page_chars,
+            )
+            
+            web_search = WebSearch(client=web_client)
+            web_pages = WebPages(client=web_client)
+            web_research = WebResearch(
+                client=web_client, 
+                search_skill=web_search, 
+                pages_skill=web_pages
+            )
+
+            register_instance(web_search)
+            register_instance(web_pages)
+            register_instance(web_research)
+
+            system_logger.info("[System] Web интерфейс загружен.")
 
     def setup_l3_agent(self, llm_api_url: str, llm_api_keys: list[str]):
         """Сборка мозга агента."""

@@ -38,9 +38,16 @@ class TelegramConfig(BaseModel):
     aiogram: AiogramConfig
 
 
+class WebConfig(BaseModel):
+    enabled: bool = True
+    request_timeout_sec: int = 15
+    max_page_chars: int = 15000
+
+
 class InterfacesConfig(BaseModel):
     host: HostConfig
     telegram: TelegramConfig
+    web: WebConfig
 
 
 # ==========================================

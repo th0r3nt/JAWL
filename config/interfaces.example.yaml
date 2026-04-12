@@ -13,9 +13,9 @@ host:
     # Лимиты и таймауты
     monitoring_interval_sec: 20 # Интервал мониторинга метрик хост-пк: datetime, uptime, telemetry, network, sandbox/
     execution_timeout_sec: 60 # Таймаут на выполнение скриптов агентом
-    file_read_max_lines: 5000 
+    file_read_max_lines: 10000
     file_list_limit: 100
-    http_response_max_chars: 5000
+    http_response_max_chars: 10000
     top_processes_limit: 10
 
 telegram:
@@ -25,3 +25,8 @@ telegram:
 
   aiogram:
     enabled: false
+
+web:
+  enabled: true
+  request_timeout_sec: 15
+  max_page_chars: 15000

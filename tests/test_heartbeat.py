@@ -18,7 +18,13 @@ def mock_accel_config():
 
 
 def test_heartbeat_wake_up_high_critical(mock_react_loop, mock_accel_config):
-    hb = Heartbeat(mock_react_loop, tick_interval_sec=60, accel_config=mock_accel_config)
+    hb = Heartbeat(
+        mock_react_loop,
+        tick_interval_sec=60,
+        continuous_cycle=False,
+        accel_config=mock_accel_config,
+        timezone=3,
+    )
     hb._next_tick_time = time.time() + 60
     hb.wake_up(EventLevel.HIGH, "URGENT_EVENT", {"key": "value"})
 
@@ -28,7 +34,13 @@ def test_heartbeat_wake_up_high_critical(mock_react_loop, mock_accel_config):
 
 
 def test_heartbeat_wake_up_medium(mock_react_loop, mock_accel_config):
-    hb = Heartbeat(mock_react_loop, tick_interval_sec=60, accel_config=mock_accel_config)
+    hb = Heartbeat(
+        mock_react_loop,
+        tick_interval_sec=60,
+        continuous_cycle=False,
+        accel_config=mock_accel_config,
+        timezone=3,
+    )
     now = time.time()
     hb._next_tick_time = now + 60
     hb.wake_up(EventLevel.MEDIUM, "SOME_EVENT")
@@ -37,7 +49,13 @@ def test_heartbeat_wake_up_medium(mock_react_loop, mock_accel_config):
 
 
 def test_heartbeat_wake_up_low(mock_react_loop, mock_accel_config):
-    hb = Heartbeat(mock_react_loop, tick_interval_sec=60, accel_config=mock_accel_config)
+    hb = Heartbeat(
+        mock_react_loop,
+        tick_interval_sec=60,
+        continuous_cycle=False,
+        accel_config=mock_accel_config,
+        timezone=3,
+    )
     now = time.time()
     hb._next_tick_time = now + 60
     hb.wake_up(EventLevel.BACKGROUND, "TRASH_EVENT")
@@ -47,7 +65,13 @@ def test_heartbeat_wake_up_low(mock_react_loop, mock_accel_config):
 
 @pytest.mark.asyncio
 async def test_heartbeat_loop_heartbeat(mock_react_loop, mock_accel_config):
-    hb = Heartbeat(mock_react_loop, tick_interval_sec=0, accel_config=mock_accel_config)
+    hb = Heartbeat(
+        mock_react_loop,
+        tick_interval_sec=0,
+        continuous_cycle=False,
+        accel_config=mock_accel_config,
+        timezone=3,
+    )
 
     async def stop_hb(*args, **kwargs):
         hb.stop()
@@ -61,7 +85,13 @@ async def test_heartbeat_loop_heartbeat(mock_react_loop, mock_accel_config):
 
 @pytest.mark.asyncio
 async def test_heartbeat_loop_event_driven(mock_react_loop, mock_accel_config):
-    hb = Heartbeat(mock_react_loop, tick_interval_sec=60, accel_config=mock_accel_config)
+    hb = Heartbeat(
+        mock_react_loop,
+        tick_interval_sec=60,
+        continuous_cycle=False,
+        accel_config=mock_accel_config,
+        timezone=3,
+    )
 
     async def trigger_event_and_stop(*args, **kwargs):
         hb.stop()
@@ -77,5 +107,5 @@ async def test_heartbeat_loop_event_driven(mock_react_loop, mock_accel_config):
     from unittest.mock import ANY
 
     mock_react_loop.run.assert_called_once_with(
-        event_name="DB_DOWN", payload={"error": "timeout"}, missed_events=ANY  # Вместо []
+        event_name="DB_DOWN", payload={"error": "timeout"}, missed_events=ANY
     )
