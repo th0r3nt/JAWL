@@ -9,6 +9,7 @@ from src.utils.logger import system_logger
 from src.l2_interfaces.host.os.client import HostOSClient
 
 from src.l3_agent.skills.registry import SkillResult, skill
+from typing import Optional
 
 
 class HostOSNetwork:
@@ -91,7 +92,7 @@ class HostOSNetwork:
 
     @skill()
     async def http_request(
-        self, url: str, method: str = "GET", headers: dict = None
+        self, url: str, method: str = "GET", headers: Optional[dict] = None
     ) -> SkillResult:
         """
         Отправляет HTTP-запрос и возвращает ответ.

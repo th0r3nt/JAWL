@@ -22,13 +22,11 @@ class TelethonAccount:
         """Меняет имя и (опционально) фамилию профиля."""
         try:
             # В Telegram "name" - это first_name, а "surname" - last_name
-            await self.tg_client.client(
+            await self.tg_client.client(  # type: ignore[call-arg]
                 UpdateProfileRequest(first_name=name, last_name=surname)
             )
 
-            system_logger.info(
-                f"Имя Telegram профиля изменено: {name} {surname}"
-            )
+            system_logger.info(f"Имя Telegram профиля изменено: {name} {surname}")
             return SkillResult.ok(f"Имя профиля успешно изменено на '{name} {surname}'.")
 
         except Exception as e:
@@ -59,9 +57,7 @@ class TelethonAccount:
             # Затем устанавливаем загруженный файл как фото профиля
             await self.tg_client.client(UploadProfilePhotoRequest(file=uploaded_file))
 
-            system_logger.info(
-                f"Аватар Telegram профиля обновлен файлом: {filepath}"
-            )
+            system_logger.info(f"Аватар Telegram профиля обновлен файлом: {filepath}")
             return SkillResult.ok("Аватар профиля успешно изменен.")
 
         except Exception as e:

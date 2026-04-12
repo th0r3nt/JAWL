@@ -1,6 +1,7 @@
 from src.l2_interfaces.telegram.aiogram.client import AiogramClient
 from src.l3_agent.skills.registry import SkillResult, skill
 from src.utils.logger import system_logger
+from typing import Optional
 
 
 class AiogramMessages:
@@ -14,7 +15,7 @@ class AiogramMessages:
 
     @skill()
     async def send_message(
-        self, chat_id: int, text: str, reply_to_message_id: int = None
+        self, chat_id: int, text: str, reply_to_message_id: Optional[int] = None
     ) -> SkillResult:
         """Отправляет текстовое сообщение от лица бота."""
 

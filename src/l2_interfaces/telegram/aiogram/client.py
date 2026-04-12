@@ -23,7 +23,7 @@ class AiogramClient:
             raise RuntimeError("AiogramClient не запущен.")
         return self._bot
 
-    async def start(self):
+    async def start(self) -> None:
         """
         Инициализирует бота и проверяет токен.
         """
@@ -41,8 +41,9 @@ class AiogramClient:
             system_logger.error(f"[System] Критическая ошибка при запуске Aiogram: {e}")
             raise e
 
-    async def stop(self):
+    async def stop(self) -> None:
         """Корректно закрывает сессию aiohttp."""
+        
         if self._bot:
             await self._bot.session.close()
             system_logger.info("[System] Aiogram клиент отключен.")

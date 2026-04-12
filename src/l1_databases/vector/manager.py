@@ -20,26 +20,21 @@ class VectorManager:
         embedding_model_name: str,
         vector_size: int = 384,
     ):
+        self.collection_name_knowledge = "knowledge"
+        self.collection_name_thoughts = "thoughts"
 
-        # Названия коллекций
-        self.knowledge = "knowledge"
-        self.thoughts = "thoughts"
-
-        # Базовые компоненты
         self.db = VectorDB(
             db_path=str(db_path),
-            collections=[self.knowledge, self.thoughts],
+            collections=[self.collection_name_knowledge, self.collection_name_thoughts],
             vector_size=vector_size,
         )
         self.embedding = EmbeddingModel(
             model_path=str(embedding_model_path), model_name=embedding_model_name
         )
 
-        # Обертки коллекций
-        knowledge_col = VectorCollection(self.db, self.knowledge)
-        thoughts_col = VectorCollection(self.db, self.thoughts)
+        knowledge_col = VectorCollection(self.db, self.collection_name_knowledge)
+        thoughts_col = VectorCollection(self.db, self.collection_name_thoughts)
 
-        # CRUD-интерфейсы (скиллы агента)
         self.knowledge = VectorKnowledge(
             db=self.db, collection=knowledge_col, embedding_model=self.embedding
         )
@@ -47,10 +42,8 @@ class VectorManager:
             db=self.db, collection=thoughts_col, embedding_model=self.embedding
         )
 
-    async def connect(self):
-        """Пробрасывает асинхронное подключение к Qdrant."""
+    async def connect(self) -> None:
         await self.db.connect()
 
-    async def disconnect(self):
-        """Корректно закрывает соединения."""
+    async def disconnect(self) -> None:
         await self.db.disconnect()

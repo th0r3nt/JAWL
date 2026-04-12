@@ -1,5 +1,5 @@
 import uuid
-from typing import TYPE_CHECKING
+from typing import Optional, TYPE_CHECKING
 from sqlalchemy import select, delete
 
 from src.l3_agent.skills.registry import skill, SkillResult
@@ -18,7 +18,7 @@ class SQLTasks:
 
     @skill()
     async def create_task(
-        self, description: str, term: str = None, context: str = None
+        self, description: str, term: Optional[str] = None, context: Optional[str] = None
     ) -> SkillResult:
         """Создает новую долгосрочную задачу в базе данных."""
         task_id = str(uuid.uuid4())[:8]  # Короткий ID для удобства LLM
@@ -54,7 +54,11 @@ class SQLTasks:
 
     @skill()
     async def update_task(
-        self, task_id: str, description: str = None, term: str = None, context: str = None
+        self,
+        task_id: str,
+        description: Optional[str] = None,
+        term: Optional[str] = None,
+        context: Optional[str] = None,
     ) -> SkillResult:
         """Обновляет задачу по ID (передавать только те поля, которые нужно изменить)."""
         async with self.db.session_factory() as session:
@@ -84,7 +88,7 @@ class SQLTasks:
             result = await session.execute(delete(TaskTable).where(TaskTable.id == task_id))
             await session.commit()
 
-            if result.rowcount == 0:
+            if result.rowcount == 0:  # type: ignore[attr-defined]
                 return SkillResult.fail(f"Задача с ID {task_id} не найдена.")
 
         msg = f"Задача {task_id} удалена."

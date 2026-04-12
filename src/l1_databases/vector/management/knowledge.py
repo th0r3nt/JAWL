@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Any, Dict
+from typing import Optional, TYPE_CHECKING, Any, Dict
 import uuid
 from qdrant_client import models
 
@@ -31,9 +31,12 @@ class VectorKnowledge:
 
     @skill()
     async def save_knowledge(
-        self, knowledge_text: str, metadata: Dict[str, Any] = None
+        self, knowledge_text: str, metadata: Optional[Dict[str, Any]] = None
     ) -> SkillResult:
         """Сохраняет фрагмент знаний."""
+        if not self.db.client:
+            return SkillResult.fail("Векторная БД не инициализирована.")
+
         try:
             vector = await self.embedding_model.get_embedding(knowledge_text)
             point_id = str(uuid.uuid4())
@@ -70,7 +73,7 @@ class VectorKnowledge:
                 with_payload=True,
             )
 
-            points = (
+            points: list[Any] = (
                 search_result.points if hasattr(search_result, "points") else search_result
             )
 

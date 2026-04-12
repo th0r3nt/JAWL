@@ -75,7 +75,7 @@ class HostOSEvents:
         self.state = state
         self.bus = event_bus
 
-        self._is_running = False
+        self._is_running: bool = False
         self._monitoring_task: asyncio.Task | None = None
 
         # Инструменты Watchdog
@@ -84,7 +84,7 @@ class HostOSEvents:
         self._last_sandbox_files = set()
         psutil.cpu_percent(interval=None)
 
-    async def start(self):
+    async def start(self) -> None:
         if self._is_running:
             return
 
@@ -102,7 +102,7 @@ class HostOSEvents:
 
         system_logger.info("[System] Host OS мониторинг и файловый радар запущены.")
 
-    async def stop(self):
+    async def stop(self) -> None:
         self._is_running = False
 
         if self._monitoring_task:

@@ -22,7 +22,7 @@ class TelethonClient:
             raise RuntimeError("TelethonClient не запущен.")
         return self._client
 
-    async def start(self):
+    async def start(self) -> None:
         """
         Запускает клиента. 
         При первом запуске попросит ввести номер и код в консоли.
@@ -45,8 +45,9 @@ class TelethonClient:
             system_logger.error(f"[System] Критическая ошибка при запуске Telethon: {e}")
             raise e
 
-    async def stop(self):
+    async def stop(self) -> None:
         """Корректно закрывает соединение."""
+        
         if self._client and self._client.is_connected():
             await self._client.disconnect()
             system_logger.info("[System] Telethon клиент отключен.")

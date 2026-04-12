@@ -1,5 +1,5 @@
 import uuid
-from typing import TYPE_CHECKING
+from typing import Optional, TYPE_CHECKING
 from sqlalchemy import select, delete
 
 from src.l3_agent.skills.registry import skill, SkillResult
@@ -18,7 +18,7 @@ class SQLPersonalityTraits:
 
     @skill()
     async def add_trait(
-        self, name: str, description: str, reason: str = None, context: str = None
+        self, name: str, description: str, reason: Optional[str] = None, context: Optional[str] = None
     ) -> SkillResult:
         """Добавляет новую приобретенную черту личности."""
 

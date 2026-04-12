@@ -57,7 +57,7 @@ class AiogramState:
         self.number_of_last_chats = number_of_last_chats
 
         self.last_chats = "Список диалогов пуст."
-        self._chats_cache = {}  # Внутренний кэш: {chat_id: "строка форматирования"}
+        self._chats_cache: dict[int, str] = {}  # Внутренний кэш: {chat_id: "строка форматирования"}
 
 
 # =======================================
@@ -72,7 +72,7 @@ class HostOSState:
     Обновляется слушателями (os/events.py) в фоне.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.is_online = False
 
         self.datetime = ""  # Время

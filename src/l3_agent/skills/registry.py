@@ -1,7 +1,7 @@
 import inspect
 import asyncio
 from dataclasses import dataclass
-from typing import Callable, Dict, Any
+from typing import Optional, Callable, Dict, Any, TypeVar
 
 from src.utils.logger import system_logger
 
@@ -24,7 +24,9 @@ _REGISTRY: Dict[str, Callable] = {}
 _SKILL_DOCS: list[str] = []
 
 
-def _build_skill_name(func: Callable, override: str = None, instance: Any = None) -> str:
+def _build_skill_name(
+    func: Callable, override: Optional[str] = None, instance: Optional[Any] = None
+) -> str:
     """Хелпер для формирования красивого имени функции."""
     if override:
         return override
@@ -40,7 +42,9 @@ def _build_skill_name(func: Callable, override: str = None, instance: Any = None
     return ".".join(clean_segments) + f".{func.__name__}"
 
 
-def _register_callable(func: Callable, override: str = None, instance: Any = None):
+def _register_callable(
+    func: Callable, override: Optional[str] = None, instance: Optional[Any] = None
+):
     """Ядро регистрации. Формирует докстринги и сохраняет ссылку на вызов."""
     skill_name = _build_skill_name(func, override, instance)
 
@@ -57,20 +61,20 @@ def _register_callable(func: Callable, override: str = None, instance: Any = Non
     system_logger.info(f"[System] Зарегистрирован скилл: {skill_name}")
 
 
-def skill(name_override: str = None):
-    """Декоратор. Умеет работать как с обычными функциями, так и с методами классов."""
+F = TypeVar("F", bound=Callable[..., Any])
 
-    def decorator(func: Callable):
+
+def skill(name_override: Optional[str] = None) -> Callable[[F], F]:
+    """Декоратор со строгой типизацией, регистрирующий функции для агента."""
+
+    def decorator(func: F) -> F:
         sig = inspect.signature(func)
 
-        # Если это метод класса, мы не можем регистрировать его сейчас (нет self)
-        # Просто вешаем метку, чтобы зарегистрировать позже через инстанс
         if "self" in sig.parameters:
-            func.__is_skill__ = True
-            func.__skill_name_override__ = name_override
+            setattr(func, "__is_skill__", True)
+            setattr(func, "__skill_name_override__", name_override)
             return func
 
-        # Если обычная функция - регистрируем сразу
         _register_callable(func, name_override)
         return func
 
@@ -102,7 +106,7 @@ async def execute_skill(actions: list[dict]) -> str:
         name = act.get("tool_name", "unknown_tool")
         params = act.get("parameters", {})
 
-        system_logger.info(f"Вызов: {name}({params})")
+        system_logger.info(f"[Agent Action] Вызов: {name}({params})")
 
         tasks.append(_run_single_skill(name, params))
 

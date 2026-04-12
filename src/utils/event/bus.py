@@ -59,3 +59,10 @@ class EventBus:
                 self.listeners[event.name].remove(handler)
             except ValueError:
                 pass
+
+    async def stop(self) -> None:
+        """Ожидает завершения всех фоновых обработчиков событий."""
+        
+        if self.background_tasks:
+            await asyncio.gather(*self.background_tasks, return_exceptions=True)
+            self.background_tasks.clear()

@@ -1,4 +1,6 @@
 from collections import deque
+from typing import Any, Dict
+
 from src.utils.logger import system_logger
 
 
@@ -8,8 +10,8 @@ class TokenTracker:
     """
 
     def __init__(self, maxlen: int = 100):
-        self.input_history = deque(maxlen=maxlen)
-        self.output_history = deque(maxlen=maxlen)
+        self.input_history: deque[Dict[str, Any]] = deque(maxlen=maxlen)
+        self.output_history: deque[Dict[str, Any]] = deque(maxlen=maxlen)
 
     @staticmethod
     def _approximate_tokens(text: str) -> int:

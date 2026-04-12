@@ -146,6 +146,11 @@ class ContextBuilder:
             else "Интерфейс отключен (нет ключей или выключен)."
         )
 
+        # Человекочитаемый Madness Level
+        madness_map = {0: "CAGE", 1: "VOYEUR", 2: "SURGEON", 3: "GOD_MODE"}
+        ml_val = self.interfaces_config.host.os.madness_level
+        madness_str = f"{ml_val} ({madness_map.get(ml_val, 'UNKNOWN')}) / 3"
+
         return f"""
 ### AGENT
 * LLM Model: {self.agent_state.llm_model}
@@ -154,6 +159,7 @@ class ContextBuilder:
 * ReAct Step: {self.agent_state.current_step}/{self.agent_state.max_react_steps}
 
 ### HOST OS [{os_status}]
+* Madness Level (Access): {madness_str}
 * Datetime: {self.host_os_state.datetime}
 * Uptime: {self.host_os_state.uptime}
 * Network: {getattr(self.host_os_state, 'network', 'Неизвестно')}
@@ -191,11 +197,13 @@ class ContextBuilder:
             ]
             actions_str = ", ".join(actions_list) if actions_list else "None"
 
-            # Достаем сырую строку из execution_report (без экранирования \n от json.dumps)
+            # Достаем сырую строку из execution_report
             if t.results and "execution_report" in t.results:
                 res_str = str(t.results["execution_report"])
             elif t.results:
-                res_str = json.dumps(t.results, ensure_ascii=False)
+                # Если это просто статус completed (пустой массив actions)
+                # json.dumps добавит фигурные скобки без экранирования слешей
+                res_str = json.dumps(t.results, ensure_ascii=False, indent=2)
             else:
                 res_str = "None"
 
@@ -206,9 +214,15 @@ class ContextBuilder:
                     + f"\n... [Результат обрезан. Превышен лимит в {max_chars} символов]"
                 )
 
+            # Форматируем время создания тика
+            if hasattr(t.created_at, "strftime"):
+                time_str = t.created_at.strftime("%Y-%m-%d %H:%M:%S")
+            else:
+                time_str = str(t.created_at)[:19]  # Фолбэк на случай сырой SQLite-строки
+
             # Собираем красивый Markdown-блок для тика
             blocks.append(
-                f"#### [Tick {i}]\n"
+                f"#### [Tick {i}] ({time_str})\n"
                 f"*Thoughts*: {t.thoughts}\n"
                 f"*Actions*: {actions_str}\n"
                 f"*Result*:\n```\n{res_str}\n```"

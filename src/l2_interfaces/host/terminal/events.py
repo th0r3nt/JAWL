@@ -24,7 +24,7 @@ class HostTerminalEvents:
         self._is_running = False
         self._listen_task: asyncio.Task | None = None
 
-    async def start(self):
+    async def start(self) -> None:
         """Запускает фоновое чтение очереди сообщений."""
         if not self.client.config.enabled or self._is_running:
             return
@@ -33,7 +33,7 @@ class HostTerminalEvents:
         self._listen_task = asyncio.create_task(self._loop())
         system_logger.info("[System] HostTerminalEvents: Слушатель терминала запущен.")
 
-    async def stop(self):
+    async def stop(self) -> None:
         """Останавливает слушатель."""
         self._is_running = False
 

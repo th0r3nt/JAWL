@@ -2,7 +2,7 @@ import asyncio
 import time
 from datetime import datetime
 from collections import deque
-from typing import Dict, Any, TYPE_CHECKING
+from typing import Optional, Dict, Any, TYPE_CHECKING
 
 from src.utils.logger import system_logger
 from src.utils.event.registry import EventLevel
@@ -33,16 +33,18 @@ class Heartbeat:
         self.accel_config = accel_config
 
         self._wake_event = asyncio.Event()
-        self._is_running = False
+        self._is_running: bool = False
 
-        self._next_tick_time = 0.0
-        self._wake_reason = "HEARTBEAT"
+        self._next_tick_time: int = 0.0
+        self._wake_reason: str = "HEARTBEAT"
         self._wake_payload: Dict[str, Any] = {}
 
         # Кольцевой буфер для событий во время сна
-        self._sleep_memory = deque(maxlen=20)
+        self._sleep_memory: deque[str] = deque(maxlen=20)
 
-    def wake_up(self, level: EventLevel, event_name: str, payload: Dict[str, Any] = None):
+    def wake_up(
+        self, level: EventLevel, event_name: str, payload: Optional[Dict[str, Any]] = None
+    ):
         """
         Сдвигает таймер пробуждения в зависимости от важности события.
         Вызывается интерфейсами через EventBus.
@@ -90,7 +92,7 @@ class Heartbeat:
                 )
                 self._wake_event.set()
 
-    async def start(self):
+    async def start(self) -> None:
         """Бесконечный цикл сердцебиения."""
 
         if self._is_running:
@@ -139,8 +141,9 @@ class Heartbeat:
                 self._wake_reason = "HEARTBEAT"
                 self._wake_payload = {}
 
-    def stop(self):
+    def stop(self) -> None:
         """Остановка пульса."""
+        
         self._is_running = False
         self._wake_event.set()
         system_logger.info("[System] Heartbeat остановлен.")

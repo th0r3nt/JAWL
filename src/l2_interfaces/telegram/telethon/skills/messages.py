@@ -3,6 +3,7 @@ from datetime import timedelta
 from src.l2_interfaces.telegram.telethon.client import TelethonClient
 from src.l3_agent.skills.registry import SkillResult, skill
 from src.utils.logger import system_logger
+from typing import Optional
 
 
 class TelethonMessages:
@@ -18,9 +19,9 @@ class TelethonMessages:
         self,
         to_id: int,
         text: str,
-        reply_to_message_id: int = None,
+        reply_to_message_id: Optional[int] = None,
         is_silent: bool = False,
-        time_delay: int = None,
+        time_delay: Optional[int] = None,
     ) -> SkillResult:
         """
         Отправляет текстовое сообщение.

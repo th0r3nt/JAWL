@@ -1,6 +1,6 @@
 # Файл: src/l1_databases/vector/management/thoughts.py
 
-from typing import TYPE_CHECKING, Any, Dict
+from typing import Optional, TYPE_CHECKING, Any, Dict
 import uuid
 from qdrant_client import models
 
@@ -32,7 +32,7 @@ class VectorThoughts:
 
     @skill()
     async def save_thought(
-        self, thought_text: str, metadata: Dict[str, Any] = None
+        self, thought_text: str, metadata: Optional[Dict[str, Any]] = None
     ) -> SkillResult:
         """Сохраняет мысль в векторную базу данных."""
         try:
@@ -69,7 +69,7 @@ class VectorThoughts:
                 with_payload=True,
             )
 
-            points = (
+            points: list[Any] = (
                 search_result.points if hasattr(search_result, "points") else search_result
             )
 

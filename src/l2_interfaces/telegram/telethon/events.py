@@ -25,7 +25,7 @@ class TelethonEvents:
         self.state = state
         self.bus = event_bus
 
-    async def start(self):
+    async def start(self) -> None:
         """Регистрирует обработчики и делает первичную сборку стейта."""
 
         client = self.tg_client.client()

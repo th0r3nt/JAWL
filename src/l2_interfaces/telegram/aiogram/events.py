@@ -29,7 +29,7 @@ class AiogramEvents:
         self.dp = Dispatcher()
         self._polling_task: asyncio.Task | None = None
 
-    async def start(self):
+    async def start(self) -> None:
         """Регистрирует роутеры и запускает фоновый поллинг."""
 
         if self._polling_task:
@@ -50,7 +50,7 @@ class AiogramEvents:
         self._polling_task = asyncio.create_task(self.dp.start_polling(bot))
         system_logger.info("[System] AiogramEvents: Фоновый поллинг запущен.")
 
-    async def stop(self):
+    async def stop(self) -> None:
         """Останавливает поллинг."""
 
         if self._polling_task:

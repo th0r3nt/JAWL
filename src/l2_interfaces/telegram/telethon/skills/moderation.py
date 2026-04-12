@@ -5,6 +5,7 @@ from telethon.tl.types import ChannelParticipantsKicked
 from src.l2_interfaces.telegram.telethon.client import TelethonClient
 from src.l3_agent.skills.registry import SkillResult, skill
 from src.utils.logger import system_logger
+from typing import Optional
 
 
 class TelethonModeration:
@@ -16,7 +17,7 @@ class TelethonModeration:
         self.tg_client = tg_client
 
     @skill()
-    async def ban_user(self, user_id: int, chat_id: int = None) -> SkillResult:
+    async def ban_user(self, user_id: int, chat_id: Optional[int] = None) -> SkillResult:
         """
         Блокирует пользователя.
         - Если chat_id НЕ передан: добавляет юзера в глобальный черный список аккаунта.
@@ -45,7 +46,7 @@ class TelethonModeration:
             return SkillResult.fail(f"Ошибка при блокировке: {e}")
 
     @skill()
-    async def unban_user(self, user_id: int, chat_id: int = None) -> SkillResult:
+    async def unban_user(self, user_id: int, chat_id: Optional[int] = None) -> SkillResult:
         """
         Разблокирует пользователя.
         - Если chat_id НЕ передан: удаляет юзера из глобального ЧС.
@@ -74,7 +75,7 @@ class TelethonModeration:
             return SkillResult.fail(f"Ошибка при разблокировке: {e}")
 
     @skill()
-    async def get_banned_users(self, limit: int = 50, chat_id: int = None) -> SkillResult:
+    async def get_banned_users(self, limit: int = 50, chat_id: Optional[int] = None) -> SkillResult:
         """
         Возвращает список заблокированных пользователей.
         - Если chat_id НЕ передан: возвращает глобальный ЧС аккаунта.

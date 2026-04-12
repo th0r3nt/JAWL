@@ -81,7 +81,7 @@ class EventAccelerationConfig(BaseModel):
 
 class SystemConfig(BaseModel):
     vector_db: VectorDBConfig
-    tick_interval_sec: int = 10
+    loop_interval_sec: int
     event_acceleration: EventAccelerationConfig = EventAccelerationConfig()
     context_depth: ContextDepthConfig
 

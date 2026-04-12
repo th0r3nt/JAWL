@@ -1,0 +1,23 @@
+[tool.mypy]
+python_version = "3.11"
+
+# Игнорируем библиотеки без тайп-хинтовов (Telethon, psutil и т.д.)
+ignore_missing_imports = true
+
+# Отключаем паранойю
+strict = false
+disallow_untyped_defs = false
+disallow_untyped_calls = false
+warn_return_any = false
+
+# прощаем декоратор @skill
+disallow_untyped_decorators = false
+
+# Показываем коды ошибок, чтобы было проще гуглить
+show_error_codes = true
+
+# Игнорируем песочницу и тесты
+exclude = [
+    "^sandbox/",
+    "^tests/"
+]

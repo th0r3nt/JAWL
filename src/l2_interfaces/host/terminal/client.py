@@ -29,7 +29,7 @@ class HostTerminalClient:
         # Очередь для передачи входящих сообщений в events.py
         self.incoming_messages = asyncio.Queue()
 
-    async def start(self):
+    async def start(self) -> None:
         """Запускает сокет-сервер."""
 
         if not self.config.enabled:
@@ -41,7 +41,7 @@ class HostTerminalClient:
         system_logger.info(f"[Terminal] Сервер интерфейса запущен на {self.host}:{self.port}")
         self.state.is_online = True
 
-    async def stop(self):
+    async def stop(self) -> None:
         """Корректно закрывает соединения."""
 
         if self._writer:

@@ -3,6 +3,7 @@ import asyncio
 import traceback
 from pathlib import Path
 from dotenv import load_dotenv
+from typing import Optional, Any
 
 # ==========================================
 # Утилиты
@@ -101,12 +102,12 @@ class System:
         self.local_data_dir = self.root_dir / "src" / "utils" / "local" / "data"
 
         # Хранилище компонентов, у которых есть методы start() и stop()
-        self._lifecycle_components = []
+        self._lifecycle_components: list[Any] = []
 
         # Заглушки для безопасного вызова stop() при раннем падении
-        self.sql = None
-        self.vector = None
-        self.heartbeat = None
+        self.sql: Optional[SQLManager] = None
+        self.vector: Optional[VectorManager] = None
+        self.heartbeat: Optional[Heartbeat] = None
 
     def setup_l0_state(self):
         """Создает стейты. Создаем все, даже если интерфейс выключен (во избежание NoneType)."""
@@ -147,9 +148,9 @@ class System:
 
     def setup_l2_interfaces(
         self,
-        telethon_api_id: str = None,
-        telethon_api_hash: str = None,
-        aiogram_bot_token: str = None,
+        telethon_api_id: Optional[str] = None,
+        telethon_api_hash: Optional[str] = None,
+        aiogram_bot_token: Optional[str] = None,
     ):
         """Читает конфиг, поднимает нужные интерфейсы и регистрирует их скиллы."""
         system_logger.info("[System] Инициализация L2 Interfaces.")
@@ -284,7 +285,7 @@ class System:
 
         self.heartbeat = Heartbeat(
             react_loop=react_loop,
-            tick_interval_sec=self.settings.system.tick_interval_sec,
+            tick_interval_sec=self.settings.system.loop_interval_sec,
             accel_config=self.settings.system.event_acceleration,
         )
 
@@ -312,9 +313,9 @@ class System:
         self,
         llm_api_url: str,
         llm_api_keys: list[str],
-        telethon_api_id: str = None,
-        telethon_api_hash: str = None,
-        aiogram_bot_token: str = None,
+        telethon_api_id: Optional[str] = None,
+        telethon_api_hash: Optional[str] = None,
+        aiogram_bot_token: Optional[str] = None,
     ):
         """Запуск системы."""
 
@@ -341,7 +342,7 @@ class System:
         # Блокирующий цикл жизни агента
         await self.heartbeat.start()
 
-    async def stop(self):
+    async def stop(self) -> None:
         """Остановка и очистка ресурсов."""
         system_logger.info("[System] Инициирована остановка JAWL.")
         await self.event_bus.publish(Events.SYSTEM_CORE_STOP, status="offline")
@@ -361,6 +362,9 @@ class System:
             await self.vector.disconnect()
         if self.sql:
             await self.sql.disconnect()
+
+        if self.event_bus:
+            await self.event_bus.stop()
 
         system_logger.info("[System] Остановка завершена. Процесс жестоко убит.")
 

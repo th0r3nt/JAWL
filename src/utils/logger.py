@@ -1,5 +1,6 @@
 import logging
 import os
+from typing import Union
 
 
 # ANSI-коды цветов для консоли
@@ -25,8 +26,6 @@ class LogColors:
 
 
 class ColorFormatter(logging.Formatter):
-    """Кастомный форматтер для раскраски логов в консоли"""
-
     PREFIX_COLORS = {
         "[System]": LogColors.BRIGHT_WHITE,
         "[Thoughts]": LogColors.BRIGHT_YELLOW,
@@ -34,23 +33,25 @@ class ColorFormatter(logging.Formatter):
         "[Agent Action Result]": LogColors.GRAY,
     }
 
-    def format(self, record):
+    def format(self, record: logging.LogRecord) -> str:
         log_message = super().format(record)
 
         if record.levelno >= logging.ERROR:
             return f"{LogColors.BRIGHT_RED}{log_message}{LogColors.RESET}"
-        
+
         if record.levelno == logging.WARNING:
             return f"{LogColors.BRIGHT_YELLOW}{log_message}{LogColors.RESET}"
 
+        # Проверяем текст самого сообщения (до форматирования с датой), чтобы найти префикс
+        msg = record.getMessage()
         for prefix, color in self.PREFIX_COLORS.items():
-            if prefix in record.getMessage():
+            if prefix in msg:
                 return f"{color}{log_message}{LogColors.RESET}"
 
         return log_message
 
 
-def setup_specific_logger(name, log_file, level):
+def setup_specific_logger(name: str, log_file: str, level: Union[int, str]) -> logging.Logger:
     log_dir = os.path.join("logs")
     if not os.path.exists(log_dir):
         os.makedirs(log_dir)
@@ -86,7 +87,7 @@ def setup_specific_logger(name, log_file, level):
 system_logger = setup_specific_logger(name="SYSTEM", log_file="system.log", level=logging.INFO)
 
 
-def update_log_level(level_str: str):
+def update_log_level(level_str: str) -> None:
     """Динамически обновляет уровень логирования (вызывается после загрузки конфига)"""
     numeric_level = getattr(logging, level_str.upper(), logging.INFO)
     system_logger.setLevel(numeric_level)
