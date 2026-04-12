@@ -76,8 +76,10 @@ class EventAccelerationConfig(BaseModel):
 
 
 class SystemConfig(BaseModel):
+    timezone: int = 3
     vector_db: VectorDBConfig
     loop_interval_sec: int
+    continuous_cycle: bool = False
     event_acceleration: EventAccelerationConfig = EventAccelerationConfig()
     context_depth: ContextDepthConfig
 

@@ -11,6 +11,7 @@ llm:
   max_react_steps: 15
 
 system:
+  timezone: 3  # Смещение от UTC в часах (например, 3 для МСК)
 
   vector_db:
     similarity_threshold: 0.43
@@ -19,7 +20,11 @@ system:
     auto_rag_top_k: 3
     
   # Интервал между циклами (в секундах)
-  loop_interval_sec: 60
+  loop_interval_sec: 180
+
+  # Непрерывный цикл. Если true, агент будет работать без пауз.
+  # Важно: это может очень быстро сжечь ваши квоты в LLM API
+  continuous_cycle: false
 
   # Настройки сокращения времени сна (Heartbeat) при входящих событиях
   event_acceleration:

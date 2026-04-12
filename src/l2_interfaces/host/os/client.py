@@ -20,9 +20,10 @@ class HostOSClient:
     Выступает в роли Гейткипера (проверка прав доступа).
     """
 
-    def __init__(self, base_dir: Path | str, config: HostOSConfig, state: HostOSState):
+    def __init__(self, base_dir: Path | str, config: HostOSConfig, state: HostOSState, timezone: int):
         self.config = config
         self.state = state
+        self.timezone = timezone
 
         try:
             self.madness_level = MadnessLevel(self.config.madness_level)

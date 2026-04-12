@@ -1,6 +1,7 @@
 import json
 import asyncio
 import re
+from datetime import timezone, timedelta
 from typing import TYPE_CHECKING, Any, Dict
 
 from src.l3_agent.skills.registry import get_skills_library, _REGISTRY
@@ -44,6 +45,7 @@ class ContextBuilder:
         vector_db_config: "VectorDBConfig",
         depth_config: "ContextDepthConfig",
         interfaces_config: "InterfacesConfig",
+        timezone: int,
     ):
         self.host_os_state = host_os_state
         self.telethon_state = telethon_state
@@ -61,6 +63,8 @@ class ContextBuilder:
 
         self.depth_config = depth_config
         self.interfaces_config = interfaces_config
+
+        self.timezone = timezone
 
     async def build(
         self, event_name: str, payload: Dict[str, Any], missed_events: list[str]
@@ -304,7 +308,11 @@ class ContextBuilder:
                 )
 
             if hasattr(t.created_at, "strftime"):
-                time_str = t.created_at.strftime("%Y-%m-%d %H:%M:%S")
+                dt = t.created_at
+                if dt.tzinfo is None:
+                    dt = dt.replace(tzinfo=timezone.utc)
+                tz = timezone(timedelta(hours=self.timezone))
+                time_str = dt.astimezone(tz).strftime("%Y-%m-%d %H:%M:%S")
             else:
                 time_str = str(t.created_at)[:19]
 

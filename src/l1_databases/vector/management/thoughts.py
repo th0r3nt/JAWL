@@ -59,6 +59,9 @@ class VectorThoughts:
     async def search_thoughts(self, query: str, limit: int = 5) -> SkillResult:
         """Семантический поиск мыслей из векторной базы данных."""
         try:
+            # Очищаем запрос от переносов строк только для удобных логов
+            safe_query = query.replace("\n", " ").replace("\r", "")
+
             query_vector = await self.embedding_model.get_embedding(query)
 
             search_result = await self.db.client.query_points(
@@ -74,12 +77,12 @@ class VectorThoughts:
             )
 
             if not points:
-                msg = f"[System] Поиск мыслей в векторной базе данных по запросу '{query}' не дал результатов."
-                system_logger.info(msg)
+                msg = f"[System] Поиск мыслей в векторной базе данных по запросу '{safe_query}' не дал результатов."
+                system_logger.debug(msg)
                 return SkillResult.ok(msg)
 
             system_logger.info(
-                f"[System] Векторная база данных вернула {len(points)} результатов по запросу '{query}'."
+                f"[System] Векторная база данных вернула {len(points)} мыслей по запросу '{safe_query}'."
             )
 
             formatted_results = []
@@ -131,10 +134,10 @@ class VectorThoughts:
 
             if not records:
                 msg = "[System] Векторная коллекция мыслей пуста."
-                system_logger.info(msg)
+                system_logger.debug(msg)
                 return SkillResult.ok(msg)
 
-            system_logger.info(
+            system_logger.debug(
                 f"[System] Векторная база данных выгрузила {len(records)} мыслей (чтение)."
             )
 

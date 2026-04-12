@@ -53,6 +53,10 @@ class TelethonEvents:
 
         system_logger.info("[System] TelethonEvents: Слушатели событий успешно запущены.")
 
+    async def stop(self) -> None:
+        """Останавливает слушатель событий."""
+        system_logger.info("[System] TelethonEvents: Слушатели событий остановлены.")
+
     async def _update_state(self):
         """
         Собирает последние N диалогов и обновляет приборную панель (State).
@@ -91,7 +95,7 @@ class TelethonEvents:
 
     async def _on_group_message(self, event: events.NewMessage.Event):
         """Триггерится при сообщениях в группах."""
-        
+
         await self._update_state()
 
         if event.mentioned:

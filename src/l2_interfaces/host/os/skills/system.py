@@ -1,6 +1,6 @@
 import time
-from datetime import datetime
 import psutil
+from datetime import datetime, timezone, timedelta
 from src.utils.logger import system_logger
 
 from src.l2_interfaces.host.os.client import HostOSClient
@@ -108,6 +108,6 @@ class HostOSSystem:
     @skill()
     async def get_datetime(self) -> SkillResult:
         """Возвращает текущую дату и время на сервере."""
-
-        current_dt = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        tz = timezone(timedelta(hours=self.host_os.timezone))
+        current_dt = datetime.now(tz).strftime("%Y-%m-%d %H:%M:%S")
         return SkillResult.ok(f"{current_dt}")

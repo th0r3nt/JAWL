@@ -156,6 +156,7 @@ class System:
                 base_dir=self.root_dir,
                 config=self.interfaces_config.host.os,
                 state=self.os_state,
+                timezone=self.settings.system.timezone,
             )
             os_events = HostOSEvents(
                 host_os_client=os_client, state=self.os_state, event_bus=self.event_bus
@@ -187,6 +188,7 @@ class System:
                     api_id=telethon_api_id,
                     api_hash=telethon_api_hash,
                     session_path=session_path,
+                    timezone=self.settings.system.timezone,
                 )
                 tel_events = TelethonEvents(
                     tg_client=tel_client, state=self.telethon_state, event_bus=self.event_bus
@@ -249,6 +251,7 @@ class System:
             vector_db_config=self.settings.system.vector_db,
             depth_config=self.settings.system.context_depth,
             interfaces_config=self.interfaces_config,
+            timezone=self.settings.system.timezone,
         )
 
         token_tracker = TokenTracker()
@@ -266,7 +269,9 @@ class System:
         self.heartbeat = Heartbeat(
             react_loop=react_loop,
             tick_interval_sec=self.settings.system.loop_interval_sec,
+            continuous_cycle=self.settings.system.continuous_cycle,
             accel_config=self.settings.system.event_acceleration,
+            timezone=self.settings.system.timezone,
         )
 
         # Связываем шину событий с пульсом агента (мост между L2 и L3)

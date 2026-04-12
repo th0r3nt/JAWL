@@ -62,7 +62,11 @@ class VectorKnowledge:
     @skill()
     async def search_knowledge(self, query: str, limit: int = 5) -> SkillResult:
         """Семантический поиск информации. Главный механизм поиска фактов для агента."""
+        
         try:
+            # Очищаем запрос от переносов строк только для красивых логов
+            safe_query = query.replace("\n", " ").replace("\r", "")
+
             query_vector = await self.embedding_model.get_embedding(query)
 
             search_result = await self.db.client.query_points(
@@ -79,11 +83,11 @@ class VectorKnowledge:
 
             if not points:
                 msg = "[System] Поиск знаний в векторной базе данных не дал результатов."
-                system_logger.info(msg)
+                system_logger.debug(msg)
                 return SkillResult.ok(msg)
 
             system_logger.info(
-                f"[System] Векторная база знаний вернула {len(points)} фрагментов знаний по запросу '{query}'."
+                f"[System] Векторная база знаний вернула {len(points)} фрагментов по запросу '{safe_query}'."
             )
 
             formatted_results = []
@@ -116,7 +120,7 @@ class VectorKnowledge:
             )
 
             msg = f"[System] Знание успешно удалено из векторной базы данных (ID: {point_id})."
-            system_logger.info(msg)
+            system_logger.debug(msg)
             return SkillResult.ok(msg)
 
         except Exception as e:
@@ -137,11 +141,11 @@ class VectorKnowledge:
 
             if not records:
                 msg = "[System] База знаний пуста."
-                system_logger.info(msg)
+                system_logger.debug(msg)
                 return SkillResult.ok(msg)
 
-            system_logger.info(
-                f"[System] ВБД выгрузила {len(records)} фрагментов знаний (чтение)."
+            system_logger.debug(
+                f"[System] Векторная база данных выгрузила {len(records)} фрагментов знаний (чтение)."
             )
 
             formatted_results = []

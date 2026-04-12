@@ -1,8 +1,8 @@
 import asyncio
 import time
 import socket
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
-from datetime import datetime
 import psutil
 
 from watchdog.observers import Observer
@@ -79,7 +79,7 @@ class HostOSEvents:
         self._monitoring_task: asyncio.Task | None = None
 
         # Инструменты Watchdog
-        self._observer: Observer | None = None # type: ignore
+        self._observer: Observer | None = None  # type: ignore
 
         self._last_sandbox_files = set()
         psutil.cpu_percent(interval=None)
@@ -151,7 +151,8 @@ class HostOSEvents:
 
     def _update_datetime_and_uptime(self):
         # Дата и время
-        self.state.datetime = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        tz = timezone(timedelta(hours=self.host_os.timezone))
+        self.state.datetime = datetime.now(tz).strftime("%Y-%m-%d %H:%M:%S")
 
         # Аптайм
         boot_time = psutil.boot_time()

@@ -1,6 +1,6 @@
 import asyncio
 import time
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from collections import deque
 from typing import Optional, Dict, Any, TYPE_CHECKING
 
@@ -26,11 +26,15 @@ class Heartbeat:
         self,
         react_loop: "ReactLoop",
         tick_interval_sec: int,
+        continuous_cycle: bool,
         accel_config: "EventAccelerationConfig",
+        timezone: int,
     ):
         self.react_loop = react_loop
         self.tick_interval_sec = tick_interval_sec
+        self.continuous_cycle = continuous_cycle
         self.accel_config = accel_config
+        self.timezone = timezone
 
         self._wake_event = asyncio.Event()
         self._is_running: bool = False
@@ -54,7 +58,8 @@ class Heartbeat:
         payload = payload or {}
 
         # Записываем ВСЕ события в память сна
-        time_str = datetime.now().strftime("%H:%M:%S")
+        tz = timezone(timedelta(hours=self.timezone))
+        time_str = datetime.now(tz).strftime("%H:%M:%S")
         payload_str = ", ".join(f"{k}={v}" for k, v in payload.items()) if payload else "empty"
         self._sleep_memory.append(
             f"[{time_str}] [{level.name}] {event_name} | Payload: {payload_str}"
@@ -107,22 +112,28 @@ class Heartbeat:
 
         while self._is_running:
             now = time.time()
-            sleep_duration = self._next_tick_time - now
 
-            if sleep_duration > 0:
-                self._wake_event.clear()
-                try:
-                    # Спим. Если вызовут wake_up() - сон прервется для перерасчета таймера
-                    await asyncio.wait_for(self._wake_event.wait(), timeout=sleep_duration)
+            if self.continuous_cycle:
+                # Если цикл непрерывный - даем event_loop крошечную паузу,
+                # чтобы не заблокировать асинхронную работу ОС и Telegram клиентов
+                await asyncio.sleep(0.1)
+            else:
+                sleep_duration = self._next_tick_time - now
 
-                except asyncio.TimeoutError:
-                    # Таймаут истек естественным путем - время для проактивности
-                    if self._next_tick_time <= time.time():
-                        self._wake_reason = "HEARTBEAT"
-                        self._wake_payload = {}
+                if sleep_duration > 0:
+                    self._wake_event.clear()
+                    try:
+                        # Спим. Если вызовут wake_up() - сон прервется для перерасчета таймера
+                        await asyncio.wait_for(self._wake_event.wait(), timeout=sleep_duration)
 
-            # Если время пришло (или было сброшено на 'now' из-за HIGH события)
-            if time.time() >= self._next_tick_time:
+                    except asyncio.TimeoutError:
+                        # Таймаут истек естественным путем - время для проактивности
+                        if self._next_tick_time <= time.time():
+                            self._wake_reason = "HEARTBEAT"
+                            self._wake_payload = {}
+
+            # Если время пришло ИЛИ включен непрерывный цикл
+            if self.continuous_cycle or time.time() >= self._next_tick_time:
                 # Извлекаем накопленную память и очищаем буфер
                 missed_events = list(self._sleep_memory)
                 self._sleep_memory.clear()

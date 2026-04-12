@@ -67,7 +67,7 @@ class ReactLoop:
 
         self.agent_state.reset_step()
         system_logger.info(
-            f"[Thoughts] ReAct-цикл инициирован (LLM Model: {self.agent_state.llm_model})."
+            f"[Thoughts] ReAct-цикл инициирован. Причина: {event_name} (LLM Model: {self.agent_state.llm_model})."
         )
 
         # Сборка промпта и контекста
@@ -112,22 +112,30 @@ class ReactLoop:
             except openai.RateLimitError as e:
                 # Пытаемся получить технический код ошибки из API
                 # Обычно это 'insufficient_quota' для денег и 'rate_limit_exceeded' для минут
-                err_code = getattr(e.body, 'get', lambda x: None)('code')
+                err_code = getattr(e.body, "get", lambda x: None)("code")
                 err_msg = str(e).lower()
 
                 # Проверяем на жесткий лимит (деньги/квота)
-                if err_code == 'insufficient_quota' or "billing" in err_msg or "check your plan" in err_msg:
-                    system_logger.error(f"[LLM] Квота исчерпана или нет денег. Бан ключа {session.api_key[:8]} на 24ч")
+                if (
+                    err_code == "insufficient_quota"
+                    or "billing" in err_msg
+                    or "check your plan" in err_msg
+                ):
+                    system_logger.error(
+                        f"[LLM] Квота исчерпана или нет денег. Бан ключа {session.api_key[:8]} на 24ч"
+                    )
                     self.llm.rotator.cooldown_key(session.api_key, 86400)
-                
+
                 # Во всех остальных случаях - это временный лимит (минутный)
                 else:
-                    # Можно попробовать вытащить время ожидания из ошибки, 
+                    # Можно попробовать вытащить время ожидания из ошибки,
                     # но 60 сек — надежная стандартная пауза
-                    system_logger.info(f"[LLM] Рейт-лимит (RPM/TPM). Пауза 60с для {session.api_key[:8]}")
+                    system_logger.info(
+                        f"[LLM] Рейт-лимит (RPM/TPM). Пауза 60с для {session.api_key[:8]}"
+                    )
                     self.llm.rotator.cooldown_key(session.api_key, 60)
 
-                await asyncio.sleep(5) 
+                await asyncio.sleep(5)
                 continue
 
             except openai.AuthenticationError:
