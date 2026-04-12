@@ -57,7 +57,9 @@ class AiogramState:
         self.number_of_last_chats = number_of_last_chats
 
         self.last_chats = "Список диалогов пуст."
-        self._chats_cache: dict[int, str] = {}  # Внутренний кэш: {chat_id: "строка форматирования"}
+        self._chats_cache: dict[int, str] = (
+            {}
+        )  # Внутренний кэш: {chat_id: "строка форматирования"}
 
 
 # =======================================
@@ -85,6 +87,7 @@ class HostOSState:
 # Host Terminal
 # =======================================
 
+
 class HostTerminalState:
     """
     Хранит состояние локального терминала и историю последних сообщений.
@@ -93,6 +96,35 @@ class HostTerminalState:
     def __init__(self, number_of_last_messages: int = 15):
         self.is_online = False
         self.is_ui_connected = False
-        
+
         self.number_of_last_messages = number_of_last_messages
         self.messages = ""  # Здесь будут лежать последние сообщения из терминала
+
+
+# =======================================
+# Web
+# =======================================
+
+
+class WebState:
+    """
+    Хранит состояние веб-клиента (история браузера агента).
+    Позволяет агенту помнить, что он недавно искал или читал.
+    """
+
+    def __init__(self, history_limit: int = 10):
+        self.is_online = False
+        self.history_limit = history_limit
+        self.history: list[str] = []
+
+    def add_history(self, entry: str):
+        """Добавляет запись в начало истории (самые свежие сверху)."""
+        self.history.insert(0, entry)
+        if len(self.history) > self.history_limit:
+            self.history.pop()
+
+    @property
+    def browser_history(self) -> str:
+        if not self.history:
+            return "История пуста."
+        return "\n".join(f"- {item}" for item in self.history)

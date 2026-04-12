@@ -7,6 +7,7 @@ from src.l0_state.interfaces.state import (
     TelethonState,
     AiogramState,
     HostTerminalState,
+    WebState,
 )
 from src.l0_state.agent.state import AgentState
 from src.l3_agent.skills.registry import SkillResult
@@ -73,6 +74,7 @@ async def test_context_builder_build(mock_states, mock_dbs):
         telethon_state=telethon_state,
         aiogram_state=aiogram_state,
         terminal_state=terminal_state,
+        web_state=WebState(),
         agent_state=agent_state,
         sql_ticks=sql_ticks,
         sql_tasks=sql_tasks,
@@ -103,3 +105,48 @@ async def test_context_builder_build(mock_states, mock_dbs):
     assert "TEST_EVENT" in context
     assert "chat_id: 123" in context
     assert "text: Hello Agent" in context
+
+
+@pytest.mark.asyncio
+async def test_build_rag_memories_regex(mock_states, mock_dbs):
+    """Тест: защита RAG-парсера от мусорных строк и регулярных сбоев."""
+    os_state, telethon_state, aiogram_state, terminal_state, agent_state = mock_states
+    sql_ticks, sql_tasks, sql_traits = mock_dbs
+
+    vector_knowledge = MagicMock()
+    vector_knowledge.search_knowledge = AsyncMock(return_value=SkillResult.ok("Fact"))
+    vector_thoughts = MagicMock()
+    vector_thoughts.search_thoughts = AsyncMock(return_value=SkillResult.ok("Thought"))
+
+    builder = ContextBuilder(
+        host_os_state=os_state,
+        telethon_state=telethon_state,
+        aiogram_state=aiogram_state,
+        terminal_state=terminal_state,
+        web_state=MagicMock(),
+        agent_state=agent_state,
+        sql_ticks=sql_ticks,
+        sql_tasks=sql_tasks,
+        sql_traits=sql_traits,
+        vector_knowledge=vector_knowledge,
+        vector_thoughts=vector_thoughts,
+        vector_db_config=MagicMock(auto_rag_top_k=2),
+        depth_config=ContextDepthConfig(),
+        interfaces_config=MagicMock(),
+        timezone=3,
+    )
+
+    # Мусорные данные с переносами строк и спецсимволами
+    payload = {"sender_name": "Ugly \n Name", "message": "Short"}
+    missed_events = [
+        "Event | Payload: sender_name=Valid User, message=Valid long message for regex test",
+        "Event | Payload: sender_name=Unknown, message=A",  # Слишком короткое
+        "Broken string without payload format",
+    ]
+
+    rag_context = await builder._build_rag_memories(payload, missed_events)
+
+    # Проверяем, что поиск не упал, а валидные запросы были отправлены
+    assert "Valid long message for regex test" in rag_context
+    assert "Valid User" in rag_context
+    assert "Ugly \n Name" in rag_context

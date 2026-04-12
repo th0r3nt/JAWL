@@ -25,6 +25,7 @@ from src.l0_state.interfaces.state import (
     HostTerminalState,
     TelethonState,
     AiogramState,
+    WebState,
 )
 
 # ==========================================
@@ -109,6 +110,7 @@ class System:
         self.sql: Optional[SQLManager] = None
         self.vector: Optional[VectorManager] = None
         self.heartbeat: Optional[Heartbeat] = None
+        self.llm_client: Optional[LLMClient] = None
 
     def setup_l0_state(self):
         """Создает стейты. Создаем все, даже если интерфейс выключен (во избежание NoneType)."""
@@ -123,6 +125,7 @@ class System:
         self.terminal_state = HostTerminalState()
         self.telethon_state = TelethonState()
         self.aiogram_state = AiogramState()
+        self.web_state = WebState()
 
     async def setup_l1_databases(self):
         """Поднимает базы данных и регистрирует их CRUD-скиллы."""
@@ -237,16 +240,15 @@ class System:
         if self.interfaces_config.web.enabled:
             web_config = self.interfaces_config.web
             web_client = WebClient(
+                state=self.web_state,
                 request_timeout=web_config.request_timeout_sec,
                 max_page_chars=web_config.max_page_chars,
             )
-            
+
             web_search = WebSearch(client=web_client)
             web_pages = WebPages(client=web_client)
             web_research = WebResearch(
-                client=web_client, 
-                search_skill=web_search, 
-                pages_skill=web_pages
+                client=web_client, search_skill=web_search, pages_skill=web_pages
             )
 
             register_instance(web_search)
@@ -260,7 +262,9 @@ class System:
         system_logger.info("[System] Инициализация L3 Agent.")
 
         rotator = APIKeyRotator(keys=llm_api_keys)
-        llm_client = LLMClient(api_url=llm_api_url, api_keys_rotator=rotator)
+
+        # Сохраняем в self, чтобы закрыть соединения при выходе
+        self.llm_client = LLMClient(api_url=llm_api_url, api_keys_rotator=rotator)
 
         prompt_builder = PromptBuilder(
             prompt_dir=self.root_dir / "src" / "l3_agent" / "prompt"
@@ -271,6 +275,7 @@ class System:
             aiogram_state=self.aiogram_state,
             terminal_state=self.terminal_state,
             agent_state=self.agent_state,
+            web_state=self.web_state,
             sql_ticks=self.sql.ticks,
             sql_tasks=self.sql.tasks,
             sql_traits=self.sql.personality_traits,
@@ -285,7 +290,7 @@ class System:
         token_tracker = TokenTracker()
 
         react_loop = ReactLoop(
-            llm_client=llm_client,
+            llm_client=self.llm_client,
             prompt_builder=prompt_builder,
             context_builder=context_builder,
             agent_state=self.agent_state,
@@ -378,6 +383,9 @@ class System:
 
         if self.event_bus:
             await self.event_bus.stop()
+
+        if self.llm_client:
+            await self.llm_client.close()
 
         system_logger.info("[System] Остановка завершена. Процесс жестоко убит.")
 

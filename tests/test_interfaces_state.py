@@ -3,6 +3,7 @@ from src.l0_state.interfaces.state import (
     AiogramState,
     HostOSState,
     HostTerminalState,
+    WebState,
 )
 
 
@@ -29,3 +30,18 @@ def test_host_terminal_state_init():
     state = HostTerminalState(number_of_last_messages=10)
     assert state.number_of_last_messages == 10
     assert state.messages == ""
+
+
+def test_web_state_mru():
+    """Тест: WebState вытесняет старые записи при превышении лимита (MRU Cache)."""
+    state = WebState(history_limit=2)
+
+    state.add_history("site_A")
+    state.add_history("site_B")
+    state.add_history("site_C")  # Должен вытеснить site_A
+
+    assert len(state.history) == 2
+    assert state.history == ["site_C", "site_B"]
+
+    assert "site_C" in state.browser_history
+    assert "site_A" not in state.browser_history

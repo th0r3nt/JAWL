@@ -2,6 +2,7 @@ import pytest
 from unittest.mock import patch, MagicMock, AsyncMock
 
 from src.l2_interfaces.web.client import WebClient
+from src.l0_state.interfaces.state import WebState
 from src.l2_interfaces.web.skills.search import WebSearch
 from src.l2_interfaces.web.skills.webpages import WebPages
 from src.l2_interfaces.web.skills.research import WebResearch
@@ -14,7 +15,7 @@ from src.l2_interfaces.web.skills.research import WebResearch
 
 @pytest.fixture
 def web_client():
-    return WebClient(request_timeout=5, max_page_chars=100)
+    return WebClient(state=WebState(), request_timeout=5, max_page_chars=100)
 
 
 @pytest.fixture
@@ -39,7 +40,7 @@ def research_skill(web_client, search_skill, pages_skill):
 
 def test_web_client_init():
     """Тест: корректная инициализация клиента с параметрами."""
-    client = WebClient(request_timeout=10, max_page_chars=500)
+    client = WebClient(state=WebState(), request_timeout=10, max_page_chars=500)
     assert client.timeout == 10
     assert client.max_page_chars == 500
 

@@ -112,3 +112,24 @@ async def test_execute_skill_ignores_extra_kwargs(mock_plain_func):
     report = await execute_skill(actions=actions)
 
     assert "Action [mock.plain_func]: OK - Plain: Valid" in report
+
+
+@pytest.mark.asyncio
+async def test_execute_skill_mixed_results(mock_plain_func):
+    """Тест: оркестратор должен переварить смесь валидных, падающих и несуществующих скиллов."""
+
+    @skill(name_override="mock.fail_func")
+    async def fail_func():
+        raise RuntimeError("Критический сбой")
+
+    actions = [
+        {"tool_name": "mock.plain_func", "parameters": {"text": "A"}},
+        {"tool_name": "mock.unknown_func", "parameters": {}},
+        {"tool_name": "mock.fail_func", "parameters": {}},
+    ]
+
+    report = await execute_skill(actions)
+
+    assert "Action [mock.plain_func]: OK - Plain: A" in report
+    assert "Action [mock.unknown_func]: ERROR - Скилл 'mock.unknown_func' не найден" in report
+    assert "Action [mock.fail_func]: ERROR - Ошибка: Критический сбой" in report

@@ -45,6 +45,7 @@ class WebPages:
                 text = text[: self.client.max_page_chars] + "\n\n... [Текст обрезан]"
 
             system_logger.info(f"[Web] Прочитана страница: {url}")
+            self.client.state.add_history(f"Чтение страницы: {url}")
             return SkillResult.ok(text)
 
         except Exception as e:

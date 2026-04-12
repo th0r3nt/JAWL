@@ -14,6 +14,7 @@ if TYPE_CHECKING:
         TelethonState,
         AiogramState,
         HostTerminalState,
+        WebState,
     )
     from src.l0_state.agent.state import AgentState
 
@@ -36,6 +37,7 @@ class ContextBuilder:
         telethon_state: "TelethonState",
         aiogram_state: "AiogramState",
         terminal_state: "HostTerminalState",
+        web_state: "WebState",
         agent_state: "AgentState",
         sql_ticks: "SQLTicks",
         sql_tasks: "SQLTasks",
@@ -52,6 +54,7 @@ class ContextBuilder:
         self.aiogram_state = aiogram_state
         self.terminal_state = terminal_state
         self.agent_state = agent_state
+        self.web_state = web_state
 
         self.sql_ticks = sql_ticks
         self.sql_tasks = sql_tasks
@@ -238,6 +241,7 @@ class ContextBuilder:
         os_status = "ON" if self.host_os_state.is_online else "OFF"
         tel_status = "ON" if self.telethon_state.is_online else "OFF"
         aio_status = "ON" if self.aiogram_state.is_online else "OFF"
+        web_status = "ON" if self.web_state.is_online else "OFF"
 
         os_data = self.host_os_state.telemetry if os_status == "ON" else "Интерфейс отключен."
         sandbox_data = self.host_os_state.sandbox_files if os_status == "ON" else ""
@@ -247,6 +251,9 @@ class ContextBuilder:
         )
         aio_data = (
             self.aiogram_state.last_chats if aio_status == "ON" else "Интерфейс отключен."
+        )
+        web_data = (
+            self.web_state.browser_history if web_status == "ON" else "Интерфейс отключен."
         )
 
         madness_map = {0: "CAGE", 1: "VOYEUR", 2: "SURGEON", 3: "GOD_MODE"}
@@ -276,6 +283,9 @@ class ContextBuilder:
 
 ### [AIOGRAM] [{aio_status}]
 {aio_data}
+
+### [WEB] [{web_status}]
+{web_data}
         """.strip()
 
     async def _build_recent_ticks(self, limit: int) -> str:

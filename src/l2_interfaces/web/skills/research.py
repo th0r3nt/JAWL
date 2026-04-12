@@ -20,7 +20,7 @@ class WebResearch:
         self, queries: list[str], max_links_per_query: int = 4
     ) -> SkillResult:
         """
-        Выполняет поиск по массиву запросов (рекомендуется формулировать по-разному) и читает содержимое лучших страниц. 
+        Выполняет поиск по массиву запросов (рекомендуется формулировать по-разному) и читает содержимое лучших страниц.
         Рекомендуется для глубокого сбора информации.
         """
 
@@ -67,6 +67,7 @@ class WebResearch:
             system_logger.info(
                 f"[Web] Deep research завершен. Обработано {len(queries)} запросов."
             )
+            self.client.state.add_history(f"Deep Research по запросам: {', '.join(queries)}")
             return SkillResult.ok("\n\n---\n\n".join(report))
 
         except Exception as e:

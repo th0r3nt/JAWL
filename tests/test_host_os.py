@@ -77,6 +77,21 @@ def test_gatekeeper_voyeur(os_client):
         os_client.validate_path(os_path, is_write=False)
 
 
+def test_gatekeeper_env_protection(os_client):
+    """Тест: запрет доступа к .env файлам работает даже в режиме GOD_MODE."""
+    os_client.madness_level = MadnessLevel.GOD_MODE
+    os_client.config.env_access = False
+
+    secret_path = os_client.framework_dir / ".env"
+    dev_secret_path = os_client.framework_dir / "config" / ".env.dev"
+
+    with pytest.raises(PermissionError, match="SYSTEM DENIED"):
+        os_client.validate_path(secret_path, is_write=False)
+
+    with pytest.raises(PermissionError, match="SYSTEM DENIED"):
+        os_client.validate_path(dev_secret_path, is_write=True)
+
+
 # ===================================================================
 # TESTS: PCFiles
 # ===================================================================

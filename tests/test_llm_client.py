@@ -1,5 +1,5 @@
 import pytest
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, AsyncMock, patch
 
 from src.l3_agent.llm.client import LLMClient
 from src.l3_agent.llm.api_keys.rotator import APIKeyRotator
@@ -46,3 +46,20 @@ async def test_llm_client_no_key_raises_error(mock_rotator):
 
     with pytest.raises(RuntimeError, match="Нет доступных API ключей"):
         client.get_session()
+
+
+@pytest.mark.asyncio
+async def test_llm_client_close(mock_rotator):
+    """Тест: корректное закрытие всех закэшированных сессий OpenAI."""
+    client = LLMClient(api_url="http://localhost", api_keys_rotator=mock_rotator)
+
+    # Инициализируем сессию (она попадает в кэш)
+    session = client.get_session()
+    assert len(client._sessions) == 1
+
+    # Подменяем метод close у реального объекта AsyncOpenAI на мок
+    with patch.object(session, "close", new_callable=AsyncMock) as mock_close:
+        await client.close()
+
+        mock_close.assert_awaited_once()
+        assert len(client._sessions) == 0

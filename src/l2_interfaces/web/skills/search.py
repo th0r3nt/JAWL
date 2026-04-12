@@ -38,6 +38,7 @@ class WebSearch:
             ]
 
             system_logger.info(f"[Web] Выполнен поиск по запросу: '{query}'")
+            self.client.state.add_history(f"Поиск DDG: '{query}'")
             return SkillResult.ok("\n\n".join(formatted))
 
         except Exception as e:
