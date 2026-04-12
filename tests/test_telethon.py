@@ -1,5 +1,5 @@
 import pytest
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 from telethon.tl.types import UpdateMessageReactions
 
 from src.utils.event.bus import EventBus
@@ -90,8 +90,12 @@ async def test_update_state(telethon_events, mock_tg_client, state):
 
 
 @pytest.mark.asyncio
-async def test_on_private_message(telethon_events, mock_bus):
+@patch("src.l2_interfaces.telegram.telethon.events.utils.get_display_name")
+async def test_on_private_message(mock_get_display_name, telethon_events, mock_bus):
     """Тест: личное сообщение публикует правильный ивент."""
+
+    # Заставляем утилиту Telethon всегда возвращать "Alex" в рамках этого теста
+    mock_get_display_name.return_value = "Alex"
 
     # Имитируем входящий ивент (сообщение)
     event = MagicMock()
@@ -99,7 +103,6 @@ async def test_on_private_message(telethon_events, mock_bus):
     event.chat_id = 12345
 
     sender = MagicMock()
-    sender.first_name = "Alex"
     event.get_sender = AsyncMock(return_value=sender)
 
     # Пустая история диалогов, чтобы _update_state не упал

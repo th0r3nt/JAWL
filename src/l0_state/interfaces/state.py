@@ -79,3 +79,20 @@ class HostOSState:
         self.uptime = ""  # Аптайм хост-пк
         self.telemetry = ""  # CPU, ОЗУ, процессы
         self.sandbox_files = ""  # Текущие файлы в Sandbox
+
+
+# =======================================
+# Host Terminal
+# =======================================
+
+class HostTerminalState:
+    """
+    Хранит состояние локального терминала и историю последних сообщений.
+    """
+
+    def __init__(self, number_of_last_messages: int = 15):
+        self.is_online = False
+        self.is_ui_connected = False
+        
+        self.number_of_last_messages = number_of_last_messages
+        self.messages = ""  # Здесь будут лежать последние сообщения из терминала

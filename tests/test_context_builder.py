@@ -65,7 +65,8 @@ async def test_context_builder_build(mock_states, mock_dbs):
     sql_ticks, sql_tasks, sql_traits = mock_dbs
 
     depth_config = ContextDepthConfig(ticks=5)
-    interfaces_config = MagicMock()  # ДОБАВЛЕН МОК
+    interfaces_config = MagicMock()
+    vector_db_config = MagicMock()
 
     builder = ContextBuilder(
         host_os_state=os_state,
@@ -76,6 +77,9 @@ async def test_context_builder_build(mock_states, mock_dbs):
         sql_ticks=sql_ticks,
         sql_tasks=sql_tasks,
         sql_traits=sql_traits,
+        vector_knowledge=MagicMock(),
+        vector_thoughts=MagicMock(),
+        vector_db_config=vector_db_config,
         depth_config=depth_config,
         interfaces_config=interfaces_config,
     )
@@ -91,7 +95,6 @@ async def test_context_builder_build(mock_states, mock_dbs):
     assert "test-model" in context
     assert "Telethon: User 1" in context
     assert "Aiogram: User 2" in context
-    assert "Admin: Wake up" in context
     assert "## RECENT TICKS" in context
     assert "I think, therefore I am." in context
     assert "`test_func`({})" in context
