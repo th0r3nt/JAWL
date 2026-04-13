@@ -2,7 +2,11 @@ import re
 from datetime import timezone, timedelta
 from telethon import utils
 from telethon.tl.functions.contacts import SearchRequest
-from telethon.tl.functions.channels import JoinChannelRequest, LeaveChannelRequest, GetFullChannelRequest
+from telethon.tl.functions.channels import (
+    JoinChannelRequest,
+    LeaveChannelRequest,
+    GetFullChannelRequest,
+)
 from telethon.tl.functions.messages import ImportChatInviteRequest
 
 from src.l2_interfaces.telegram.telethon.client import TelethonClient
@@ -79,6 +83,12 @@ class TelethonChats:
         try:
             client = self.tg_client.client()
             target_entity = await client.get_entity(int(chat_id))
+
+            # Человеческое поведение: агент запросил историю - значит он её прочитал
+            try:
+                await client.send_read_acknowledge(target_entity)
+            except Exception:
+                pass
 
             messages = []
             async for msg in client.iter_messages(target_entity, limit=limit):
@@ -255,25 +265,31 @@ class TelethonChats:
         """
         try:
             client = self.tg_client.client()
-            
+
             # Получаем полную информацию о канале
             target_entity = await client.get_input_entity(int(channel_id))
             full_channel = await client(GetFullChannelRequest(target_entity))
-            
+
             linked_chat_id = full_channel.full_chat.linked_chat_id
-            
+
             if not linked_chat_id:
-                return SkillResult.fail(f"Ошибка: У канала {channel_id} нет привязанной группы для обсуждений.")
-            
+                return SkillResult.fail(
+                    f"Ошибка: У канала {channel_id} нет привязанной группы для обсуждений."
+                )
+
             # Вступаем в привязанную группу
             await client(JoinChannelRequest(await client.get_input_entity(linked_chat_id)))
-            
-            system_logger.info(f"Агент вступил в группу обсуждения: {linked_chat_id} (для канала {channel_id})")
-            return SkillResult.ok(f"Успешное вступление в группу обсуждений (ID: {linked_chat_id}).")
-            
+
+            system_logger.info(
+                f"Агент вступил в группу обсуждения: {linked_chat_id} (для канала {channel_id})"
+            )
+            return SkillResult.ok(
+                f"Успешное вступление в группу обсуждений (ID: {linked_chat_id})."
+            )
+
         except ValueError:
             return SkillResult.fail(f"Ошибка: Некорректный ID канала ({channel_id}).")
-            
+
         except Exception as e:
             msg = str(e)
             if "UserAlreadyParticipant" in msg or "USER_ALREADY_PARTICIPANT" in msg:

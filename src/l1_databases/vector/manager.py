@@ -19,6 +19,7 @@ class VectorManager:
         embedding_model_path: Path,
         embedding_model_name: str,
         vector_size: int = 384,
+        timezone: int = 0,
     ):
         self.collection_name_knowledge = "knowledge"
         self.collection_name_thoughts = "thoughts"
@@ -35,11 +36,18 @@ class VectorManager:
         knowledge_col = VectorCollection(self.db, self.collection_name_knowledge)
         thoughts_col = VectorCollection(self.db, self.collection_name_thoughts)
 
+        # Передаем timezone в CRUD-обработчики
         self.knowledge = VectorKnowledge(
-            db=self.db, collection=knowledge_col, embedding_model=self.embedding
+            db=self.db,
+            collection=knowledge_col,
+            embedding_model=self.embedding,
+            timezone=timezone,
         )
         self.thoughts = VectorThoughts(
-            db=self.db, collection=thoughts_col, embedding_model=self.embedding
+            db=self.db,
+            collection=thoughts_col,
+            embedding_model=self.embedding,
+            timezone=timezone,
         )
 
     async def connect(self) -> None:

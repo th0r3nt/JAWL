@@ -31,9 +31,8 @@ class TelethonMessages:
         time_delay: Optional[int] = None,
     ) -> SkillResult:
         """
-        Отправляет текстовое сообщение. to_id может быть как числовым ID, так и юзернеймом (например, '@username').
+        Отправляет текстовое сообщение. to_id может быть как числовым ID, так и юзернеймом.
         """
-
         try:
             client = self.tg_client.client()
             entity = self._parse_entity(to_id)
@@ -48,11 +47,16 @@ class TelethonMessages:
                 kwargs["reply_to"] = int(reply_to_message_id)
 
             if time_delay:
-                # В Telegram отложенные сообщения можно ставить минимум на 10 секунд вперед
                 delay_sec = max(10, int(time_delay))
                 kwargs["schedule"] = timedelta(seconds=delay_sec)
 
             sent_msg = await client.send_message(**kwargs)
+
+            # Если мы написали в чат - значит мы его гарантированно прочитали
+            try:
+                await client.send_read_acknowledge(entity)
+            except Exception:
+                pass
 
             schedule_info = f" (отложено на {time_delay} сек)" if time_delay else ""
             msg = f"Сообщение успешно отправлено{schedule_info}. ID: {sent_msg.id}"

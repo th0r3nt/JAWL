@@ -17,7 +17,7 @@ class Heartbeat:
     Главный пульс агента.
     Управляет таймерами запуска ReAct-цикла.
     Реагирует на внешние раздражители:
-    - HIGH/CRITICAL: моментальное пробуждение.
+    - HIGH/CRITICAL: моментальное пробуждение и отмена текущего цикла.
     - MEDIUM: сокращение времени сна на 50%.
     - LOW/BACKGROUND: незначительное сокращение времени сна (на 20%).
     """
@@ -43,21 +43,17 @@ class Heartbeat:
         self._wake_reason: str = "HEARTBEAT"
         self._wake_payload: Dict[str, Any] = {}
 
-        # Кольцевой буфер для событий во время сна
         self._sleep_memory: deque[str] = deque(maxlen=20)
+
+        # Ссылка на текущую выполняемую задачу ReAct-цикла
+        self._active_react_task: Optional[asyncio.Task] = None
 
     def wake_up(
         self, level: EventLevel, event_name: str, payload: Optional[Dict[str, Any]] = None
     ):
-        """
-        Сдвигает таймер пробуждения в зависимости от важности события.
-        Вызывается интерфейсами через EventBus.
-        """
-
         now = time.time()
         payload = payload or {}
 
-        # Записываем ВСЕ события в память сна
         tz = timezone(timedelta(hours=self.timezone))
         time_str = datetime.now(tz).strftime("%H:%M:%S")
         payload_str = ", ".join(f"{k}={v}" for k, v in payload.items()) if payload else "empty"
@@ -66,47 +62,39 @@ class Heartbeat:
         )
 
         if level >= EventLevel.HIGH:
-            # Моментальное пробуждение
             self._wake_reason = event_name
             self._wake_payload = payload
             self._next_tick_time = now
             self._wake_event.set()
 
+            # Жесткое прерывание: если агент сейчас думает, убиваем процесс
+            if self._active_react_task and not self._active_react_task.done():
+                system_logger.warning(
+                    f"[System] Прерывание текущего ReAct-цикла из-за события: {event_name}"
+                )
+                self._active_react_task.cancel()
+
         elif level == EventLevel.MEDIUM:
             remaining = self._next_tick_time - now
             if remaining > 0:
                 new_remaining = remaining * self.accel_config.medium_multiplier
-                saved_seconds = remaining - new_remaining
                 self._next_tick_time = now + new_remaining
-
-                system_logger.info(
-                    f"[System] Событие {event_name} (Level: MEDIUM). Следующий вызов LLM ускорен на {saved_seconds:.1f} сек. (До вызова: {new_remaining:.1f} сек)"
-                )
                 self._wake_event.set()
 
         elif level <= EventLevel.LOW:
-            # Незначительно сокращаем время сна
             remaining = self._next_tick_time - now
             if remaining > 0:
                 new_remaining = remaining * self.accel_config.low_background_multiplier
-                saved_seconds = remaining - new_remaining
                 self._next_tick_time = now + new_remaining
-
-                system_logger.info(
-                    f"[System] Событие {event_name} (Level: {level.name}). Следующий вызов LLM ускорен на {saved_seconds:.1f} сек. (До вызова: {new_remaining:.1f} сек)"
-                )
                 self._wake_event.set()
 
     async def start(self) -> None:
-        """Бесконечный цикл сердцебиения."""
-
         if self._is_running:
             return
 
         self._is_running = True
         system_logger.info("[System] Heartbeat запущен. Агент переведен в автономный режим.")
 
-        # Инициализируем таймер, только если он еще не был задан событием
         if self._next_tick_time == 0.0:
             self._next_tick_time = time.time() + self.tick_interval_sec
 
@@ -114,47 +102,56 @@ class Heartbeat:
             now = time.time()
 
             if self.continuous_cycle:
-                # Если цикл непрерывный - даем event_loop крошечную паузу,
-                # чтобы не заблокировать асинхронную работу ОС и Telegram клиентов
                 await asyncio.sleep(0.1)
             else:
                 sleep_duration = self._next_tick_time - now
-
                 if sleep_duration > 0:
                     self._wake_event.clear()
                     try:
-                        # Спим. Если вызовут wake_up() - сон прервется для перерасчета таймера
                         await asyncio.wait_for(self._wake_event.wait(), timeout=sleep_duration)
-
                     except asyncio.TimeoutError:
-                        # Таймаут истек естественным путем - время для проактивности
                         if self._next_tick_time <= time.time():
                             self._wake_reason = "HEARTBEAT"
                             self._wake_payload = {}
 
-            # Если время пришло ИЛИ включен непрерывный цикл
             if self.continuous_cycle or time.time() >= self._next_tick_time:
-                # Извлекаем накопленную память и очищаем буфер
                 missed_events = list(self._sleep_memory)
                 self._sleep_memory.clear()
 
                 try:
-                    await self.react_loop.run(
-                        event_name=self._wake_reason,
-                        payload=self._wake_payload,
-                        missed_events=missed_events,
+                    # Оборачиваем вызов в Task для возможности прерывания
+                    self._active_react_task = asyncio.create_task(
+                        self.react_loop.run(
+                            event_name=self._wake_reason,
+                            payload=self._wake_payload,
+                            missed_events=missed_events,
+                        )
                     )
+                    await self._active_react_task
+
+                    # Сбрасываем причину ТОЛЬКО если цикл завершился сам, без прерываний
+                    self._next_tick_time = time.time() + self.tick_interval_sec
+                    self._wake_reason = "HEARTBEAT"
+                    self._wake_payload = {}
+
+                except asyncio.CancelledError:
+                    # Цикл был отменен методом wake_up().
+                    # Мы намеренно не сбрасываем _wake_reason, чтобы на следующей итерации
+                    # while цикл мгновенно запустился с приоритетными данными.
+                    system_logger.info("[System] Текущий ReAct-цикл успешно отменен.")
+
                 except Exception as e:
                     system_logger.error(f"[System] Критическая ошибка в ReAct-цикле: {e}")
+                    self._next_tick_time = time.time() + self.tick_interval_sec
+                    self._wake_reason = "HEARTBEAT"
+                    self._wake_payload = {}
 
-                # Сбрасываем таймер и причину для следующего тика
-                self._next_tick_time = time.time() + self.tick_interval_sec
-                self._wake_reason = "HEARTBEAT"
-                self._wake_payload = {}
+                finally:
+                    self._active_react_task = None
 
     def stop(self) -> None:
-        """Остановка пульса."""
-
         self._is_running = False
         self._wake_event.set()
+        if self._active_react_task and not self._active_react_task.done():
+            self._active_react_task.cancel()
         system_logger.info("[System] Heartbeat остановлен.")

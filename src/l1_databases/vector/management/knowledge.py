@@ -1,14 +1,15 @@
-from typing import Optional, TYPE_CHECKING, Any, Dict
+import time
 import uuid
+from datetime import datetime, timezone, timedelta
+from typing import Optional, TYPE_CHECKING, Any, Dict
 from qdrant_client import models
 
 from src.utils.logger import system_logger
+from src.l3_agent.skills.registry import skill, SkillResult
 
 if TYPE_CHECKING:
     from src.l1_databases.vector.db import VectorDB
     from src.l1_databases.vector.embedding import EmbeddingModel
-
-from src.l3_agent.skills.registry import skill, SkillResult
 
 
 class VectorKnowledge:
@@ -23,11 +24,20 @@ class VectorKnowledge:
         embedding_model: "EmbeddingModel",
         collection: str = "knowledge",
         similarity_threshold: float = 0.45,
+        timezone: int = 0,
     ):
         self.db = db
         self.collection = collection
         self.embedding_model = embedding_model
         self.similarity_threshold = similarity_threshold
+        self.timezone = timezone
+
+    def _format_time(self, timestamp: Optional[float]) -> str:
+        """Вспомогательный метод для красивого вывода времени."""
+        if not timestamp:
+            return "Неизвестно"
+        tz = timezone(timedelta(hours=self.timezone))
+        return datetime.fromtimestamp(timestamp, tz=tz).strftime("%Y-%m-%d %H:%M:%S")
 
     @skill()
     async def save_knowledge(
@@ -42,6 +52,9 @@ class VectorKnowledge:
             point_id = str(uuid.uuid4())
             payload = metadata or {}
             payload["text"] = knowledge_text
+
+            if "created_at" not in payload:
+                payload["created_at"] = time.time()
 
             await self.db.client.upsert(
                 collection_name=self.collection.name,
@@ -62,11 +75,8 @@ class VectorKnowledge:
     @skill()
     async def search_knowledge(self, query: str, limit: int = 5) -> SkillResult:
         """Семантический поиск информации. Главный механизм поиска фактов для агента."""
-        
         try:
-            # Очищаем запрос от переносов строк только для красивых логов
             safe_query = query.replace("\n", " ").replace("\r", "")
-
             query_vector = await self.embedding_model.get_embedding(query)
 
             search_result = await self.db.client.query_points(
@@ -94,13 +104,16 @@ class VectorKnowledge:
             for point in points:
                 score = round(point.score, 2)
                 text = point.payload.get("text", "")
+                time_str = self._format_time(point.payload.get("created_at"))
 
-                metadata_dict = {k: v for k, v in point.payload.items() if k != "text"}
+                metadata_dict = {
+                    k: v for k, v in point.payload.items() if k not in ("text", "created_at")
+                }
                 metadata_str = (
                     f"\nМетаданные (источник): `{metadata_dict}`" if metadata_dict else ""
                 )
 
-                md_block = f"[ID: `{point.id}`] Релевантность: {score}\n{text}{metadata_str}"
+                md_block = f"[ID: `{point.id}`] [Время: {time_str}] Релевантность: {score}\n{text}{metadata_str}"
                 formatted_results.append(md_block)
 
             return SkillResult.ok("\n\n".join(formatted_results))
@@ -118,11 +131,9 @@ class VectorKnowledge:
                 collection_name=self.collection.name,
                 points_selector=models.PointIdsList(points=[point_id]),
             )
-
             msg = f"[System] Знание успешно удалено из векторной базы данных (ID: {point_id})."
             system_logger.debug(msg)
             return SkillResult.ok(msg)
-
         except Exception as e:
             msg = f"[System] Ошибка при удалении знания из векторной базы данных: {e}"
             system_logger.error(msg)
@@ -132,7 +143,7 @@ class VectorKnowledge:
     async def get_all_knowledge(self, limit: int = 10) -> SkillResult:
         """Получает последние n записей из базы знаний (без семантического поиска)."""
         try:
-            records, next_offset = await self.db.client.scroll(
+            records, _ = await self.db.client.scroll(
                 collection_name=self.collection.name,
                 limit=limit,
                 with_payload=True,
@@ -151,12 +162,16 @@ class VectorKnowledge:
             formatted_results = []
             for point in records:
                 text = point.payload.get("text", "")
-                metadata_dict = {k: v for k, v in point.payload.items() if k != "text"}
+                time_str = self._format_time(point.payload.get("created_at"))
+
+                metadata_dict = {
+                    k: v for k, v in point.payload.items() if k not in ("text", "created_at")
+                }
                 metadata_str = (
                     f"\nМетаданные (источник): `{metadata_dict}`" if metadata_dict else ""
                 )
 
-                md_block = f"[ID: `{point.id}`]\n{text}{metadata_str}"
+                md_block = f"[ID: `{point.id}`] [Время: {time_str}]\n{text}{metadata_str}"
                 formatted_results.append(md_block)
 
             return SkillResult.ok("\n\n".join(formatted_results))

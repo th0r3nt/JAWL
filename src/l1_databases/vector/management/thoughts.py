@@ -1,7 +1,7 @@
-# Файл: src/l1_databases/vector/management/thoughts.py
-
-from typing import Optional, TYPE_CHECKING, Any, Dict
+import time
 import uuid
+from datetime import datetime, timezone, timedelta
+from typing import Optional, TYPE_CHECKING, Any, Dict
 from qdrant_client import models
 
 from src.l3_agent.skills.registry import skill, SkillResult
@@ -24,22 +24,36 @@ class VectorThoughts:
         embedding_model: "EmbeddingModel",
         collection: str = "thoughts",
         similarity_threshold: float = 0.43,
+        timezone: int = 0,
     ):
         self.db = db
         self.collection = collection
         self.embedding_model = embedding_model
         self.similarity_threshold = similarity_threshold
+        self.timezone = timezone
+
+    def _format_time(self, timestamp: Optional[float]) -> str:
+        """Вспомогательный метод для красивого вывода времени."""
+        if not timestamp:
+            return "Неизвестно"
+        tz = timezone(timedelta(hours=self.timezone))
+        return datetime.fromtimestamp(timestamp, tz=tz).strftime("%Y-%m-%d %H:%M:%S")
 
     @skill()
     async def save_thought(
         self, thought_text: str, metadata: Optional[Dict[str, Any]] = None
     ) -> SkillResult:
         """Сохраняет мысль в векторную базу данных."""
+        
         try:
             vector = await self.embedding_model.get_embedding(thought_text)
-            point_id = str(uuid.uuid4())  # Формируем уникальный ID
+            point_id = str(uuid.uuid4())
             payload = metadata or {}
             payload["text"] = thought_text
+
+            # Добавляем метку времени, если ее нет
+            if "created_at" not in payload:
+                payload["created_at"] = time.time()
 
             await self.db.client.upsert(
                 collection_name=self.collection.name,
@@ -58,10 +72,9 @@ class VectorThoughts:
     @skill()
     async def search_thoughts(self, query: str, limit: int = 5) -> SkillResult:
         """Семантический поиск мыслей из векторной базы данных."""
-        try:
-            # Очищаем запрос от переносов строк только для удобных логов
-            safe_query = query.replace("\n", " ").replace("\r", "")
 
+        try:
+            safe_query = query.replace("\n", " ").replace("\r", "")
             query_vector = await self.embedding_model.get_embedding(query)
 
             search_result = await self.db.client.query_points(
@@ -89,11 +102,14 @@ class VectorThoughts:
             for point in points:
                 score = round(point.score, 2)
                 text = point.payload.get("text", "")
+                time_str = self._format_time(point.payload.get("created_at"))
 
-                metadata_dict = {k: v for k, v in point.payload.items() if k != "text"}
+                metadata_dict = {
+                    k: v for k, v in point.payload.items() if k not in ("text", "created_at")
+                }
                 metadata_str = f"\nМетаданные: `{metadata_dict}`" if metadata_dict else ""
 
-                md_block = f"[ID: `{point.id}`] Релевантность: {score}\n{text}{metadata_str}"
+                md_block = f"[ID: `{point.id}`] [Время: {time_str}] Релевантность: {score}\n{text}{metadata_str}"
                 formatted_results.append(md_block)
 
             return SkillResult.ok("\n\n".join(formatted_results))
@@ -106,16 +122,15 @@ class VectorThoughts:
     @skill()
     async def delete_thought(self, point_id: str) -> SkillResult:
         """Удаляет мысль из векторной базы данных по ID."""
+
         try:
             await self.db.client.delete(
                 collection_name=self.collection.name,
                 points_selector=models.PointIdsList(points=[point_id]),
             )
-
             msg = f"[System] Мысль успешно удалена в векторной базе данных (ID: {point_id})."
             system_logger.info(msg)
             return SkillResult.ok(msg)
-
         except Exception as e:
             msg = f"[System] Ошибка при удалении мысли в векторной базе данных: {e}"
             system_logger.error(msg)
@@ -124,8 +139,9 @@ class VectorThoughts:
     @skill()
     async def get_all_thoughts(self, limit: int = 10) -> SkillResult:
         """Получает последние n мыслей из векторной базы данных."""
+
         try:
-            records, next_offset = await self.db.client.scroll(
+            records, _ = await self.db.client.scroll(
                 collection_name=self.collection.name,
                 limit=limit,
                 with_payload=True,
@@ -144,11 +160,14 @@ class VectorThoughts:
             formatted_results = []
             for point in records:
                 text = point.payload.get("text", "")
+                time_str = self._format_time(point.payload.get("created_at"))
 
-                metadata_dict = {k: v for k, v in point.payload.items() if k != "text"}
+                metadata_dict = {
+                    k: v for k, v in point.payload.items() if k not in ("text", "created_at")
+                }
                 metadata_str = f"\nМетаданные: `{metadata_dict}`" if metadata_dict else ""
 
-                md_block = f"[ID: `{point.id}`]\n{text}{metadata_str}"
+                md_block = f"[ID: `{point.id}`] [Время: {time_str}]\n{text}{metadata_str}"
                 formatted_results.append(md_block)
 
             return SkillResult.ok("\n\n".join(formatted_results))

@@ -144,6 +144,7 @@ class System:
             embedding_model_path=self.local_data_dir / "embeddings",
             embedding_model_name=self.settings.system.vector_db.embedding_model,
             vector_size=self.settings.system.vector_db.vector_size,
+            timezone=self.settings.system.timezone,
         )
         await self.vector.connect()
 

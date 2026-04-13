@@ -10,11 +10,6 @@ from src.l2_interfaces.telegram.telethon.client import TelethonClient
 
 
 class TelethonEvents:
-    """
-    Слушатель событий Telegram.
-    Обновляет TelethonState и публикует события в EventBus.
-    """
-
     def __init__(
         self,
         tg_client: TelethonClient,
@@ -26,43 +21,30 @@ class TelethonEvents:
         self.bus = event_bus
 
     async def start(self) -> None:
-        """Регистрирует обработчики и делает первичную сборку стейта."""
-
         client = self.tg_client.client()
-
-        # Первичное заполнение стейта
         await self._update_state()
 
-        # Личные сообщения (будят агента)
         client.add_event_handler(
             self._on_private_message,
             events.NewMessage(incoming=True, func=lambda e: e.is_private),
         )
 
-        # Групповые сообщения (фоновые, либо будим при упоминании)
         client.add_event_handler(
             self._on_group_message,
             events.NewMessage(incoming=True, func=lambda e: e.is_group),
         )
 
-        # Реакции (фоновые)
         client.add_event_handler(
             self._on_reaction,
-            events.Raw(),  # Обрабатываем сырые апдейты, фильтруем внутри метода
+            events.Raw(),
         )
 
         system_logger.info("[System] TelethonEvents: Слушатели событий успешно запущены.")
 
     async def stop(self) -> None:
-        """Останавливает слушатель событий."""
         system_logger.info("[System] TelethonEvents: Слушатели событий остановлены.")
 
     async def _update_state(self):
-        """
-        Собирает последние N диалогов и обновляет приборную панель (State).
-        Вызывается при старте и при каждом новом событии.
-        """
-
         client = self.tg_client.client()
         chats = []
 
@@ -71,20 +53,22 @@ class TelethonEvents:
             unread = (
                 f" [Непрочитанных: {dialog.unread_count}]" if dialog.unread_count > 0 else ""
             )
-
             chats.append(f"{chat_type} | ID: {dialog.id} | Название: {dialog.name}{unread}")
 
         self.state.last_chats = "\n".join(chats) if chats else "Список диалогов пуст."
 
     async def _on_private_message(self, event: events.NewMessage.Event):
-        """Триггерится при входящем личном сообщении."""
+        # Автоматически помечаем прочитанным на уровне Telegram, чтобы не триггерить агента позже
+        try:
+            await event.message.mark_read()
+        except Exception:
+            pass
 
         await self._update_state()
 
         sender = await event.get_sender()
-        # utils.get_display_name сам поймет: это User (имя+фамилия) или Channel (title)
         sender_name = utils.get_display_name(sender) if sender else "Unknown"
-        sender_name = sender_name or "Unknown"  # Фолбэк, если вернется пустая строка
+        sender_name = sender_name or "Unknown"
 
         await self.bus.publish(
             Events.TELETHON_MESSAGE_INCOMING,
@@ -94,14 +78,17 @@ class TelethonEvents:
         )
 
     async def _on_group_message(self, event: events.NewMessage.Event):
-        """Триггерится при сообщениях в группах."""
-
-        await self._update_state()
-
         if event.mentioned:
             event_type = Events.TELETHON_GROUP_MENTION
+            # Если нас тегнули, сбрасываем счетчик непрочитанных
+            try:
+                await event.message.mark_read()
+            except Exception:
+                pass
         else:
             event_type = Events.TELETHON_GROUP_MESSAGE
+
+        await self._update_state()
 
         sender = await event.get_sender()
         sender_name = utils.get_display_name(sender) if sender else "Unknown"
@@ -115,9 +102,6 @@ class TelethonEvents:
         )
 
     async def _on_reaction(self, event):
-        """Триггерится при установке/снятии эмодзи-реакций."""
-
-        # Фильтруем только события реакций
         if not isinstance(event, UpdateMessageReactions):
             return
 
