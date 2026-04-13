@@ -1,4 +1,4 @@
-from telethon.tl.types import InputMediaPoll, Poll, PollAnswer
+from telethon.tl.types import InputMediaPoll, Poll, PollAnswer, TextWithEntities
 from telethon.tl.functions.messages import SendVoteRequest
 
 from src.l2_interfaces.telegram.telethon.client import TelethonClient
@@ -28,15 +28,18 @@ class TelethonPolls:
         try:
             client = self.tg_client.client()
 
-            # Конвертируем варианты ответов в формат Telethon (option должен быть bytes)
+            # Оборачиваем текст ответов в TextWithEntities
             answers = [
-                PollAnswer(text=opt, option=str(i).encode("utf-8"))
+                PollAnswer(
+                    text=TextWithEntities(text=opt, entities=[]), option=str(i).encode("utf-8")
+                )
                 for i, opt in enumerate(options)
             ]
 
+            # Оборачиваем вопрос в TextWithEntities
             poll = Poll(
-                id=0,  # ID всегда 0 при создании, сервер Telegram сам назначит настоящий ID
-                question=question,
+                id=0,
+                question=TextWithEntities(text=question, entities=[]),
                 answers=answers,
             )
 
@@ -119,9 +122,7 @@ class TelethonPolls:
                 )
             )
 
-            system_logger.info(
-                f"Оставлен голос в опросе {message_id} (чат {chat_id})"
-            )
+            system_logger.info(f"Оставлен голос в опросе {message_id} (чат {chat_id})")
             return SkillResult.ok("Голос успешно учтен.")
 
         except Exception as e:

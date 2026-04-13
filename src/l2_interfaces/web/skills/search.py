@@ -1,5 +1,5 @@
 import asyncio
-from duckduckgo_search import DDGS
+from ddgs import DDGS
 from typing import Any
 
 from src.utils.logger import system_logger
