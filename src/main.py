@@ -359,12 +359,22 @@ class System:
         )
         self.setup_l3_agent(llm_api_url=llm_api_url, llm_api_keys=llm_api_keys)
 
-        # Запускаем все фоновые задачи (клиенты и слушатели событий)
+        # Запускаем все фоновые задачи (клиенты и слушатели событий) отказоустройство
+        started_components = []
         for component in self._lifecycle_components:
-            await component.start()
+            try:
+                await component.start()
+                started_components.append(component)
+            except Exception as e:
+                system_logger.error(
+                    f"[System] Ошибка при запуске интерфейса {component.__class__.__name__}: {e}. Компонент отключен."
+                )
+
+        # Оставляем в пуле только те компоненты, которые успешно запустились (чтобы корректно их стопнуть при выходе)
+        self._lifecycle_components = started_components
 
         system_logger.info(
-            f"[System] Система успешно запущена. Имя агента: {self.settings.identity.agent_name}."
+            f"[System] JAWL успешно запущен. Имя агента: {self.settings.identity.agent_name}."
         )
         await self.event_bus.publish(Events.SYSTEM_CORE_START, status="online")
 
