@@ -1,12 +1,8 @@
 identity:
-  agent_name: E.X.E.
+  agent_name: AgentName
 
 llm:
-  model_name: gemini-3.1-pro-preview 
-  # gemini-3.1-pro-preview 
-  # gemini-3-flash-preview
-  # gemini-3.1-flash-lite-preview
-  # gemma-4-31b-it
+  model_name: gemini-3.1-pro-preview # Можно поставить любую
   temperature: 0.7
   max_react_steps: 15
 
@@ -32,5 +28,7 @@ system:
     low_background_multiplier: 0.9 # При событии уровня LOW - умножает остаток сна на 0.9 (сокращает на 10%)
 
   context_depth:
-    ticks: 20 # Tick у LLM = Наблюдение > Мысли > Действие > Результат
+    ticks: 30 # Tick у LLM = Наблюдение > Мысли > Действие > Результат
     tick_result_max_chars: 10000 # Обрезает длинные ответы от функций в контексте агента
+
+  max_mental_state_entities: 10 # Макс. количество сущностей, которые может запомнить агент

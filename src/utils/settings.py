@@ -89,6 +89,7 @@ class SystemConfig(BaseModel):
     continuous_cycle: bool = False
     event_acceleration: EventAccelerationConfig = EventAccelerationConfig()
     context_depth: ContextDepthConfig
+    max_mental_state_entities: int = 10
 
 
 class SettingsConfig(BaseModel):

@@ -16,10 +16,7 @@ class Heartbeat:
     """
     Главный пульс агента.
     Управляет таймерами запуска ReAct-цикла.
-    Реагирует на внешние раздражители:
-    - HIGH/CRITICAL: моментальное пробуждение и отмена текущего цикла.
-    - MEDIUM: сокращение времени сна на 50%.
-    - LOW/BACKGROUND: незначительное сокращение времени сна (на 20%).
+    Реагирует на внешние раздражители.
     """
 
     def __init__(
@@ -48,6 +45,9 @@ class Heartbeat:
         # Ссылка на текущую выполняемую задачу ReAct-цикла
         self._active_react_task: Optional[asyncio.Task] = None
 
+        # Флаг намеренного прерывания, чтобы отличать логику агента от Ctrl+C
+        self._is_interrupted: bool = False
+
     def wake_up(
         self, level: EventLevel, event_name: str, payload: Optional[Dict[str, Any]] = None
     ):
@@ -72,6 +72,7 @@ class Heartbeat:
                 system_logger.warning(
                     f"[System] Прерывание текущего ReAct-цикла из-за события: {event_name}"
                 )
+                self._is_interrupted = True
                 self._active_react_task.cancel()
 
         elif level == EventLevel.MEDIUM:
@@ -79,14 +80,14 @@ class Heartbeat:
             if remaining > 0:
                 new_remaining = remaining * self.accel_config.medium_multiplier
                 self._next_tick_time = now + new_remaining
-                self._wake_event.set()
+                self._wake_event.set() # Вызываем
 
         elif level <= EventLevel.LOW:
             remaining = self._next_tick_time - now
             if remaining > 0:
                 new_remaining = remaining * self.accel_config.low_background_multiplier
                 self._next_tick_time = now + new_remaining
-                self._wake_event.set()
+                self._wake_event.set() # Вызываем
 
     async def start(self) -> None:
         if self._is_running:
@@ -103,12 +104,16 @@ class Heartbeat:
 
             if self.continuous_cycle:
                 await asyncio.sleep(0.1)
+
             else:
                 sleep_duration = self._next_tick_time - now
+
                 if sleep_duration > 0:
                     self._wake_event.clear()
+
                     try:
                         await asyncio.wait_for(self._wake_event.wait(), timeout=sleep_duration)
+
                     except asyncio.TimeoutError:
                         if self._next_tick_time <= time.time():
                             self._wake_reason = "HEARTBEAT"
@@ -119,7 +124,6 @@ class Heartbeat:
                 self._sleep_memory.clear()
 
                 try:
-                    # Оборачиваем вызов в Task для возможности прерывания
                     self._active_react_task = asyncio.create_task(
                         self.react_loop.run(
                             event_name=self._wake_reason,
@@ -129,16 +133,20 @@ class Heartbeat:
                     )
                     await self._active_react_task
 
-                    # Сбрасываем причину ТОЛЬКО если цикл завершился сам, без прерываний
+                    # Сбрасываем причину только если цикл завершился сам, без прерываний
                     self._next_tick_time = time.time() + self.tick_interval_sec
                     self._wake_reason = "HEARTBEAT"
                     self._wake_payload = {}
 
                 except asyncio.CancelledError:
-                    # Цикл был отменен методом wake_up().
-                    # Мы намеренно не сбрасываем _wake_reason, чтобы на следующей итерации
-                    # while цикл мгновенно запустился с приоритетными данными.
-                    system_logger.info("[System] Текущий ReAct-цикл успешно отменен.")
+                    if self._is_interrupted:
+                        # Отмена инициирована нами (wake_up). Глотаем ошибку и идем на новый круг
+                        system_logger.info("[System] Текущий ReAct-цикл успешно прерван.")
+                        self._is_interrupted = False
+                    else:
+                        # Отмена пришла извне (Ctrl+C или закрытие event loop'а)
+                        # Обязаны пробросить исключение наверх, чтобы система корректно умерла
+                        raise
 
                 except Exception as e:
                     system_logger.error(f"[System] Критическая ошибка в ReAct-цикле: {e}")
@@ -153,5 +161,6 @@ class Heartbeat:
         self._is_running = False
         self._wake_event.set()
         if self._active_react_task and not self._active_react_task.done():
+            self._is_interrupted = True
             self._active_react_task.cancel()
         system_logger.info("[System] Heartbeat остановлен.")

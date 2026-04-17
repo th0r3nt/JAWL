@@ -57,13 +57,18 @@ def mock_dbs():
     sql_traits = MagicMock()
     sql_traits.get_traits = AsyncMock(return_value=SkillResult.ok("Trait: Sarcasm"))
 
-    return sql_ticks, sql_tasks, sql_traits
+    sql_mental_states = MagicMock()
+    sql_mental_states.get_mental_states = AsyncMock(
+        return_value=SkillResult.ok("[user123] (tier: high)")
+    )
+
+    return sql_ticks, sql_tasks, sql_traits, sql_mental_states
 
 
 @pytest.mark.asyncio
 async def test_context_builder_build(mock_states, mock_dbs):
     os_state, telethon_state, aiogram_state, terminal_state, agent_state = mock_states
-    sql_ticks, sql_tasks, sql_traits = mock_dbs
+    sql_ticks, sql_tasks, sql_traits, sql_mental_states = mock_dbs
 
     depth_config = ContextDepthConfig(ticks=5)
     interfaces_config = MagicMock()
@@ -79,6 +84,7 @@ async def test_context_builder_build(mock_states, mock_dbs):
         sql_ticks=sql_ticks,
         sql_tasks=sql_tasks,
         sql_traits=sql_traits,
+        sql_mental_states=sql_mental_states,
         vector_knowledge=MagicMock(),
         vector_thoughts=MagicMock(),
         vector_db_config=vector_db_config,
@@ -101,17 +107,19 @@ async def test_context_builder_build(mock_states, mock_dbs):
     assert "## RECENT TICKS" in context
     assert "I think, therefore I am." in context
     assert "`test_func`({})" in context
-    assert "## WAKE UP REASON" in context
+    assert "## HEARTBEAT" in context
     assert "TEST_EVENT" in context
     assert "chat_id: 123" in context
     assert "text: Hello Agent" in context
+    assert "## MENTAL STATES" in context
+    assert "[user123] (tier: high)" in context
 
 
 @pytest.mark.asyncio
 async def test_build_rag_memories_regex(mock_states, mock_dbs):
     """Тест: защита RAG-парсера от мусорных строк и регулярных сбоев."""
     os_state, telethon_state, aiogram_state, terminal_state, agent_state = mock_states
-    sql_ticks, sql_tasks, sql_traits = mock_dbs
+    sql_ticks, sql_tasks, sql_traits, sql_mental_states = mock_dbs
 
     vector_knowledge = MagicMock()
     vector_knowledge.search_knowledge = AsyncMock(return_value=SkillResult.ok("Fact"))
@@ -128,6 +136,7 @@ async def test_build_rag_memories_regex(mock_states, mock_dbs):
         sql_ticks=sql_ticks,
         sql_tasks=sql_tasks,
         sql_traits=sql_traits,
+        sql_mental_states=sql_mental_states,
         vector_knowledge=vector_knowledge,
         vector_thoughts=vector_thoughts,
         vector_db_config=MagicMock(auto_rag_top_k=2),

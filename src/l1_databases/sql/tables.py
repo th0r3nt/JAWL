@@ -51,3 +51,24 @@ class PersonalityTraitTable(Base):
     description: Mapped[str]  # Описание черты
     reason: Mapped[Optional[str]]  # Причина добавления
     context: Mapped[Optional[str]]  # Контекст (в каких ситуациях применять)
+
+
+class MentalStateTable(Base):
+    """Таблица для отслеживания состояний важных сущностей (Mental State)."""
+
+    __tablename__ = "mental_states"
+
+    id: Mapped[str] = mapped_column(primary_key=True)
+    name: Mapped[str]
+    tier: Mapped[str]  # high, medium, low, background
+    category: Mapped[str]  # subject, object
+
+    # Автоматическое обновление времени при любых изменениях
+    updated_at: Mapped[datetime] = mapped_column(
+        default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc)
+    )
+
+    description: Mapped[str]
+    status: Mapped[str]
+    context: Mapped[Optional[str]]
+    related_information: Mapped[Optional[str]]

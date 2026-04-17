@@ -7,8 +7,10 @@ from typing import TYPE_CHECKING, Any, Dict
 from src.l3_agent.skills.registry import get_skills_library, _REGISTRY
 
 if TYPE_CHECKING:
+    # yaml
     from src.utils.settings import ContextDepthConfig, InterfacesConfig, VectorDBConfig
 
+    # States
     from src.l0_state.interfaces.state import (
         HostOSState,
         TelethonState,
@@ -18,10 +20,13 @@ if TYPE_CHECKING:
     )
     from src.l0_state.agent.state import AgentState
 
+    # SQL
     from src.l1_databases.sql.management.ticks import SQLTicks
     from src.l1_databases.sql.management.tasks import SQLTasks
     from src.l1_databases.sql.management.personality_traits import SQLPersonalityTraits
+    from src.l1_databases.sql.management.mental_states import SQLMentalStates
 
+    # Vector
     from src.l1_databases.vector.management.knowledge import VectorKnowledge
     from src.l1_databases.vector.management.thoughts import VectorThoughts
 
@@ -33,22 +38,28 @@ class ContextBuilder:
 
     def __init__(
         self,
+        # States
         host_os_state: "HostOSState",
         telethon_state: "TelethonState",
         aiogram_state: "AiogramState",
         terminal_state: "HostTerminalState",
         web_state: "WebState",
         agent_state: "AgentState",
+        # SQL
         sql_ticks: "SQLTicks",
         sql_tasks: "SQLTasks",
         sql_traits: "SQLPersonalityTraits",
+        sql_mental_states: "SQLMentalStates",
+        # Vector
         vector_knowledge: "VectorKnowledge",
         vector_thoughts: "VectorThoughts",
         vector_db_config: "VectorDBConfig",
+        # yaml
         depth_config: "ContextDepthConfig",
         interfaces_config: "InterfacesConfig",
         timezone: int,
     ):
+        # States
         self.host_os_state = host_os_state
         self.telethon_state = telethon_state
         self.aiogram_state = aiogram_state
@@ -56,17 +67,20 @@ class ContextBuilder:
         self.agent_state = agent_state
         self.web_state = web_state
 
+        # SQL
         self.sql_ticks = sql_ticks
         self.sql_tasks = sql_tasks
         self.sql_traits = sql_traits
+        self.sql_mental_states = sql_mental_states
 
+        # Vector
         self.vector_knowledge = vector_knowledge
         self.vector_thoughts = vector_thoughts
         self.vector_db_config = vector_db_config
 
+        # yaml
         self.depth_config = depth_config
         self.interfaces_config = interfaces_config
-
         self.timezone = timezone
 
     async def build(
@@ -74,16 +88,18 @@ class ContextBuilder:
     ) -> str:
         """Собирает готовый контекст для агента."""
 
-        # Запускаем все тяжелые сборки параллельно (БД, Вектора, API-история)
+        # Асинхронные таски для сбора
         traits_task = self._build_personality_traits()
+        mental_states_task = self._build_mental_states()
         tasks_task = self._build_tasks()
         ticks_task = self._build_recent_ticks(limit=self.depth_config.ticks)
         chat_histories_task = self._build_chat_histories(missed_events)
         rag_task = self._build_rag_memories(payload, missed_events)
 
-        personality_traits, tasks, recent_ticks, chat_histories, rag_memories = (
+        # Выполняем
+        personality_traits, mental_states, tasks, recent_ticks, chat_histories, rag_memories = (
             await asyncio.gather(
-                traits_task, tasks_task, ticks_task, chat_histories_task, rag_task
+                traits_task, mental_states_task, tasks_task, ticks_task, chat_histories_task, rag_task
             )
         )
 
@@ -93,10 +109,11 @@ class ContextBuilder:
 
         # Собираем блоки промпта
         context_blocks = [
-            f"## PERSONALITY TRAITS\n{personality_traits}",
-            f"## SKILLS\n{skills}",
-            f"## TASKS\n{tasks}",
-            f"## STATE\n{state}",
+            f"## PERSONALITY TRAITS \n{personality_traits}",
+            f"## SKILLS \n{skills}",
+            f"## TASKS \n{tasks}",
+            f"## MENTAL STATES \nMax number of stored entities: {self.sql_mental_states.max_entities} \n{mental_states}",
+            f"## STATE \n{state}",
         ]
 
         # Внедряем динамически добытую инфу
@@ -104,12 +121,12 @@ class ContextBuilder:
             context_blocks.append(f"## SPECIFIC CHAT HISTORY\n{chat_histories}")
 
         if rag_memories:
-            context_blocks.append(f"## RELEVANT MEMORIES (Автоматический RAG)\n{rag_memories}")
+            context_blocks.append(f"## RELEVANT INFORMATION (Автоматический RAG)\n{rag_memories}")
 
         context_blocks.extend(
             [
-                f"## RECENT TICKS\n{recent_ticks}",
-                f"## WAKE UP REASON\n{wake_up_reason}",
+                f"## RECENT TICKS \n{recent_ticks}",
+                f"## HEARTBEAT \n{wake_up_reason}",
             ]
         )
 
@@ -127,6 +144,7 @@ class ContextBuilder:
         извлекает имена, длинные сообщения и названия непрочитанных чатов,
         а затем ищет совпадения в Knowledge и Thoughts.
         """
+
         queries = set()
 
         # Из Payload (Имя отправителя и суть сообщения)
@@ -268,7 +286,7 @@ class ContextBuilder:
 * ReAct Step: {self.agent_state.current_step}/{self.agent_state.max_react_steps}
 
 ### HOST OS [{os_status}]
-* Madness Level (Access): {madness_str}
+* Madness Level (Access Level): {madness_str}
 * Datetime: {self.host_os_state.datetime}
 * Uptime: {self.host_os_state.uptime}
 * Network: {getattr(self.host_os_state, 'network', 'Неизвестно')}
@@ -277,14 +295,13 @@ class ContextBuilder:
 * Sandbox Directory:
 {sandbox_data}
 
-
-### [TELETHON] [{tel_status}]
+### TELETHON [{tel_status}]
 {tel_data}
 
-### [AIOGRAM] [{aio_status}]
+### AIOGRAM [{aio_status}]
 {aio_data}
 
-### [WEB] [{web_status}]
+### WEB [{web_status}]
 {web_data}
         """.strip()
 
@@ -352,3 +369,7 @@ class ContextBuilder:
             return f"{main_trigger}\n\nEvent Log:\n{events_log}"
 
         return main_trigger
+
+    async def _build_mental_states(self) -> str:
+            res = await self.sql_mental_states.get_mental_states()
+            return res.message

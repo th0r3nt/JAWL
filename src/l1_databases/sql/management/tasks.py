@@ -34,7 +34,6 @@ class SQLTasks:
         system_logger.info(f"[System] {msg}")
         return SkillResult.ok(msg)
 
-    @skill()
     async def get_tasks(self) -> SkillResult:
         """Возвращает список всех текущих задач."""
         async with self.db.session_factory() as session:

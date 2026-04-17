@@ -129,7 +129,7 @@ class ReactLoop:
                         )
                         self.llm.rotator.cooldown_key(session.api_key, 60)
 
-                    await asyncio.sleep(5)
+                    await asyncio.sleep(10)
                     continue
 
                 except openai.AuthenticationError:

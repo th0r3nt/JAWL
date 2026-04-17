@@ -34,7 +34,6 @@ class HostOSSystem:
 
         return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
 
-    @skill()
     async def get_telemetry(self) -> SkillResult:
         """Возвращает загрузку CPU, свободной RAM и аптайм системы."""
 
@@ -98,14 +97,12 @@ class HostOSSystem:
         except Exception as e:
             return SkillResult.fail(f"Ошибка при получении списка процессов: {e}")
 
-    @skill()
     async def get_uptime(self) -> SkillResult:
         """Возвращает время непрерывной работы хост-системы (аптайм)."""
 
         uptime_str = self._get_uptime_string()
         return SkillResult.ok(f"{uptime_str}")
 
-    @skill()
     async def get_datetime(self) -> SkillResult:
         """Возвращает текущую дату и время на сервере."""
         tz = timezone(timedelta(hours=self.host_os.timezone))

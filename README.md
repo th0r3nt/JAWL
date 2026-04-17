@@ -1,4 +1,4 @@
-# ПРОЕКТ: JAWL
+# JAWL
 (Just A While Loop)
 
 Статус: Планирование 

@@ -20,6 +20,7 @@ def mock_configs():
     settings.system.timezone = 3
     settings.system.loop_interval_sec = 30
     settings.system.continuous_cycle = False
+    settings.system.max_mental_state_entities = 10
 
     # Identity
     settings.identity.agent_name = "TestAgent"

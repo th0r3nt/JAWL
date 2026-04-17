@@ -132,11 +132,15 @@ class System:
         system_logger.info("[System] Инициализация L1 Databases.")
 
         # SQL DB
-        self.sql = SQLManager(db_path=self.local_data_dir / "sql_db" / "agent.db")
+        self.sql = SQLManager(
+            db_path=self.local_data_dir / "sql_db" / "agent.db",
+            max_mental_state_entities=self.settings.system.max_mental_state_entities,
+        )
         await self.sql.connect()
 
         register_instance(self.sql.tasks)
         register_instance(self.sql.personality_traits)
+        register_instance(self.sql.mental_states)
 
         # Vector DB
         self.vector = VectorManager(
@@ -158,6 +162,7 @@ class System:
         aiogram_bot_token: Optional[str] = None,
     ):
         """Читает конфиг, поднимает нужные интерфейсы и регистрирует их скиллы."""
+
         system_logger.info("[System] Инициализация L2 Interfaces.")
 
         # HOST OS
@@ -271,18 +276,23 @@ class System:
             prompt_dir=self.root_dir / "src" / "l3_agent" / "prompt"
         )
         context_builder = ContextBuilder(
+            # States
             host_os_state=self.os_state,
             telethon_state=self.telethon_state,
             aiogram_state=self.aiogram_state,
             terminal_state=self.terminal_state,
             agent_state=self.agent_state,
             web_state=self.web_state,
+            # SQL
             sql_ticks=self.sql.ticks,
             sql_tasks=self.sql.tasks,
             sql_traits=self.sql.personality_traits,
+            sql_mental_states=self.sql.mental_states,
+            # Vector
             vector_knowledge=self.vector.knowledge,
             vector_thoughts=self.vector.thoughts,
             vector_db_config=self.settings.system.vector_db,
+            # yaml
             depth_config=self.settings.system.context_depth,
             interfaces_config=self.interfaces_config,
             timezone=self.settings.system.timezone,

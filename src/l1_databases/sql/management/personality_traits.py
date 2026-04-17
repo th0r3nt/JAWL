@@ -35,9 +35,9 @@ class SQLPersonalityTraits:
         system_logger.info(f"[System] {msg}")
         return SkillResult.ok(msg)
 
-    @skill()
     async def get_traits(self) -> SkillResult:
         """Возвращает список всех текущих приобретенных черт личности."""
+        
         async with self.db.session_factory() as session:
             result = await session.execute(select(PersonalityTraitTable))
             traits = result.scalars().all()
