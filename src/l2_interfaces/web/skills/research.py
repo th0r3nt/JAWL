@@ -44,7 +44,7 @@ class WebResearch:
                 return SkillResult.fail("Не найдено ни одной ссылки по запросам.")
 
             system_logger.info(
-                f"[Web] Deep research: найдено уникальных ссылок - {len(all_urls)}. Читение."
+                f"[Web] Deep research: найдено уникальных ссылок - {len(all_urls)}. Чтение."
             )
 
             # Параллельное чтение собранных страниц

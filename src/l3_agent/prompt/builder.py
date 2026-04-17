@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import Literal
 
 
 class PromptBuilder:
@@ -10,10 +11,12 @@ class PromptBuilder:
     def __init__(self, prompt_dir: str | Path):
         self.prompt_dir = Path(prompt_dir)
 
-    def _gather_markdown(self, sub_folder: str) -> str:
+    def _gather_markdown(self, sub_folder: Literal["personality", "system"]) -> str:
         """
         Рекурсивно ищет, читает и склеивает все .md файлы в указанной подпапке.
         Игнорирует примеры (.example.md).
+
+        sub_folder: название папки в l3/agent/prompt/.
         """
 
         target_dir = self.prompt_dir / sub_folder

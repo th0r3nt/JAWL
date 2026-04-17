@@ -46,22 +46,23 @@ def _register_callable(
     func: Callable, override: Optional[str] = None, instance: Optional[Any] = None
 ):
     """Ядро регистрации. Формирует докстринги и сохраняет ссылку на вызов."""
+    
     skill_name = _build_skill_name(func, override, instance)
 
     sig = inspect.signature(func)
-    
+
     # Формируем новую строку сигнатуры, добавляя пометку <REQUIRED> к обязательным аргументам
-    formatted_params =[]
+    formatted_params = []
     for name, param in sig.parameters.items():
         param_str = str(param)
-        
+
         # Если у параметра нет дефолтного значения и это не *args / **kwargs
         if param.default is inspect.Parameter.empty and param.kind not in (
             inspect.Parameter.VAR_POSITIONAL,
             inspect.Parameter.VAR_KEYWORD,
         ):
             param_str += " <REQUIRED>"
-            
+
         formatted_params.append(param_str)
 
     # Вручную склеиваем в строку, что заодно избавит нас от аннотации типа возврата (-> SkillResult)
@@ -148,9 +149,9 @@ async def _run_single_skill(name: str, params: dict) -> SkillResult:
 
         result = await func(**valid_params)
         system_logger.info(f"[Agent Action Result] {name}: {result}")
-        
+
         return result
-    
+
     except Exception as e:
         system_logger.info(f"[Agent Action Result] Ошибка в скилле {name}: {str(e)}")
         return SkillResult.fail(f"Ошибка: {str(e)}")
