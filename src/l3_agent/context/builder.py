@@ -112,7 +112,7 @@ class ContextBuilder:
             f"## PERSONALITY TRAITS \n{personality_traits}",
             f"## SKILLS \n{skills}",
             f"## TASKS \n{tasks}",
-            f"## MENTAL STATES \nMax number of stored entities: {self.sql_mental_states.max_entities} \n{mental_states}",
+            f"## MENTAL STATES \nMax number of entities that can be remembered: {self.sql_mental_states.max_entities} \n{mental_states}",
             f"## STATE \n{state}",
         ]
 

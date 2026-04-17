@@ -48,9 +48,24 @@ def _register_callable(
     """Ядро регистрации. Формирует докстринги и сохраняет ссылку на вызов."""
     skill_name = _build_skill_name(func, override, instance)
 
-    # Убираем аннотацию возвращаемого типа (-> SkillResult), чтобы не мусорить в промпте
     sig = inspect.signature(func)
-    clean_sig = sig.replace(return_annotation=inspect.Signature.empty)
+    
+    # Формируем новую строку сигнатуры, добавляя пометку <REQUIRED> к обязательным аргументам
+    formatted_params =[]
+    for name, param in sig.parameters.items():
+        param_str = str(param)
+        
+        # Если у параметра нет дефолтного значения и это не *args / **kwargs
+        if param.default is inspect.Parameter.empty and param.kind not in (
+            inspect.Parameter.VAR_POSITIONAL,
+            inspect.Parameter.VAR_KEYWORD,
+        ):
+            param_str += " <REQUIRED>"
+            
+        formatted_params.append(param_str)
+
+    # Вручную склеиваем в строку, что заодно избавит нас от аннотации типа возврата (-> SkillResult)
+    clean_sig = f"({', '.join(formatted_params)})"
 
     # Убираем переносы строк из докстринга: сворачиваем всё в одну красивую строку
     raw_doc = inspect.getdoc(func) or "Без описания."
@@ -114,9 +129,8 @@ async def execute_skill(actions: list[dict]) -> str:
 
     report = []
     for i, res in enumerate(results):
-        status = "OK" if res.is_success else "ERROR"
         tool_name = actions[i].get("tool_name")
-        report.append(f"Action [{tool_name}]: {status} - {res.message}")
+        report.append(f"Action [{tool_name}]: {res.message}")
 
     return "\n".join(report)
 

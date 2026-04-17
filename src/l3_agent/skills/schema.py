@@ -4,7 +4,7 @@
 обеспечивая механизм Chain-of-Thought (CoT).
 """
 
-ACTION_SCHEMA = [
+ACTION_SCHEMA =[
     {
         "type": "function",
         "function": {
@@ -25,11 +25,11 @@ ACTION_SCHEMA = [
                             "properties": {
                                 "tool_name": {
                                     "type": "string",
-                                    "description": "Точное имя функции (например: 'HostTerminalMessages.send_to_terminal').",
+                                    "description": "Точное имя функции.",
                                 },
                                 "parameters": {
                                     "type": "object",
-                                    "description": "Словарь с аргументами функции. ОБЯЗАТЕЛЬНО передавай сюда нужные ключи и значения!",
+                                    "description": "Словарь с аргументами той функции, которую нужно вызвать (например, 'to_id': '12345'). Ключи должны точно совпадать с описанием в 'parameters'. Запрещено отправлять пустой словарь {}, если инструмент требует обязательные аргументы <REQUIRED>.",
                                     "additionalProperties": True,
                                 },
                             },
