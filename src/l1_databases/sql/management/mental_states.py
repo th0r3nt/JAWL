@@ -77,7 +77,8 @@ class SQLMentalStates:
         lines = []
         for s in states:
             # Высчитываем время с последнего обновления
-            delta = datetime.now(timezone.utc) - s.updated_at
+            updated_at_aware = s.updated_at.replace(tzinfo=timezone.utc) if s.updated_at.tzinfo is None else s.updated_at
+            delta = datetime.now(timezone.utc) - updated_at_aware
             hours, remainder = divmod(int(delta.total_seconds()), 3600)
             minutes, _ = divmod(remainder, 60)
             time_ago = f"{hours}h {minutes}m ago"
