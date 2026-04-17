@@ -18,7 +18,7 @@ class EmbeddingModel:
         self.model_name = model_name
 
         system_logger.info(
-            f"[System] Инициализация локальной embedding модели: {self.model_name}."
+            f"[Vector DB] Инициализация локальной embedding модели: {self.model_name}."
         )
 
         # Передаем cache_dir
@@ -26,7 +26,7 @@ class EmbeddingModel:
         self.model = TextEmbedding(model_name=self.model_name, cache_dir=self.model_path)
 
         system_logger.info(
-            f"[System] Embedding модель готова к работе (путь: {self.model_path})."
+            f"[Vector DB] Embedding модель готова к работе (путь: {self.model_path})."
         )
 
     async def get_embedding(self, text: str) -> list[float]:

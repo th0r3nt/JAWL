@@ -5,7 +5,7 @@ host:
     # Уровень доступа агента к файловой системе, на которой он запущен
     # 0 - cage      (Read/Write только внутри папки sandbox/)
     # 1 - voyeur    (Read для всего кода фреймворка, Write только в sandbox/)
-    # 2 - surgeon   (Read для всей ОС-системы, Write только для файлов фреймворка (агент может переписать собственный код))
+    # 2 - surgeon   (Read для всей ОС-системы, управление процессами, Write только для файлов фреймворка (агент может переписать собственный код))
     # 3 - god_mode  (Полный доступ: Read/Write всей системы)
     madness_level: 0
     env_access: false # false - запрещает агенту читать и изменять файлы *.env
@@ -13,9 +13,9 @@ host:
     # Лимиты и таймауты
     monitoring_interval_sec: 30 # Интервал мониторинга метрик хост-пк: datetime, uptime, telemetry, network, sandbox/
     execution_timeout_sec: 60 # Таймаут на выполнение скриптов агентом
-    file_read_max_lines: 10000
+    file_read_max_chars: 3000
     file_list_limit: 100
-    http_response_max_chars: 10000
+    http_response_max_chars: 5000
     top_processes_limit: 10
 
 telegram:
@@ -29,4 +29,4 @@ telegram:
 web:
   enabled: true
   request_timeout_sec: 15
-  max_page_chars: 15000
+  max_page_chars: 10000

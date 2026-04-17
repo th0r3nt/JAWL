@@ -31,9 +31,7 @@ class _SandboxWatchdogHandler(FileSystemEventHandler):
         if event.is_directory:
             return
 
-        # Игнорируем скрытые и временные файлы (например .DS_Store, .tmp)
-        filename = Path(event.src_path).name
-        if filename.startswith(".") or filename.endswith("~"):
+        if self.os_events._is_ignored(Path(event.src_path)):
             return
 
         # Безопасный вызов асинхронного метода из синхронного потока
@@ -52,10 +50,8 @@ class _SandboxWatchdogHandler(FileSystemEventHandler):
         self._trigger_event(event, Events.HOST_OS_FILE_DELETED)
 
     def on_moved(self, event):
-        # Если файл переместили/переименовали, считаем это "созданием" по новому пути
         if not event.is_directory:
-            filename = Path(event.dest_path).name
-            if not (filename.startswith(".") or filename.endswith("~")):
+            if not self.os_events._is_ignored(Path(event.dest_path)):
                 asyncio.run_coroutine_threadsafe(
                     self.os_events.handle_file_system_event(
                         Events.HOST_OS_FILE_CREATED, event.dest_path
@@ -84,6 +80,32 @@ class HostOSEvents:
         self._last_sandbox_files = set()
         psutil.cpu_percent(interval=None)
 
+    def _is_ignored(self, path: Path) -> bool:
+        """Единый фильтр мусора. Отсекает кэш, логи, скрытые файлы и виртуальные окружения."""
+
+        ignore_dirs = {
+            "__pycache__",
+            ".pytest_cache",
+            "node_modules",
+            "venv",
+            ".venv",
+            "env",
+            ".git",
+        }
+        ignore_exts = {".pyc", ".pyo", ".pyd", ".tmp", ".swp"}
+
+        if path.suffix in ignore_exts or path.name.endswith("~"):
+            return True
+
+        for part in path.parts:
+            if part in ignore_dirs:
+                return True
+            # Игнорируем скрытые папки/файлы, но оставляем .env на случай, если он нужен в песочнице
+            if part.startswith(".") and part not in {".", ".env"}:
+                return True
+
+        return False
+
     async def start(self) -> None:
         if self._is_running:
             return
@@ -100,7 +122,7 @@ class HostOSEvents:
         self._observer.schedule(handler, str(self.host_os.sandbox_dir), recursive=True)
         self._observer.start()
 
-        system_logger.info("[System] Host OS мониторинг и файловый радар запущены.")
+        system_logger.info("[Host OS] Мониторинг и файловый радар запущены.")
 
     async def stop(self) -> None:
         self._is_running = False
@@ -116,7 +138,7 @@ class HostOSEvents:
             await asyncio.to_thread(self._observer.join)
             self._observer = None
 
-        system_logger.info("[System] Host OS мониторинг остановлен.")
+        system_logger.info("[Host OS] Мониторинг остановлен.")
         self.state.is_online = False
 
     async def handle_file_system_event(self, sys_event_config, filepath: str):
@@ -127,13 +149,14 @@ class HostOSEvents:
         try:
             rel_path = str(Path(filepath).relative_to(self.host_os.sandbox_dir))
         except ValueError:
-            rel_path = str(filepath)  # Фолбэк, если путь почему-то вне песочницы
+            rel_path = str(filepath)
 
         # Публикуем событие
         await self.bus.publish(sys_event_config, filepath=rel_path)
 
     async def _loop(self):
         """Бесконечный цикл поллинга для телеметрии (раз в 20-30 сек)."""
+
         while self._is_running:
             try:
                 self._update_datetime_and_uptime()
@@ -145,12 +168,11 @@ class HostOSEvents:
             except asyncio.CancelledError:
                 break
             except Exception as e:
-                system_logger.error(f"[System] Ошибка в цикле мониторинга Host OS: {e}")
+                system_logger.error(f"[Host OS] Ошибка в цикле мониторинга: {e}")
 
             await asyncio.sleep(self.host_os.config.monitoring_interval_sec)
 
     def _update_datetime_and_uptime(self):
-        # Дата и время
         tz = timezone(timedelta(hours=self.host_os.timezone))
         self.state.datetime = datetime.now(tz).strftime("%Y-%m-%d %H:%M:%S")
 
@@ -167,7 +189,6 @@ class HostOSEvents:
             self.state.uptime = f"{hours:02d}:{minutes:02d}:{seconds:02d}"
 
     def _update_telemetry(self):
-        # CPU и RAM
         cpu = psutil.cpu_percent(interval=None)
         ram = psutil.virtual_memory().percent
 
@@ -183,7 +204,6 @@ class HostOSEvents:
         limit = self.host_os.config.top_processes_limit
         top_procs = sorted(processes, key=lambda x: x["memory_percent"], reverse=True)[:limit]
 
-        # Внедряем PID в итоговую строку
         proc_strings = [
             f"{p['name']} (PID: {p['pid']}, {round(p['memory_percent'], 1)}%)"
             for p in top_procs
@@ -194,7 +214,6 @@ class HostOSEvents:
         self.state.telemetry = f"CPU: {cpu}%, RAM: {ram}%\nТоп процессов (RAM): {top_str}"
 
     async def _update_network(self):
-        # Проверяем доступ к интернету через легкий сокет
         def check_internet():
             try:
                 with socket.create_connection(("1.1.1.1", 53), timeout=2):
@@ -216,24 +235,23 @@ class HostOSEvents:
     def _check_sandbox(self):
         sandbox = self.host_os.sandbox_dir
 
-        # Получаем список всех относительных путей (рекурсивно) для поиска новых файлов
-        current_paths = set(str(p.relative_to(sandbox)) for p in sandbox.rglob("*"))
+        # Собираем только те файлы, которые не попадают под фильтр
+        current_paths = set(
+            str(p.relative_to(sandbox)) for p in sandbox.rglob("*") if not self._is_ignored(p)
+        )
 
-        # Вычисляем разницу
         new_files = current_paths - self._last_sandbox_files
         if new_files:
             system_logger.info(
-                f"[System] В песочнице появились новые файлы/папки: {', '.join(new_files)}"
+                f"[Host OS] В песочнице появились новые файлы/папки: {', '.join(new_files)}"
             )
 
-        # Строим красивое ASCII-дерево для приборной панели
         def build_tree(dir_path, prefix=""):
             lines = []
             try:
-                # Сортируем: сначала папки, потом файлы (по алфавиту)
-                items = sorted(
-                    list(dir_path.iterdir()), key=lambda x: (not x.is_dir(), x.name.lower())
-                )
+                # Фильтруем папки и файлы перед построением дерева
+                items = [item for item in dir_path.iterdir() if not self._is_ignored(item)]
+                items = sorted(items, key=lambda x: (not x.is_dir(), x.name.lower()))
                 for i, item in enumerate(items):
                     is_last = i == len(items) - 1
                     connector = "└── " if is_last else "├── "
@@ -248,14 +266,12 @@ class HostOSEvents:
 
         tree_lines = build_tree(sandbox)
 
-        # Защита контекста LLM: если в песочнице слишком много файлов, обрезаем вывод
         max_tree_lines = 200
         if len(tree_lines) > max_tree_lines:
             tree_lines = tree_lines[:max_tree_lines] + [
-                f"└── ... [Дерево обрезано: показано {max_tree_lines} элементов]"
+                f"└── ...[Дерево обрезано: показано {max_tree_lines} элементов]"
             ]
 
-        # Сохраняем стейт
         if tree_lines:
             self.state.sandbox_files = "sandbox/\n" + "\n".join(tree_lines)
         else:

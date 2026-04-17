@@ -84,7 +84,7 @@ class TelethonChats:
             client = self.tg_client.client()
             target_entity = await client.get_entity(int(chat_id))
 
-            # Человеческое поведение: агент запросил историю - значит он её прочитал
+            # Агент запросил историю > значит он её прочитал
             try:
                 await client.send_read_acknowledge(target_entity)
             except Exception:
@@ -169,7 +169,6 @@ class TelethonChats:
 
             await client.send_read_acknowledge(target_entity)
 
-            system_logger.info(f"Чат {chat_id} помечен как прочитанный.")
             return SkillResult.ok(f"Чат {chat_id} успешно помечен как прочитанный.")
 
         except Exception as e:
@@ -196,7 +195,6 @@ class TelethonChats:
             if not chats:
                 return SkillResult.ok(f"По глобальному запросу '{query}' ничего не найдено.")
 
-            system_logger.info(f"Глобальный поиск чатов по запросу '{query}'")
             return SkillResult.ok("\n".join(chats))
 
         except Exception as e:
@@ -281,7 +279,7 @@ class TelethonChats:
             await client(JoinChannelRequest(await client.get_input_entity(linked_chat_id)))
 
             system_logger.info(
-                f"Агент вступил в группу обсуждения: {linked_chat_id} (для канала {channel_id})"
+                f"[Telegram Telethon] Успешное вступление в группу обсуждений: {linked_chat_id} (для канала {channel_id})"
             )
             return SkillResult.ok(
                 f"Успешное вступление в группу обсуждений (ID: {linked_chat_id})."

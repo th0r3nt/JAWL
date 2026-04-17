@@ -58,9 +58,6 @@ class AiogramChats:
                 count = await bot.get_chat_member_count(int(chat_id))
                 lines.append(f"Количество участников: {count}")
 
-            system_logger.info(
-                f"Запрошена информация о чате {chat_id} (Aiogram)"
-            )
             return SkillResult.ok("\n".join(lines))
 
         except ValueError:

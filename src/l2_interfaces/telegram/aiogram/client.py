@@ -27,18 +27,18 @@ class AiogramClient:
         """
         Инициализирует бота и проверяет токен.
         """
-        system_logger.info("[System] Инициализация Aiogram клиента.")
+        system_logger.info("[Telegram Aiogram] Инициализация Aiogram клиента.")
 
         try:
             self._bot = Bot(token=self.bot_token)
 
             # Делаем тестовый запрос для проверки токена
             me = await self._bot.get_me()
-            system_logger.info(f"[System] Aiogram успешно авторизован как бот: @{me.username}")
+            system_logger.info(f"[Telegram Aiogram] Aiogram успешно авторизован как бот: @{me.username}")
             self.state.is_online = True
 
         except Exception as e:
-            system_logger.error(f"[System] Критическая ошибка при запуске Aiogram: {e}")
+            system_logger.error(f"[Telegram Aiogram] Критическая ошибка при запуске Aiogram: {e}")
             raise e
 
     async def stop(self) -> None:
@@ -46,5 +46,5 @@ class AiogramClient:
         
         if self._bot:
             await self._bot.session.close()
-            system_logger.info("[System] Aiogram клиент отключен.")
+            system_logger.info("[Telegram Aiogram] Aiogram клиент отключен.")
             self.state.is_online = False

@@ -31,13 +31,13 @@ class SQLDB:
             async with self.engine.begin() as conn:
                 await conn.run_sync(Base.metadata.create_all)
 
-            system_logger.info("[System] SQL база данных успешно инициализирована.")
+            system_logger.info("[SQL DB] База данных успешно инициализирована.")
         except Exception as e:
-            system_logger.error(f"[System] Критическая ошибка при запуске SQL базы данных: {e}")
+            system_logger.error(f"[SQL DB] Критическая ошибка при запуске базы данных: {e}")
             raise e
 
     async def disconnect(self):
         """Корректно закрывает соединения при остановке системы."""
         if self.engine:
             await self.engine.dispose()
-            system_logger.info("[System] Подключение к SQL базе данных закрыто.")
+            system_logger.info("[SQL DB] Подключение к базе данных закрыто.")

@@ -32,10 +32,10 @@ class TelethonModeration:
                 target_chat = int(chat_id)
                 # view_messages=False - это полный бан пользователя (он больше не увидит чат)
                 await client.edit_permissions(target_chat, target_user, view_messages=False)
-                msg = f"Пользователь {target_user} забанен в чате {target_chat}."
+                msg = f"[Telegram Telethon] Пользователь {target_user} забанен в чате {target_chat}."
             else:
                 await client(BlockRequest(id=target_user))
-                msg = f"Пользователь {target_user} добавлен в глобальный ЧС."
+                msg = f"[Telegram Telethon] Пользователь {target_user} добавлен в глобальный ЧС."
 
             system_logger.info({msg})
             return SkillResult.ok(msg)
@@ -61,10 +61,10 @@ class TelethonModeration:
                 target_chat = int(chat_id)
                 # Снимаем все ограничения, возвращая пользователю дефолтные права группы
                 await client.edit_permissions(target_chat, target_user)
-                msg = f"Пользователь {target_user} разбанен в чате {target_chat}."
+                msg = f"[Telegram Telethon] Пользователь {target_user} разбанен в чате {target_chat}."
             else:
                 await client(UnblockRequest(id=target_user))
-                msg = f"Пользователь {target_user} удален из глобального ЧС."
+                msg = f"[Telegram Telethon] Пользователь {target_user} удален из глобального ЧС."
 
             system_logger.info({msg})
             return SkillResult.ok(msg)

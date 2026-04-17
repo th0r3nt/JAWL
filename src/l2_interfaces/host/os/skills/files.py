@@ -19,10 +19,14 @@ class HostOSFiles:
         self.host_os = host_os_client
 
     @skill()
-    async def read_file(self, filepath: str) -> SkillResult:
-        """Читает содержимое файла. Имеет встроенную защиту от огромных файлов (max_lines)."""
-
-        max_lines = self.host_os.config.file_read_max_lines
+    async def read_file(
+        self, filepath: str, read_from: Literal["head", "tail"] = "head"
+    ) -> SkillResult:
+        """
+        Читает содержимое файла. Имеет встроенную защиту от огромных файлов.
+        read_from: 'head' (с начала) или 'tail' (с конца, полезно для логов).
+        """
+        max_chars = self.host_os.config.file_read_max_chars
 
         try:
             safe_path = self.host_os.validate_path(filepath, is_write=False)
@@ -32,26 +36,44 @@ class HostOSFiles:
                     f"Ошибка: Путь не является файлом или не существует ({filepath})."
                 )
 
-            with open(safe_path, "r", encoding="utf-8") as f:
-                lines = []
-                for i, line in enumerate(f):
-                    if i >= max_lines:
-                        lines.append(
-                            f"\n... [Файл обрезан. Превышен лимит в {max_lines} строк] ..."
-                        )
-                        break
-                    lines.append(line.rstrip("\n"))
+            def _read_fast():
+                with open(safe_path, "rb") as f:
+                    f.seek(0, 2)
+                    file_size = f.tell()
 
-            system_logger.info(f"Прочитан файл: {safe_path.name}")
-            return SkillResult.ok("\n".join(lines))
+                    # Если файл маленький - читаем целиком
+                    if file_size <= max_chars:
+                        f.seek(0)
+                        return f.read().decode("utf-8", errors="replace"), False
+
+                    # Иначе читаем только нужный кусок
+                    if read_from == "tail":
+                        f.seek(file_size - max_chars)
+                        return f.read().decode("utf-8", errors="replace"), True
+                    else:
+                        f.seek(0)
+                        return f.read(max_chars).decode("utf-8", errors="replace"), True
+
+            # Выполняем тяжелый I/O в пуле потоков
+            content, is_truncated = await asyncio.to_thread(_read_fast)
+
+            if is_truncated:
+                if read_from == "tail":
+                    content = (
+                        f"...[Файл обрезан с начала. Показаны последние {max_chars} символов]...\n"
+                        + content
+                    )
+                else:
+                    content = (
+                        content
+                        + f"\n...[Файл обрезан с конца. Показаны первые {max_chars} символов]..."
+                    )
+
+            system_logger.info(f"[Host OS] Прочитан файл ({read_from}): {safe_path.name}")
+            return SkillResult.ok(content)
 
         except PermissionError as e:
             return SkillResult.fail(str(e))
-
-        except UnicodeDecodeError:
-            return SkillResult.fail(
-                "Ошибка: Файл является бинарным или имеет неподдерживаемую кодировку."
-            )
 
         except Exception as e:
             return SkillResult.fail(f"Ошибка при чтении файла: {e}")
@@ -75,7 +97,7 @@ class HostOSFiles:
                 f.write(content)
 
             action_type = "Перезаписан" if mode == "w" else "Обновлен"
-            system_logger.info(f"{action_type} файл: {safe_path.name}")
+            system_logger.info(f"[Host OS] {action_type} файл: {safe_path.name}")
             return SkillResult.ok(f"Файл {safe_path.name} успешно сохранен.")
 
         except PermissionError as e:
@@ -108,7 +130,7 @@ class HostOSFiles:
             if not items:
                 return SkillResult.ok(f"Директория '{safe_path.name}' пуста.")
 
-            system_logger.info(f"Просмотр директории: {safe_path.name}")
+            system_logger.info(f"[Host OS] Просмотр директории: {safe_path.name}")
             return SkillResult.ok("\n".join(items))
 
         except PermissionError as e:
@@ -144,7 +166,7 @@ class HostOSFiles:
             if not found:
                 return SkillResult.ok(f"По маске '{pattern}' ничего не найдено.")
 
-            system_logger.info(f"Поиск файлов '{pattern}' в {safe_path.name}")
+            system_logger.info(f"[Host OS] Поиск файлов '{pattern}' в {safe_path.name}")
             return SkillResult.ok("\n".join(found))
 
         except PermissionError as e:
@@ -168,7 +190,7 @@ class HostOSFiles:
 
             safe_path.unlink()
 
-            system_logger.info(f"Удален файл: {safe_path.name}")
+            system_logger.info(f"[Host OS] Удален файл: {safe_path.name}")
             return SkillResult.ok(f"Файл {safe_path.name} успешно удален.")
 
         except PermissionError as e:
@@ -202,7 +224,7 @@ class HostOSFiles:
             # Выполняем I/O-операцию в отдельном потоке, чтобы не блокировать event loop
             await asyncio.to_thread(shutil.rmtree, safe_path)
 
-            system_logger.info(f"Удалена директория: {safe_path.name}")
+            system_logger.info(f"[Host OS] Удалена директория: {safe_path.name}")
             return SkillResult.ok(
                 f"Директория {safe_path.name} и всё её содержимое успешно удалены."
             )

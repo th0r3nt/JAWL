@@ -60,12 +60,12 @@ class VectorThoughts:
                 points=[models.PointStruct(id=point_id, vector=vector, payload=payload)],
             )
 
-            msg = f"[System] Мысль успешно сохранена в векторную базу данных (ID: {point_id})."
+            msg = f"[Vector DB] Мысль успешно сохранена в базу данных (ID: {point_id})."
             system_logger.info(msg)
             return SkillResult.ok(msg)
 
         except Exception as e:
-            msg = f"[System] Ошибка при сохранении мысли в векторную базу данных: {e}"
+            msg = f"[Vector DB] Ошибка при сохранении мысли в базу данных: {e}"
             system_logger.error(msg)
             return SkillResult.fail(msg)
 
@@ -90,12 +90,12 @@ class VectorThoughts:
             )
 
             if not points:
-                msg = f"[System] Поиск мыслей в векторной базе данных по запросу '{safe_query}' не дал результатов."
+                msg = f"[Vector DB] Поиск мыслей в базе данных по запросу '{safe_query}' не дал результатов."
                 system_logger.debug(msg)
                 return SkillResult.ok(msg)
 
             system_logger.info(
-                f"[System] Векторная база данных вернула {len(points)} мыслей по запросу '{safe_query}'."
+                f"[Vector DB] База данных вернула {len(points)} мыслей по запросу '{safe_query}'."
             )
 
             formatted_results = []
@@ -115,7 +115,7 @@ class VectorThoughts:
             return SkillResult.ok("\n\n".join(formatted_results))
 
         except Exception as e:
-            msg = f"[System] Ошибка при поиске мыслей в векторной базе данных: {e}"
+            msg = f"[Vector DB] Ошибка при поиске мыслей в базе данных: {e}"
             system_logger.error(msg)
             return SkillResult.fail(msg)
 
@@ -128,11 +128,12 @@ class VectorThoughts:
                 collection_name=self.collection.name,
                 points_selector=models.PointIdsList(points=[point_id]),
             )
-            msg = f"[System] Мысль успешно удалена в векторной базе данных (ID: {point_id})."
+            msg = f"[Vector DB] Мысль успешно удалена в базе данных (ID: {point_id})."
             system_logger.info(msg)
             return SkillResult.ok(msg)
+        
         except Exception as e:
-            msg = f"[System] Ошибка при удалении мысли в векторной базе данных: {e}"
+            msg = f"[Vector DB] Ошибка при удалении мысли в базе данных: {e}"
             system_logger.error(msg)
             return SkillResult.fail(msg)
 
@@ -149,12 +150,12 @@ class VectorThoughts:
             )
 
             if not records:
-                msg = "[System] Векторная коллекция мыслей пуста."
+                msg = "[Vector DB] Векторная коллекция мыслей пуста."
                 system_logger.debug(msg)
                 return SkillResult.ok(msg)
 
             system_logger.debug(
-                f"[System] Векторная база данных выгрузила {len(records)} мыслей (чтение)."
+                f"[Vector DB] База данных выгрузила {len(records)} мыслей (чтение)."
             )
 
             formatted_results = []
@@ -173,6 +174,6 @@ class VectorThoughts:
             return SkillResult.ok("\n\n".join(formatted_results))
 
         except Exception as e:
-            msg = f"[System] Ошибка при получении мыслей из векторной базы данных: {e}"
+            msg = f"[Vector DB] Ошибка при получении мыслей из базы данных: {e}"
             system_logger.error(msg)
             return SkillResult.fail(msg)

@@ -129,7 +129,11 @@ class ReactLoop:
                         )
                         self.llm.rotator.cooldown_key(session.api_key, 60)
 
-                    await asyncio.sleep(10)
+                    cooldown_sec = 30
+                    await asyncio.sleep(cooldown_sec)
+                    system_logger.info(
+                        f"[LLM] Пауза на {cooldown_sec} сек. перед следующим API вызовом."
+                    )
                     continue
 
                 except openai.AuthenticationError:
@@ -156,17 +160,19 @@ class ReactLoop:
 
                 try:
                     args = json.loads(args_str)
+                    if not isinstance(args, dict):
+                        raise ValueError("Ответ должен быть JSON-объектом (dict).")
 
-                except json.JSONDecodeError:
+                except (json.JSONDecodeError, ValueError) as e:
                     system_logger.error(
-                        "[ReAct] LLM сгенерировала невалидный JSON. Запрашиваем исправление."
+                        f"[ReAct] Ошибка структуры JSON от LLM: {e}. Запрашиваем исправление."
                     )
                     messages.append(
                         {
                             "role": "tool",
                             "tool_call_id": tool_call.id,
                             "name": tool_call.function.name,
-                            "content": "JSONDecodeError: JSON невалиден.",
+                            "content": f"Format Error: {e}",
                         }
                     )
                     step += 1
@@ -177,6 +183,19 @@ class ReactLoop:
 
                 if thoughts:
                     system_logger.info(f"[Thoughts]: {thoughts}")
+
+                if not isinstance(actions, list) or any(not isinstance(a, dict) for a in actions):
+                    error_msg = "Format Error: 'actions' должен быть массивом объектов (list of dicts). Передавать строки запрещено."
+                    system_logger.warning("[ReAct] LLM сгенерировала неверную структуру actions. Запрашиваем исправление.")
+                    
+                    messages.append({
+                        "role": "tool",
+                        "tool_call_id": tool_call.id,
+                        "name": tool_call.function.name,
+                        "content": error_msg,
+                    })
+                    step += 1
+                    continue
 
                 if not actions:
                     system_logger.info(

@@ -32,12 +32,12 @@ class SQLPersonalityTraits:
             await session.commit()
 
         msg = f"Черта личности '{name}' успешно добавлена. ID: {trait_id}"
-        system_logger.info(f"[System] {msg}")
+        system_logger.info(f"[SQL DB] {msg}")
         return SkillResult.ok(msg)
 
     async def get_traits(self) -> SkillResult:
         """Возвращает список всех текущих приобретенных черт личности."""
-        
+
         async with self.db.session_factory() as session:
             result = await session.execute(select(PersonalityTraitTable))
             traits = result.scalars().all()
@@ -66,5 +66,5 @@ class SQLPersonalityTraits:
                 return SkillResult.fail(f"Черта личности с ID {trait_id} не найдена.")
 
         msg = f"Черта личности {trait_id} удалена."
-        system_logger.info(f"[System] {msg}")
+        system_logger.info(f"[SQL DB] {msg}")
         return SkillResult.ok(msg)

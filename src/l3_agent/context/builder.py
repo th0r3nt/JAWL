@@ -312,16 +312,32 @@ class ContextBuilder:
             return "Нет предыдущих тиков."
 
         blocks = []
-        history_max_chars = 500
+        history_max_chars = 1500
 
         for t in ticks:
-            actions_list = [
-                f"`{a.get('tool_name')}`({json.dumps(a.get('parameters', {}), ensure_ascii=False)})"
-                for a in t.actions
-            ]
+            actions_list = []
+            
+            # Если это список (как и должно быть)
+            if isinstance(t.actions, list):
+                for a in t.actions:
+                    if isinstance(a, dict):
+                        t_name = a.get('tool_name', 'unknown')
+                        params = a.get('parameters', {})
+                        actions_list.append(f"`{t_name}`({json.dumps(params, ensure_ascii=False)})")
+                    else:
+                        # Если там застряла строка с прошлых багов
+                        actions_list.append(str(a))
+            # Если LLM сгенерировала словарь вместо списка и он сохранился
+            elif isinstance(t.actions, dict):
+                t_name = t.actions.get('tool_name', 'unknown')
+                params = t.actions.get('parameters', {})
+                actions_list.append(f"`{t_name}`({json.dumps(params, ensure_ascii=False)})")
+            else:
+                actions_list.append(str(t.actions))
+
             actions_str = ", ".join(actions_list) if actions_list else "None"
 
-            if t.results and "execution_report" in t.results:
+            if t.results and isinstance(t.results, dict) and "execution_report" in t.results:
                 res_str = str(t.results["execution_report"])
             elif t.results:
                 res_str = json.dumps(t.results, ensure_ascii=False, indent=2)

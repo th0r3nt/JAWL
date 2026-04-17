@@ -41,12 +41,12 @@ class VectorDB:
                     )
 
             system_logger.info(
-                f"[System] Векторная база данных успешно инициализирована по пути: {self.db_path}"
+                f"[Vector DB] База данных успешно инициализирована по пути: {self.db_path}"
             )
 
         except Exception as e:
             system_logger.error(
-                f"[System] Критическая ошибка при запуске векторной базы данных: {e}"
+                f"[Vector DB] Критическая ошибка при запуске базы данных: {e}"
             )
             raise e
 
@@ -56,4 +56,4 @@ class VectorDB:
         """
         if self.client:
             self.client = None
-            system_logger.info("[System] Подключение к векторной базе данных закрыто.")
+            system_logger.info("[Vector DB] Подключение к базе данных закрыто.")

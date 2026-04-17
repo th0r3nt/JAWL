@@ -48,7 +48,7 @@ class AiogramEvents:
 
         # Запускаем поллинг как фоновую задачу
         self._polling_task = asyncio.create_task(self.dp.start_polling(bot))
-        system_logger.info("[System] AiogramEvents: Фоновый поллинг запущен.")
+        system_logger.info("[Telegram Aiogram] Фоновый поллинг запущен.")
 
     async def stop(self) -> None:
         """Останавливает поллинг."""
@@ -63,7 +63,7 @@ class AiogramEvents:
         except RuntimeError:
             pass  # Игнорируем ошибку "Polling is not started", если он не успел запуститься
 
-        system_logger.info("[System] AiogramEvents: Поллинг остановлен.")
+        system_logger.info("[Telegram Aiogram] Фоновый поллинг остановлен.")
 
     async def _update_state(self, message: Message):
         """

@@ -9,15 +9,15 @@ from pydantic import BaseModel
 
 
 class HostOSConfig(BaseModel):
-    enabled: bool = True
-    madness_level: int = 1
-    env_access: bool = False
-    monitoring_interval_sec: int = 30
-    execution_timeout_sec: int = 60
-    file_read_max_lines: int = 5000
-    file_list_limit: int = 100
-    http_response_max_chars: int = 5000
-    top_processes_limit: int = 10
+    enabled: bool
+    madness_level: int
+    env_access: bool
+    monitoring_interval_sec: int
+    execution_timeout_sec: int
+    file_read_max_chars: int
+    file_list_limit: int
+    http_response_max_chars: int
+    top_processes_limit: int
 
 
 class HostConfig(BaseModel):
@@ -25,12 +25,12 @@ class HostConfig(BaseModel):
 
 
 class TelethonConfig(BaseModel):
-    enabled: bool = False
-    session_name: str = "agent_telethon"
+    enabled: bool
+    session_name: str
 
 
 class AiogramConfig(BaseModel):
-    enabled: bool = False
+    enabled: bool
 
 
 class TelegramConfig(BaseModel):
@@ -39,9 +39,9 @@ class TelegramConfig(BaseModel):
 
 
 class WebConfig(BaseModel):
-    enabled: bool = True
-    request_timeout_sec: int = 15
-    max_page_chars: int = 15000
+    enabled: bool
+    request_timeout_sec: int
+    max_page_chars: int
 
 
 class InterfacesConfig(BaseModel):
@@ -61,35 +61,35 @@ class IdentityConfig(BaseModel):
 
 class LLMConfig(BaseModel):
     model_name: str
-    temperature: float = 0.7
-    max_react_steps: int = 15
+    temperature: float
+    max_react_steps: int
 
 
 class VectorDBConfig(BaseModel):
-    similarity_threshold: float = 0.43
-    embedding_model: str = "intfloat/multilingual-e5-small"
-    vector_size: int = 384
-    auto_rag_top_k: int = 5
+    similarity_threshold: float
+    embedding_model: str
+    vector_size: int
+    auto_rag_top_k: int
 
 
 class ContextDepthConfig(BaseModel):
-    ticks: int = 20
-    tick_result_max_chars: int = 10000  # Лимит на размер результата тулза в контексте
+    ticks: int
+    tick_result_max_chars: int  # Лимит на размер результата тулза в контексте
 
 
 class EventAccelerationConfig(BaseModel):
-    medium_multiplier: float = 0.5
-    low_background_multiplier: float = 0.8
+    medium_multiplier: float
+    low_background_multiplier: float
 
 
 class SystemConfig(BaseModel):
-    timezone: int = 3
+    timezone: int
     vector_db: VectorDBConfig
     loop_interval_sec: int
-    continuous_cycle: bool = False
-    event_acceleration: EventAccelerationConfig = EventAccelerationConfig()
+    continuous_cycle: bool
+    event_acceleration: EventAccelerationConfig
     context_depth: ContextDepthConfig
-    max_mental_state_entities: int = 10
+    max_mental_state_entities: int
 
 
 class SettingsConfig(BaseModel):

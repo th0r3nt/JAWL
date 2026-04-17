@@ -62,13 +62,13 @@ class VectorKnowledge:
             )
 
             msg = (
-                f"[System] Знание успешно сохранено в векторной базе данных (ID: {point_id})."
+                f"[Vector DB] Знание успешно сохранено в базе данных (ID: {point_id})."
             )
             system_logger.info(msg)
             return SkillResult.ok(msg)
 
         except Exception as e:
-            msg = f"[System] Ошибка при сохранении знания в векторной базе данных: {e}"
+            msg = f"[Vector DB] Ошибка при сохранении знания в базе данных: {e}"
             system_logger.error(msg)
             return SkillResult.fail(msg)
 
@@ -92,12 +92,12 @@ class VectorKnowledge:
             )
 
             if not points:
-                msg = "[System] Поиск знаний в векторной базе данных не дал результатов."
+                msg = "[Vector DB] Поиск знаний в базе данных не дал результатов."
                 system_logger.debug(msg)
                 return SkillResult.ok(msg)
 
             system_logger.info(
-                f"[System] Векторная база знаний вернула {len(points)} фрагментов по запросу '{safe_query}'."
+                f"[Vector DB] База знаний вернула {len(points)} фрагментов по запросу '{safe_query}'."
             )
 
             formatted_results = []
@@ -119,7 +119,7 @@ class VectorKnowledge:
             return SkillResult.ok("\n\n".join(formatted_results))
 
         except Exception as e:
-            msg = f"[System] Ошибка при поиске знаний в векторной базе данных: {e}"
+            msg = f"[Vector DB] Ошибка при поиске знаний в базе данных: {e}"
             system_logger.error(msg)
             return SkillResult.fail(msg)
 
@@ -131,17 +131,18 @@ class VectorKnowledge:
                 collection_name=self.collection.name,
                 points_selector=models.PointIdsList(points=[point_id]),
             )
-            msg = f"[System] Знание успешно удалено из векторной базы данных (ID: {point_id})."
+            msg = f"[Vector DB] Знание успешно удалено из базы данных (ID: {point_id})."
             system_logger.debug(msg)
             return SkillResult.ok(msg)
         except Exception as e:
-            msg = f"[System] Ошибка при удалении знания из векторной базы данных: {e}"
+            msg = f"[Vector DB] Ошибка при удалении знания из базы данных: {e}"
             system_logger.error(msg)
             return SkillResult.fail(msg)
 
     @skill()
     async def get_all_knowledge(self, limit: int = 10) -> SkillResult:
         """Получает последние n записей из базы знаний (без семантического поиска)."""
+
         try:
             records, _ = await self.db.client.scroll(
                 collection_name=self.collection.name,
@@ -151,12 +152,12 @@ class VectorKnowledge:
             )
 
             if not records:
-                msg = "[System] База знаний пуста."
+                msg = "[Vector DB] База знаний пуста."
                 system_logger.debug(msg)
                 return SkillResult.ok(msg)
 
             system_logger.debug(
-                f"[System] Векторная база данных выгрузила {len(records)} фрагментов знаний (чтение)."
+                f"[Vector DB] База данных выгрузила {len(records)} фрагментов знаний (чтение)."
             )
 
             formatted_results = []
@@ -177,6 +178,6 @@ class VectorKnowledge:
             return SkillResult.ok("\n\n".join(formatted_results))
 
         except Exception as e:
-            msg = f"[System] Ошибка при чтении базы знаний из векторной базы данных: {e}"
+            msg = f"[Vector DB] Ошибка при чтении базы знаний из базы данных: {e}"
             system_logger.error(msg)
             return SkillResult.fail(msg)

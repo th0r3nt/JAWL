@@ -31,7 +31,7 @@ class SQLTicks:
             session.add(new_tick)
             await session.commit()
 
-        system_logger.info(f"[System] Тик сохранен в SQL (ID: {tick_id[:8]}).")
+        system_logger.debug(f"[SQL DB] Тик сохранен (ID: {tick_id[:8]}).")
         return tick_id
 
     async def get_ticks(self, limit: int = 5) -> list[TickTable]:

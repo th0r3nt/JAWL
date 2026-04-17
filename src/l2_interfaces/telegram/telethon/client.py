@@ -38,7 +38,7 @@ class TelethonClient:
         Запускает клиента.
         При первом запуске попросит ввести номер и код в консоли.
         """
-        system_logger.info("[System] Инициализация Telethon клиента.")
+        system_logger.info("[Telegram Telethon] Инициализация клиента.")
 
         try:
             self._client = TelegramClient(self.session_path, self.api_id, self.api_hash)
@@ -49,11 +49,11 @@ class TelethonClient:
             me = await self._client.get_me()
             name = me.username or me.first_name or "Unknown"
 
-            system_logger.info(f"[System] Telethon успешно авторизован как: {name}")
+            system_logger.info(f"[Telegram Telethon] Успешная авторизация как: {name}")
             self.state.is_online = True
 
         except Exception as e:
-            system_logger.error(f"[System] Критическая ошибка при запуске Telethon: {e}")
+            system_logger.error(f"[Telegram Telethon] Критическая ошибка при запуске: {e}")
             raise e
 
     async def stop(self) -> None:
@@ -61,5 +61,5 @@ class TelethonClient:
 
         if self._client and self._client.is_connected():
             await self._client.disconnect()
-            system_logger.info("[System] Telethon клиент отключен.")
+            system_logger.info("[Telegram Telethon] Клиент отключен.")
             self.state.is_online = False

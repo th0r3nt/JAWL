@@ -61,7 +61,7 @@ class TelethonMessages:
             schedule_info = f" (отложено на {time_delay} сек)" if time_delay else ""
             msg = f"Сообщение успешно отправлено{schedule_info}. ID: {sent_msg.id}"
 
-            system_logger.info(f"Отправлено сообщение в {entity}")
+            system_logger.info(f"[Telegram Telethon] Отправлено сообщение в {entity}")
             return SkillResult.ok(msg)
 
         except ValueError:
@@ -69,7 +69,7 @@ class TelethonMessages:
 
         except Exception as e:
             msg = f"Ошибка при отправке сообщения: {e}"
-            system_logger.error(f"[Agent Action Result] {msg}")
+            system_logger.error(msg)
             return SkillResult.fail(msg)
 
     @skill()
@@ -86,7 +86,7 @@ class TelethonMessages:
                 from_peer=self._parse_entity(from_id),
             )
 
-            system_logger.info(f"Пересылка сообщения {msg_id} в {to_id}")
+            system_logger.info(f"[Telegram Telethon] Пересылка сообщения {msg_id} в {to_id}")
             return SkillResult.ok(f"Сообщение {msg_id} успешно переслано.")
 
         except Exception as e:
@@ -102,7 +102,7 @@ class TelethonMessages:
                 entity=self._parse_entity(chat_id), message_ids=[int(msg_id)]
             )
 
-            system_logger.info(f"Сообщение {msg_id} удалено в чате {chat_id}")
+            system_logger.info(f"[Telegram Telethon]Сообщение {msg_id} удалено в чате {chat_id}")
             return SkillResult.ok(f"Сообщение {msg_id} успешно удалено.")
 
         except Exception as e:
@@ -120,7 +120,7 @@ class TelethonMessages:
                 entity=self._parse_entity(chat_id), message=int(msg_id), text=new_text
             )
 
-            system_logger.info(f"Сообщение {msg_id} отредактировано")
+            system_logger.info(f"[Telegram Telethon]Сообщение {msg_id} отредактировано")
             return SkillResult.ok(f"Текст сообщения {msg_id} успешно изменен.")
 
         except Exception as e:

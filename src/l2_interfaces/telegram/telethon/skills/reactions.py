@@ -33,7 +33,7 @@ class TelethonReactions:
             )
 
             system_logger.info(
-                f"Реакция '{reaction}' поставлена на сообщение {message_id} в чате {chat_id}"
+                f"[Telegram Telethon] Реакция '{reaction}' поставлена на сообщение {message_id} в чате {chat_id}"
             )
             return SkillResult.ok(f"Реакция '{reaction}' успешно установлена.")
 
@@ -58,7 +58,7 @@ class TelethonReactions:
                 SendReactionRequest(peer=int(chat_id), msg_id=int(message_id), reaction=[])
             )
 
-            system_logger.info(f"Реакция снята с сообщения {message_id} в чате {chat_id}")
+            system_logger.info(f"[Telegram Telethon] Реакция снята с сообщения {message_id} в чате {chat_id}")
             return SkillResult.ok("Реакция успешно удалена.")
 
         except Exception as e:

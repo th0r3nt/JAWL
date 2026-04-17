@@ -34,7 +34,7 @@ class TokenTracker:
             {"prompt": prompt_tokens, "context": context_tokens, "total": total_tokens}
         )
 
-        msg = f"Input tokens: {total_tokens} (prompt: {prompt_tokens}, context: {context_tokens})."
+        msg = f"[LLM] Input tokens: {total_tokens} (prompt: {prompt_tokens}, context: {context_tokens})."
         system_logger.info(msg)
         return msg
 
@@ -44,7 +44,7 @@ class TokenTracker:
 
         self.output_history.append({"total": output_tokens})
 
-        msg = f"Output tokens: {output_tokens}."
+        msg = f"[LLM] Output tokens: {output_tokens}."
         system_logger.info(msg)
         return msg
 

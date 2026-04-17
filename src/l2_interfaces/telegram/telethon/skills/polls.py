@@ -45,7 +45,7 @@ class TelethonPolls:
 
             msg = await client.send_message(int(chat_id), file=InputMediaPoll(poll=poll))
 
-            system_logger.info(f"Создан опрос '{question}' в чате {chat_id}")
+            system_logger.info(f"[Telegram Telethon] Создан опрос '{question}' в чате {chat_id}")
             return SkillResult.ok(f"Опрос успешно создан. ID сообщения: {msg.id}")
 
         except Exception as e:
@@ -122,7 +122,7 @@ class TelethonPolls:
                 )
             )
 
-            system_logger.info(f"Оставлен голос в опросе {message_id} (чат {chat_id})")
+            system_logger.info(f"[Telegram Telethon] Оставлен голос в опросе {message_id} (чат {chat_id})")
             return SkillResult.ok("Голос успешно учтен.")
 
         except Exception as e:
@@ -152,7 +152,7 @@ class TelethonPolls:
                 int(chat_id), int(message_id), file=InputMediaPoll(poll=poll)
             )
 
-            system_logger.info(f"Опрос {message_id} закрыт (чат {chat_id})")
+            system_logger.info(f"[Telegram Telethon] Опрос {message_id} закрыт (чат {chat_id})")
             return SkillResult.ok("Опрос успешно закрыт.")
 
         except Exception as e:

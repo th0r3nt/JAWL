@@ -39,10 +39,10 @@ class TelethonEvents:
             events.Raw(),
         )
 
-        system_logger.info("[System] TelethonEvents: Слушатели событий успешно запущены.")
+        system_logger.info("[Telegram Telethon] Слушатели событий успешно запущены.")
 
     async def stop(self) -> None:
-        system_logger.info("[System] TelethonEvents: Слушатели событий остановлены.")
+        system_logger.info("[Telegram Telethon] Слушатели событий успешно остановлены.")
 
     async def _update_state(self):
         client = self.tg_client.client()

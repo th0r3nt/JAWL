@@ -46,7 +46,7 @@ def _register_callable(
     func: Callable, override: Optional[str] = None, instance: Optional[Any] = None
 ):
     """Ядро регистрации. Формирует докстринги и сохраняет ссылку на вызов."""
-    
+
     skill_name = _build_skill_name(func, override, instance)
 
     sig = inspect.signature(func)
@@ -114,11 +114,18 @@ def get_skills_library() -> str:
 
 
 async def execute_skill(actions: list[dict]) -> str:
+    if not isinstance(actions, list):
+        return "System Error: Поле 'actions' должно быть массивом (list) объектов."
+
     if not actions:
         return "Цикл завершен: действий не передано."
 
     tasks = []
     for act in actions:
+        # Добавляем защиту от галлюцинаций LLM
+        if not isinstance(act, dict):
+            return f"System Error: Элемент массива 'actions' должен быть объектом (dict), а получен {type(act).__name__}."
+
         name = act.get("tool_name", "unknown_tool")
         params = act.get("parameters", {})
 
@@ -130,7 +137,11 @@ async def execute_skill(actions: list[dict]) -> str:
 
     report = []
     for i, res in enumerate(results):
-        tool_name = actions[i].get("tool_name")
+        tool_name = (
+            actions[i].get("tool_name", "unknown")
+            if isinstance(actions[i], dict)
+            else "unknown"
+        )
         report.append(f"Action [{tool_name}]: {res.message}")
 
     return "\n".join(report)

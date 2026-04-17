@@ -25,7 +25,7 @@ class TelethonAccount:
             # В Telegram "name" - это first_name, а "surname" - last_name
             await client(UpdateProfileRequest(first_name=name, last_name=surname))
 
-            system_logger.info(f"Имя Telegram профиля изменено: {name} {surname}")
+            system_logger.info(f"[Telegram Telethon] Имя профиля изменено: {name} {surname}")
             return SkillResult.ok(f"Имя профиля успешно изменено на '{name} {surname}'.")
 
         except Exception as e:
@@ -39,8 +39,8 @@ class TelethonAccount:
 
             await client(UpdateProfileRequest(about=text))
 
-            system_logger.info(f"Био ТГ профиля изменено на: {text}")
-            return SkillResult.ok("Биография успешно изменена.")
+            system_logger.info(f"[Telegram Telethon] Био профиля изменено на: {text}")
+            return SkillResult.ok("[Telegram Telethon] Биография успешно изменена.")
 
         except Exception as e:
             return SkillResult.fail(f"Ошибка при изменении био: {e}")
@@ -60,7 +60,7 @@ class TelethonAccount:
             # Затем устанавливаем загруженный файл как фото профиля
             await client(UploadProfilePhotoRequest(file=uploaded_file))
 
-            system_logger.info(f"Аватар Telegram профиля обновлен файлом: {filepath}")
+            system_logger.info(f"[Telegram Telethon] Аватар профиля обновлен файлом: {filepath}")
             return SkillResult.ok("Аватар профиля успешно изменен.")
 
         except Exception as e:

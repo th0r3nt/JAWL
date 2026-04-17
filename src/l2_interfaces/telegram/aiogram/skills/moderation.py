@@ -23,7 +23,7 @@ class AiogramModeration:
             # В aiogram ban_chat_member навсегда исключает пользователя из чата
             await bot.ban_chat_member(chat_id=int(chat_id), user_id=int(user_id))
 
-            msg = f"Пользователь {user_id} забанен в чате {chat_id} (Aiogram)."
+            msg = f"[Telegram Aiogram] Пользователь {user_id} забанен в чате {chat_id} (Aiogram)."
             system_logger.info({msg})
             return SkillResult.ok(msg)
 
