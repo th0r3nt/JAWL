@@ -32,6 +32,7 @@ class ReactLoop:
         sql_ticks: SQLTicks,
         token_tracker: TokenTracker,
         tools: list,  # ACTION SCHEMA
+        cooldown_sec: int = 30
     ):
         self.llm = llm_client
         self.prompt_builder = prompt_builder
@@ -40,6 +41,7 @@ class ReactLoop:
         self.sql_ticks = sql_ticks
         self.tracker = token_tracker
         self.tools = tools
+        self.cooldown_sec = cooldown_sec # Если API ключ ллмки уйдет в минутный RateLimit - он отдыхает n сек
 
     def _dump_context_to_file(self, messages: list):
         """
@@ -129,10 +131,9 @@ class ReactLoop:
                         )
                         self.llm.rotator.cooldown_key(session.api_key, 60)
 
-                    cooldown_sec = 30
-                    await asyncio.sleep(cooldown_sec)
+                    await asyncio.sleep(self.cooldown_sec)
                     system_logger.info(
-                        f"[LLM] Пауза на {cooldown_sec} сек. перед следующим API вызовом."
+                        f"[LLM] Пауза на {self.cooldown_sec} сек. перед следующим API вызовом."
                     )
                     continue
 

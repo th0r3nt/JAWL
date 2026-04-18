@@ -27,12 +27,15 @@ class TelethonMessages:
         to_id: Union[int, str],
         text: str,
         reply_to_message_id: Optional[int] = None,
+        topic_id: Optional[int] = None,
         is_silent: bool = False,
         time_delay: Optional[int] = None,
     ) -> SkillResult:
         """
         Отправляет текстовое сообщение. to_id может быть как числовым ID, так и юзернеймом.
+        Для отправки в конкретный топик форума - использовать аргумент topic_id.
         """
+
         try:
             client = self.tg_client.client()
             entity = self._parse_entity(to_id)
@@ -43,7 +46,10 @@ class TelethonMessages:
                 "silent": is_silent,
             }
 
-            if reply_to_message_id:
+            # Telethon использует один и тот же параметр reply_to для ответов и топиков
+            if topic_id:
+                kwargs["reply_to"] = int(topic_id)
+            elif reply_to_message_id:
                 kwargs["reply_to"] = int(reply_to_message_id)
 
             if time_delay:
@@ -61,7 +67,9 @@ class TelethonMessages:
             schedule_info = f" (отложено на {time_delay} сек)" if time_delay else ""
             msg = f"Сообщение успешно отправлено{schedule_info}. ID: {sent_msg.id}"
 
-            system_logger.info(f"[Telegram Telethon] Отправлено сообщение в {entity}")
+            system_logger.info(
+                f"[Telegram Telethon] Отправлено сообщение в {entity} (Топик: {topic_id})"
+            )
             return SkillResult.ok(msg)
 
         except ValueError:
@@ -85,10 +93,8 @@ class TelethonMessages:
                 messages=int(msg_id),
                 from_peer=self._parse_entity(from_id),
             )
-
             system_logger.info(f"[Telegram Telethon] Пересылка сообщения {msg_id} в {to_id}")
             return SkillResult.ok(f"Сообщение {msg_id} успешно переслано.")
-
         except Exception as e:
             return SkillResult.fail(f"Ошибка при пересылке сообщения: {e}")
 
@@ -101,10 +107,10 @@ class TelethonMessages:
             await client.delete_messages(
                 entity=self._parse_entity(chat_id), message_ids=[int(msg_id)]
             )
-
-            system_logger.info(f"[Telegram Telethon]Сообщение {msg_id} удалено в чате {chat_id}")
+            system_logger.info(
+                f"[Telegram Telethon] Сообщение {msg_id} удалено в чате {chat_id}"
+            )
             return SkillResult.ok(f"Сообщение {msg_id} успешно удалено.")
-
         except Exception as e:
             return SkillResult.fail(f"Ошибка при удалении сообщения: {e}")
 
@@ -119,9 +125,7 @@ class TelethonMessages:
             await client.edit_message(
                 entity=self._parse_entity(chat_id), message=int(msg_id), text=new_text
             )
-
-            system_logger.info(f"[Telegram Telethon]Сообщение {msg_id} отредактировано")
+            system_logger.info(f"[Telegram Telethon] Сообщение {msg_id} отредактировано")
             return SkillResult.ok(f"Текст сообщения {msg_id} успешно изменен.")
-
         except Exception as e:
             return SkillResult.fail(f"Ошибка при редактировании сообщения: {e}")

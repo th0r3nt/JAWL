@@ -178,7 +178,7 @@ async def test_on_reaction(telethon_events, mock_bus):
 
 
 # ===================================================================
-# TESTS: SKILLS (Пример)
+# TESTS: SKILLS
 # ===================================================================
 
 
@@ -199,4 +199,25 @@ async def test_send_message_skill(mock_tg_client):
 
     mock_tg_client.client().send_message.assert_called_once_with(
         entity=123, message="Test", silent=False
+    )
+
+
+@pytest.mark.asyncio
+async def test_send_message_with_topic_skill(mock_tg_client):
+    """Тест навыка агента: отправка сообщения в конкретный топик форума."""
+    skills = TelethonMessages(mock_tg_client)
+
+    sent_msg = MagicMock()
+    sent_msg.id = 777
+    mock_tg_client.client().send_message = AsyncMock(return_value=sent_msg)
+
+    # Передаем topic_id = 5238
+    res = await skills.send_message(to_id=-100123, text="Test Topic", topic_id=5238)
+
+    assert res.is_success is True
+    assert "777" in res.message
+
+    # Telethon под капотом использует reply_to для отправки в топики
+    mock_tg_client.client().send_message.assert_called_once_with(
+        entity=-100123, message="Test Topic", silent=False, reply_to=5238
     )

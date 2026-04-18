@@ -31,6 +31,8 @@ def mock_dependencies():
     # Фейковая схема
     tools = [{"type": "function", "function": {"name": "execute_skill"}}]
 
+    cooldown_sec = 2
+
     return {
         "llm_client": llm_client,
         "prompt_builder": prompt_builder,
@@ -39,6 +41,7 @@ def mock_dependencies():
         "sql_ticks": sql_ticks,
         "token_tracker": token_tracker,
         "tools": tools,
+        "cooldown_sec": cooldown_sec,
     }
 
 
@@ -83,7 +86,7 @@ async def test_react_empty_actions_exit(mock_execute_skill, mock_dependencies):
     )
     deps["llm_client"].get_session = MagicMock(return_value=mock_session)
 
-    await loop.run("HEARTBEAT", {}, missed_events=[]) 
+    await loop.run("HEARTBEAT", {}, missed_events=[])
 
     # Проверки
     assert deps["agent_state"].state == AgentStatus.IDLE

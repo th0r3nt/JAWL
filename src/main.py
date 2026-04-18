@@ -51,6 +51,7 @@ from src.l2_interfaces.host.os.skills.monitoring import HostOSMonitoring
 # Meta
 from src.l2_interfaces.meta.client import MetaClient
 from src.l2_interfaces.meta.skills.configuration import MetaConfiguration
+from src.l2_interfaces.meta.skills.system import MetaSystem
 
 # Telethon
 from src.l2_interfaces.telegram.telethon.client import TelethonClient
@@ -110,6 +111,7 @@ class System:
 
         # Хранилище компонентов, у которых есть методы start() и stop()
         self._lifecycle_components: list[Any] = []
+        self._exit_code: int = 0  # 0 - выключение, 1 - перезагрузка
 
         # Заглушки для безопасного вызова stop() при раннем падении
         self.sql: Optional[SQLManager] = None
@@ -200,7 +202,11 @@ class System:
         ):
             settings_path = self.root_dir / "config" / "settings.yaml"
             meta_client = MetaClient(self.agent_state, self.event_bus, settings_path)
+
+            # Регистрация навыков для агента
             register_instance(MetaConfiguration(meta_client))
+            register_instance(MetaSystem(meta_client))
+
             system_logger.info("[System]  Интерфейс Meta загружен.")
 
         # TELEGRAM: TELETHON
@@ -356,12 +362,27 @@ class System:
         for event in Events.all():
             self.event_bus.subscribe(event, create_handler(event))
 
-        # Специфичная подписка: если это событие конфига - меняем настройки на лету
+        # Специфичные подписки
         def handle_config_update(**kwargs):
             key = kwargs.get("key")
             value = kwargs.get("value")
             if key and value is not None:
                 self.heartbeat.update_config(key, value)
+
+        # Если агент решил совершить сэппуку
+        def handle_shutdown(**kwargs):
+            self._exit_code = 0
+            if self.heartbeat:
+                self.heartbeat.stop()
+
+        # Если агент запросил перезагрузку
+        def handle_reboot(**kwargs):
+            self._exit_code = 1
+            if self.heartbeat:
+                self.heartbeat.stop()
+
+        self.event_bus.subscribe(Events.SYSTEM_SHUTDOWN_REQUESTED, handle_shutdown)
+        self.event_bus.subscribe(Events.SYSTEM_REBOOT_REQUESTED, handle_reboot)
 
         self.event_bus.subscribe(Events.SYSTEM_CONFIG_UPDATED, handle_config_update)
 
@@ -376,7 +397,7 @@ class System:
         telethon_api_id: Optional[str] = None,
         telethon_api_hash: Optional[str] = None,
         aiogram_bot_token: Optional[str] = None,
-    ):
+    ) -> int:
         """Запуск системы."""
 
         system_logger.info("[System] Инициализация JAWL.")
@@ -411,6 +432,8 @@ class System:
 
         # Блокирующий цикл жизни агента
         await self.heartbeat.start()
+
+        return self._exit_code
 
     async def stop(self) -> None:
         """Остановка и очистка ресурсов."""
@@ -447,7 +470,7 @@ class System:
 # ===================================================================
 
 
-async def main():
+async def main() -> int:
     # Загружаем переменные окружения
     load_dotenv()
 
@@ -472,23 +495,26 @@ async def main():
             if k.startswith("LLM_API_KEY_") and v.strip()
         ]
 
-        await system.run(
+        exit_code = await system.run(
             llm_api_url=LLM_API_URL,
             llm_api_keys=LLM_API_KEYS,
             telethon_api_id=TELETHON_API_ID,
             telethon_api_hash=TELETHON_API_HASH,
             aiogram_bot_token=AIOGRAM_BOT_TOKEN,
         )
+        return exit_code
 
     except asyncio.CancelledError:
         pass
 
     except KeyboardInterrupt:
         system_logger.info("[System] Получен сигнал прерывания.")
+        return 0
 
     except BaseException as e:
         system_logger.error(f"[System] Критическая ошибка: {type(e).__name__} - {e}")
         system_logger.error(traceback.format_exc())
+        return 0
 
     finally:
         await system.stop()

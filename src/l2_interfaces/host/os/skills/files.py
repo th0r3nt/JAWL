@@ -234,3 +234,42 @@ class HostOSFiles:
 
         except Exception as e:
             return SkillResult.fail(f"Ошибка при удалении директории: {e}")
+
+    @skill()
+    async def create_directories(self, paths: list[str]) -> SkillResult:
+        """
+        Создает одну или несколько директорий (папок).
+        Поддерживает создание вложенных структур (например, 'project/src/api').
+        """
+
+        if not paths:
+            return SkillResult.fail("Ошибка: Список путей пуст.")
+
+        created = []
+        errors = []
+
+        for path in paths:
+            try:
+                # Гейткипер проверит права на запись
+                safe_path = self.host_os.validate_path(path, is_write=True)
+
+                # Создаем папку вместе со всеми промежуточными
+                await asyncio.to_thread(safe_path.mkdir, parents=True, exist_ok=True)
+                created.append(safe_path.name)
+                
+            except PermissionError as e:
+                errors.append(f"{path}: {e}")
+
+            except Exception as e:
+                errors.append(f"{path}: Ошибка создания ({e})")
+
+        # Формируем итоговый отчет
+        if not created and errors:
+            return SkillResult.fail("Не удалось создать директории:\n" + "\n".join(errors))
+
+        msg = f"Успешно созданы директории: {', '.join(created)}."
+        if errors:
+            msg += "\n\nНо возникли ошибки с этими путями:\n" + "\n".join(errors)
+
+        system_logger.info(f"[Host OS] Созданы директории: {', '.join(created)}")
+        return SkillResult.ok(msg)

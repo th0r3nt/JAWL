@@ -146,6 +146,20 @@ class Events:
         requires_attention=False,
     )
 
+    SYSTEM_SHUTDOWN_REQUESTED = EventConfig(
+        name="SYSTEM_SHUTDOWN_REQUESTED",
+        description="Агент запросил полное выключение системы.",
+        level=EventLevel.HIGH,
+        requires_attention=False,
+    )
+
+    SYSTEM_REBOOT_REQUESTED = EventConfig(
+        name="SYSTEM_REBOOT_REQUESTED",
+        description="Агент запросил перезагрузку системы.",
+        level=EventLevel.HIGH,
+        requires_attention=False,
+    )
+
     @classmethod
     def all(cls) -> list[EventConfig]:
         events = []

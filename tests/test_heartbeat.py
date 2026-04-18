@@ -109,3 +109,22 @@ async def test_heartbeat_loop_event_driven(mock_react_loop, mock_accel_config):
     mock_react_loop.run.assert_called_once_with(
         event_name="DB_DOWN", payload={"error": "timeout"}, missed_events=ANY
     )
+
+
+def test_heartbeat_update_config(mock_react_loop, mock_accel_config):
+    """Тест: обновление конфигурации на лету."""
+    hb = Heartbeat(
+        mock_react_loop,
+        heartbeat_interval=60,
+        continuous_cycle=False,
+        accel_config=mock_accel_config,
+        timezone=3,
+    )
+
+    # Меняем интервал
+    hb.update_config("heartbeat_interval", 120)
+    assert hb.heartbeat_interval == 120
+
+    # Меняем continuous_cycle
+    hb.update_config("continuous_cycle", True)
+    assert hb.continuous_cycle is True

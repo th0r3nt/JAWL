@@ -162,6 +162,25 @@ async def test_os_files_delete_directory_root_protection(os_client):
     assert os_client.sandbox_dir.exists()  # Папка должна выжить
 
 
+@pytest.mark.asyncio
+async def test_os_files_create_directories(os_client):
+    """Тест: массовое создание вложенных директорий."""
+    files = HostOSFiles(os_client)
+
+    # Передаем два пути. Один простой, второй вложенный
+    paths = [
+        str(os_client.sandbox_dir / "docs"),
+        str(os_client.sandbox_dir / "src" / "api" / "v1"),
+    ]
+
+    res = await files.create_directories(paths)
+
+    assert res.is_success is True
+    assert (os_client.sandbox_dir / "docs").exists()
+    assert (os_client.sandbox_dir / "src" / "api" / "v1").exists()
+    assert "Успешно созданы директории: docs, v1" in res.message
+
+
 # ===================================================================
 # TESTS: PCExecution
 # ===================================================================
