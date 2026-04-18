@@ -28,7 +28,7 @@ class Heartbeat:
         timezone: int,
     ):
         self.react_loop = react_loop
-        self.tick_interval_sec = heartbeat_interval
+        self.heartbeat_interval = heartbeat_interval
         self.continuous_cycle = continuous_cycle
         self.accel_config = accel_config
         self.timezone = timezone
@@ -99,7 +99,7 @@ class Heartbeat:
         system_logger.info("[System] Heartbeat запущен. Агент переведен в автономный режим.")
 
         if self._next_tick_time == 0.0:
-            self._next_tick_time = time.time() + self.tick_interval_sec
+            self._next_tick_time = time.time() + self.heartbeat_interval
 
         while self._is_running:
             now = time.time()
@@ -136,7 +136,7 @@ class Heartbeat:
                     await self._active_react_task
 
                     # Сбрасываем причину только если цикл завершился сам, без прерываний
-                    self._next_tick_time = time.time() + self.tick_interval_sec
+                    self._next_tick_time = time.time() + self.heartbeat_interval
                     self._wake_reason = "HEARTBEAT"
                     self._wake_payload = {}
 
@@ -152,7 +152,7 @@ class Heartbeat:
 
                 except Exception as e:
                     system_logger.error(f"[System] Критическая ошибка в ReAct-цикле: {e}")
-                    self._next_tick_time = time.time() + self.tick_interval_sec
+                    self._next_tick_time = time.time() + self.heartbeat_interval
                     self._wake_reason = "HEARTBEAT"
                     self._wake_payload = {}
 
@@ -171,9 +171,9 @@ class Heartbeat:
         """Метод для динамического обновления настроек на лету (по сигналу из EventBus)."""
 
         if key == "heartbeat_interval":
-            self.tick_interval_sec = int(value)
+            self.heartbeat_interval = int(value)
             system_logger.info(
-                f"[System] Heartbeat обновил интервал на {self.tick_interval_sec} сек."
+                f"[System] Heartbeat обновил интервал на {self.heartbeat_interval} сек."
             )
 
         elif key == "continuous_cycle":

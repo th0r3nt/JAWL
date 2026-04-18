@@ -333,7 +333,7 @@ class System:
 
         self.heartbeat = Heartbeat(
             react_loop=react_loop,
-            tick_interval_sec=self.settings.system.heartbeat_interval,
+            heartbeat_interval=self.settings.system.heartbeat_interval,
             continuous_cycle=self.settings.system.continuous_cycle,
             accel_config=self.settings.system.event_acceleration,
             timezone=self.settings.system.timezone,
