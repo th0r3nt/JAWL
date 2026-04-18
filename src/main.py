@@ -46,6 +46,11 @@ from src.l2_interfaces.host.os.skills.execution import HostOSExecution
 from src.l2_interfaces.host.os.skills.files import HostOSFiles
 from src.l2_interfaces.host.os.skills.network import HostOSNetwork
 from src.l2_interfaces.host.os.skills.system import HostOSSystem
+from src.l2_interfaces.host.os.skills.monitoring import HostOSMonitoring
+
+# Meta
+from src.l2_interfaces.meta.client import MetaClient
+from src.l2_interfaces.meta.skills.configuration import MetaConfiguration
 
 # Telethon
 from src.l2_interfaces.telegram.telethon.client import TelethonClient
@@ -152,6 +157,7 @@ class System:
         )
         await self.vector.connect()
 
+        # Регистрация навыков для агента
         register_instance(self.vector.knowledge)
         register_instance(self.vector.thoughts)
 
@@ -177,13 +183,25 @@ class System:
                 host_os_client=os_client, state=self.os_state, event_bus=self.event_bus
             )
 
+            # Регистрация навыков для агента
             register_instance(HostOSExecution(os_client))
             register_instance(HostOSFiles(os_client))
             register_instance(HostOSNetwork(os_client))
             register_instance(HostOSSystem(os_client))
+            register_instance(HostOSMonitoring(os_client, os_events))
 
             self._lifecycle_components.append(os_events)
             system_logger.info("[System] Интерфейс Host OS загружен.")
+
+        # META
+        if (
+            getattr(self.interfaces_config, "meta", None)
+            and self.interfaces_config.meta.enabled
+        ):
+            settings_path = self.root_dir / "config" / "settings.yaml"
+            meta_client = MetaClient(self.agent_state, self.event_bus, settings_path)
+            register_instance(MetaConfiguration(meta_client))
+            system_logger.info("[System]  Интерфейс Meta загружен.")
 
         # TELEGRAM: TELETHON
         if self.interfaces_config.telegram.telethon.enabled:
@@ -209,6 +227,7 @@ class System:
                     tg_client=tel_client, state=self.telethon_state, event_bus=self.event_bus
                 )
 
+                # Регистрация навыков для агента
                 register_instance(TelethonAccount(tel_client))
                 register_instance(TelethonChats(tel_client))
                 register_instance(TelethonMessages(tel_client))
@@ -235,6 +254,7 @@ class System:
                     event_bus=self.event_bus,
                 )
 
+                # Регистрация навыков для агента
                 register_instance(AiogramChats(aio_client, self.aiogram_state))
                 register_instance(AiogramMessages(aio_client))
                 register_instance(AiogramModeration(aio_client))
@@ -257,6 +277,7 @@ class System:
                 client=web_client, search_skill=web_search, pages_skill=web_pages
             )
 
+            # Регистрация навыков для агента
             register_instance(web_search)
             register_instance(web_pages)
             register_instance(web_research)
@@ -312,7 +333,7 @@ class System:
 
         self.heartbeat = Heartbeat(
             react_loop=react_loop,
-            tick_interval_sec=self.settings.system.loop_interval_sec,
+            tick_interval_sec=self.settings.system.heartbeat_interval,
             continuous_cycle=self.settings.system.continuous_cycle,
             accel_config=self.settings.system.event_acceleration,
             timezone=self.settings.system.timezone,
@@ -331,8 +352,18 @@ class System:
 
             return handler
 
+        # Базовая подписка: будим агента на любые события
         for event in Events.all():
             self.event_bus.subscribe(event, create_handler(event))
+
+        # Специфичная подписка: если это событие конфига - меняем настройки на лету
+        def handle_config_update(**kwargs):
+            key = kwargs.get("key")
+            value = kwargs.get("value")
+            if key and value is not None:
+                self.heartbeat.update_config(key, value)
+
+        self.event_bus.subscribe(Events.SYSTEM_CONFIG_UPDATED, handle_config_update)
 
     # ===========================================
     # RUN & STOP

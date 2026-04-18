@@ -4,6 +4,8 @@ import socket
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 import psutil
+import json
+from typing import Any
 
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
@@ -74,37 +76,22 @@ class HostOSEvents:
         self._is_running: bool = False
         self._monitoring_task: asyncio.Task | None = None
 
-        # Инструменты Watchdog
         self._observer: Observer | None = None  # type: ignore
+        self._watches: dict[str, Any] = {}
+
+        # Файл для хранения отслеживаемых директорий между запусками
+        self._persistence_file = (
+            self.host_os.framework_dir
+            / "src"
+            / "utils"
+            / "local"
+            / "data"
+            / "os"
+            / "tracked_dirs.json"
+        )
 
         self._last_sandbox_files = set()
         psutil.cpu_percent(interval=None)
-
-    def _is_ignored(self, path: Path) -> bool:
-        """Единый фильтр мусора. Отсекает кэш, логи, скрытые файлы и виртуальные окружения."""
-
-        ignore_dirs = {
-            "__pycache__",
-            ".pytest_cache",
-            "node_modules",
-            "venv",
-            ".venv",
-            "env",
-            ".git",
-        }
-        ignore_exts = {".pyc", ".pyo", ".pyd", ".tmp", ".swp"}
-
-        if path.suffix in ignore_exts or path.name.endswith("~"):
-            return True
-
-        for part in path.parts:
-            if part in ignore_dirs:
-                return True
-            # Игнорируем скрытые папки/файлы, но оставляем .env на случай, если он нужен в песочнице
-            if part.startswith(".") and part not in {".", ".env"}:
-                return True
-
-        return False
 
     async def start(self) -> None:
         if self._is_running:
@@ -112,16 +99,32 @@ class HostOSEvents:
 
         self._is_running = True
 
-        # 1. Запуск регулярного поллинга (Телеметрия, Сеть, Время)
+        # Тихая пред-индексация песочницы, чтобы не спамить логами о "новых" файлах при старте
+        if self.host_os.sandbox_dir.exists():
+            self._last_sandbox_files = set(
+                str(p.relative_to(self.host_os.sandbox_dir))
+                for p in self.host_os.sandbox_dir.rglob("*")
+                if not self._is_ignored(p)
+            )
+
         self._monitoring_task = asyncio.create_task(self._loop())
 
-        # 2. Запуск Watchdog (Моментальная реакция на файлы)
+        # Запуск Watchdog
         self._observer = Observer()
-        handler = _SandboxWatchdogHandler(self, asyncio.get_running_loop())
-        # Натравливаем наблюдателя на песочницу
-        self._observer.schedule(handler, str(self.host_os.sandbox_dir), recursive=True)
-        self._observer.start()
 
+        # Дефолтная песочница
+        self.track_path(str(self.host_os.sandbox_dir), save=False)
+
+        # Восстанавливаем кастомные пути
+        for p in self._load_persisted_dirs():
+            try:
+                self.track_path(p, save=False)
+            except Exception as e:
+                system_logger.warning(
+                    f"[Host OS] Не удалось восстановить отслеживание для {p}: {e}"
+                )
+
+        self._observer.start()
         system_logger.info("[Host OS] Мониторинг и файловый радар запущены.")
 
     async def stop(self) -> None:
@@ -131,15 +134,71 @@ class HostOSEvents:
             self._monitoring_task.cancel()
             self._monitoring_task = None
 
-        # Остановка Watchdog
         if self._observer:
             self._observer.stop()
-            # Для корректного закрытия потока (to_thread чтобы не блочить Event Loop)
             await asyncio.to_thread(self._observer.join)
             self._observer = None
+            self._watches.clear()
 
         system_logger.info("[Host OS] Мониторинг остановлен.")
         self.state.is_online = False
+
+    # ==========================================================
+    # КАСТОМНЫЕ ДИРЕКТОРИИ
+    # ==========================================================
+
+    def track_path(self, path_str: str, save: bool = True) -> bool:
+        """Регистрирует путь в Watchdog."""
+
+        if path_str in self._watches:
+            return False
+
+        path_obj = Path(path_str)
+        if not path_obj.exists() or not path_obj.is_dir():
+            raise ValueError(f"Путь не существует или не является директорией: {path_str}")
+
+        handler = _SandboxWatchdogHandler(self, asyncio.get_running_loop())
+        watch = self._observer.schedule(handler, path_str, recursive=True)
+        self._watches[path_str] = watch
+
+        if save:
+            self._save_persisted_dirs()
+        return True
+
+    def untrack_path(self, path_str: str) -> bool:
+        """Удаляет путь из Watchdog."""
+
+        if path_str not in self._watches:
+            return False
+        if path_str == str(self.host_os.sandbox_dir):
+            raise ValueError(
+                "Отказано в доступе: запрещено отключать мониторинг корневой песочницы."
+            )
+
+        watch = self._watches.pop(path_str)
+        self._observer.unschedule(watch)
+        self._save_persisted_dirs()
+        return True
+
+    def _save_persisted_dirs(self):
+        self._persistence_file.parent.mkdir(parents=True, exist_ok=True)
+        # Не сохраняем дефолтную песочницу, только кастомные пути
+        paths = [p for p in self._watches.keys() if p != str(self.host_os.sandbox_dir)]
+        with open(self._persistence_file, "w", encoding="utf-8") as f:
+            json.dump(paths, f, indent=4)
+
+    def _load_persisted_dirs(self) -> list:
+        if not self._persistence_file.exists():
+            return []
+        try:
+            with open(self._persistence_file, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            return []
+
+    # ==========================================================
+    # ПОЛЛИНГ
+    # ==========================================================
 
     async def handle_file_system_event(self, sys_event_config, filepath: str):
         """Вызывается мгновенно при любом изменении файла (создание/удаление/изменение)."""
@@ -171,6 +230,32 @@ class HostOSEvents:
                 system_logger.error(f"[Host OS] Ошибка в цикле мониторинга: {e}")
 
             await asyncio.sleep(self.host_os.config.monitoring_interval_sec)
+
+    def _is_ignored(self, path: Path) -> bool:
+        """Единый фильтр мусора. Отсекает кэш, логи, скрытые файлы и виртуальные окружения."""
+
+        ignore_dirs = {
+            "__pycache__",
+            ".pytest_cache",
+            "node_modules",
+            "venv",
+            ".venv",
+            "env",
+            ".git",
+        }
+        ignore_exts = {".pyc", ".pyo", ".pyd", ".tmp", ".swp"}
+
+        if path.suffix in ignore_exts or path.name.endswith("~"):
+            return True
+
+        for part in path.parts:
+            if part in ignore_dirs:
+                return True
+            # Игнорируем скрытые папки/файлы, но оставляем .env на случай, если он нужен в песочнице
+            if part.startswith(".") and part not in {".", ".env"}:
+                return True
+
+        return False
 
     def _update_datetime_and_uptime(self):
         tz = timezone(timedelta(hours=self.host_os.timezone))

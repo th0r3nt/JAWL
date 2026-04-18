@@ -139,6 +139,13 @@ class Events:
         requires_attention=True,
     )
 
+    SYSTEM_CONFIG_UPDATED = EventConfig(
+        name="SYSTEM_CONFIG_UPDATED",
+        description="Обновление конфигурации системы через Meta-интерфейс.",
+        level=EventLevel.INFO,
+        requires_attention=False,
+    )
+
     @classmethod
     def all(cls) -> list[EventConfig]:
         events = []

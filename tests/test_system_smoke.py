@@ -18,7 +18,7 @@ def mock_configs():
     settings.system.vector_db.embedding_model = "test-model"
     settings.system.vector_db.vector_size = 384
     settings.system.timezone = 3
-    settings.system.loop_interval_sec = 30
+    settings.system.heartbeat_interval = 30
     settings.system.continuous_cycle = False
     settings.system.max_mental_state_entities = 10
 

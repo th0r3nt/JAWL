@@ -97,10 +97,20 @@ class ContextBuilder:
         rag_task = self._build_rag_memories(payload, missed_events)
 
         # Выполняем
-        personality_traits, mental_states, tasks, recent_ticks, chat_histories, rag_memories = (
-            await asyncio.gather(
-                traits_task, mental_states_task, tasks_task, ticks_task, chat_histories_task, rag_task
-            )
+        (
+            personality_traits,
+            mental_states,
+            tasks,
+            recent_ticks,
+            chat_histories,
+            rag_memories,
+        ) = await asyncio.gather(
+            traits_task,
+            mental_states_task,
+            tasks_task,
+            ticks_task,
+            chat_histories_task,
+            rag_task,
         )
 
         skills = self._build_skills()
@@ -121,7 +131,9 @@ class ContextBuilder:
             context_blocks.append(f"## SPECIFIC CHAT HISTORY\n{chat_histories}")
 
         if rag_memories:
-            context_blocks.append(f"## RELEVANT INFORMATION (Автоматический RAG)\n{rag_memories}")
+            context_blocks.append(
+                f"## RELEVANT INFORMATION (Автоматический RAG)\n{rag_memories}"
+            )
 
         context_blocks.extend(
             [
@@ -261,6 +273,13 @@ class ContextBuilder:
         aio_status = "ON" if self.aiogram_state.is_online else "OFF"
         web_status = "ON" if self.web_state.is_online else "OFF"
 
+        # Читаем статус Meta интерфейса напрямую из конфига
+        meta_enabled = (
+            getattr(self.interfaces_config, "meta", None)
+            and self.interfaces_config.meta.enabled
+        )
+        meta_status = "ON" if meta_enabled else "OFF"
+
         os_data = self.host_os_state.telemetry if os_status == "ON" else "Интерфейс отключен."
         sandbox_data = self.host_os_state.sandbox_files if os_status == "ON" else ""
 
@@ -272,6 +291,11 @@ class ContextBuilder:
         )
         web_data = (
             self.web_state.browser_history if web_status == "ON" else "Интерфейс отключен."
+        )
+        meta_data = (
+            "Навыки изменения конфигурации в рантайме доступны."
+            if meta_status == "ON"
+            else "Интерфейс отключен."
         )
 
         madness_map = {0: "CAGE", 1: "VOYEUR", 2: "SURGEON", 3: "GOD_MODE"}
@@ -295,6 +319,9 @@ class ContextBuilder:
 * Sandbox Directory:
 {sandbox_data}
 
+### META [{meta_status}]
+{meta_data}
+
 ### TELETHON [{tel_status}]
 {tel_data}
 
@@ -316,21 +343,23 @@ class ContextBuilder:
 
         for t in ticks:
             actions_list = []
-            
+
             # Если это список (как и должно быть)
             if isinstance(t.actions, list):
                 for a in t.actions:
                     if isinstance(a, dict):
-                        t_name = a.get('tool_name', 'unknown')
-                        params = a.get('parameters', {})
-                        actions_list.append(f"`{t_name}`({json.dumps(params, ensure_ascii=False)})")
+                        t_name = a.get("tool_name", "unknown")
+                        params = a.get("parameters", {})
+                        actions_list.append(
+                            f"`{t_name}`({json.dumps(params, ensure_ascii=False)})"
+                        )
                     else:
                         # Если там застряла строка с прошлых багов
                         actions_list.append(str(a))
             # Если LLM сгенерировала словарь вместо списка и он сохранился
             elif isinstance(t.actions, dict):
-                t_name = t.actions.get('tool_name', 'unknown')
-                params = t.actions.get('parameters', {})
+                t_name = t.actions.get("tool_name", "unknown")
+                params = t.actions.get("parameters", {})
                 actions_list.append(f"`{t_name}`({json.dumps(params, ensure_ascii=False)})")
             else:
                 actions_list.append(str(t.actions))
@@ -387,5 +416,5 @@ class ContextBuilder:
         return main_trigger
 
     async def _build_mental_states(self) -> str:
-            res = await self.sql_mental_states.get_mental_states()
-            return res.message
+        res = await self.sql_mental_states.get_mental_states()
+        return res.message

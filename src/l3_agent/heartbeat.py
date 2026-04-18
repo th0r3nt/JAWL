@@ -22,13 +22,13 @@ class Heartbeat:
     def __init__(
         self,
         react_loop: "ReactLoop",
-        tick_interval_sec: int,
+        heartbeat_interval: int,
         continuous_cycle: bool,
         accel_config: "EventAccelerationConfig",
         timezone: int,
     ):
         self.react_loop = react_loop
-        self.tick_interval_sec = tick_interval_sec
+        self.tick_interval_sec = heartbeat_interval
         self.continuous_cycle = continuous_cycle
         self.accel_config = accel_config
         self.timezone = timezone
@@ -51,6 +51,8 @@ class Heartbeat:
     def wake_up(
         self, level: EventLevel, event_name: str, payload: Optional[Dict[str, Any]] = None
     ):
+        """Смотрит на входящее событие и решает, вызывать ли агента."""
+
         now = time.time()
         payload = payload or {}
 
@@ -80,14 +82,14 @@ class Heartbeat:
             if remaining > 0:
                 new_remaining = remaining * self.accel_config.medium_multiplier
                 self._next_tick_time = now + new_remaining
-                self._wake_event.set() # Вызываем
+                self._wake_event.set()
 
         elif level <= EventLevel.LOW:
             remaining = self._next_tick_time - now
             if remaining > 0:
                 new_remaining = remaining * self.accel_config.low_background_multiplier
                 self._next_tick_time = now + new_remaining
-                self._wake_event.set() # Вызываем
+                self._wake_event.set()
 
     async def start(self) -> None:
         if self._is_running:
@@ -164,3 +166,18 @@ class Heartbeat:
             self._is_interrupted = True
             self._active_react_task.cancel()
         system_logger.info("[System] Heartbeat остановлен.")
+
+    def update_config(self, key: str, value: Any):
+        """Метод для динамического обновления настроек на лету (по сигналу из EventBus)."""
+
+        if key == "heartbeat_interval":
+            self.tick_interval_sec = int(value)
+            system_logger.info(
+                f"[System] Heartbeat обновил интервал на {self.tick_interval_sec} сек."
+            )
+
+        elif key == "continuous_cycle":
+            self.continuous_cycle = bool(value)
+            system_logger.info(
+                f"[System] Heartbeat обновил continuous_cycle на {self.continuous_cycle}."
+            )

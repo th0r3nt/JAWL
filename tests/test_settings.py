@@ -29,18 +29,38 @@ def test_load_yaml_file_not_found():
         load_yaml(fake_path)
 
 
-def test_host_pc_config_defaults():
-    """Тест: Pydantic-модель HostOSConfig правильно подставляет дефолтные значения."""
-    # Передаем только часть данных, остальное должно заполниться по умолчанию
-    config = HostOSConfig(madness_level=3)
+def test_host_os_config_parsing():
+    """Тест: Pydantic-модель HostOSConfig правильно парсит валидные данные."""
+    data = {
+        "enabled": True,
+        "madness_level": 3,
+        "env_access": False,
+        "monitoring_interval_sec": 30,
+        "execution_timeout_sec": 60,
+        "file_read_max_chars": 5000,
+        "file_list_limit": 100,
+        "http_response_max_chars": 5000,
+        "top_processes_limit": 10,
+    }
+    config = HostOSConfig(**data)
 
     assert config.madness_level == 3
     assert config.enabled is True
-    assert config.file_read_max_lines == 5000  # Дефолтное значение
+    assert config.file_read_max_chars == 5000
 
 
-def test_host_pc_config_validation():
+def test_host_os_config_validation():
     """Тест: Pydantic-модель выбрасывает ошибку при неверных типах."""
+    data = {
+        "enabled": True,
+        "madness_level": 3,
+        "env_access": False,
+        "monitoring_interval_sec": "not_a_number",  # Намеренная ошибка типа
+        "execution_timeout_sec": 60,
+        "file_read_max_chars": 5000,
+        "file_list_limit": 100,
+        "http_response_max_chars": 5000,
+        "top_processes_limit": 10,
+    }
     with pytest.raises(ValueError):
-        # Передаем строку вместо числа
-        HostOSConfig(monitoring_interval_sec="not_a_number")
+        HostOSConfig(**data)

@@ -70,8 +70,9 @@ async def test_context_builder_build(mock_states, mock_dbs):
     os_state, telethon_state, aiogram_state, terminal_state, agent_state = mock_states
     sql_ticks, sql_tasks, sql_traits, sql_mental_states = mock_dbs
 
-    depth_config = ContextDepthConfig(ticks=5)
+    depth_config = ContextDepthConfig(ticks=5, tick_result_max_chars=5000)
     interfaces_config = MagicMock()
+    interfaces_config.meta.enabled = True
     vector_db_config = MagicMock()
 
     builder = ContextBuilder(
@@ -113,6 +114,7 @@ async def test_context_builder_build(mock_states, mock_dbs):
     assert "text: Hello Agent" in context
     assert "## MENTAL STATES" in context
     assert "[user123] (tier: high)" in context
+    assert "### META [ON]" in context 
 
 
 @pytest.mark.asyncio
@@ -121,6 +123,7 @@ async def test_build_rag_memories_regex(mock_states, mock_dbs):
     os_state, telethon_state, aiogram_state, terminal_state, agent_state = mock_states
     sql_ticks, sql_tasks, sql_traits, sql_mental_states = mock_dbs
 
+    depth_config = (ContextDepthConfig(ticks=30, tick_result_max_chars=5000),)
     vector_knowledge = MagicMock()
     vector_knowledge.search_knowledge = AsyncMock(return_value=SkillResult.ok("Fact"))
     vector_thoughts = MagicMock()
@@ -140,7 +143,7 @@ async def test_build_rag_memories_regex(mock_states, mock_dbs):
         vector_knowledge=vector_knowledge,
         vector_thoughts=vector_thoughts,
         vector_db_config=MagicMock(auto_rag_top_k=2),
-        depth_config=ContextDepthConfig(),
+        depth_config=depth_config,
         interfaces_config=MagicMock(),
         timezone=3,
     )

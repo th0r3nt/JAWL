@@ -99,8 +99,8 @@ async def test_execute_skill_success(mock_plain_func):
 
     report = await execute_skill(actions=actions)
 
-    assert "Action [mock.plain_func]: OK - Plain: Hello" in report
-    assert "Action [mock.class_func]: OK - Agent: World" in report
+    assert "Action [mock.plain_func]: Plain: Hello" in report
+    assert "Action [mock.class_func]: Agent: World" in report
 
 
 @pytest.mark.asyncio
@@ -111,7 +111,7 @@ async def test_execute_skill_ignores_extra_kwargs(mock_plain_func):
 
     report = await execute_skill(actions=actions)
 
-    assert "Action [mock.plain_func]: OK - Plain: Valid" in report
+    assert "Action [mock.plain_func]: Plain: Valid" in report
 
 
 @pytest.mark.asyncio
@@ -130,6 +130,6 @@ async def test_execute_skill_mixed_results(mock_plain_func):
 
     report = await execute_skill(actions)
 
-    assert "Action [mock.plain_func]: OK - Plain: A" in report
-    assert "Action [mock.unknown_func]: ERROR - Скилл 'mock.unknown_func' не найден" in report
-    assert "Action [mock.fail_func]: ERROR - Ошибка: Критический сбой" in report
+    assert "Action [mock.plain_func]: Plain: A" in report
+    assert "Action [mock.unknown_func]: Скилл 'mock.unknown_func' не найден" in report
+    assert "Action [mock.fail_func]: Ошибка: Критический сбой" in report

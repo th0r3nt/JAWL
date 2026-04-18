@@ -30,3 +30,7 @@ web:
   enabled: true
   request_timeout_sec: 15
   max_page_chars: 10000
+
+# Интерфейс, позволяющий агенту менять свои параметры в settings.yaml сразу в рантайме
+meta:
+  enabled: false 

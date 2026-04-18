@@ -44,10 +44,15 @@ class WebConfig(BaseModel):
     max_page_chars: int
 
 
+class MetaConfig(BaseModel):
+    enabled: bool
+
+
 class InterfacesConfig(BaseModel):
     host: HostConfig
     telegram: TelegramConfig
     web: WebConfig
+    meta: MetaConfig
 
 
 # ==========================================
@@ -85,7 +90,7 @@ class EventAccelerationConfig(BaseModel):
 class SystemConfig(BaseModel):
     timezone: int
     vector_db: VectorDBConfig
-    loop_interval_sec: int
+    heartbeat_interval: int
     continuous_cycle: bool
     event_acceleration: EventAccelerationConfig
     context_depth: ContextDepthConfig

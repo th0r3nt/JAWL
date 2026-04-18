@@ -20,7 +20,7 @@ def mock_accel_config():
 def test_heartbeat_wake_up_high_critical(mock_react_loop, mock_accel_config):
     hb = Heartbeat(
         mock_react_loop,
-        tick_interval_sec=60,
+        heartbeat_interval=60,
         continuous_cycle=False,
         accel_config=mock_accel_config,
         timezone=3,
@@ -36,7 +36,7 @@ def test_heartbeat_wake_up_high_critical(mock_react_loop, mock_accel_config):
 def test_heartbeat_wake_up_medium(mock_react_loop, mock_accel_config):
     hb = Heartbeat(
         mock_react_loop,
-        tick_interval_sec=60,
+        heartbeat_interval=60,
         continuous_cycle=False,
         accel_config=mock_accel_config,
         timezone=3,
@@ -51,7 +51,7 @@ def test_heartbeat_wake_up_medium(mock_react_loop, mock_accel_config):
 def test_heartbeat_wake_up_low(mock_react_loop, mock_accel_config):
     hb = Heartbeat(
         mock_react_loop,
-        tick_interval_sec=60,
+        heartbeat_interval=60,
         continuous_cycle=False,
         accel_config=mock_accel_config,
         timezone=3,
@@ -67,7 +67,7 @@ def test_heartbeat_wake_up_low(mock_react_loop, mock_accel_config):
 async def test_heartbeat_loop_heartbeat(mock_react_loop, mock_accel_config):
     hb = Heartbeat(
         mock_react_loop,
-        tick_interval_sec=0,
+        heartbeat_interval=0,
         continuous_cycle=False,
         accel_config=mock_accel_config,
         timezone=3,
@@ -87,7 +87,7 @@ async def test_heartbeat_loop_heartbeat(mock_react_loop, mock_accel_config):
 async def test_heartbeat_loop_event_driven(mock_react_loop, mock_accel_config):
     hb = Heartbeat(
         mock_react_loop,
-        tick_interval_sec=60,
+        heartbeat_interval=60,
         continuous_cycle=False,
         accel_config=mock_accel_config,
         timezone=3,
