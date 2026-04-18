@@ -46,11 +46,11 @@ class TelethonMessages:
                 "silent": is_silent,
             }
 
-            # Telethon использует один и тот же параметр reply_to для ответов и топиков
-            if topic_id:
-                kwargs["reply_to"] = int(topic_id)
-            elif reply_to_message_id:
+            # Приоритет у ответа на конкретное сообщение (Telegram сам поместит его в нужный топик)
+            if reply_to_message_id:
                 kwargs["reply_to"] = int(reply_to_message_id)
+            elif topic_id:
+                kwargs["reply_to"] = int(topic_id)
 
             if time_delay:
                 delay_sec = max(10, int(time_delay))

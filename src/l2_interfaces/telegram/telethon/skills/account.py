@@ -25,6 +25,9 @@ class TelethonAccount:
             # В Telegram "name" - это first_name, а "surname" - last_name
             await client(UpdateProfileRequest(first_name=name, last_name=surname))
 
+            # Обновляем стейт, чтобы контекст агента сразу актуализировался
+            await self.tg_client.update_profile_state()
+
             system_logger.info(f"[Telegram Telethon] Имя профиля изменено: {name} {surname}")
             return SkillResult.ok(f"Имя профиля успешно изменено на '{name} {surname}'.")
 
@@ -38,6 +41,9 @@ class TelethonAccount:
             client = self.tg_client.client()
 
             await client(UpdateProfileRequest(about=text))
+
+            # Обновляем стейт
+            await self.tg_client.update_profile_state()
 
             system_logger.info(f"[Telegram Telethon] Био профиля изменено на: {text}")
             return SkillResult.ok("[Telegram Telethon] Биография успешно изменена.")

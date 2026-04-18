@@ -64,6 +64,11 @@ class Heartbeat:
         )
 
         if level >= EventLevel.HIGH:
+            remaining = max(0.0, self._next_tick_time - now)
+            system_logger.info(
+                f"[System] Heartbeat: '{event_name}' (HIGH). Сон сокращен на {remaining:.1f} сек. Мгновенное пробуждение."
+            )
+
             self._wake_reason = event_name
             self._wake_payload = payload
             self._next_tick_time = now
@@ -81,15 +86,27 @@ class Heartbeat:
             remaining = self._next_tick_time - now
             if remaining > 0:
                 new_remaining = remaining * self.accel_config.medium_multiplier
+                reduced_by = remaining - new_remaining
+
                 self._next_tick_time = now + new_remaining
                 self._wake_event.set()
+
+                system_logger.info(
+                    f"[System] Heartbeat: '{event_name}' (MEDIUM). Сон сокращен на {reduced_by:.1f} сек. До пробуждения: {new_remaining:.1f} сек."
+                )
 
         elif level <= EventLevel.LOW:
             remaining = self._next_tick_time - now
             if remaining > 0:
                 new_remaining = remaining * self.accel_config.low_background_multiplier
+                reduced_by = remaining - new_remaining
+
                 self._next_tick_time = now + new_remaining
                 self._wake_event.set()
+
+                system_logger.info(
+                    f"[System] Heartbeat: '{event_name}' ({level.name}). Сон сокращен на {reduced_by:.1f} сек. До пробуждения: {new_remaining:.1f} сек."
+                )
 
     async def start(self) -> None:
         if self._is_running:
@@ -125,6 +142,11 @@ class Heartbeat:
                 missed_events = list(self._sleep_memory)
                 self._sleep_memory.clear()
 
+                # Устанавливаем таймер ДО начала работы агента
+                # Фоновые события, приходящие во время бодрствования,
+                # будут корректно сокращать будущий сон и высвечиваться в логах
+                self._next_tick_time = time.time() + self.heartbeat_interval
+
                 try:
                     self._active_react_task = asyncio.create_task(
                         self.react_loop.run(
@@ -136,7 +158,6 @@ class Heartbeat:
                     await self._active_react_task
 
                     # Сбрасываем причину только если цикл завершился сам, без прерываний
-                    self._next_tick_time = time.time() + self.heartbeat_interval
                     self._wake_reason = "HEARTBEAT"
                     self._wake_payload = {}
 
@@ -146,12 +167,11 @@ class Heartbeat:
                         system_logger.info("[System] Текущий ReAct-цикл успешно прерван.")
                         self._is_interrupted = False
                     else:
-                        # Отмена пришла извне (Ctrl+C или закрытие event loop'а)
-                        # Обязаны пробросить исключение наверх, чтобы система корректно умерла
                         raise
 
                 except Exception as e:
                     system_logger.error(f"[System] Критическая ошибка в ReAct-цикле: {e}")
+                    # При краше сбрасываем таймер заново, чтобы не уйти в бесконечный луп ошибок
                     self._next_tick_time = time.time() + self.heartbeat_interval
                     self._wake_reason = "HEARTBEAT"
                     self._wake_payload = {}

@@ -49,7 +49,7 @@ class MetaConfiguration:
     @skill()
     async def change_heartbeat_interval(self, interval_sec: int) -> SkillResult:
         """Изменяет интервал между пробуждениями агента (в секундах)."""
-        
+
         success = await self.client.update_setting(
             ["system", "heartbeat_interval"],
             interval_sec,
@@ -57,6 +57,8 @@ class MetaConfiguration:
         )
         if not success:
             return SkillResult.fail("Ошибка при сохранении конфигурации.")
+
+        self.client.agent_state.heartbeat_interval = interval_sec
 
         # Публикуем событие для L3 (Heartbeat)
         await self.client.bus.publish(

@@ -127,6 +127,7 @@ class System:
             llm_model=self.settings.llm.model_name,
             temperature=self.settings.llm.temperature,
             max_react_steps=self.settings.llm.max_react_steps,
+            heartbeat_interval=self.settings.system.heartbeat_interval,
         )
         self.os_state = HostOSState()
         self.terminal_state = HostTerminalState()

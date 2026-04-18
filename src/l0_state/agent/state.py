@@ -24,6 +24,7 @@ class AgentState(BaseModel):
     # ReAct цикл
     current_step: int = 1
     max_react_steps: int = 15
+    heartbeat_interval: int = 180
 
     # Время запуска (записывается автоматически при создании объекта)
     start_time: float = Field(default_factory=time.time)

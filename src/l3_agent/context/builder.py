@@ -284,7 +284,8 @@ class ContextBuilder:
         sandbox_data = self.host_os_state.sandbox_files if os_status == "ON" else ""
 
         tel_data = (
-            self.telethon_state.last_chats if tel_status == "ON" else "Интерфейс отключен."
+            f"Account info: {self.telethon_state.account_info}\n{self.telethon_state.last_chats}" 
+            if tel_status == "ON" else "Интерфейс отключен."
         )
         aio_data = (
             self.aiogram_state.last_chats if aio_status == "ON" else "Интерфейс отключен."
@@ -304,6 +305,7 @@ class ContextBuilder:
 
         return f"""
 ### AGENT
+* Heartbeat Interval: {self.agent_state.heartbeat_interval}s
 * LLM Model: {self.agent_state.llm_model}
 * Temperature: {self.agent_state.temperature}
 * Uptime: {self.agent_state.get_uptime()}

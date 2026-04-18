@@ -113,7 +113,7 @@ class VectorKnowledge:
                     f"\nМетаданные (источник): `{metadata_dict}`" if metadata_dict else ""
                 )
 
-                md_block = f"[ID: `{point.id}`] [Время: {time_str}] Релевантность: {score}\n{text}{metadata_str}"
+                md_block = f"[ID: `{point.id}`][Время: {time_str}] Релевантность: {score}/{self.similarity_threshold}\n{text}{metadata_str}"
                 formatted_results.append(md_block)
 
             return SkillResult.ok("\n\n".join(formatted_results))

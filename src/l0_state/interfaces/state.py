@@ -38,6 +38,8 @@ class TelethonState:
         # Group | ID: -10099887766 | Название: Python Backend Devs
         # Channel | ID: -10011223344 | Название: Хабр: IT Новости
 
+        self.account_info = "Данные профиля загружаются..."
+
 
 # =======================================
 # AIOGRAM

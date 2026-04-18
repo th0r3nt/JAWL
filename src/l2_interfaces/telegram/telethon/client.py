@@ -1,4 +1,6 @@
 from telethon import TelegramClient
+from telethon.tl.functions.users import GetFullUserRequest
+
 from src.utils.logger import system_logger
 from src.l0_state.interfaces.state import TelethonState
 
@@ -49,6 +51,9 @@ class TelethonClient:
             me = await self._client.get_me()
             name = me.username or me.first_name or "Unknown"
 
+            # Сразу после старта стягиваем полные данные
+            await self.update_profile_state()
+
             system_logger.info(f"[Telegram Telethon] Успешная авторизация как: {name}")
             self.state.is_online = True
 
@@ -63,3 +68,25 @@ class TelethonClient:
             await self._client.disconnect()
             system_logger.info("[Telegram Telethon] Клиент отключен.")
             self.state.is_online = False
+
+    async def update_profile_state(self) -> None:
+        """Запрашивает актуальные данные аккаунта (имя, юзернейм, био) и сохраняет в стейт."""
+        if not self._client:
+            return
+
+        try:
+            me = await self._client.get_me()
+            name = me.first_name or "Unknown"
+            if getattr(me, "last_name", None):
+                name += f" {me.last_name}"
+
+            username = f"@{me.username}" if me.username else "Без @username"
+
+            # Для получения "о себе" (bio) нужен FullUser запрос
+            full_me = await self._client(GetFullUserRequest(me))
+            bio = full_me.full_user.about or "Пусто"
+
+            self.state.account_info = f"Профиль: {name} ({username}) | Био: {bio}\n---"
+        except Exception as e:
+            system_logger.error(f"[Telegram Telethon] Ошибка обновления профиля: {e}")
+            self.state.account_info = "Профиль: Ошибка загрузки данных\n---"

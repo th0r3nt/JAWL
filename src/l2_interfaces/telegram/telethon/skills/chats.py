@@ -162,6 +162,13 @@ class TelethonChats:
                 if msg.media:
                     if msg.photo:
                         content_parts.append("[Фотография]")
+                    elif msg.sticker:
+                        # Достаем эмодзи стикера для лучшего контекста агента
+                        emoji = msg.file.emoji if (hasattr(msg, 'file') and msg.file) else ""
+                        sticker_text = f"[Стикер {emoji}]" if emoji else "[Стикер]"
+                        content_parts.append(sticker_text)
+                    elif getattr(msg, "gif", None):
+                        content_parts.append("[GIF]")
                     elif msg.voice:
                         content_parts.append("[Голосовое сообщение]")
                     elif msg.video or msg.video_note:
