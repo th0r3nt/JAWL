@@ -505,7 +505,7 @@ async def main() -> int:
         return exit_code
 
     except asyncio.CancelledError:
-        pass
+        return 0
 
     except KeyboardInterrupt:
         system_logger.info("[System] Получен сигнал прерывания.")
