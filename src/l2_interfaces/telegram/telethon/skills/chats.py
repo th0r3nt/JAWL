@@ -153,7 +153,10 @@ class TelethonChats:
                 # 1. Отправитель
                 sender_name = "Unknown"
                 if msg.sender:
-                    sender_name = utils.get_display_name(msg.sender)
+                    name = utils.get_display_name(msg.sender)
+                    sender_name = f"{name} (ID: {msg.sender_id})" if msg.sender_id else name
+                elif msg.sender_id:
+                    sender_name = f"Unknown (ID: {msg.sender_id})"
 
                 # 2. Формирование контента
                 content_parts = []
@@ -163,8 +166,7 @@ class TelethonChats:
                     if msg.photo:
                         content_parts.append("[Фотография]")
                     elif msg.sticker:
-                        # Достаем эмодзи стикера для лучшего контекста агента
-                        emoji = msg.file.emoji if (hasattr(msg, 'file') and msg.file) else ""
+                        emoji = msg.file.emoji if (hasattr(msg, "file") and msg.file) else ""
                         sticker_text = f"[Стикер {emoji}]" if emoji else "[Стикер]"
                         content_parts.append(sticker_text)
                     elif getattr(msg, "gif", None):
@@ -186,17 +188,22 @@ class TelethonChats:
 
                 # Обработка Reply (Ответов)
                 reply_context = ""
-                # Если мы читаем топик, то игнорируем системный reply_to на сам topic_id,
-                # чтобы не спамить агенту "В ответ на сообщение..." в каждом сообщении.
                 is_actual_reply = msg.is_reply and msg.reply_to_msg_id
                 if is_actual_reply and str(msg.reply_to_msg_id) != str(topic_id):
                     try:
                         orig_msg = await msg.get_reply_message()
-                        orig_sender = (
-                            utils.get_display_name(orig_msg.sender)
-                            if (orig_msg and orig_msg.sender)
-                            else "Unknown"
-                        )
+
+                        orig_sender = "Unknown"
+                        if orig_msg and orig_msg.sender:
+                            orig_name = utils.get_display_name(orig_msg.sender)
+                            orig_sender = (
+                                f"{orig_name} (ID: {orig_msg.sender_id})"
+                                if orig_msg.sender_id
+                                else orig_name
+                            )
+                        elif orig_msg and orig_msg.sender_id:
+                            orig_sender = f"Unknown (ID: {orig_msg.sender_id})"
+
                         reply_context = f"\n  ↳ (В ответ на сообщение ID {msg.reply_to_msg_id} от {orig_sender})"
                     except Exception:
                         reply_context = (
@@ -324,10 +331,10 @@ class TelethonChats:
             return SkillResult.ok(
                 f"Успешное вступление в группу обсуждений (ID: {linked_chat_id})."
             )
-        
+
         except ValueError:
             return SkillResult.fail("Ошибка: Некорректный ID канала.")
-        
+
         except Exception as e:
             if "USER_ALREADY_PARTICIPANT" in str(e):
                 return SkillResult.ok("Вы уже состоите в группе обсуждений этого канала.")

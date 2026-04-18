@@ -83,8 +83,11 @@ class ContextDepthConfig(BaseModel):
 
 
 class EventAccelerationConfig(BaseModel):
+    critical_multiplier: float
+    high_multiplier: float
     medium_multiplier: float
-    low_background_multiplier: float
+    low_multiplier: float
+    background_multiplier: float
 
 
 class SystemConfig(BaseModel):

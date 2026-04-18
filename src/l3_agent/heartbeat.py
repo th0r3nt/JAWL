@@ -63,50 +63,55 @@ class Heartbeat:
             f"[{time_str}] [{level.name}] {event_name} | Payload: {payload_str}"
         )
 
-        if level >= EventLevel.HIGH:
-            remaining = max(0.0, self._next_tick_time - now)
-            system_logger.info(
-                f"[System] Heartbeat: '{event_name}' (HIGH). Сон сокращен на {remaining:.1f} сек. Мгновенное пробуждение."
-            )
+        remaining = self._next_tick_time - now
 
-            self._wake_reason = event_name
-            self._wake_payload = payload
-            self._next_tick_time = now
-            self._wake_event.set()
+        multiplier = 1.0
+        if level == EventLevel.CRITICAL:
+            multiplier = self.accel_config.critical_multiplier
 
-            # Жесткое прерывание: если агент сейчас думает, убиваем процесс
-            if self._active_react_task and not self._active_react_task.done():
-                system_logger.warning(
-                    f"[System] Прерывание текущего ReAct-цикла из-за события: {event_name}"
-                )
-                self._is_interrupted = True
-                self._active_react_task.cancel()
+        elif level == EventLevel.HIGH:
+            multiplier = self.accel_config.high_multiplier
 
         elif level == EventLevel.MEDIUM:
-            remaining = self._next_tick_time - now
-            if remaining > 0:
-                new_remaining = remaining * self.accel_config.medium_multiplier
-                reduced_by = remaining - new_remaining
+            multiplier = self.accel_config.medium_multiplier
 
-                self._next_tick_time = now + new_remaining
-                self._wake_event.set()
+        elif level == EventLevel.LOW:
+            multiplier = self.accel_config.low_multiplier
 
+        elif level == EventLevel.BACKGROUND:
+            multiplier = self.accel_config.background_multiplier
+
+        # Если множитель < 1, значит событие должно повлиять на таймер
+        if multiplier < 1.0:
+            # Защита от отрицательного remaining (например, если Heartbeat только инициализирован)
+            safe_remaining = max(0.0, remaining)
+
+            new_remaining = safe_remaining * multiplier
+            reduced_by = safe_remaining - new_remaining
+
+            self._next_tick_time = now + new_remaining
+            self._wake_event.set()
+
+            # Если сон срезан в ноль (или изначально был нулем при старте) - это экстренное пробуждение
+            if new_remaining <= 0.01:
                 system_logger.info(
-                    f"[System] Heartbeat: '{event_name}' (MEDIUM). Сон сокращен на {reduced_by:.1f} сек. До пробуждения: {new_remaining:.1f} сек."
+                    f"[System] Heartbeat: '{event_name}' ({level.name}). Мгновенное пробуждение."
                 )
+                self._wake_reason = event_name
+                self._wake_payload = payload
 
-        elif level <= EventLevel.LOW:
-            remaining = self._next_tick_time - now
-            if remaining > 0:
-                new_remaining = remaining * self.accel_config.low_background_multiplier
-                reduced_by = remaining - new_remaining
-
-                self._next_tick_time = now + new_remaining
-                self._wake_event.set()
-
-                system_logger.info(
-                    f"[System] Heartbeat: '{event_name}' ({level.name}). Сон сокращен на {reduced_by:.1f} сек. До пробуждения: {new_remaining:.1f} сек."
-                )
+                # Жесткое прерывание: если агент сейчас думает, убиваем процесс
+                if self._active_react_task and not self._active_react_task.done():
+                    system_logger.warning(
+                        f"[System] Прерывание текущего ReAct-цикла из-за события: {event_name}"
+                    )
+                    self._is_interrupted = True
+                    self._active_react_task.cancel()
+            else:
+                if safe_remaining > 0:
+                    system_logger.info(
+                        f"[System] Heartbeat: '{event_name}' ({level.name}). Сон сокращен на {reduced_by:.1f} сек. До пробуждения: {new_remaining:.1f} сек."
+                    )
 
     async def start(self) -> None:
         if self._is_running:

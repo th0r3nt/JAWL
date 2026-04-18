@@ -14,7 +14,13 @@ def mock_react_loop():
 
 @pytest.fixture
 def mock_accel_config():
-    return EventAccelerationConfig(medium_multiplier=0.5, low_background_multiplier=0.8)
+    return EventAccelerationConfig(
+        critical_multiplier=0.0,
+        high_multiplier=0.3,
+        medium_multiplier=0.6,
+        low_multiplier=0.7,
+        background_multiplier=0.8,
+    )
 
 
 def test_heartbeat_wake_up_high_critical(mock_react_loop, mock_accel_config):
@@ -26,7 +32,7 @@ def test_heartbeat_wake_up_high_critical(mock_react_loop, mock_accel_config):
         timezone=3,
     )
     hb._next_tick_time = time.time() + 60
-    hb.wake_up(EventLevel.HIGH, "URGENT_EVENT", {"key": "value"})
+    hb.wake_up(EventLevel.CRITICAL, "URGENT_EVENT", {"key": "value"})
 
     assert hb._wake_event.is_set()
     assert hb._wake_reason == "URGENT_EVENT"
@@ -44,7 +50,7 @@ def test_heartbeat_wake_up_medium(mock_react_loop, mock_accel_config):
     now = time.time()
     hb._next_tick_time = now + 60
     hb.wake_up(EventLevel.MEDIUM, "SOME_EVENT")
-    expected_time = now + 30
+    expected_time = now + 36  # 60 * 0.6 = 36
     assert abs(hb._next_tick_time - expected_time) < 0.1
 
 
@@ -59,7 +65,7 @@ def test_heartbeat_wake_up_low(mock_react_loop, mock_accel_config):
     now = time.time()
     hb._next_tick_time = now + 60
     hb.wake_up(EventLevel.BACKGROUND, "TRASH_EVENT")
-    expected_time = now + 48
+    expected_time = now + 48  # 60 * 0.8 = 48
     assert abs(hb._next_tick_time - expected_time) < 0.1
 
 
