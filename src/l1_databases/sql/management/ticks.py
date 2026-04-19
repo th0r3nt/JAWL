@@ -33,6 +33,13 @@ class SQLTicks:
         self.result_max_chars = result_max_chars
         self.tz_offset = tz_offset
 
+        # Кэш ID тиков, созданных в рамках текущего просыпания агента
+        self.session_ignored_ids = set()
+
+    def clear_session_cache(self):
+        """Очищает игнор-лист (вызывается в начале и в конце ReAct-цикла)."""
+        self.session_ignored_ids.clear()
+
     async def save_tick(
         self, thoughts: str, actions: list[dict[str, Any]], results: dict[str, Any]
     ) -> str:
@@ -46,27 +53,34 @@ class SQLTicks:
             session.add(new_tick)
             await session.commit()
 
+        # Добавляем в игнор-лист, чтобы агент не ловил "дежавю" на следующем шаге
+        self.session_ignored_ids.add(tick_id)
+
         system_logger.debug(f"[SQL DB] Тик сохранен (ID: {tick_id[:8]}).")
         return tick_id
 
-    async def get_ticks(self, limit: int = 5) -> list[TickTable]:
+    async def get_ticks(self, limit: int = 5, ignore_session: bool = False) -> list[TickTable]:
         """
         Возвращает последние N тиков.
+        Если ignore_session=True, скрывает тики текущего ReAct-цикла (нужно для ReAct цикла, чтобы LLM не видела дубли своих недавних действий).
         """
+
         async with self.db.session_factory() as session:
-            stmt = select(TickTable).order_by(desc(TickTable.created_at)).limit(limit)
+            stmt = select(TickTable)
+
+            # Исключаем свежие логи из выдачи
+            if ignore_session and self.session_ignored_ids:
+                stmt = stmt.where(TickTable.id.notin_(self.session_ignored_ids))
+
+            stmt = stmt.order_by(desc(TickTable.created_at)).limit(limit)
             result = await session.execute(stmt)
 
             ticks = result.scalars().all()
             return list(reversed(ticks))
 
     async def get_context_block(self, **kwargs) -> str:
-        """
-        Провайдер контекста для ContextRegistry.
-        Отдает отформатированный блок для контекста агента.
-        """
-
-        ticks = await self.get_ticks(limit=self.ticks_limit)
+        # ВАЖНО: передаем ignore_session=True
+        ticks = await self.get_ticks(limit=self.ticks_limit, ignore_session=True)
 
         if not ticks:
             return "## RECENT TICKS\nНет предыдущих тиков."
@@ -110,8 +124,6 @@ class SQLTicks:
 
             if t.results and isinstance(t.results, dict) and "execution_report" in t.results:
                 raw_report = str(t.results["execution_report"])
-
-                # Разбиваем строку по маркеру "Action [...]: "
                 parts = re.split(r"(?=^Action \[[^\]]+\]: )", raw_report, flags=re.MULTILINE)
 
                 formatted_parts = []
@@ -141,7 +153,6 @@ class SQLTicks:
             else:
                 res_str = "None"
 
-            # Форматирование времени
             time_str = format_datetime(t.created_at, self.tz_offset)
             short_id = t.id[:8]
 

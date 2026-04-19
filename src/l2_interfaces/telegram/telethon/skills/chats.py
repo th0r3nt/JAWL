@@ -8,6 +8,7 @@ from telethon.tl.functions.channels import (
     LeaveChannelRequest,
     GetFullChannelRequest,
     InviteToChannelRequest,
+    GetForumTopicsRequest,  # Добавлен импорт Raw API для работы с топиками
 )
 from telethon.tl.functions.messages import ImportChatInviteRequest
 
@@ -33,6 +34,25 @@ class TelethonChats:
         except ValueError:
             return str(entity_id).strip()
 
+    async def _get_topics(self, client: Any, entity: Any, limit: int = 100) -> list:
+        """Хелпер: получает список топиков форума через Raw API Telethon."""
+        try:
+            result = await client(
+                GetForumTopicsRequest(
+                    channel=entity,
+                    q="",
+                    offset_date=0,
+                    offset_id=0,
+                    offset_topic=0,
+                    limit=limit,
+                )
+            )
+            # Возвращаем список объектов ForumTopic
+            return getattr(result, "topics", [])
+        except Exception as e:
+            system_logger.error(f"[TelethonChats] Ошибка _get_topics: {e}")
+            return []
+
     # =================================================================
     # Хелперы для парсинга сообщений (SRP)
     # =================================================================
@@ -50,10 +70,7 @@ class TelethonChats:
     def _determine_reply(
         self, msg: Any, topic_id: Optional[int]
     ) -> Tuple[bool, Optional[int]]:
-        """
-        Определяет, является ли сообщение реальным ответом на другое сообщение.
-        Отсекает баги форумов.
-        """
+        """Определяет, является ли сообщение реальным ответом на другое сообщение."""
 
         if not msg.reply_to:
             return False, None
@@ -124,7 +141,7 @@ class TelethonChats:
         except Exception:
             pass
 
-        return "\n  ↳ [Переслано]"
+        return "\n  ↳[Переслано]"
 
     async def _parse_reply(
         self, client: Any, target_entity: Any, is_reply: bool, reply_id: Optional[int]
@@ -218,30 +235,32 @@ class TelethonChats:
                 forum_str = ""
                 if getattr(dialog.entity, "forum", False):
                     chat_type = "Forum"
-                    topics = []
+                    topics_list = []
                     try:
-                        async for topic in client.iter_forum_topics(dialog.entity, limit=10):
+                        # Получаем топики через безопасный хелпер
+                        topics_data = await self._get_topics(client, dialog.entity, limit=10)
+                        for topic in topics_data:
                             t_unread = (
                                 f" ({topic.unread_count} непр.)"
                                 if getattr(topic, "unread_count", 0) > 0
                                 else ""
                             )
-                            topics.append(
-                                f"      ↳ Топик '{topic.title}' (ID: {topic.id}){t_unread}"
+                            topics_list.append(
+                                f"      ↳ Топик '{getattr(topic, 'title', 'Unknown')}' (ID: {topic.id}){t_unread}"
                             )
                     except Exception as e:
                         system_logger.error(
-                            f"[TelethonChats] Ошибка iter_forum_topics в get_chats: {e}"
+                            f"[TelethonChats] Ошибка при получении топиков в get_chats: {e}"
                         )
 
                     # Если топиков нет, но сообщения висят - значит они в дефолтном General
-                    if not topics and dialog.unread_count > 0:
-                        topics.append(
+                    if not topics_list and dialog.unread_count > 0:
+                        topics_list.append(
                             f"      ↳ General / Общий топик ({dialog.unread_count} непр.)"
                         )
 
-                    if topics:
-                        forum_str = "\n" + "\n".join(topics)
+                    if topics_list:
+                        forum_str = "\n" + "\n".join(topics_list)
 
                 chats.append(
                     f"- {chat_type} | ID: `{dialog.id}` | Название: {dialog.name}{unread}{forum_str}"
@@ -273,26 +292,29 @@ class TelethonChats:
 
                     if getattr(dialog.entity, "forum", False):
                         chat_type = "Forum"
-                        topics = []
+                        topics_list = []
                         try:
-                            async for topic in client.iter_forum_topics(dialog.entity):
+                            topics_data = await self._get_topics(
+                                client, dialog.entity, limit=100
+                            )
+                            for topic in topics_data:
                                 unread = getattr(topic, "unread_count", 0)
                                 if unread > 0:
-                                    topics.append(
-                                        f"      ↳ Топик '{topic.title}' (ID: {topic.id}) [{unread} непр.]"
+                                    topics_list.append(
+                                        f"      ↳ Топик '{getattr(topic, 'title', 'Unknown')}' (ID: {topic.id}) [{unread} непр.]"
                                     )
                         except Exception as e:
                             system_logger.error(
-                                f"[TelethonChats] Ошибка iter_forum_topics в get_unread_chats: {e}"
+                                f"[TelethonChats] Ошибка при получении топиков в get_unread_chats: {e}"
                             )
 
                         # Fallback для General топика
-                        if not topics:
-                            topics.append(
+                        if not topics_list:
+                            topics_list.append(
                                 f"      ↳ General / Другие топики [{dialog.unread_count} непр.]"
                             )
 
-                        forum_str = "\n" + "\n".join(topics)
+                        forum_str = "\n" + "\n".join(topics_list)
 
                     chats.append(
                         f"- {chat_type} | ID: `{dialog.id}` | Название: **{dialog.name}** | Непрочитанных: {dialog.unread_count}{forum_str}"
@@ -385,7 +407,8 @@ class TelethonChats:
             if getattr(target_entity, "forum", False) and not topic_id:
                 # Если это форум и топик не указан - нужно перебрать все топики
                 try:
-                    async for topic in client.iter_forum_topics(target_entity):
+                    topics_data = await self._get_topics(client, target_entity, limit=100)
+                    for topic in topics_data:
                         if getattr(topic, "unread_count", 0) > 0:
                             await client.send_read_acknowledge(
                                 target_entity, reply_to=topic.id

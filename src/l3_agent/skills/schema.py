@@ -4,7 +4,25 @@
 обеспечивая механизм Chain-of-Thought (CoT).
 """
 
-ACTION_SCHEMA =[
+from typing import Any
+from pydantic import BaseModel, Field
+
+
+class ActionCall(BaseModel):
+    """Типизированная модель вызова одного инструмента."""
+
+    tool_name: str
+    parameters: dict[str, Any] = Field(default_factory=dict)
+
+
+class AgentResponse(BaseModel):
+    """Типизированная схема полного ответа LLM."""
+
+    thoughts: str
+    actions: list[ActionCall] = Field(default_factory=list)
+
+
+ACTION_SCHEMA = [
     {
         "type": "function",
         "function": {
@@ -29,7 +47,7 @@ ACTION_SCHEMA =[
                                 },
                                 "parameters": {
                                     "type": "object",
-                                    "description": "Словарь с аргументами той функции, которую нужно вызвать (например, 'to_id': '12345'). Ключи должны точно совпадать с описанием в 'parameters'. Запрещено отправлять пустой словарь {}, если инструмент требует обязательные аргументы <REQUIRED>.",
+                                    "description": "Словарь с аргументами той функции, которую нужно вызвать. Ключи должны точно совпадать с описанием в 'parameters'.",
                                     "additionalProperties": True,
                                 },
                             },

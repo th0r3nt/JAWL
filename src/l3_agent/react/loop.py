@@ -1,7 +1,7 @@
-import json
 import openai
 import asyncio
 from typing import Dict, Any
+from pydantic import ValidationError
 
 from src.utils.logger import system_logger
 from src.utils.token_tracker import TokenTracker
@@ -15,6 +15,7 @@ from src.l3_agent.context.builder import ContextBuilder
 
 # Импортируем готовый роутер скиллов
 from src.l3_agent.skills.registry import execute_skill
+from src.l3_agent.skills.schema import AgentResponse
 
 
 class ReactLoop:
@@ -31,7 +32,7 @@ class ReactLoop:
         agent_state: AgentState,
         sql_ticks: SQLTicks,
         token_tracker: TokenTracker,
-        tools: list,  # Единый марштизатор (ACTION_SCHEMA)
+        tools: list,
         cooldown_sec: int = 30,
     ):
         self.llm = llm_client
@@ -41,7 +42,6 @@ class ReactLoop:
         self.sql_ticks = sql_ticks
         self.tracker = token_tracker
         self.tools = tools
-        # Если API ключ ллмки уйдет в минутный RateLimit - он отдыхает n сек
         self.cooldown_sec = cooldown_sec
 
         self.current_events: list[str] = []  # Хранилище событий для текущего цикла
@@ -54,7 +54,6 @@ class ReactLoop:
         try:
             with open("logs/last_prompt.md", "w", encoding="utf-8") as f:
                 for m in messages:
-                    # Поддержка как словарей, так и pydantic-моделей
                     role = getattr(
                         m,
                         "role",
@@ -69,7 +68,6 @@ class ReactLoop:
             system_logger.error(f"[System] Не удалось сохранить промпт: {e}")
 
     def add_realtime_event(self, event_str: str):
-        """Вызывается из Heartbeat для проброса событий прямо во время работы агента."""
         self.current_events.append(event_str)
 
     async def run(self, event_name: str, payload: Dict[str, Any], missed_events: list[str]):
@@ -79,6 +77,9 @@ class ReactLoop:
 
         # Переносим пропущенные события в память текущего цикла
         self.current_events = missed_events.copy()
+
+        # Очищаем кэш тиков перед стартом
+        self.sql_ticks.clear_session_cache()
 
         try:
             self.agent_state.reset_step()
@@ -98,9 +99,6 @@ class ReactLoop:
             while step <= self.agent_state.max_react_steps:
                 self.agent_state.current_step = step
                 self.agent_state.update_state(AgentStatus.THINKING)
-
-                # Собираем свежий контекст с актуальными состояниями (L0), временем и шагом
-                context = await self.context_builder.build(event_name, payload, missed_events)
 
                 # Передаем обновляемый список self.current_events
                 context = await self.context_builder.build(
@@ -185,14 +183,12 @@ class ReactLoop:
                 tool_call = response_message.tool_calls[0]
                 args_str = tool_call.function.arguments
 
+                # Валидация ответа LLM через Pydantic
                 try:
-                    args = json.loads(args_str)
-                    if not isinstance(args, dict):
-                        raise ValueError("Ответ должен быть JSON-объектом (dict).")
-
-                except (json.JSONDecodeError, ValueError) as e:
-                    system_logger.error(
-                        f"[ReAct] Ошибка структуры JSON от LLM: {e}. Запрашиваем исправление."
+                    parsed_response = AgentResponse.model_validate_json(args_str)
+                except ValidationError as e:
+                    system_logger.warning(
+                        f"[ReAct] Ошибка структуры от LLM. Запрашиваем исправление. Детали: {e}"
                     )
                     messages.append(
                         {
@@ -205,14 +201,8 @@ class ReactLoop:
                     step += 1
                     continue
 
-                thoughts = args.get("thoughts", "")
-                actions = args.get("actions", [])
-
-                # Схлопываем все переносы строк, табы и лишние пробелы в одну строку
-                if thoughts and isinstance(thoughts, str):
-                    thoughts = " ".join(thoughts.split())
-
-                actions = args.get("actions", [])
+                thoughts = " ".join(parsed_response.thoughts.split())
+                actions = parsed_response.actions
 
                 if thoughts:
                     system_logger.info(f"[Thoughts]: {thoughts}")
@@ -246,11 +236,12 @@ class ReactLoop:
                     break
 
                 self.agent_state.update_state(AgentStatus.ACTING)
+
                 results_str = await execute_skill(actions=actions)
 
                 await self.sql_ticks.save_tick(
                     thoughts=thoughts,
-                    actions=actions,
+                    actions=[a.model_dump() for a in actions],
                     results={"execution_report": results_str},
                 )
 
@@ -266,5 +257,6 @@ class ReactLoop:
                 step += 1
 
         finally:
-            # Срабатывает всегда, в т.ч. при выбросе asyncio.CancelledError
+            # Обязательно сбрасываем кэш при любом исходе
+            self.sql_ticks.clear_session_cache()
             self.agent_state.update_state(AgentStatus.IDLE)

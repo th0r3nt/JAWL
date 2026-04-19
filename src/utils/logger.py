@@ -1,9 +1,8 @@
 import logging
-import os
 from typing import Union
+from pathlib import Path
 
 
-# ANSI-коды цветов для консоли
 class LogColors:
     RESET = "\033[0m"
     RED = "\033[31m"
@@ -15,7 +14,6 @@ class LogColors:
     WHITE = "\033[37m"
     GRAY = "\033[90m"
 
-    # Яркие (Bright) версии цветов для лучшего контраста
     BRIGHT_RED = "\033[91m"
     BRIGHT_GREEN = "\033[92m"
     BRIGHT_YELLOW = "\033[93m"
@@ -26,28 +24,23 @@ class LogColors:
 
 
 class ColorFormatter(logging.Formatter):
-    # Порядок имеет значение: более специфичные теги лучше держать выше
     PREFIX_COLORS = {
-        # === Жизненный цикл и Логика (Агент) ===
-        "[Heartbeat]": LogColors.BRIGHT_MAGENTA,  # Пульс системы (сердцебиение)
-        "[ReAct]": LogColors.BRIGHT_CYAN,  # Основной цикл мышления
-        "[Thoughts]": LogColors.MAGENTA,  # Внутренний монолог агента
-        "[Agent Action]": LogColors.BRIGHT_GREEN,  # Вызов инструмента (успешный старт)
-        "[Agent Action Result]": LogColors.GRAY,  # Результаты функций (приглушаем, чтобы не отвлекали)
-        "[Skills]": LogColors.GRAY, # Скиллы и регистрация
-        # === Внешние интерфейсы (L2) ===
-        "[LLM]": LogColors.BRIGHT_BLUE,  # Запросы к API нейросетей
-        "[Host OS]": LogColors.GREEN,  # Терминал, ОС, Файлы (Хакерский вайб)
-        "[Web]": LogColors.MAGENTA,  # Поиск в интернете и парсинг
-        "[Telegram Telethon]": LogColors.CYAN,  # Telegram User-API (Юзербот)
-        "[Telegram Aiogram]": LogColors.BLUE,  # Telegram Bot-API (Классический бот)
-        "[Meta]": LogColors.WHITE,  # Управление конфигурацией в рантайме
-        # === Хранилища (L1) ===
-        "[SQL DB]": LogColors.YELLOW,  # Традиционная база данных
-        "[Vector DB]": LogColors.YELLOW,  # Семантическая память (векторы)
-        # === Ядро и Системные шины ===
-        "[EventBus]": LogColors.GRAY,  # Шина событий (фоновый роутинг, тоже приглушаем)
-        "[System]": LogColors.BRIGHT_WHITE,  # Системные уведомления (старт/стоп оркестратора)
+        "[Heartbeat]": LogColors.BRIGHT_MAGENTA,
+        "[ReAct]": LogColors.BRIGHT_CYAN,
+        "[Thoughts]": LogColors.MAGENTA,
+        "[Agent Action]": LogColors.BRIGHT_GREEN,
+        "[Agent Action Result]": LogColors.GRAY,
+        "[Skills]": LogColors.GRAY,
+        "[LLM]": LogColors.BRIGHT_BLUE,
+        "[Host OS]": LogColors.GREEN,
+        "[Web]": LogColors.MAGENTA,
+        "[Telegram Telethon]": LogColors.CYAN,
+        "[Telegram Aiogram]": LogColors.BLUE,
+        "[Meta]": LogColors.WHITE,
+        "[SQL DB]": LogColors.YELLOW,
+        "[Vector DB]": LogColors.YELLOW,
+        "[EventBus]": LogColors.GRAY,
+        "[System]": LogColors.BRIGHT_WHITE,
     }
 
     def __init__(self, fmt=None, datefmt=None, max_console_length=800):
@@ -56,12 +49,8 @@ class ColorFormatter(logging.Formatter):
 
     def format(self, record: logging.LogRecord) -> str:
         original_msg = record.msg
-
         try:
             msg_str = str(original_msg)
-
-            # Универсальная защита консоли от гигантских простыней текста.
-            # Теперь режет не только Action Result, а вообще любой огромный вывод.
             if len(msg_str) > self.max_console_length:
                 record.msg = (
                     msg_str[: self.max_console_length]
@@ -70,43 +59,36 @@ class ColorFormatter(logging.Formatter):
 
             log_message = super().format(record)
 
-            # Жесткий перехват для ошибок и предупреждений (они важнее любых префиксов)
             if record.levelno >= logging.ERROR:
                 return f"{LogColors.BRIGHT_RED}{log_message}{LogColors.RESET}"
-
             if record.levelno == logging.WARNING:
                 return f"{LogColors.BRIGHT_YELLOW}{log_message}{LogColors.RESET}"
 
-            # Применение цветовой палитры по префиксам
             for prefix, color in self.PREFIX_COLORS.items():
                 if prefix in msg_str:
                     return f"{color}{log_message}{LogColors.RESET}"
 
-            # Фолбек для сообщений без префикса
             return log_message
-
+        
         finally:
-            # ОБЯЗАТЕЛЬНО возвращаем оригинальное сообщение обратно в объект Record.
-            # Благодаря этому FileHandler (который пишет в файл) сохранит строку целиком без ANSI-кодов и обрезки.
+            # Возвращаем оригинальное сообщение обратно в объект Record.
+            # Благодаря этому FileHandler (который пишет в файл) сохранит строку целиком без ANSI-кодов и обрезки
             record.msg = original_msg
 
 
 def setup_specific_logger(name: str, log_file: str, level: Union[int, str]) -> logging.Logger:
-    log_dir = os.path.join("logs")
-    if not os.path.exists(log_dir):
-        os.makedirs(log_dir)
+    log_dir = Path("logs")
+    log_dir.mkdir(exist_ok=True)
 
-    full_path = os.path.join(log_dir, log_file)
+    full_path = log_dir / log_file
 
     file_format = "%(asctime)s.%(msecs)03d - %(name)s - %(levelname)s - %(message)s"
     date_format = "%Y-%m-%d %H:%M:%S"
 
-    # Файловый логгер (без цветов, пишет полные дампы!)
     file_handler = logging.FileHandler(full_path, encoding="utf-8", mode="a")
     file_formatter = logging.Formatter(fmt=file_format, datefmt=date_format)
     file_handler.setFormatter(file_formatter)
 
-    # Консольный логгер (с цветами и лимитом в 800 символов)
     console_handler = logging.StreamHandler()
     color_formatter = ColorFormatter(
         fmt=file_format, datefmt=date_format, max_console_length=800

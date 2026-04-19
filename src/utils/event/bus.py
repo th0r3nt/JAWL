@@ -1,6 +1,6 @@
 import asyncio
 import inspect
-from typing import Any
+from typing import Any, Callable
 
 from src.utils.event.registry import EventConfig
 from src.utils.logger import system_logger
@@ -8,10 +8,10 @@ from src.utils.logger import system_logger
 
 class EventBus:
     def __init__(self):
-        self.listeners = {}
-        self.background_tasks = set()
+        self.listeners: dict[str, list[Callable[..., Any]]] = {}
+        self.background_tasks: set[asyncio.Task] = set()
 
-    async def _run_handlers(self, tasks: list, event_name: str) -> None:
+    async def _run_handlers(self, tasks: list[Any], event_name: str) -> None:
         results = await asyncio.gather(*tasks, return_exceptions=True)
 
         for res in results:
@@ -20,7 +20,7 @@ class EventBus:
                     f"[System] Ошибка в обработчике события '{event_name}': {res}"
                 )
 
-    def subscribe(self, event: EventConfig, handler) -> None:
+    def subscribe(self, event: EventConfig, handler: Callable[..., Any]) -> None:
         """Подписывает функцию на событие."""
 
         if event.name not in self.listeners:
@@ -51,7 +51,7 @@ class EventBus:
             self.background_tasks.add(background_task)
             background_task.add_done_callback(self.background_tasks.discard)
 
-    def unsubscribe(self, event: EventConfig, handler) -> None:
+    def unsubscribe(self, event: EventConfig, handler: Callable[..., Any]) -> None:
         """Отписывает функцию от события."""
 
         if event.name in self.listeners:
@@ -62,7 +62,7 @@ class EventBus:
 
     async def stop(self) -> None:
         """Ожидает завершения всех фоновых обработчиков событий."""
-        
+
         if self.background_tasks:
             await asyncio.gather(*self.background_tasks, return_exceptions=True)
             self.background_tasks.clear()
