@@ -129,3 +129,59 @@ class TelethonMessages:
             return SkillResult.ok(f"Текст сообщения {msg_id} успешно изменен.")
         except Exception as e:
             return SkillResult.fail(f"Ошибка при редактировании сообщения: {e}")
+
+    @skill()
+    async def click_inline_button(
+        self, chat_id: Union[int, str], message_id: int, button_text: str
+    ) -> SkillResult:
+        """
+        Нажимает inline-кнопку (встроенную под сообщением ботов).
+        button_text: точный или частичный текст кнопки.
+        """
+
+        try:
+            client = self.tg_client.client()
+            msg = await client.get_messages(self._parse_entity(chat_id), ids=int(message_id))
+
+            if not msg:
+                return SkillResult.fail("Ошибка: Сообщение не найдено.")
+
+            if not msg.buttons:
+                return SkillResult.fail("Ошибка: У этого сообщения нет inline-кнопок.")
+
+            # Ищем кнопку по тексту (частичное совпадение, без учета регистра)
+            target_i, target_j = None, None
+            for i, row in enumerate(msg.buttons):
+                for j, button in enumerate(row):
+                    if button.text and button_text.lower() in button.text.lower():
+                        target_i, target_j = i, j
+                        break
+                if target_i is not None:
+                    break
+
+            if target_i is None:
+                available_buttons = [
+                    btn.text for row in msg.buttons for btn in row if btn.text
+                ]
+                return SkillResult.fail(
+                    f"Ошибка: Кнопка с текстом '{button_text}' не найдена. Доступные кнопки: {available_buttons}"
+                )
+
+            # Нажимаем кнопку по её координатам
+            result = await msg.click(target_i, target_j)
+
+            # Если это callback кнопка, бот может вернуть всплывающее уведомление
+            if result and hasattr(result, "message") and result.message:
+                return SkillResult.ok(f"Успешно. Ответ бота: {result.message}")
+
+            system_logger.info(
+                f"[Telegram Telethon] Нажата кнопка '{button_text}' в сообщении {message_id}"
+            )
+            return SkillResult.ok("Кнопка успешно нажата.")
+
+        except ValueError:
+            return SkillResult.fail("Ошибка: Некорректный ID чата или сообщения.")
+        except Exception as e:
+            msg_err = f"Ошибка при нажатии кнопки: {e}"
+            system_logger.error(msg_err)
+            return SkillResult.fail(msg_err)

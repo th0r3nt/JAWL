@@ -12,7 +12,7 @@ from src.l3_agent.skills.registry import SkillResult, skill
 class HostOSFiles:
     """
     Навыки агента для работы с файловой системой хоста.
-    Учитывают уровень доступа (Madness Level) через Гейткипер (HostOSClient).
+    Учитывают уровень доступа (Access Level) через Гейткипер (HostOSClient).
     """
 
     def __init__(self, host_os_client: HostOSClient):

@@ -3,6 +3,8 @@ import re
 import pytest
 import pytest_asyncio
 
+from unittest.mock import MagicMock, patch
+
 from src.l1_databases.vector.db import VectorDB
 from src.l1_databases.vector.collections import VectorCollection
 from src.l1_databases.vector.management.knowledge import VectorKnowledge
@@ -30,8 +32,10 @@ class MockEmbeddingModel:
         # Создаем ортогональные вектора для четкого семантического разделения
         if "яблоко" in text_lower or "фрукт" in text_lower:
             return [1.0, 0.0, 0.0]
+
         elif "машина" in text_lower or "двигатель" in text_lower:
             return [0.0, 1.0, 0.0]
+
         else:
             # Дефолтный вектор для всего остального ("шум")
             return [0.0, 0.0, 1.0]
@@ -124,31 +128,26 @@ async def test_db_initialization(tmp_path):
 async def test_knowledge_save_and_search(knowledge_manager):
     """Тест: сохранение факта и его успешный семантический поиск."""
 
-    # 1. Сохраняем два совершенно разных знания
-    res1 = await knowledge_manager.save_knowledge(
-        "Яблоко - это вкусный фрукт", {"source": "wiki"}
-    )
-    res2 = await knowledge_manager.save_knowledge(
-        "Машина имеет мощный двигатель", {"source": "auto.ru"}
-    )
+    # Сохраняем два совершенно разных знания
+    res1 = await knowledge_manager.save_knowledge("Боги смерти едят яблоки")
+    res2 = await knowledge_manager.save_knowledge("Машина имеет мощный двигатель")
 
     assert res1.is_success
     assert res2.is_success
 
-    # 2. Ищем информацию про фрукты (ожидаем попадание в яблоко)
-    search_result = await knowledge_manager.search_knowledge("Расскажи про фрукт")
+    # Ищем информацию про яблоки
+    search_result = await knowledge_manager.search_knowledge("Расскажи про яблоки")
 
     assert search_result.is_success
-    assert "Яблоко" in search_result.message
-    assert "wiki" in search_result.message
-    assert "Машина" not in search_result.message  # Проверка, что отсекло лишнее
+    assert "яблоки" in search_result.message
+    assert "Машина" not in search_result.message
 
 
 @pytest.mark.asyncio
 async def test_knowledge_search_not_found(knowledge_manager):
     """Тест: поиск того, чего нет, не должен ломать систему."""
     # Сохраняем "яблоко", а ищем "шум" (другой вектор)
-    await knowledge_manager.save_knowledge("Яблоко", {})
+    await knowledge_manager.save_knowledge("Яблоко")
 
     search_result = await knowledge_manager.search_knowledge("Неизвестный космос")
 
@@ -206,9 +205,7 @@ async def test_knowledge_get_all(knowledge_manager):
 async def test_thoughts_save_and_search(thoughts_manager):
     """Тест: сохранение мыслей (рефлексии) агента."""
 
-    save_result = await thoughts_manager.save_thought(
-        "Я подумал про яблоко", {"mood": "hungry"}
-    )
+    save_result = await thoughts_manager.save_thought("Я подумал про яблоко")
     assert save_result.is_success
 
     # Ищем по теме
@@ -216,7 +213,6 @@ async def test_thoughts_save_and_search(thoughts_manager):
 
     assert search_result.is_success
     assert "Я подумал про яблоко" in search_result.message
-    assert "hungry" in search_result.message
 
 
 @pytest.mark.asyncio
@@ -225,3 +221,32 @@ async def test_thoughts_empty_db(thoughts_manager):
     result = await thoughts_manager.get_all_thoughts()
     assert result.is_success
     assert "пуста" in result.message
+
+
+# ===================================================================
+# TESTS: EMBEDDING WRAPPER
+# ===================================================================
+
+
+@pytest.mark.asyncio
+@patch("src.l1_databases.vector.embedding.TextEmbedding")
+async def test_embedding_model_wrapper(mock_fastembed):
+    """Тест: EmbeddingModel корректно вызывает генератор fastembed и возвращает list."""
+    from src.l1_databases.vector.embedding import EmbeddingModel
+    import numpy as np
+
+    # Настраиваем мок так, чтобы он возвращал генератор с одним numpy array (как в реальности)
+    mock_instance = MagicMock()
+    mock_instance.embed.return_value = iter([np.array([0.1, 0.2, 0.3])])
+    mock_fastembed.return_value = mock_instance
+
+    # Инициализируем модель (fastembed не будет качаться, так как он замокан)
+    model = EmbeddingModel(model_path="/fake", model_name="fake-model")
+
+    # Запрашиваем вектор
+    vector = await model.get_embedding("Тестовый текст")
+
+    # Проверяем, что это list из float (а не numpy array или генератор)
+    assert isinstance(vector, list)
+    assert vector == [0.1, 0.2, 0.3]
+    mock_instance.embed.assert_called_once_with("Тестовый текст")

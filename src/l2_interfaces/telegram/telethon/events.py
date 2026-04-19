@@ -107,7 +107,26 @@ class TelethonEvents:
 
         await self._update_state()
 
+        # Вытаскиваем ID чата, в котором поставили реакцию
+        try:
+            chat_id = utils.get_peer_id(event.peer)
+        except Exception:
+            chat_id = "Unknown"
+
+        # Парсим новые реакции
+        reactions_str = "Реакции удалены"
+        if getattr(event, "reactions", None) and getattr(event.reactions, "results", None):
+            r_list = []
+            for r in event.reactions.results:
+                emo = getattr(r.reaction, "emoticon", "[CustomEmoji]")
+                r_list.append(f"{emo} x{r.count}")
+
+            if r_list:
+                reactions_str = ", ".join(r_list)
+
         await self.bus.publish(
             Events.TELETHON_MESSAGE_REACTION,
+            chat_id=chat_id,
             message_id=event.msg_id,
+            reactions=reactions_str,
         )

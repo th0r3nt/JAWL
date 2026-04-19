@@ -1,6 +1,6 @@
 import time
 import uuid
-from typing import Optional, TYPE_CHECKING, Any, Dict
+from typing import Optional, TYPE_CHECKING, Any
 from qdrant_client import models
 
 from src.utils.dtime import format_timestamp
@@ -24,7 +24,7 @@ class VectorKnowledge:
         db: "VectorDB",
         embedding_model: "EmbeddingModel",
         collection: str = "knowledge",
-        similarity_threshold: float = 0.45,
+        similarity_threshold: float = 0.65,
         timezone: int = 0,
     ):
         self.db = db
@@ -34,27 +34,23 @@ class VectorKnowledge:
         self.timezone = timezone
 
     def _format_time(self, timestamp: Optional[float]) -> str:
-        """Вспомогательный метод для красивого вывода времени."""
         if not timestamp:
             return "Неизвестно"
         return format_timestamp(timestamp, self.timezone)
 
     @skill()
-    async def save_knowledge(
-        self, knowledge_text: str, metadata: Optional[Dict[str, Any]] = None
-    ) -> SkillResult:
+    async def save_knowledge(self, knowledge_text: str) -> SkillResult:
         """Сохраняет фрагмент знаний."""
+
         if not self.db.client:
             return SkillResult.fail("Векторная БД не инициализирована.")
 
         try:
             vector = await self.embedding_model.get_embedding(knowledge_text)
             point_id = str(uuid.uuid4())
-            payload = metadata or {}
-            payload["text"] = knowledge_text
 
-            if "created_at" not in payload:
-                payload["created_at"] = time.time()
+            # Сохраняем только текст и системное время
+            payload = {"text": knowledge_text, "created_at": time.time()}
 
             await self.db.client.upsert(
                 collection_name=self.collection.name,
@@ -72,7 +68,8 @@ class VectorKnowledge:
 
     @skill()
     async def search_knowledge(self, query: str, limit: int = 5) -> SkillResult:
-        """Семантический поиск информации. Главный механизм поиска фактов для агента."""
+        """Семантический поиск информации из базы данных."""
+
         try:
             safe_query = query.replace("\n", " ").replace("\r", "")
             query_vector = await self.embedding_model.get_embedding(query)
@@ -104,14 +101,7 @@ class VectorKnowledge:
                 text = point.payload.get("text", "")
                 time_str = self._format_time(point.payload.get("created_at"))
 
-                metadata_dict = {
-                    k: v for k, v in point.payload.items() if k not in ("text", "created_at")
-                }
-                metadata_str = (
-                    f"\nМетаданные (источник): `{metadata_dict}`" if metadata_dict else ""
-                )
-
-                md_block = f"[ID: `{point.id}`][Время: {time_str}] Релевантность: {score}/{self.similarity_threshold}\n{text}{metadata_str}"
+                md_block = f"[ID: `{point.id}`][Время: {time_str}] Релевантность: {score}/{self.similarity_threshold}\n{text}"
                 formatted_results.append(md_block)
 
             return SkillResult.ok("\n\n".join(formatted_results))
@@ -140,7 +130,6 @@ class VectorKnowledge:
     @skill()
     async def get_all_knowledge(self, limit: int = 10) -> SkillResult:
         """Получает последние n записей из базы знаний (без семантического поиска)."""
-
         try:
             records, _ = await self.db.client.scroll(
                 collection_name=self.collection.name,
@@ -163,14 +152,7 @@ class VectorKnowledge:
                 text = point.payload.get("text", "")
                 time_str = self._format_time(point.payload.get("created_at"))
 
-                metadata_dict = {
-                    k: v for k, v in point.payload.items() if k not in ("text", "created_at")
-                }
-                metadata_str = (
-                    f"\nМетаданные (источник): `{metadata_dict}`" if metadata_dict else ""
-                )
-
-                md_block = f"[ID: `{point.id}`] [Время: {time_str}]\n{text}{metadata_str}"
+                md_block = f"[ID: `{point.id}`][Время: {time_str}]\n{text}"
                 formatted_results.append(md_block)
 
             return SkillResult.ok("\n\n".join(formatted_results))

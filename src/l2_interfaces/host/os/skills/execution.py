@@ -11,7 +11,7 @@ from src.l3_agent.skills.registry import SkillResult, skill
 class HostOSExecution:
     """
     Навыки агента для запуска кода и управления процессами.
-    Самый опасный модуль: строго контролируется через Madness Level.
+    Самый опасный модуль: строго контролируется через Access Level.
     """
 
     def __init__(self, host_os_client: HostOSClient):

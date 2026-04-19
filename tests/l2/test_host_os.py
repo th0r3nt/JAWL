@@ -2,6 +2,8 @@ import os
 import pytest
 from pathlib import Path
 
+from unittest.mock import MagicMock, patch
+
 from src.utils.settings import HostOSConfig
 from src.utils.event.bus import EventBus
 
@@ -13,6 +15,7 @@ from src.l2_interfaces.host.os.skills.files import HostOSFiles
 from src.l2_interfaces.host.os.skills.execution import HostOSExecution
 from src.l2_interfaces.host.os.skills.system import HostOSSystem
 from src.l2_interfaces.host.os.skills.network import HostOSNetwork
+from src.l2_interfaces.host.os.skills.monitoring import HostOSMonitoring
 
 
 # ===================================================================
@@ -288,3 +291,70 @@ def test_os_events_check_sandbox_tree(os_client):
 
     # Проверяем символы соединителей
     assert "├──" in state.sandbox_files or "└──" in state.sandbox_files
+
+
+@pytest.mark.asyncio
+async def test_os_monitoring_track_and_untrack(os_client):
+    """Тест: управление Watchdog-радаром."""
+    events_mock = MagicMock(spec=HostOSEvents)
+    events_mock._watches = {}
+
+    # Мокаем методы events, чтобы не поднимать реальные потоки Watchdog
+    events_mock.track_path.return_value = True
+    events_mock.untrack_path.return_value = True
+
+    monitoring = HostOSMonitoring(os_client, events_mock)
+
+    # Тестируем добавление
+    res_track = await monitoring.track_directory(str(os_client.sandbox_dir))
+    assert res_track.is_success is True
+    events_mock.track_path.assert_called_once()
+
+    # Тестируем удаление
+    res_untrack = await monitoring.untrack_directory(str(os_client.sandbox_dir))
+    assert res_untrack.is_success is True
+    events_mock.untrack_path.assert_called_once()
+
+
+# ===================================================================
+# TESTS: HOST OS (EDGE CASES)
+# ===================================================================
+
+
+@pytest.mark.asyncio
+@patch("src.l2_interfaces.host.os.skills.execution.psutil.Process")
+async def test_execution_kill_process_not_found(mock_process, os_client):
+    """Тест: Агент пытается убить процесс, которого не существует."""
+    import psutil
+
+    os_client.access_level = HostOSAccessLevel.OPERATOR
+    executor = HostOSExecution(os_client)
+
+    mock_process.side_effect = psutil.NoSuchProcess(pid=99999)
+
+    res = await executor.kill_process(pid=99999)
+    assert res.is_success is False
+    assert "не найден" in res.message
+
+
+@pytest.mark.asyncio
+@patch("src.l2_interfaces.host.os.skills.network.urllib.request.urlopen")
+async def test_network_http_request_truncation(mock_urlopen, os_client):
+    """Тест: Ответ от HTTP-запроса обрезается, если он слишком большой."""
+    network = HostOSNetwork(os_client)
+    os_client.config.http_response_max_chars = 100
+
+    # Имитируем гигантский ответ
+    mock_response = MagicMock()
+    mock_response.status = 200
+    mock_response.read.return_value = b"A" * 500  # 500 байт
+    mock_response.__enter__.return_value = mock_response
+    mock_urlopen.return_value = mock_response
+
+    res = await network.http_request("http://fake.url")
+
+    assert res.is_success is True
+    assert "Статус: 200" in res.message
+    # Проверяем, что сработал лимит в 100 символов
+    assert "Превышен лимит символов" in res.message
+    assert len(res.message) < 200

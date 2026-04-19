@@ -2,7 +2,7 @@ import re
 from typing import Optional, Union
 
 from telethon import utils
-from telethon.tl.functions.contacts import SearchRequest
+from telethon.tl.functions.contacts import SearchRequest, AddContactRequest
 from telethon.tl.functions.channels import (
     JoinChannelRequest,
     LeaveChannelRequest,
@@ -159,46 +159,6 @@ class TelethonChats:
                 elif msg.sender_id:
                     sender_name = f"Unknown (ID: {msg.sender_id})"
 
-                content_parts = []
-                if msg.action:
-                    content_parts.append("[Системное сообщение]")
-                if msg.media:
-                    if msg.photo:
-                        content_parts.append("[Фотография]")
-                    elif msg.sticker:
-                        emoji = msg.file.emoji if (hasattr(msg, "file") and msg.file) else ""
-                        sticker_text = f"[Стикер {emoji}]" if emoji else "[Стикер]"
-                        content_parts.append(sticker_text)
-                    elif getattr(msg, "gif", None):
-                        content_parts.append("[GIF]")
-                    elif msg.voice:
-                        content_parts.append("[Голосовое сообщение]")
-                    elif msg.video or msg.video_note:
-                        content_parts.append("[Видео]")
-                    elif msg.document:
-                        content_parts.append("[Файл]")
-                    elif msg.poll:
-                        content_parts.append("[Опрос]")
-                    else:
-                        content_parts.append("[Медиа]")
-                if msg.text:
-                    content_parts.append(msg.text)
-
-                # Обработка пересланных сообщений
-                forward_context = ""
-                if msg.fwd_from:
-                    try:
-                        fwd_sender = await msg.get_forward_sender()
-                        if fwd_sender:
-                            fwd_name = utils.get_display_name(fwd_sender)
-                            forward_context = f"\n  ↳[Переслано от: {fwd_name}]"
-                        elif msg.fwd_from.from_name:
-                            forward_context = f"\n  ↳[Переслано от: {msg.fwd_from.from_name}]"
-                        else:
-                            forward_context = "\n  ↳ [Переслано]"
-                    except Exception:
-                        forward_context = "\n  ↳ [Переслано]"
-
                 # Логика определения реальных ответов (отсечение костылей Telegram-форумов)
                 is_actual_reply = False
                 reply_id = None
@@ -220,7 +180,67 @@ class TelethonChats:
                 if is_actual_reply and str(reply_id) == str(topic_id):
                     is_actual_reply = False
 
+                # =================================================================
+                # МЕДИА
+
+                content_parts = []
+
+                if msg.action:
+                    content_parts.append("[Системное сообщение]")
+
+                if msg.media:
+                    if msg.photo:
+                        content_parts.append("[Фотография]")
+
+                    elif msg.sticker:
+                        emoji = msg.file.emoji if (hasattr(msg, "file") and msg.file) else ""
+                        sticker_text = f"[Стикер {emoji}]" if emoji else "[Стикер]"
+                        content_parts.append(sticker_text)
+
+                    elif getattr(msg, "gif", None):
+                        content_parts.append("[GIF]")
+
+                    elif msg.voice:
+                        content_parts.append("[Голосовое сообщение]")
+
+                    elif msg.video or msg.video_note:
+                        content_parts.append("[Видео]")
+
+                    elif msg.document:
+                        content_parts.append("[Файл]")
+
+                    elif msg.poll:
+                        content_parts.append("[Опрос]")
+
+                    else:
+                        content_parts.append("[Медиа]")
+
+                if msg.text:
+                    content_parts.append(msg.text)
+
+                # =================================================================
+                # ПЕРЕСЛАННЫЕ СООБЩЕНИЯ
+
+                forward_context = ""
+
+                if msg.fwd_from:
+                    try:
+                        fwd_sender = await msg.get_forward_sender()
+                        if fwd_sender:
+                            fwd_name = utils.get_display_name(fwd_sender)
+                            forward_context = f"\n  ↳[Переслано от: {fwd_name}]"
+                        elif msg.fwd_from.from_name:
+                            forward_context = f"\n  ↳[Переслано от: {msg.fwd_from.from_name}]"
+                        else:
+                            forward_context = "\n  ↳ [Переслано]"
+                    except Exception:
+                        forward_context = "\n  ↳ [Переслано]"
+
+                # =================================================================
+                # REPLY
+
                 reply_context = ""
+
                 if is_actual_reply and reply_id:
                     try:
                         # Запрашиваем оригинальное сообщение, на которое был дан ответ
@@ -242,13 +262,45 @@ class TelethonChats:
                     except Exception:
                         reply_context = f"\n  ↳ (В ответ на сообщение ID {reply_id})"
 
+                # =================================================================
+                # РЕАКЦИИ
+
+                reaction_context = ""
+
+                if getattr(msg, "reactions", None) and getattr(msg.reactions, "results", None):
+                    r_list = []
+                    for r in msg.reactions.results:
+                        emo = getattr(r.reaction, "emoticon", "[CustomEmoji]")
+                        r_list.append(f"{emo} {r.count}")
+
+                    if r_list:
+                        reaction_context = f"\n  ↳[Реакции: {', '.join(r_list)}]"
+
+                # =================================================================
+                # INLINE КНОПКИ
+
+                buttons_context = ""
+
+                if getattr(msg, "buttons", None):
+                    btn_texts = []
+                    for row in msg.buttons:
+                        for btn in row:
+                            if btn.text:
+                                btn_texts.append(f"[{btn.text}]")
+                    if btn_texts:
+                        buttons_context = f"\n  ↳[Кнопки: {', '.join(btn_texts)}]"
+
+                # =================================================================
+                # СКЛЕИВАНИЕ СООБЩЕНИЯ
+
                 final_text = " ".join(content_parts) if content_parts else "[Пустое сообщение]"
+
                 time_str = format_datetime(
                     msg.date, self.tg_client.timezone, fmt="%Y-%m-%d %H:%M"
                 )
 
                 messages.append(
-                    f"[{time_str}][ID: {msg.id}] {sender_name}: {final_text}{forward_context}{reply_context}"
+                    f"[{time_str}] [ID: {msg.id}] {sender_name}: {final_text}{forward_context}{reply_context}{reaction_context}{buttons_context}"  # Помогите
                 )
 
             if not messages:
@@ -416,3 +468,34 @@ class TelethonChats:
                 )
 
             return SkillResult.fail(f"Ошибка при инвайтинге: {e}")
+
+
+    @skill()
+    async def add_contact(
+        self, user_id: Union[int, str], first_name: str, last_name: str = ""
+    ) -> SkillResult:
+        """
+        Добавляет пользователя в контакты Telegram.
+        """
+        try:
+            client = self.tg_client.client()
+            target_entity = await client.get_input_entity(self._parse_entity(user_id))
+
+            # Telethon позволяет добавить контакт без номера телефона, 
+            # если мы укажем пустую строку и передадим InputUser объект (target_entity)
+            await client(AddContactRequest(
+                id=target_entity,
+                first_name=first_name,
+                last_name=last_name,
+                phone="",
+                add_phone_privacy_exception=False
+            ))
+
+            name_str = f"{first_name} {last_name}".strip()
+            system_logger.info(f"[Telegram Telethon] Пользователь {user_id} добавлен в контакты как '{name_str}'")
+            return SkillResult.ok(f"Успешно. Пользователь {user_id} добавлен в контакты как '{name_str}'.")
+
+        except ValueError:
+            return SkillResult.fail(f"Ошибка: Пользователь '{user_id}' не найден. Проверьте правильность ID или юзернейма.")
+        except Exception as e:
+            return SkillResult.fail(f"Ошибка при добавлении в контакты: {e}")

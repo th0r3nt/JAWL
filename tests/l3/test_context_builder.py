@@ -13,7 +13,7 @@ async def test_context_builder_build():
     # Мокаем Registry
     mock_registry = AsyncMock()
     # Имитируем, что разные провайдеры вернули свои блоки
-    mock_registry.gather_all.return_value = "### TELETHON [ON]\nAccount info..."
+    mock_registry.gather_all.return_value = {"telethon": "### TELETHON [ON]\nAccount info..."}
 
     builder = ContextBuilder(agent_state=agent_state, registry=mock_registry)
 
@@ -31,3 +31,27 @@ async def test_context_builder_build():
     assert "## HEARTBEAT" in context
     assert "TEST_EVENT" in context
     assert "text: Hello Agent" in context
+
+
+@pytest.mark.asyncio
+async def test_context_registry_resilience():
+    """Тест: Если один провайдер падает, реестр игнорирует его и отдает остальные."""
+    from src.l3_agent.context.registry import ContextRegistry
+
+    registry = ContextRegistry()
+
+    async def success_provider(**kwargs):
+        return "Успешный блок"
+
+    async def failing_provider(**kwargs):
+        raise ValueError("Критическая ошибка БД/Сети")
+
+    registry.register_provider("good", success_provider)
+    registry.register_provider("bad", failing_provider)
+
+    results = await registry.gather_all("EVENT", {}, [])
+
+    # Реестр должен проглотить ошибку failing_provider и вернуть только good
+    assert "good" in results
+    assert results["good"] == "Успешный блок"
+    assert "bad" not in results

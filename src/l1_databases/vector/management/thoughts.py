@@ -1,6 +1,6 @@
 import time
 import uuid
-from typing import Optional, TYPE_CHECKING, Any, Dict
+from typing import Optional, TYPE_CHECKING, Any
 from qdrant_client import models
 
 from src.utils.dtime import format_timestamp
@@ -24,7 +24,7 @@ class VectorThoughts:
         db: "VectorDB",
         embedding_model: "EmbeddingModel",
         collection: str = "thoughts",
-        similarity_threshold: float = 0.43,
+        similarity_threshold: float = 0.65,
         timezone: int = 0,
     ):
         self.db = db
@@ -34,26 +34,19 @@ class VectorThoughts:
         self.timezone = timezone
 
     def _format_time(self, timestamp: Optional[float]) -> str:
-        """Вспомогательный метод для красивого вывода времени."""
         if not timestamp:
             return "Неизвестно"
         return format_timestamp(timestamp, self.timezone)
 
     @skill()
-    async def save_thought(
-        self, thought_text: str, metadata: Optional[Dict[str, Any]] = None
-    ) -> SkillResult:
-        """Сохраняет мысль в векторную базу данных."""
-
+    async def save_thought(self, thought_text: str) -> SkillResult:
+        """Сохраняет мысль в базу данных."""
+        
         try:
             vector = await self.embedding_model.get_embedding(thought_text)
             point_id = str(uuid.uuid4())
-            payload = metadata or {}
-            payload["text"] = thought_text
 
-            # Добавляем метку времени, если ее нет
-            if "created_at" not in payload:
-                payload["created_at"] = time.time()
+            payload = {"text": thought_text, "created_at": time.time()}
 
             await self.db.client.upsert(
                 collection_name=self.collection.name,
@@ -71,8 +64,7 @@ class VectorThoughts:
 
     @skill()
     async def search_thoughts(self, query: str, limit: int = 5) -> SkillResult:
-        """Семантический поиск мыслей из векторной базы данных."""
-
+        """Семантический поиск мыслей из базы данных."""
         try:
             safe_query = query.replace("\n", " ").replace("\r", "")
             query_vector = await self.embedding_model.get_embedding(query)
@@ -104,12 +96,7 @@ class VectorThoughts:
                 text = point.payload.get("text", "")
                 time_str = self._format_time(point.payload.get("created_at"))
 
-                metadata_dict = {
-                    k: v for k, v in point.payload.items() if k not in ("text", "created_at")
-                }
-                metadata_str = f"\nМетаданные: `{metadata_dict}`" if metadata_dict else ""
-
-                md_block = f"[ID: `{point.id}`] [Время: {time_str}] Релевантность: {score}/{self.similarity_threshold}\n{text}{metadata_str}"
+                md_block = f"[ID: `{point.id}`] [Время: {time_str}] Релевантность: {score}/{self.similarity_threshold}\n{text}"
                 formatted_results.append(md_block)
 
             return SkillResult.ok("\n\n".join(formatted_results))
@@ -121,8 +108,7 @@ class VectorThoughts:
 
     @skill()
     async def delete_thought(self, point_id: str) -> SkillResult:
-        """Удаляет мысль из векторной базы данных по ID."""
-
+        """Удаляет мысль из базы данных по ID."""
         try:
             await self.db.client.delete(
                 collection_name=self.collection.name,
@@ -139,7 +125,7 @@ class VectorThoughts:
 
     @skill()
     async def get_all_thoughts(self, limit: int = 10) -> SkillResult:
-        """Получает последние n мыслей из векторной базы данных."""
+        """Получает последние n мыслей из базы данных."""
 
         try:
             records, _ = await self.db.client.scroll(
@@ -163,12 +149,7 @@ class VectorThoughts:
                 text = point.payload.get("text", "")
                 time_str = self._format_time(point.payload.get("created_at"))
 
-                metadata_dict = {
-                    k: v for k, v in point.payload.items() if k not in ("text", "created_at")
-                }
-                metadata_str = f"\nМетаданные: `{metadata_dict}`" if metadata_dict else ""
-
-                md_block = f"[ID: `{point.id}`] [Время: {time_str}]\n{text}{metadata_str}"
+                md_block = f"[ID: `{point.id}`] [Время: {time_str}]\n{text}"
                 formatted_results.append(md_block)
 
             return SkillResult.ok("\n\n".join(formatted_results))
