@@ -3,7 +3,7 @@ import sys
 import psutil
 from src.utils.logger import system_logger
 
-from src.l2_interfaces.host.os.client import HostOSClient, MadnessLevel
+from src.l2_interfaces.host.os.client import HostOSClient, HostOSAccessLevel
 
 from src.l3_agent.skills.registry import SkillResult, skill
 
@@ -34,23 +34,21 @@ class HostOSExecution:
     async def execute_script(self, filepath: str) -> SkillResult:
         """
         Запускает скрипт (.py, .sh, .bat, .js).
-        По умолчанию (при madness_level = 1) запускает только из папки sandbox/.
-        Автоматически завершается, если работает дольше timeout секунд.
+        При Access level = 1 запускает только из папки sandbox/.
         """
 
         timeout = self.host_os.config.execution_timeout_sec
 
-        if self.host_os.madness_level < MadnessLevel.VOYEUR: 
+        if self.host_os.access_level < HostOSAccessLevel.OBSERVER: 
             return SkillResult.fail(
-                "Отказано в доступе: выполнение скриптов разрешено при madness_level >= 1."
+                "Отказано в доступе: выполнение скриптов разрешено при Access Level >= 1."
             )
 
         try:
             safe_path = self.host_os.validate_path(filepath, is_write=False)
 
-            # Дополнительная проверка: Voyeur может запускать только внутри песочницы
             if (
-                self.host_os.madness_level < MadnessLevel.SURGEON
+                self.host_os.access_level < HostOSAccessLevel.OPERATOR
                 and not safe_path.is_relative_to(self.host_os.sandbox_dir)
             ):
                 return SkillResult.fail(
@@ -127,14 +125,14 @@ class HostOSExecution:
     async def execute_shell_command(self, command: str) -> SkillResult:
         """
         Запускает сырую bash/cmd команду в терминале ОС.
-        Доступно только при madness_level >= 2.
+        Доступно только при Access Level >= 2.
         """
 
         timeout = self.host_os.config.execution_timeout_sec
 
-        if self.host_os.madness_level < MadnessLevel.SURGEON:
+        if self.host_os.access_level < HostOSAccessLevel.OPERATOR:
             return SkillResult.fail(
-                "Отказано в доступе: выполнение shell-команд требует madness_level >= 2 (SURGEON)."
+                "Отказано в доступе: выполнение shell-команд требует access_level >= 2 (OPERATOR)."
             )
 
         try:
@@ -182,12 +180,12 @@ class HostOSExecution:
     async def kill_process(self, pid: int) -> SkillResult:
         """
         Принудительно завершает процесс ОС по его PID.
-        Доступно только при madness_level >= 2.
+        Доступно только при Access Level >= 2.
         """
 
-        if self.host_os.madness_level < MadnessLevel.SURGEON:
+        if self.host_os.access_level < HostOSAccessLevel.OPERATOR:
             return SkillResult.fail(
-                "Отказано в доступе: управление процессами ОС требует madness_level >= 2 (SURGEON)."
+                "Отказано в доступе: управление процессами ОС требует access_level >= 2 (OPERATOR)."
             )
 
         try:

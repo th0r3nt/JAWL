@@ -18,24 +18,29 @@ if TYPE_CHECKING:
 def setup_host_os(system: "System") -> List[Any]:
     """Инициализирует Host OS, регистрирует скиллы и возвращает фоновые задачи (events)."""
 
-    os_client = HostOSClient(
+    client = HostOSClient(
         base_dir=system.root_dir,
         config=system.interfaces_config.host.os,
         state=system.os_state,
         timezone=system.settings.system.timezone,
     )
-    os_events = HostOSEvents(
-        host_os_client=os_client, state=system.os_state, event_bus=system.event_bus
+    events = HostOSEvents(
+        host_os_client=client, state=system.os_state, event_bus=system.event_bus
     )
 
     # Регистрация навыков для агента
-    register_instance(HostOSExecution(os_client))
-    register_instance(HostOSFiles(os_client))
-    register_instance(HostOSNetwork(os_client))
-    register_instance(HostOSSystem(os_client))
-    register_instance(HostOSMonitoring(os_client, os_events))
+    register_instance(HostOSExecution(client))
+    register_instance(HostOSFiles(client))
+    register_instance(HostOSNetwork(client))
+    register_instance(HostOSSystem(client))
+    register_instance(HostOSMonitoring(client, events))
+
+    # Регистрация провайдеров контекста (отдают Markdown блоки в промпт агента)
+    system.context_registry.register_provider(
+        name="host os", provider_func=client.get_context_block
+    )
 
     system_logger.info("[System] Интерфейс Host OS загружен.")
 
-    # os_events имеет start() и stop() (Watchdog и поллинг)
-    return [os_events]
+    # events имеет start() и stop() (Watchdog и поллинг)
+    return [events]

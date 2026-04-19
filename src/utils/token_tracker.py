@@ -1,3 +1,4 @@
+import tiktoken
 from collections import deque
 from typing import Any, Dict
 
@@ -7,23 +8,31 @@ from src.utils.logger import system_logger
 class TokenTracker:
     """
     Отслеживает статистику использования токенов.
+    Использует tiktoken (энкодер от OpenAI) для точного подсчета.
     """
 
     def __init__(self, maxlen: int = 100):
         self.input_history: deque[Dict[str, Any]] = deque(maxlen=maxlen)
         self.output_history: deque[Dict[str, Any]] = deque(maxlen=maxlen)
+        try:
+            # o200k_base - актуальный энкодер
+            self.encoding = tiktoken.get_encoding("o200k_base")
+        except Exception:
+            # Fallback на старый, если что-то пойдет не так
+            self.encoding = tiktoken.get_encoding("cl100k_base")
 
-    @staticmethod
-    def _approximate_tokens(text: str) -> int:
-        """
-        Приблизительный подсчет токенов без тяжелых зависимостей.
-        1 токен ~= 4 символа (стандартная эвристика).
-        """
+    def _approximate_tokens(self, text: str) -> int:
+        """Точный подсчет токенов через tiktoken."""
         if not text:
             return 0
-        return max(1, len(text) // 4)
+        try:
+            # disallowed_special=() разрешает энкодеру глотать спец-токены, если они попадутся
+            return len(self.encoding.encode(text, disallowed_special=()))
+        except Exception:
+            # Fallback на случай непредвиденных крашей кодировщика
+            return max(1, len(text) // 4)
 
-    def add_input_record(self, prompt: str, context: str) -> str:
+    def add_input_record(self, prompt: str, context: str) -> None:
         """Записывает входящие токены текущего цикла."""
         prompt_tokens = self._approximate_tokens(prompt)
         context_tokens = self._approximate_tokens(context)
@@ -34,25 +43,24 @@ class TokenTracker:
             {"prompt": prompt_tokens, "context": context_tokens, "total": total_tokens}
         )
 
-        msg = f"[LLM] Input tokens: {total_tokens} (prompt: {prompt_tokens}, context: {context_tokens})."
-        system_logger.info(msg)
-        return msg
+        system_logger.info(
+            f"[LLM] Input tokens: {total_tokens} (prompt: {prompt_tokens}, context: {context_tokens})."
+        )
 
-    def add_output_record(self, output_text: str) -> str:
+    def add_output_record(self, output_text: str) -> None:
         """Записывает исходящие (сгенерированные) токены текущего цикла."""
+
         output_tokens = self._approximate_tokens(output_text)
 
         self.output_history.append({"total": output_tokens})
 
-        msg = f"[LLM] Output tokens: {output_tokens}."
-        system_logger.info(msg)
-        return msg
+        system_logger.info(f"[LLM] Output tokens: {output_tokens}.")
 
     def get_token_statistics(self) -> str:
         """Возвращает статистику входящих и исходящих токенов."""
+
         stats_lines = []
 
-        # Подсчет Input токенов
         if self.input_history:
             total_in = sum(item["total"] for item in self.input_history)
             avg_in = total_in // len(self.input_history)
@@ -62,7 +70,6 @@ class TokenTracker:
         else:
             stats_lines.append("Input: No data yet.")
 
-        # Подсчет Output токенов
         if self.output_history:
             total_out = sum(item["total"] for item in self.output_history)
             avg_out = total_out // len(self.output_history)

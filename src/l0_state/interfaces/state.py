@@ -79,6 +79,12 @@ class HostOSState:
     def __init__(self) -> None:
         self.is_online = False
 
+        # Статические данные (определяются 1 раз при старте)
+        self.os_info = "" # Окно/Linux/Mac
+        self.cpu_name = ""
+        self.total_ram_gb = 0.0
+
+        # Динамические данные
         self.datetime = ""  # Время
         self.uptime = ""  # Аптайм хост-пк
         self.telemetry = ""  # CPU, ОЗУ, процессы

@@ -46,3 +46,18 @@ class AgentState(BaseModel):
         hours, remainder = divmod(uptime_seconds, 3600)
         minutes, seconds = divmod(remainder, 60)
         return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
+
+    # P.S. Функцию сборки контекста засунул сюда, ибо это самое подходящее место
+    async def get_context_block(self, **kwargs) -> str:
+        """
+        Провайдер контекста для ContextRegistry.
+        Возвращает отформатированный блок для контекста агента.
+        """
+
+        return f"""
+* Heartbeat Interval: {self.heartbeat_interval}s
+* LLM Model: {self.llm_model}
+* Temperature: {self.temperature}
+* Uptime: {self.get_uptime()}
+* ReAct Step: {self.current_step}/{self.max_react_steps}
+        """.strip()

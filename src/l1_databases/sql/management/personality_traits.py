@@ -68,3 +68,11 @@ class SQLPersonalityTraits:
         msg = f"Черта личности {trait_id} удалена."
         system_logger.info(f"[SQL DB] {msg}")
         return SkillResult.ok(msg)
+
+    async def get_context_block(self, **kwargs) -> str:
+        """
+        Провайдер контекста для ContextRegistry.
+        Отдает отформатированный блок для контекста агента.
+        """
+        res = await self.get_traits()
+        return f"## PERSONALITY TRAITS\n{res.message}"

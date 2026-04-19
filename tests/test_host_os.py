@@ -8,7 +8,7 @@ from src.utils.event.bus import EventBus
 from src.l0_state.interfaces.state import HostOSState
 
 from src.l2_interfaces.host.os.events import HostOSEvents
-from src.l2_interfaces.host.os.client import HostOSClient, MadnessLevel
+from src.l2_interfaces.host.os.client import HostOSClient, HostOSAccessLevel
 from src.l2_interfaces.host.os.skills.files import HostOSFiles
 from src.l2_interfaces.host.os.skills.execution import HostOSExecution
 from src.l2_interfaces.host.os.skills.system import HostOSSystem
@@ -23,12 +23,12 @@ from src.l2_interfaces.host.os.skills.network import HostOSNetwork
 @pytest.fixture
 def os_client(tmp_path: Path):
     """
-    Создает изолированного клиента ПК с уровнем VOYEUR (1).
+    Создает изолированного клиента ПК с уровнем OBSERVER (1).
     Передает временную директорию tmp_path напрямую как корень фреймворка.
     """
     config = HostOSConfig(
         enabled=True,
-        madness_level=1,
+        access_level=1,
         env_access=False,
         monitoring_interval_sec=20,
         execution_timeout_sec=60,
@@ -47,9 +47,9 @@ def os_client(tmp_path: Path):
 # ===================================================================
 
 
-def test_gatekeeper_cage(os_client):
-    """Тест CAGE (0): доступ строго только в sandbox/."""
-    os_client.madness_level = MadnessLevel.CAGE
+def test_gatekeeper_sandbox(os_client):
+    """Тест SANDBOX (0): доступ строго только в sandbox/."""
+    os_client.access_level = HostOSAccessLevel.SANDBOX
 
     safe_path = os_client.sandbox_dir / "test.txt"
     framework_path = os_client.framework_dir / "code.py"
@@ -58,13 +58,13 @@ def test_gatekeeper_cage(os_client):
     assert os_client.validate_path(safe_path) == safe_path.resolve()
 
     # Чтение фреймворка - Запрещено
-    with pytest.raises(PermissionError, match="CAGE"):
+    with pytest.raises(PermissionError, match="SANDBOX"):
         os_client.validate_path(framework_path, is_write=False)
 
 
-def test_gatekeeper_voyeur(os_client):
-    """Тест VOYEUR (1): чтение фреймворка, запись только в sandbox/."""
-    os_client.madness_level = MadnessLevel.VOYEUR
+def test_gatekeeper_observer(os_client):
+    """Тест OBSERVER (1): чтение фреймворка, запись только в sandbox/."""
+    os_client.access_level = HostOSAccessLevel.OBSERVER
 
     safe_path = os_client.sandbox_dir / "test.txt"
     framework_path = os_client.framework_dir / "code.py"
@@ -74,20 +74,20 @@ def test_gatekeeper_voyeur(os_client):
     assert os_client.validate_path(safe_path, is_write=True) == safe_path.resolve()
 
     # Запись во фреймворке - Запрещено
-    with pytest.raises(PermissionError, match="VOYEUR"):
+    with pytest.raises(PermissionError, match="OBSERVER"):
         os_client.validate_path(framework_path, is_write=True)
 
     # Чтение фреймворка - ОК
     assert os_client.validate_path(framework_path, is_write=False) == framework_path.resolve()
 
     # Чтение чужой системы - Запрещено
-    with pytest.raises(PermissionError, match="VOYEUR"):
+    with pytest.raises(PermissionError, match="OBSERVER"):
         os_client.validate_path(os_path, is_write=False)
 
 
 def test_gatekeeper_env_protection(os_client):
-    """Тест: запрет доступа к .env файлам работает даже в режиме GOD_MODE."""
-    os_client.madness_level = MadnessLevel.GOD_MODE
+    """Тест: запрет доступа к .env файлам работает даже в режиме ROOT."""
+    os_client.access_level = HostOSAccessLevel.ROOT
     os_client.config.env_access = False
 
     secret_path = os_client.framework_dir / ".env"
@@ -129,7 +129,7 @@ async def test_os_files_delete_out_of_bounds(os_client):
 
     res_del = await files.delete_file(forbidden_path)
     assert res_del.is_success is False
-    assert "VOYEUR: Запись разрешена строго в папке" in res_del.message
+    assert "OBSERVER: Запись разрешена строго в папке" in res_del.message
 
 
 @pytest.mark.asyncio
@@ -189,7 +189,7 @@ async def test_os_files_create_directories(os_client):
 @pytest.mark.asyncio
 async def test_execute_shell_command_safe(os_client):
     """Тест: выполнение простой безопасной кроссплатформенной команды."""
-    os_client.madness_level = MadnessLevel.SURGEON  # Требуется для shell_command
+    os_client.access_level = HostOSAccessLevel.OPERATOR  # Требуется для shell_command
     executor = HostOSExecution(os_client)
 
     # Используем python -c, так как это работает везде (Windows, Linux, Mac)

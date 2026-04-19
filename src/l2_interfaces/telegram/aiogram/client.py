@@ -48,3 +48,13 @@ class AiogramClient:
             await self._bot.session.close()
             system_logger.info("[Telegram Aiogram] Aiogram клиент отключен.")
             self.state.is_online = False
+
+    async def get_context_block(self, **kwargs) -> str:
+        """
+        Провайдер контекста для ContextRegistry.
+        Отдает отформатированный блок контекста для агента.
+        """
+
+        status = "ON" if self.state.is_online else "OFF"
+        data = self.state.last_chats if self.state.is_online else "Интерфейс отключен."
+        return f"### AIOGRAM [{status}]\n{data}"

@@ -10,7 +10,7 @@ from pydantic import BaseModel
 
 class HostOSConfig(BaseModel):
     enabled: bool
-    madness_level: int
+    access_level: int
     env_access: bool
     monitoring_interval_sec: int
     execution_timeout_sec: int

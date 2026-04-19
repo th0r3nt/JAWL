@@ -53,6 +53,8 @@ from src.l3_agent.react.loop import ReactLoop
 from src.l3_agent.heartbeat import Heartbeat
 from src.l3_agent.skills.registry import register_instance
 from src.l3_agent.skills.schema import ACTION_SCHEMA
+from src.l3_agent.context.registry import ContextRegistry
+from src.l3_agent.context.rag.memories import RAGMemories
 
 
 class System:
@@ -86,6 +88,8 @@ class System:
         self.heartbeat: Optional[Heartbeat] = None
         self.llm_client: Optional[LLMClient] = None
 
+        self.context_registry = ContextRegistry()
+
     def setup_l0_state(self):
         """Создает стейты. Создает все, даже если интерфейс выключен (во избежание NoneType)."""
 
@@ -112,6 +116,9 @@ class System:
         self.sql = SQLManager(
             db_path=self.local_data_dir / "sql_db" / "agent.db",
             max_mental_state_entities=self.settings.system.max_mental_state_entities,
+            ticks_limit=self.settings.system.context_depth.ticks,
+            tick_result_max_chars=self.settings.system.context_depth.tick_result_max_chars,
+            timezone=self.settings.system.timezone,
         )
         await self.sql.connect()
 
@@ -133,6 +140,23 @@ class System:
         # Регистрация навыков для агента
         register_instance(self.vector.knowledge)
         register_instance(self.vector.thoughts)
+
+        # Регистрация провайдеров контекста (отдают Markdown блоки в промпт)
+        self.context_registry.register_provider(
+            name="sql_tasks", provider_func=self.sql.tasks.get_context_block
+        )
+        self.context_registry.register_provider(
+            name="sql_traits", provider_func=self.sql.personality_traits.get_context_block
+        )
+        self.context_registry.register_provider(
+            name="sql_mental_states", provider_func=self.sql.mental_states.get_context_block
+        )
+        self.context_registry.register_provider(
+            name="sql_ticks", provider_func=self.sql.ticks.get_context_block
+        )
+        self.context_registry.register_provider(
+            "agent_state", self.agent_state.get_context_block
+        )
 
     def setup_l2_interfaces(
         self,
@@ -159,34 +183,24 @@ class System:
         system_logger.info("[System] Инициализация L3 Agent.")
 
         rotator = APIKeyRotator(keys=llm_api_keys)
-
-        # Сохраняем в self, чтобы закрыть соединения при выходе
         self.llm_client = LLMClient(api_url=llm_api_url, api_keys_rotator=rotator)
 
         prompt_builder = PromptBuilder(
             prompt_dir=self.root_dir / "src" / "l3_agent" / "prompt"
         )
-        context_builder = ContextBuilder(
-            # States
-            host_os_state=self.os_state,
-            telethon_state=self.telethon_state,
-            aiogram_state=self.aiogram_state,
-            terminal_state=self.terminal_state,
-            agent_state=self.agent_state,
-            web_search_state=self.web_search_state,
-            # SQL
-            sql_ticks=self.sql.ticks,
-            sql_tasks=self.sql.tasks,
-            sql_traits=self.sql.personality_traits,
-            sql_mental_states=self.sql.mental_states,
-            # Vector
+
+        # Поднимаем RAG-провайдер и регистрируем его
+        rag_memories = RAGMemories(
             vector_knowledge=self.vector.knowledge,
             vector_thoughts=self.vector.thoughts,
-            vector_db_config=self.settings.system.vector_db,
-            # yaml
-            depth_config=self.settings.system.context_depth,
-            interfaces_config=self.interfaces_config,
-            timezone=self.settings.system.timezone,
+            telethon_state=self.telethon_state,
+            auto_rag_top_k=self.settings.system.vector_db.auto_rag_top_k,
+        )
+        self.context_registry.register_provider("rag memories", rag_memories.get_context_block)
+
+        # Инициализируем тонкий ContextBuilder
+        context_builder = ContextBuilder(
+            agent_state=self.agent_state, registry=self.context_registry
         )
 
         token_tracker = TokenTracker()

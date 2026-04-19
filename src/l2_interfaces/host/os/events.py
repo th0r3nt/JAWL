@@ -1,7 +1,8 @@
 import asyncio
 import time
 import socket
-from datetime import datetime, timezone, timedelta
+import platform
+import subprocess
 from pathlib import Path
 import psutil
 import json
@@ -13,9 +14,37 @@ from watchdog.events import FileSystemEventHandler
 from src.utils.event.bus import EventBus
 from src.utils.event.registry import Events
 from src.utils.logger import system_logger
+from src.utils.dtime import get_now_formatted
 
 from src.l0_state.interfaces.state import HostOSState
 from src.l2_interfaces.host.os.client import HostOSClient
+
+
+def _get_cpu_name() -> str:
+    """Безопасный кроссплатформенный метод получения названия CPU."""
+
+    try:
+        os_name = platform.system()
+
+        if os_name == "Windows":
+            return platform.processor()
+
+        elif os_name == "Darwin":
+            return (
+                subprocess.check_output(["sysctl", "-n", "machdep.cpu.brand_string"])
+                .strip()
+                .decode()
+            )
+
+        elif os_name == "Linux":
+            with open("/proc/cpuinfo", "r") as f:
+                for line in f:
+                    if "model name" in line:
+                        return line.split(":")[1].strip()
+    except Exception:
+        pass
+    # Фолбек, если что-то пошло не так
+    return platform.processor() or "Unknown CPU"
 
 
 class _SandboxWatchdogHandler(FileSystemEventHandler):
@@ -65,7 +94,7 @@ class _SandboxWatchdogHandler(FileSystemEventHandler):
 class HostOSEvents:
     """
     Фоновый мониторинг состояния ПК.
-    Обновляет приборную панель агента (HostOSState).
+    Обновляет HostOSState.
     """
 
     def __init__(self, host_os_client: HostOSClient, state: HostOSState, event_bus: EventBus):
@@ -79,7 +108,6 @@ class HostOSEvents:
         self._observer: Observer | None = None  # type: ignore
         self._watches: dict[str, Any] = {}
 
-        # Файл для хранения отслеживаемых директорий между запусками
         self._persistence_file = (
             self.host_os.framework_dir
             / "src"
@@ -92,6 +120,11 @@ class HostOSEvents:
 
         self._last_sandbox_files = set()
         psutil.cpu_percent(interval=None)
+
+        # Собираем статику 1 раз при старте
+        self.state.os_info = f"{platform.system()} {platform.release()}"
+        self.state.cpu_name = _get_cpu_name()
+        self.state.total_ram_gb = round(psutil.virtual_memory().total / (1024**3), 1)
 
     async def start(self) -> None:
         if self._is_running:
@@ -258,8 +291,7 @@ class HostOSEvents:
         return False
 
     def _update_datetime_and_uptime(self):
-        tz = timezone(timedelta(hours=self.host_os.timezone))
-        self.state.datetime = datetime.now(tz).strftime("%Y-%m-%d %H:%M:%S")
+        self.state.datetime = get_now_formatted(self.host_os.timezone)
 
         # Аптайм
         boot_time = psutil.boot_time()
@@ -275,7 +307,10 @@ class HostOSEvents:
 
     def _update_telemetry(self):
         cpu = psutil.cpu_percent(interval=None)
-        ram = psutil.virtual_memory().percent
+
+        mem = psutil.virtual_memory()
+        ram_percent = mem.percent
+        ram_used_gb = round((mem.total - mem.available) / (1024**3), 1)
 
         # Собираем топ процессов по ОЗУ
         processes = []
@@ -295,8 +330,12 @@ class HostOSEvents:
         ]
         top_str = ", ".join(proc_strings) if proc_strings else "Нет данных"
 
-        # Записываем в стейт агента
-        self.state.telemetry = f"CPU: {cpu}%, RAM: {ram}%\nТоп процессов (RAM): {top_str}"
+        # === Обновляем вывод телеметрии ===
+        self.state.telemetry = (
+            f"CPU: {cpu}% ({self.state.cpu_name})\n"
+            f"RAM: {ram_percent}% ({ram_used_gb} / {self.state.total_ram_gb} GB)\n"
+            f"Топ процессов (RAM): {top_str}"
+        )
 
     async def _update_network(self):
         def check_internet():

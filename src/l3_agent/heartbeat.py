@@ -1,11 +1,12 @@
 import asyncio
 import time
-from datetime import datetime, timezone, timedelta
 from collections import deque
 from typing import Optional, Dict, Any, TYPE_CHECKING
 
 from src.utils.logger import system_logger
 from src.utils.event.registry import EventLevel
+from src.utils.dtime import get_now_formatted
+
 
 if TYPE_CHECKING:
     from src.l3_agent.react.loop import ReactLoop
@@ -56,15 +57,16 @@ class Heartbeat:
         now = time.time()
         payload = payload or {}
 
-        tz = timezone(timedelta(hours=self.timezone))
-        time_str = datetime.now(tz).strftime("%H:%M:%S")
+        time_str = get_now_formatted(self.timezone, fmt="%H:%M:%S")
         payload_str = ", ".join(f"{k}={v}" for k, v in payload.items()) if payload else "empty"
+
         self._sleep_memory.append(
-            f"[{time_str}] [{level.name}] {event_name} | Payload: {payload_str}"
+            f"[{time_str}][{level.name}] {event_name} | Payload: {payload_str}"
         )
 
         remaining = self._next_tick_time - now
 
+        # Умножаем остаток времени в зависимости от важности события
         multiplier = 1.0
         if level == EventLevel.CRITICAL:
             multiplier = self.accel_config.critical_multiplier

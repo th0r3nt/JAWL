@@ -1,11 +1,12 @@
 import time
 import uuid
-from datetime import datetime, timezone, timedelta
 from typing import Optional, TYPE_CHECKING, Any, Dict
 from qdrant_client import models
 
-from src.l3_agent.skills.registry import skill, SkillResult
+from src.utils.dtime import format_timestamp
 from src.utils.logger import system_logger
+
+from src.l3_agent.skills.registry import skill, SkillResult
 
 if TYPE_CHECKING:
     from src.l1_databases.vector.db import VectorDB
@@ -36,15 +37,14 @@ class VectorThoughts:
         """Вспомогательный метод для красивого вывода времени."""
         if not timestamp:
             return "Неизвестно"
-        tz = timezone(timedelta(hours=self.timezone))
-        return datetime.fromtimestamp(timestamp, tz=tz).strftime("%Y-%m-%d %H:%M:%S")
+        return format_timestamp(timestamp, self.timezone)
 
     @skill()
     async def save_thought(
         self, thought_text: str, metadata: Optional[Dict[str, Any]] = None
     ) -> SkillResult:
         """Сохраняет мысль в векторную базу данных."""
-        
+
         try:
             vector = await self.embedding_model.get_embedding(thought_text)
             point_id = str(uuid.uuid4())
@@ -131,7 +131,7 @@ class VectorThoughts:
             msg = f"[Vector DB] Мысль успешно удалена в базе данных (ID: {point_id})."
             system_logger.info(msg)
             return SkillResult.ok(msg)
-        
+
         except Exception as e:
             msg = f"[Vector DB] Ошибка при удалении мысли в базе данных: {e}"
             system_logger.error(msg)

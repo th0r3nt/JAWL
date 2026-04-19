@@ -167,3 +167,11 @@ class SQLMentalStates:
         msg = f"MentalState с ID {state_id} удален."
         system_logger.info(f"[SQL DB] {msg}")
         return SkillResult.ok(msg)
+
+    async def get_context_block(self, **kwargs) -> str:
+        """
+        Провайдер контекста для ContextRegistry.
+        Отдает отформатированный блок для контекста агента.
+        """
+        res = await self.get_mental_states()
+        return f"## MENTAL STATES\nMax number of entities that can be remembered:\n{self.max_entities}\n{res.message}"

@@ -90,3 +90,14 @@ class TelethonClient:
         except Exception as e:
             system_logger.error(f"[Telegram Telethon] Ошибка обновления профиля: {e}")
             self.state.account_info = "Профиль: Ошибка загрузки данных\n---"
+
+    async def get_context_block(self, **kwargs) -> str:
+        """
+        Провайдер контекста для ContextRegistry.
+        Возвращает отформатированный блок контекста для агента.
+        """
+
+        if not self.state.is_online:
+            return "### TELETHON [OFF]\nИнтерфейс отключен."
+
+        return f"### TELETHON [ON]\nAccount info: {self.state.account_info}\n{self.state.last_chats}"

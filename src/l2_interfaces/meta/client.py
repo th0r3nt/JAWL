@@ -40,3 +40,11 @@ class MetaClient:
         except Exception as e:
             system_logger.error(f"[Meta] Ошибка обновления settings.yaml: {e}")
             return False
+
+    async def get_context_block(self, **kwargs) -> str:
+        """
+        Провайдер контекста для ContextRegistry.
+        Отдает отформатированный блок контекста для агента.
+        """
+        
+        return "### META[ON]\nНавыки изменения конфигурации в рантайме доступны."

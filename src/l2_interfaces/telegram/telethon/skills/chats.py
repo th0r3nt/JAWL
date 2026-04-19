@@ -1,5 +1,4 @@
 import re
-from datetime import timezone, timedelta
 from typing import Optional, Union
 
 from telethon import utils
@@ -12,9 +11,12 @@ from telethon.tl.functions.channels import (
 )
 from telethon.tl.functions.messages import ImportChatInviteRequest
 
-from src.l2_interfaces.telegram.telethon.client import TelethonClient
-from src.l3_agent.skills.registry import SkillResult, skill
 from src.utils.logger import system_logger
+from src.utils.dtime import format_datetime
+
+from src.l2_interfaces.telegram.telethon.client import TelethonClient
+
+from src.l3_agent.skills.registry import SkillResult, skill
 
 
 class TelethonChats:
@@ -182,13 +184,47 @@ class TelethonChats:
                 if msg.text:
                     content_parts.append(msg.text)
 
-                final_text = " ".join(content_parts) if content_parts else "[Пустое сообщение]"
+                # Обработка пересланных сообщений
+                forward_context = ""
+                if msg.fwd_from:
+                    try:
+                        fwd_sender = await msg.get_forward_sender()
+                        if fwd_sender:
+                            fwd_name = utils.get_display_name(fwd_sender)
+                            forward_context = f"\n  ↳[Переслано от: {fwd_name}]"
+                        elif msg.fwd_from.from_name:
+                            forward_context = f"\n  ↳[Переслано от: {msg.fwd_from.from_name}]"
+                        else:
+                            forward_context = "\n  ↳ [Переслано]"
+                    except Exception:
+                        forward_context = "\n  ↳ [Переслано]"
+
+                # Логика определения реальных ответов (отсечение костылей Telegram-форумов)
+                is_actual_reply = False
+                reply_id = None
+
+                if msg.reply_to:
+                    if getattr(msg.reply_to, "forum_topic", False):
+                        # В топиках форума обычные сообщения имеют reply_to_msg_id == ID топика
+                        top_id = getattr(msg.reply_to, "reply_to_top_id", None)
+                        # Если top_id существует, и reply_to_msg_id не равен top_id, значит это реальный ответ
+                        if top_id and msg.reply_to.reply_to_msg_id != top_id:
+                            is_actual_reply = True
+                            reply_id = msg.reply_to.reply_to_msg_id
+                    else:
+                        # В обычных группах и ЛС всё просто
+                        is_actual_reply = True
+                        reply_id = msg.reply_to.reply_to_msg_id
+
+                # Если мы принудительно читаем историю конкретного топика (иногда первый пост ссылается сам на себя)
+                if is_actual_reply and str(reply_id) == str(topic_id):
+                    is_actual_reply = False
 
                 reply_context = ""
-                is_actual_reply = msg.is_reply and msg.reply_to_msg_id
-                if is_actual_reply and str(msg.reply_to_msg_id) != str(topic_id):
+                if is_actual_reply and reply_id:
                     try:
-                        orig_msg = await msg.get_reply_message()
+                        # Запрашиваем оригинальное сообщение, на которое был дан ответ
+                        orig_msg = await client.get_messages(target_entity, ids=reply_id)
                         orig_sender = "Unknown"
                         if orig_msg and orig_msg.sender:
                             orig_name = utils.get_display_name(orig_msg.sender)
@@ -200,16 +236,19 @@ class TelethonChats:
                         elif orig_msg and orig_msg.sender_id:
                             orig_sender = f"Unknown (ID: {orig_msg.sender_id})"
 
-                        reply_context = f"\n  ↳ (В ответ на сообщение ID {msg.reply_to_msg_id} от {orig_sender})"
-                    except Exception:
                         reply_context = (
-                            f"\n  ↳ (В ответ на сообщение ID {msg.reply_to_msg_id})"
+                            f"\n  ↳ (В ответ на сообщение ID {reply_id} от {orig_sender})"
                         )
+                    except Exception:
+                        reply_context = f"\n  ↳ (В ответ на сообщение ID {reply_id})"
 
-                tz = timezone(timedelta(hours=self.tg_client.timezone))
-                time_str = msg.date.astimezone(tz).strftime("%Y-%m-%d %H:%M")
+                final_text = " ".join(content_parts) if content_parts else "[Пустое сообщение]"
+                time_str = format_datetime(
+                    msg.date, self.tg_client.timezone, fmt="%Y-%m-%d %H:%M"
+                )
+
                 messages.append(
-                    f"[{time_str}][ID: {msg.id}] {sender_name}: {final_text}{reply_context}"
+                    f"[{time_str}][ID: {msg.id}] {sender_name}: {final_text}{forward_context}{reply_context}"
                 )
 
             if not messages:

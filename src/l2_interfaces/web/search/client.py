@@ -14,3 +14,13 @@ class WebClient:
         self.timeout = request_timeout
         self.max_page_chars = max_page_chars
         self.state.is_online = True  # Если инициализирован, считаем включенным
+
+    async def get_context_block(self, **kwargs) -> str:
+        """
+        Провайдер контекста для ContextRegistry.
+        Отдает отформатированный блок контекста для агента.
+        """
+
+        status = "ON" if self.state.is_online else "OFF"
+        data = self.state.browser_history if self.state.is_online else "Интерфейс отключен."
+        return f"### WEB [{status}]\n{data}"

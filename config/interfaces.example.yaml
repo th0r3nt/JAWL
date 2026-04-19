@@ -2,13 +2,13 @@ host:
   os:
     enabled: true
 
-    # Уровень доступа агента к файловой системе, на которой он запущен
-    # 0 - cage      (Read/Write только внутри папки sandbox/)
-    # 1 - voyeur    (Read для всего кода фреймворка, Write только в sandbox/)
-    # 2 - surgeon   (Read для всей ОС-системы, управление процессами, Write только для файлов фреймворка (агент может переписать собственный код))
-    # 3 - god_mode  (Полный доступ: Read/Write всей системы)
-    madness_level: 0
-    env_access: false # false - запрещает агенту читать и изменять файлы *.env
+    # Уровень доступа агента к файловой системе и ОС
+    # 0 - SANDBOX   (Read/Write только внутри папки sandbox/)
+    # 1 - OBSERVER  (Read для всего кода фреймворка, Write только в sandbox/)
+    # 2 - OPERATOR  (Read всей ОС, управление процессами, Write только для файлов фреймворка)
+    # 3 - ROOT      (Полный доступ: Read/Write всей системы и управление процессами)
+    access_level: 1
+    env_access: false # Если false - запрещает агенту читать и изменять файлы *.env во избежание слива ключей
 
     # Лимиты и таймауты
     monitoring_interval_sec: 30 # Интервал мониторинга метрик хост-пк: datetime, uptime, telemetry, network, sandbox/
@@ -27,9 +27,10 @@ telegram:
     enabled: false # Перед включением введите токен бота в .env
 
 web:
-  enabled: true
-  request_timeout_sec: 15
-  max_page_chars: 10000
+  search:
+    enabled: true
+    request_timeout_sec: 15
+    max_page_chars: 5000
 
 # Интерфейс, позволяющий агенту менять свои параметры в settings.yaml и управлять системой сразу в рантайме
 meta:

@@ -93,3 +93,12 @@ class SQLTasks:
         msg = f"Задача {task_id} удалена."
         system_logger.info(f"[SQL DB] {msg}")
         return SkillResult.ok(msg)
+
+    async def get_context_block(self, **kwargs) -> str:
+        """
+        Провайдер контекста для ContextRegistry.
+        Отдает отформатированный блок для контекста агента.
+        """
+
+        res = await self.get_tasks()
+        return f"## TASKS\n{res.message}"

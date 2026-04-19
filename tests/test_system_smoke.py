@@ -53,17 +53,17 @@ async def test_system_di_assembly_smoke(
 
     # Изолируем БД от диска и делаем методы awaitable
     mock_sql.return_value.connect = AsyncMock()
-    mock_sql.return_value.disconnect = AsyncMock()  # <-- ДОБАВИТЬ
+    mock_sql.return_value.disconnect = AsyncMock()
 
     mock_vector.return_value.connect = AsyncMock()
-    mock_vector.return_value.disconnect = AsyncMock()  # <-- ДОБАВИТЬ
+    mock_vector.return_value.disconnect = AsyncMock()
 
     try:
         system.setup_l0_state()
         await system.setup_l1_databases()
 
         # Чтобы не падал Гейткипер в логах (для красоты)
-        interfaces.host.os.madness_level = 1
+        interfaces.host.os.access_level = 1
 
         system.setup_l2_interfaces()
         system.setup_l3_agent(llm_api_url="http://test", llm_api_keys=["key1"])

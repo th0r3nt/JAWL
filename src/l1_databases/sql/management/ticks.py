@@ -1,8 +1,11 @@
+import json
 import uuid
 from typing import TYPE_CHECKING, Any
 from sqlalchemy import select, desc
 
 from src.utils.logger import system_logger
+from src.utils.dtime import format_datetime
+
 from src.l1_databases.sql.tables import TickTable
 
 if TYPE_CHECKING:
@@ -12,11 +15,15 @@ if TYPE_CHECKING:
 class SQLTicks:
     """
     CRUD-функции для взаимодействия с таблицей логгирования тиков агента.
-    Вызывается системой (ReAct циклом), а не самим агентом.
     """
 
-    def __init__(self, db: "SQLDB"):
+    def __init__(
+        self, db: "SQLDB", limit: int = 30, result_max_chars: int = 5000, tz_offset: int = 0
+    ):
         self.db = db
+        self.limit = limit
+        self.result_max_chars = result_max_chars
+        self.tz_offset = tz_offset
 
     async def save_tick(
         self, thoughts: str, actions: list[dict[str, Any]], results: dict[str, Any]
@@ -36,7 +43,7 @@ class SQLTicks:
 
     async def get_ticks(self, limit: int = 5) -> list[TickTable]:
         """
-        Возвращает последние N тиков для инъекции в системный промпт (Context Builder).
+        Возвращает последние N тиков.
         """
         async with self.db.session_factory() as session:
             # Сортируем по времени по убыванию, берем limit
@@ -46,3 +53,69 @@ class SQLTicks:
             # Возвращаем в хронологическом порядке (от старых к новым)
             ticks = result.scalars().all()
             return list(reversed(ticks))
+
+    async def get_context_block(self, **kwargs) -> str:
+        """
+        Провайдер контекста для ContextRegistry.
+        Отдает отформатированный блок для контекста агента.
+        """
+
+        ticks = await self.get_ticks(limit=self.limit)
+
+        if not ticks:
+            return "## RECENT TICKS\nНет предыдущих тиков."
+
+        blocks =[]
+        for t in ticks:
+            actions_list =[]
+
+            # Парсинг действий
+            if isinstance(t.actions, list):
+                for a in t.actions:
+                    if isinstance(a, dict):
+                        t_name = a.get("tool_name", "unknown")
+                        params = a.get("parameters", {})
+                        actions_list.append(f"`{t_name}`({json.dumps(params, ensure_ascii=False)})")
+                    else:
+                        actions_list.append(str(a))
+
+            elif isinstance(t.actions, dict):
+                t_name = t.actions.get("tool_name", "unknown")
+                params = t.actions.get("parameters", {})
+                actions_list.append(f"`{t_name}`({json.dumps(params, ensure_ascii=False)})")
+
+            else:
+                actions_list.append(str(t.actions))
+
+            actions_str = ", ".join(actions_list) if actions_list else "None"
+
+            # Парсинг результатов
+            if t.results and isinstance(t.results, dict) and "execution_report" in t.results:
+                res_str = str(t.results["execution_report"])
+
+            elif t.results:
+                res_str = json.dumps(t.results, ensure_ascii=False, indent=2)
+
+            else:
+                res_str = "None"
+
+            # Обрезка длинных результатов
+            if len(res_str) > self.result_max_chars:
+                res_str = (
+                    res_str[:self.result_max_chars]
+                    + f"\n...[Результат обрезан. Превышен лимит истории в {self.result_max_chars} символов]"
+                )
+
+            # Форматирование времени
+            time_str = format_datetime(t.created_at, self.tz_offset)
+
+            short_id = t.id[:8]
+
+            blocks.append(
+                f"#### [Tick ID: {short_id}] ({time_str})\n"
+                f"*Thoughts*: {t.thoughts}\n"
+                f"*Actions*: {actions_str}\n"
+                f"*Result*:\n```\n{res_str}\n```"
+            )
+
+        return "## RECENT TICKS\n" + "\n\n".join(blocks)

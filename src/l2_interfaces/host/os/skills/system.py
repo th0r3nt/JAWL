@@ -1,7 +1,8 @@
 import time
 import psutil
-from datetime import datetime, timezone, timedelta
+
 from src.utils.logger import system_logger
+from src.utils.dtime import get_now_formatted
 
 from src.l2_interfaces.host.os.client import HostOSClient
 
@@ -38,18 +39,17 @@ class HostOSSystem:
         """Возвращает загрузку CPU, свободной RAM и аптайм системы."""
 
         try:
-            # interval=None позволяет вернуть значение мгновенно (не блокируя event loop)
             cpu_usage = psutil.cpu_percent(interval=None)
             mem = psutil.virtual_memory()
 
             uptime = self._get_uptime_string()
 
-            # Форматируем байты в гигабайты для удобочитаемости
-            total_ram_gb = round(mem.total / (1024**3), 1)
+            total_ram_gb = self.host_os.state.total_ram_gb
             free_ram_gb = round(mem.available / (1024**3), 1)
 
             report = (
-                f"Системная телеметрия ОС:\n"
+                f"Системная телеметрия ОС ({self.host_os.state.os_info}):\n"
+                f"- Модель CPU: {self.host_os.state.cpu_name}\n"
                 f"- Загрузка CPU: {cpu_usage}%\n"
                 f"- Использование RAM: {mem.percent}% (Свободно: {free_ram_gb} GB / {total_ram_gb} GB)\n"
                 f"- Uptime: {uptime}"
@@ -99,12 +99,9 @@ class HostOSSystem:
 
     async def get_uptime(self) -> SkillResult:
         """Возвращает время непрерывной работы хост-системы (аптайм)."""
-
         uptime_str = self._get_uptime_string()
         return SkillResult.ok(f"{uptime_str}")
 
     async def get_datetime(self) -> SkillResult:
         """Возвращает текущую дату и время на сервере."""
-        tz = timezone(timedelta(hours=self.host_os.timezone))
-        current_dt = datetime.now(tz).strftime("%Y-%m-%d %H:%M:%S")
-        return SkillResult.ok(f"{current_dt}")
+        return SkillResult.ok(get_now_formatted(self.host_os.timezone))

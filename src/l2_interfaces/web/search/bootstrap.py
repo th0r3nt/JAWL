@@ -15,18 +15,21 @@ def setup_web_search(system: "System") -> List[Any]:
     """Инициализирует Web-интерфейс."""
 
     web_search_config = system.interfaces_config.web.search
-    web_client = WebClient(
+    client = WebClient(
         state=system.web_search_state,
         request_timeout=web_search_config.request_timeout_sec,
         max_page_chars=web_search_config.max_page_chars,
     )
 
-    web_search = DuckDuckGoSearch(client=web_client)
-    web_pages = WebPages(client=web_client)
+    web_search = DuckDuckGoSearch(client=client)
+    web_pages = WebPages(client=client)
 
     # Регистрация навыков для агента
     register_instance(web_search)
     register_instance(web_pages)
+
+    # Регистрация провайдеров контекста (отдают Markdown блоки в промпт агента)
+    system.context_registry.register_provider(name="web search", provider_func=client.get_context_block)
 
     system_logger.info("[System] Интерфейс Web загружен.")
 

@@ -1,10 +1,11 @@
 import time
 import uuid
-from datetime import datetime, timezone, timedelta
 from typing import Optional, TYPE_CHECKING, Any, Dict
 from qdrant_client import models
 
+from src.utils.dtime import format_timestamp
 from src.utils.logger import system_logger
+
 from src.l3_agent.skills.registry import skill, SkillResult
 
 if TYPE_CHECKING:
@@ -36,8 +37,7 @@ class VectorKnowledge:
         """Вспомогательный метод для красивого вывода времени."""
         if not timestamp:
             return "Неизвестно"
-        tz = timezone(timedelta(hours=self.timezone))
-        return datetime.fromtimestamp(timestamp, tz=tz).strftime("%Y-%m-%d %H:%M:%S")
+        return format_timestamp(timestamp, self.timezone)
 
     @skill()
     async def save_knowledge(
@@ -61,9 +61,7 @@ class VectorKnowledge:
                 points=[models.PointStruct(id=point_id, vector=vector, payload=payload)],
             )
 
-            msg = (
-                f"[Vector DB] Знание успешно сохранено в базе данных (ID: {point_id})."
-            )
+            msg = f"[Vector DB] Знание успешно сохранено в базе данных (ID: {point_id})."
             system_logger.info(msg)
             return SkillResult.ok(msg)
 

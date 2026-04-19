@@ -25,10 +25,10 @@ system:
 # Настройки сокращения времени сна (Heartbeat) при входящих событиях разного уровня (CRITICAL, HIGH, MEDIUM, LOW, BACKGROUND)
   event_acceleration:
     critical_multiplier: 0.0       # Если 0.0 - вызывает сразу и прерывает текущий цикл
-    high_multiplier: 0.3           # Умножает остаток сна на 0.3 (сокращает на 70%)
-    medium_multiplier: 0.6         # Умножает остаток сна на 0.6 (сокращает на 40%)
-    low_multiplier: 0.7            # Умножает остаток сна на 0.7 (сокращает на 30%)
-    background_multiplier: 0.8     # Умножает остаток сна на 0.8 (сокращает на 20%)
+    high_multiplier: 0.3           # При входящем событии уровня HIGH - умножает остаток сна на 0.3 (сокращает на 70%)
+    medium_multiplier: 0.6
+    low_multiplier: 0.7
+    background_multiplier: 0.8
 
   context_depth:
     ticks: 30 # Tick у LLM = Наблюдение > Мысли > Действие > Результат

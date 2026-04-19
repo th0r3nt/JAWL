@@ -15,15 +15,18 @@ def setup_meta(system: "System") -> List[Any]:
     """Инициализирует интерфейс Meta. Фоновых процессов нет."""
     
     settings_path = system.root_dir / "config" / "settings.yaml"
-    meta_client = MetaClient(
+    client = MetaClient(
         agent_state=system.agent_state, 
         event_bus=system.event_bus, 
         settings_path=settings_path
     )
 
     # Регистрация навыков для агента
-    register_instance(MetaConfiguration(meta_client))
-    register_instance(MetaSystem(meta_client))
+    register_instance(MetaConfiguration(client))
+    register_instance(MetaSystem(client))
+
+    # Регистрация провайдеров контекста (отдают Markdown блоки в промпт агента)
+    system.context_registry.register_provider(name="meta", provider_func=client.get_context_block)
 
     system_logger.info("[System] Интерфейс Meta загружен.")
     
