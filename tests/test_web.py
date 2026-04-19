@@ -1,7 +1,7 @@
 import pytest
 from unittest.mock import patch, MagicMock
 
-from src.l2_interfaces.web.search.client import WebClient
+from src.l2_interfaces.web.search.client import WebSearchClient
 from src.l0_state.interfaces.state import WebSearchState
 from src.l2_interfaces.web.search.skills.duckduckgo import DuckDuckGoSearch
 from src.l2_interfaces.web.search.skills.webpages import WebPages
@@ -14,7 +14,7 @@ from src.l2_interfaces.web.search.skills.webpages import WebPages
 
 @pytest.fixture
 def web_client():
-    return WebClient(state=WebSearchState(), request_timeout=5, max_page_chars=100)
+    return WebSearchClient(state=WebSearchState(), request_timeout=5, max_page_chars=100)
 
 
 @pytest.fixture
@@ -32,9 +32,9 @@ def pages_skill(web_client):
 # ===================================================================
 
 
-def test_web_client_init():
+def test_web_search_client_init():
     """Тест: корректная инициализация клиента с параметрами."""
-    client = WebClient(state=WebSearchState(), request_timeout=10, max_page_chars=500)
+    client = WebSearchClient(state=WebSearchState(), request_timeout=10, max_page_chars=500)
     assert client.timeout == 10
     assert client.max_page_chars == 500
 

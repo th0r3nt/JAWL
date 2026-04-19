@@ -3,13 +3,13 @@ import trafilatura
 
 from src.utils.logger import system_logger
 from src.l3_agent.skills.registry import skill, SkillResult
-from src.l2_interfaces.web.search.client import WebClient
+from src.l2_interfaces.web.search.client import WebSearchClient
 
 
 class WebPages:
     """Навыки чтения и извлечения текста из веб-страниц."""
 
-    def __init__(self, client: WebClient):
+    def __init__(self, client: WebSearchClient):
         self.client = client
 
     async def read_raw(self, url: str) -> str | None:

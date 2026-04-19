@@ -4,13 +4,13 @@ from typing import Any
 
 from src.utils.logger import system_logger
 from src.l3_agent.skills.registry import skill, SkillResult
-from src.l2_interfaces.web.search.client import WebClient
+from src.l2_interfaces.web.search.client import WebSearchClient
 
 
 class DuckDuckGoSearch:
     """Навыки поиска информации в интернете (DuckDuckGo)."""
 
-    def __init__(self, client: WebClient):
+    def __init__(self, client: WebSearchClient):
         self.client = client
 
     async def search_raw(self, query: str, max_results: int = 5) -> list[dict[str, Any]]:

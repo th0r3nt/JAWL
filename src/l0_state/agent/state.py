@@ -55,6 +55,7 @@ class AgentState(BaseModel):
         """
 
         return f"""
+### AGENT STATE
 * Heartbeat Interval: {self.heartbeat_interval}s
 * LLM Model: {self.llm_model}
 * Temperature: {self.temperature}

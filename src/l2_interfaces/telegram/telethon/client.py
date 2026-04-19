@@ -100,4 +100,4 @@ class TelethonClient:
         if not self.state.is_online:
             return "### TELETHON [OFF]\nИнтерфейс отключен."
 
-        return f"### TELETHON [ON]\nAccount info: {self.state.account_info}\n{self.state.last_chats}"
+        return f"### TELETHON [ON] \nAccount info: {self.state.account_info}\n{self.state.last_chats}"

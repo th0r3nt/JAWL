@@ -1,7 +1,7 @@
 from src.l0_state.interfaces.state import WebSearchState
 
 
-class WebClient:
+class WebSearchClient:
     """
     Базовый клиент веб-интерфейса.
     Хранит общие константы и настройки для веб-скиллов.
@@ -23,4 +23,4 @@ class WebClient:
 
         status = "ON" if self.state.is_online else "OFF"
         data = self.state.browser_history if self.state.is_online else "Интерфейс отключен."
-        return f"### WEB [{status}]\n{data}"
+        return f"### WEB SEARCH [{status}]\n{data}"

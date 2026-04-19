@@ -5,7 +5,6 @@ from sqlalchemy import select, desc
 
 from src.utils.logger import system_logger
 from src.utils.dtime import format_datetime
-
 from src.l1_databases.sql.tables import TickTable
 
 if TYPE_CHECKING:
@@ -46,11 +45,9 @@ class SQLTicks:
         Возвращает последние N тиков.
         """
         async with self.db.session_factory() as session:
-            # Сортируем по времени по убыванию, берем limit
             stmt = select(TickTable).order_by(desc(TickTable.created_at)).limit(limit)
             result = await session.execute(stmt)
 
-            # Возвращаем в хронологическом порядке (от старых к новым)
             ticks = result.scalars().all()
             return list(reversed(ticks))
 
@@ -65,17 +62,23 @@ class SQLTicks:
         if not ticks:
             return "## RECENT TICKS\nНет предыдущих тиков."
 
-        blocks =[]
-        for t in ticks:
-            actions_list =[]
+        blocks = []
+        total_ticks = len(ticks)
 
-            # Парсинг действий
+        for i, t in enumerate(ticks):
+            # Определяем, является ли этот тик самым последним (свежим)
+            is_last_tick = i == total_ticks - 1
+
+            # ПАРСИНГ ДЕЙСТВИЙ
+            actions_list = []
             if isinstance(t.actions, list):
                 for a in t.actions:
                     if isinstance(a, dict):
                         t_name = a.get("tool_name", "unknown")
                         params = a.get("parameters", {})
-                        actions_list.append(f"`{t_name}`({json.dumps(params, ensure_ascii=False)})")
+                        actions_list.append(
+                            f"`{t_name}`({json.dumps(params, ensure_ascii=False)})"
+                        )
                     else:
                         actions_list.append(str(a))
 
@@ -89,6 +92,12 @@ class SQLTicks:
 
             actions_str = ", ".join(actions_list) if actions_list else "None"
 
+            # Динамическая обрезка действий: 1500 символов для последнего, 500 для истории
+
+            action_limit = 1500 if is_last_tick else 500
+            if len(actions_str) > action_limit:
+                actions_str = actions_str[:action_limit] + " ...[Параметры обрезаны]"
+
             # Парсинг результатов
             if t.results and isinstance(t.results, dict) and "execution_report" in t.results:
                 res_str = str(t.results["execution_report"])
@@ -99,16 +108,16 @@ class SQLTicks:
             else:
                 res_str = "None"
 
-            # Обрезка длинных результатов
-            if len(res_str) > self.result_max_chars:
+            # Динамическая обрезка результатов: лимит из конфига для последнего, 500 для истории
+            res_limit = self.result_max_chars if is_last_tick else 500
+            if len(res_str) > res_limit:
                 res_str = (
-                    res_str[:self.result_max_chars]
-                    + f"\n...[Результат обрезан. Превышен лимит истории в {self.result_max_chars} символов]"
+                    res_str[:res_limit]
+                    + f"\n...[Результат обрезан. Превышен лимит истории в {res_limit} символов]"
                 )
 
-            # Форматирование времени
+            # Форматирование времени через нашу новую утилиту
             time_str = format_datetime(t.created_at, self.tz_offset)
-
             short_id = t.id[:8]
 
             blocks.append(
