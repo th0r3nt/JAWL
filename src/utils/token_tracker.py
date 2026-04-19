@@ -30,24 +30,37 @@ class TokenTracker:
         except Exception:
             return max(1, len(text) // 4)
 
-    def count_messages_tokens(self, messages: List[Dict[str, Any]]) -> int:
+    def count_messages_tokens(self, messages: List[Any]) -> int:
         """
         Подсчитывает токены для всего списка сообщений (chat history).
-        Учитывает накладные расходы на структуру (роли, имена).
+        Поддерживает как словари, так и объекты OpenAI ChatCompletionMessage.
         """
-
         num_tokens = 0
         for message in messages:
-            num_tokens += 3  # Каждое сообщение обрамляется метаданными
-            for key, value in message.items():
+            num_tokens += 3  # Накладные расходы на сообщение
+
+            # Превращаем объект OpenAI в словарь, если это не dict
+            if isinstance(message, dict):
+                m_dict = message
+            elif hasattr(message, "model_dump"):
+                m_dict = message.model_dump()
+            else:
+                # Фолбек на случай странных типов
+                m_dict = {"content": str(message)}
+
+            for key, value in m_dict.items():
+                if value is None:
+                    continue
                 if isinstance(value, str):
                     num_tokens += self._approximate_tokens(value)
-                elif isinstance(value, list):  # Для сложных структур tool_calls
+                elif isinstance(value, list):
+                    # Обработка tool_calls и других вложенных структур
                     num_tokens += self._approximate_tokens(str(value))
-        num_tokens += 3  # Ответ ассистента начинается с метаданных
+
+        num_tokens += 3  # Ответ ассистента
         return num_tokens
 
-    def add_input_record(self, messages: List[Dict[str, Any]]) -> None:
+    def add_input_record(self, messages: List[Any]) -> None:
         """Записывает реальное количество входных токенов всего запроса."""
 
         total_tokens = self.count_messages_tokens(messages)
