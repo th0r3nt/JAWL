@@ -29,11 +29,12 @@ class ColorFormatter(logging.Formatter):
     # Порядок имеет значение: более специфичные теги лучше держать выше
     PREFIX_COLORS = {
         # === Жизненный цикл и Логика (Агент) ===
-        "[Heartbeat]": LogColors.BRIGHT_MAGENTA,  # Пульс системы (сердцебиение)
+        "[Heartbeat]": LogColors.MAGENTA,  # Пульс системы (сердцебиение)
         "[ReAct]": LogColors.BRIGHT_CYAN,  # Основной цикл мышления
-        "[Thoughts]": LogColors.BRIGHT_YELLOW,  # Внутренний монолог агента
+        "[Thoughts]": LogColors.BRIGHT_MAGENTA,  # Внутренний монолог агента
         "[Agent Action]": LogColors.BRIGHT_GREEN,  # Вызов инструмента (успешный старт)
         "[Agent Action Result]": LogColors.GRAY,  # Результаты функций (приглушаем, чтобы не отвлекали)
+        "[Skills]": LogColors.GRAY, # Скиллы и регистрация
         # === Внешние интерфейсы (L2) ===
         "[LLM]": LogColors.BRIGHT_BLUE,  # Запросы к API нейросетей
         "[Host OS]": LogColors.GREEN,  # Терминал, ОС, Файлы (Хакерский вайб)
@@ -43,7 +44,7 @@ class ColorFormatter(logging.Formatter):
         "[Meta]": LogColors.WHITE,  # Управление конфигурацией в рантайме
         # === Хранилища (L1) ===
         "[SQL DB]": LogColors.YELLOW,  # Традиционная база данных
-        "[Vector DB]": LogColors.BRIGHT_WHITE,  # Семантическая память (векторы)
+        "[Vector DB]": LogColors.YELLOW,  # Семантическая память (векторы)
         # === Ядро и Системные шины ===
         "[EventBus]": LogColors.GRAY,  # Шина событий (фоновый роутинг, тоже приглушаем)
         "[System]": LogColors.BRIGHT_WHITE,  # Системные уведомления (старт/стоп оркестратора)

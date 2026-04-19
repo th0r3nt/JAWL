@@ -40,7 +40,7 @@ def setup_host_os(system: "System") -> List[Any]:
         name="host os", provider_func=client.get_context_block
     )
 
-    system_logger.info("[System] Интерфейс Host OS загружен.")
+    system_logger.info("[Host OS] Интерфейс загружен.")
 
     # events имеет start() и stop() (Watchdog и поллинг)
     return [events]

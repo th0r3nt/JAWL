@@ -60,9 +60,15 @@ class Heartbeat:
         time_str = get_now_formatted(self.timezone, fmt="%H:%M:%S")
         payload_str = ", ".join(f"{k}={v}" for k, v in payload.items()) if payload else "empty"
 
-        self._sleep_memory.append(
-            f"[{time_str}][{level.name}] {event_name} | Payload: {payload_str}"
-        )
+        event_str = f"[{time_str}][{level.name}] {event_name} | Payload: {payload_str}"
+
+        # Пробрасываем событие прямо в активный цикл, если агент сейчас думает
+        if self._active_react_task and not self._active_react_task.done():
+            self.react_loop.add_realtime_event(event_str)
+
+        # Либо же копим в памяти сна, если агент сейчас спит
+        else:
+            self._sleep_memory.append(event_str)
 
         remaining = self._next_tick_time - now
 
@@ -105,14 +111,14 @@ class Heartbeat:
                 # Жесткое прерывание: если агент сейчас думает, убиваем процесс
                 if self._active_react_task and not self._active_react_task.done():
                     system_logger.warning(
-                        f"[System] Прерывание текущего ReAct-цикла из-за события: {event_name}"
+                        f"[Heartbeat] Прерывание текущего ReAct-цикла из-за события: {event_name}"
                     )
                     self._is_interrupted = True
                     self._active_react_task.cancel()
             else:
                 if safe_remaining > 0:
                     system_logger.info(
-                        f"[System] Heartbeat: '{event_name}' ({level.name}). Сон сокращен на {reduced_by:.1f} сек. До пробуждения: {new_remaining:.1f} сек."
+                        f"[Heartbeat] Входящее событие '{event_name}' ({level.name}). Сон сокращен на {reduced_by:.1f} сек. До пробуждения: {new_remaining:.1f} сек."
                     )
 
     async def start(self) -> None:
@@ -192,7 +198,7 @@ class Heartbeat:
         if self._active_react_task and not self._active_react_task.done():
             self._is_interrupted = True
             self._active_react_task.cancel()
-        system_logger.info("[System] Heartbeat остановлен.")
+        system_logger.info("[Heartbeat] Остановка завершена.")
 
     def update_config(self, key: str, value: Any):
         """Метод для динамического обновления настроек на лету (по сигналу из EventBus)."""

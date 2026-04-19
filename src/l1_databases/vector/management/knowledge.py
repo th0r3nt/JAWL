@@ -71,7 +71,7 @@ class VectorKnowledge:
         """Семантический поиск информации из базы данных."""
 
         try:
-            safe_query = query.replace("\n", " ").replace("\r", "")
+            # safe_query = query.replace("\n", " ").replace("\r", "")
             query_vector = await self.embedding_model.get_embedding(query)
 
             search_result = await self.db.client.query_points(
@@ -91,9 +91,9 @@ class VectorKnowledge:
                 system_logger.debug(msg)
                 return SkillResult.ok(msg)
 
-            system_logger.info(
-                f"[Vector DB] База знаний вернула {len(points)} фрагментов по запросу '{safe_query}'."
-            )
+            # system_logger.info(
+            #     f"[Vector DB] База знаний вернула {len(points)} фрагментов по запросу '{safe_query}'."
+            # )
 
             formatted_results = []
             for point in points:

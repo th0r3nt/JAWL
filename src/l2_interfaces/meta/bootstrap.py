@@ -28,6 +28,6 @@ def setup_meta(system: "System") -> List[Any]:
     # Регистрация провайдеров контекста (отдают Markdown блоки в промпт агента)
     system.context_registry.register_provider(name="meta", provider_func=client.get_context_block)
 
-    system_logger.info("[System] Интерфейс Meta загружен.")
+    system_logger.info("[Meta] Интерфейс загружен.")
     
     return []

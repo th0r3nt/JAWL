@@ -31,7 +31,7 @@ class ReactLoop:
         agent_state: AgentState,
         sql_ticks: SQLTicks,
         token_tracker: TokenTracker,
-        tools: list,  # ACTION SCHEMA
+        tools: list,  # Единый марштизатор (ACTION_SCHEMA)
         cooldown_sec: int = 30,
     ):
         self.llm = llm_client
@@ -41,9 +41,10 @@ class ReactLoop:
         self.sql_ticks = sql_ticks
         self.tracker = token_tracker
         self.tools = tools
-        self.cooldown_sec = (
-            cooldown_sec  # Если API ключ ллмки уйдет в минутный RateLimit - он отдыхает n сек
-        )
+        # Если API ключ ллмки уйдет в минутный RateLimit - он отдыхает n сек
+        self.cooldown_sec = cooldown_sec
+
+        self.current_events: list[str] = []  # Хранилище событий для текущего цикла
 
     def _dump_context_to_file(self, messages: list):
         """
@@ -67,7 +68,18 @@ class ReactLoop:
         except Exception as e:
             system_logger.error(f"[System] Не удалось сохранить промпт: {e}")
 
+    def add_realtime_event(self, event_str: str):
+        """Вызывается из Heartbeat для проброса событий прямо во время работы агента."""
+        self.current_events.append(event_str)
+
     async def run(self, event_name: str, payload: Dict[str, Any], missed_events: list[str]):
+        """
+        Запускает ReAct цикл вызова к LLM.
+        """
+
+        # Переносим пропущенные события в память текущего цикла
+        self.current_events = missed_events.copy()
+
         try:
             self.agent_state.reset_step()
             system_logger.info(
@@ -89,6 +101,11 @@ class ReactLoop:
 
                 # Собираем свежий контекст с актуальными состояниями (L0), временем и шагом
                 context = await self.context_builder.build(event_name, payload, missed_events)
+
+                # Передаем обновляемый список self.current_events
+                context = await self.context_builder.build(
+                    event_name, payload, self.current_events
+                )
 
                 # Обновляем блок контекста пользователя в истории сообщений
                 messages[1]["content"] = context

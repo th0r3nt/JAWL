@@ -331,6 +331,7 @@ class TelethonChats:
 
         except ValueError:
             return SkillResult.fail(f"Ошибка: Некорректный ID чата ({chat_id}).")
+        
         except Exception as e:
             return SkillResult.fail(f"Ошибка при чтении чата {chat_id}: {e}")
 

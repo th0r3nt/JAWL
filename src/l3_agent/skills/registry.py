@@ -74,7 +74,7 @@ def _register_callable(
 
     _SKILL_DOCS.append(f"`{skill_name}{clean_sig}` - {clean_doc}")
     _REGISTRY[skill_name] = func
-    system_logger.info(f"[System] Зарегистрирован скилл: {skill_name}")
+    system_logger.info(f"[Skills] Зарегистрирован скилл: {skill_name}")
 
 
 F = TypeVar("F", bound=Callable[..., Any])
@@ -129,7 +129,7 @@ async def execute_skill(actions: list[dict]) -> str:
         name = act.get("tool_name", "unknown_tool")
         params = act.get("parameters", {})
 
-        system_logger.info(f"[Agent Action] Вызов: {name}({params})")
+        system_logger.info(f"[Agent Action] {name}({params})")
 
         tasks.append(_run_single_skill(name, params))
 
