@@ -29,9 +29,9 @@ class ColorFormatter(logging.Formatter):
     # Порядок имеет значение: более специфичные теги лучше держать выше
     PREFIX_COLORS = {
         # === Жизненный цикл и Логика (Агент) ===
-        "[Heartbeat]": LogColors.MAGENTA,  # Пульс системы (сердцебиение)
+        "[Heartbeat]": LogColors.BRIGHT_MAGENTA,  # Пульс системы (сердцебиение)
         "[ReAct]": LogColors.BRIGHT_CYAN,  # Основной цикл мышления
-        "[Thoughts]": LogColors.BRIGHT_MAGENTA,  # Внутренний монолог агента
+        "[Thoughts]": LogColors.MAGENTA,  # Внутренний монолог агента
         "[Agent Action]": LogColors.BRIGHT_GREEN,  # Вызов инструмента (успешный старт)
         "[Agent Action Result]": LogColors.GRAY,  # Результаты функций (приглушаем, чтобы не отвлекали)
         "[Skills]": LogColors.GRAY, # Скиллы и регистрация

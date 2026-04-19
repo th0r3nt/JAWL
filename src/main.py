@@ -342,7 +342,7 @@ class System:
         if self.llm_client:
             await self.llm_client.close()
 
-        system_logger.info("[System] Остановка завершена. Процесс жестоко убит.")
+        system_logger.info("[System] Остановка завершена. Процесс выслежен и жестоко убит.")
 
 
 # ===================================================================

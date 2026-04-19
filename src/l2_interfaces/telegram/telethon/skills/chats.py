@@ -11,7 +11,7 @@ from telethon.tl.functions.channels import (
 )
 from telethon.tl.functions.messages import ImportChatInviteRequest
 
-# from src.utils.logger import system_logger
+from src.utils.logger import system_logger
 from src.utils.dtime import format_datetime
 
 from src.l2_interfaces.telegram.telethon.client import TelethonClient
@@ -229,9 +229,16 @@ class TelethonChats:
                             topics.append(
                                 f"      ↳ Топик '{topic.title}' (ID: {topic.id}){t_unread}"
                             )
+                    except Exception as e:
+                        system_logger.error(
+                            f"[TelethonChats] Ошибка iter_forum_topics в get_chats: {e}"
+                        )
 
-                    except Exception:
-                        pass
+                    # Если топиков нет, но сообщения висят - значит они в дефолтном General
+                    if not topics and dialog.unread_count > 0:
+                        topics.append(
+                            f"      ↳ General / Общий топик ({dialog.unread_count} непр.)"
+                        )
 
                     if topics:
                         forum_str = "\n" + "\n".join(topics)
@@ -274,11 +281,18 @@ class TelethonChats:
                                     topics.append(
                                         f"      ↳ Топик '{topic.title}' (ID: {topic.id}) [{unread} непр.]"
                                     )
-                        except Exception:
-                            pass
+                        except Exception as e:
+                            system_logger.error(
+                                f"[TelethonChats] Ошибка iter_forum_topics в get_unread_chats: {e}"
+                            )
 
-                        if topics:
-                            forum_str = "\n" + "\n".join(topics)
+                        # Fallback для General топика
+                        if not topics:
+                            topics.append(
+                                f"      ↳ General / Другие топики [{dialog.unread_count} непр.]"
+                            )
+
+                        forum_str = "\n" + "\n".join(topics)
 
                     chats.append(
                         f"- {chat_type} | ID: `{dialog.id}` | Название: **{dialog.name}** | Непрочитанных: {dialog.unread_count}{forum_str}"
@@ -305,7 +319,10 @@ class TelethonChats:
             target_entity = await client.get_entity(self._parse_entity(chat_id))
 
             try:
-                await client.send_read_acknowledge(target_entity)
+                kwargs_ack = {}
+                if topic_id:
+                    kwargs_ack["reply_to"] = int(topic_id)
+                await client.send_read_acknowledge(target_entity, **kwargs_ack)
             except Exception:
                 pass
 
@@ -357,13 +374,36 @@ class TelethonChats:
             return SkillResult.fail(f"Ошибка при чтении чата {chat_id}: {e}")
 
     @skill()
-    async def mark_as_read(self, chat_id: Union[int, str]) -> SkillResult:
-        """Помечает все сообщения в чате как прочитанные."""
+    async def mark_as_read(
+        self, chat_id: Union[int, str], topic_id: Optional[int] = None
+    ) -> SkillResult:
+        """Помечает все сообщения в чате (или конкретном топике) как прочитанные."""
         try:
             client = self.tg_client.client()
             target_entity = await client.get_entity(self._parse_entity(chat_id))
-            await client.send_read_acknowledge(target_entity)
+
+            if getattr(target_entity, "forum", False) and not topic_id:
+                # Если это форум и топик не указан - нужно перебрать все топики
+                try:
+                    async for topic in client.iter_forum_topics(target_entity):
+                        if getattr(topic, "unread_count", 0) > 0:
+                            await client.send_read_acknowledge(
+                                target_entity, reply_to=topic.id
+                            )
+
+                except Exception as e:
+                    system_logger.error(f"[TelethonChats] Ошибка при очистке топиков: {e}")
+
+                # Плюс помечаем основную ветку (General)
+                await client.send_read_acknowledge(target_entity)
+            else:
+                kwargs = {}
+                if topic_id:
+                    kwargs["reply_to"] = int(topic_id)
+                await client.send_read_acknowledge(target_entity, **kwargs)
+
             return SkillResult.ok(f"Чат {chat_id} успешно помечен как прочитанный.")
+
         except Exception as e:
             return SkillResult.fail(f"Ошибка при пометке чата {chat_id} как прочитанного: {e}")
 
