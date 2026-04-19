@@ -118,6 +118,8 @@ class SettingsConfig(BaseModel):
 
 
 def load_yaml(file_path: Path) -> dict:
+    """Безопасно читает YAML файл и возвращает словарь."""
+
     if not file_path.exists():
         raise FileNotFoundError(f"Конфигурационный файл не найден: {file_path}")
     with open(file_path, "r", encoding="utf-8") as f:
@@ -126,6 +128,7 @@ def load_yaml(file_path: Path) -> dict:
 
 def load_config() -> tuple[SettingsConfig, InterfacesConfig]:
     """Загружает и валидирует настройки из YAML файлов."""
+
     base_dir = Path.cwd() / "config"
 
     settings_data = load_yaml(base_dir / "settings.yaml")

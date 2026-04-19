@@ -24,6 +24,12 @@ class LogColors:
 
 
 class ColorFormatter(logging.Formatter):
+    """
+    Кастомный форматтер логов.
+    Раскрашивает префиксы подсистем в терминале и обрезает слишком длинные сообщения,
+    сохраняя при этом полный дамп для файлового вывода.
+    """
+
     PREFIX_COLORS = {
         "[Heartbeat]": LogColors.BRIGHT_MAGENTA,
         "[ReAct]": LogColors.BRIGHT_CYAN,
@@ -69,7 +75,7 @@ class ColorFormatter(logging.Formatter):
                     return f"{color}{log_message}{LogColors.RESET}"
 
             return log_message
-        
+
         finally:
             # Возвращаем оригинальное сообщение обратно в объект Record.
             # Благодаря этому FileHandler (который пишет в файл) сохранит строку целиком без ANSI-кодов и обрезки
@@ -77,6 +83,11 @@ class ColorFormatter(logging.Formatter):
 
 
 def setup_specific_logger(name: str, log_file: str, level: Union[int, str]) -> logging.Logger:
+    """
+    Инициализирует логгер с двойным выводом (терминал + файл).
+    Защищает от дублирования хендлеров при перезагрузках системы.
+    """
+    
     log_dir = Path("logs")
     log_dir.mkdir(exist_ok=True)
 

@@ -9,7 +9,14 @@ from telethon.tl.functions.channels import (
     GetFullChannelRequest,
     InviteToChannelRequest,
 )
-from telethon.tl.functions.messages import ImportChatInviteRequest
+from telethon.tl.functions.messages import ImportChatInviteRequest, GetPeerDialogsRequest
+
+from src.utils.logger import system_logger
+from src.utils.dtime import format_datetime
+
+from src.l2_interfaces.telegram.telethon.client import TelethonClient
+from src.l3_agent.skills.registry import SkillResult, skill
+
 
 # Безопасный импорт для поддержки старых версий Telethon
 try:
@@ -17,11 +24,10 @@ try:
 except ImportError:
     GetForumTopicsRequest = None
 
-from src.utils.logger import system_logger
-from src.utils.dtime import format_datetime
-
-from src.l2_interfaces.telegram.telethon.client import TelethonClient
-from src.l3_agent.skills.registry import SkillResult, skill
+try:
+    from telethon.tl.functions.messages import ReadReactionsRequest
+except ImportError:
+    ReadReactionsRequest = None
 
 
 class TelethonChats:
@@ -60,10 +66,35 @@ class TelethonChats:
             )
             # Возвращаем список объектов ForumTopic
             return getattr(result, "topics", [])
-        
         except Exception as e:
             system_logger.error(f"[TelethonChats] Ошибка _get_topics: {e}")
             return []
+
+    async def _mark_chat_read(
+        self, client: Any, target_entity: Any, topic_id: Optional[int] = None
+    ):
+        """Хелпер: Помечает сообщения, меншны и реакции прочитанными."""
+        try:
+            # clear_mentions=True автоматически сбросит собачки (@)
+            kwargs_ack = {"clear_mentions": True}
+            if topic_id:
+                kwargs_ack["reply_to"] = int(topic_id)
+
+            await client.send_read_acknowledge(target_entity, **kwargs_ack)
+
+            # Если версия Telethon поддерживает чтение реакций, очищаем и их
+            if ReadReactionsRequest:
+                try:
+                    if topic_id:
+                        await client(
+                            ReadReactionsRequest(peer=target_entity, top_msg_id=int(topic_id))
+                        )
+                    else:
+                        await client(ReadReactionsRequest(peer=target_entity))
+                except Exception:
+                    pass  # Некоторые чаты не поддерживают реакции, тихо глотаем
+        except Exception as e:
+            system_logger.debug(f"[TelethonChats] Ошибка при очистке реакций/меншнов: {e}")
 
     # =================================================================
     # Хелперы для парсинга сообщений (SRP)
@@ -352,11 +383,15 @@ class TelethonChats:
             client = self.tg_client.client()
             target_entity = await client.get_entity(self._parse_entity(chat_id))
 
+            # Помечаем сообщения, реакции и меншны прочитанными
+            await self._mark_chat_read(client, target_entity, topic_id)
+
+            # Получаем read_outbox_max_id для проверки прочитанности исходящих сообщений
+            read_outbox_max_id = 0
             try:
-                kwargs_ack = {}
-                if topic_id:
-                    kwargs_ack["reply_to"] = int(topic_id)
-                await client.send_read_acknowledge(target_entity, **kwargs_ack)
+                peer_dialogs = await client(GetPeerDialogsRequest(peers=[target_entity]))
+                if peer_dialogs and peer_dialogs.dialogs:
+                    read_outbox_max_id = peer_dialogs.dialogs[0].read_outbox_max_id
             except Exception:
                 pass
 
@@ -366,6 +401,13 @@ class TelethonChats:
                 kwargs["reply_to"] = int(topic_id)
 
             async for msg in client.iter_messages(target_entity, **kwargs):
+
+                # Пометка прочитанности для твоих сообщений
+                read_status = ""
+                if msg.out:
+                    read_status = (
+                        " [Прочитано]" if msg.id <= read_outbox_max_id else " [Не прочитано]"
+                    )
 
                 # Получаем имя сообщения
                 sender_name = self._get_sender_name(msg)
@@ -389,7 +431,10 @@ class TelethonChats:
                     msg.date, self.tg_client.timezone, fmt="%Y-%m-%d %H:%M"
                 )
 
-                messages.append(f"[{time_str}] [ID: {msg.id}] {sender_name}: {final_text}")
+                # Добавили read_status сразу после ID
+                messages.append(
+                    f"[{time_str}] [ID: {msg.id}]{read_status} {sender_name}: {final_text}"
+                )
 
             if not messages:
                 return SkillResult.ok(
@@ -422,22 +467,19 @@ class TelethonChats:
                     topics_data = await self._get_topics(client, target_entity, limit=100)
                     for topic in topics_data:
                         if getattr(topic, "unread_count", 0) > 0:
-                            await client.send_read_acknowledge(
-                                target_entity, reply_to=topic.id
-                            )
+                            await self._mark_chat_read(client, target_entity, topic.id)
 
                 except Exception as e:
                     system_logger.error(f"[TelethonChats] Ошибка при очистке топиков: {e}")
 
                 # Плюс помечаем основную ветку (General)
-                await client.send_read_acknowledge(target_entity)
+                await self._mark_chat_read(client, target_entity)
             else:
-                kwargs = {}
-                if topic_id:
-                    kwargs["reply_to"] = int(topic_id)
-                await client.send_read_acknowledge(target_entity, **kwargs)
+                await self._mark_chat_read(client, target_entity, topic_id)
 
-            return SkillResult.ok(f"Чат {chat_id} успешно помечен как прочитанный.")
+            return SkillResult.ok(
+                f"Чат {chat_id} успешно помечен как прочитанный (вкл. меншны и реакции)."
+            )
 
         except Exception as e:
             return SkillResult.fail(f"Ошибка при пометке чата {chat_id} как прочитанного: {e}")

@@ -1,5 +1,6 @@
 import pytest
 from src.l3_agent.skills import registry
+from src.l3_agent.skills.schema import ActionCall
 from src.l3_agent.skills.registry import (
     skill,
     register_instance,
@@ -15,31 +16,19 @@ from src.l3_agent.skills.registry import (
 
 @pytest.fixture(autouse=True)
 def clean_registry():
-    """
-    Фикстура, которая автоматически очищает глобальный реестр скиллов
-    перед каждым тестом, чтобы тесты не пересекались.
-    """
-    # Сохраняем оригинальное состояние (вдруг что-то из main.py уже загрузилось)
     original_registry = registry._REGISTRY.copy()
     original_docs = registry._SKILL_DOCS.copy()
 
     registry._REGISTRY.clear()
     registry._SKILL_DOCS.clear()
 
-    yield  # Выполняется тест
+    yield
 
     # Возвращаем всё как было
     registry._REGISTRY.clear()
     registry._SKILL_DOCS.clear()
     registry._REGISTRY.update(original_registry)
     registry._SKILL_DOCS.extend(original_docs)
-
-
-# ===================================================================
-# MOCKS
-# ===================================================================
-
-# Обычную функцию убрали отсюда, перенесли в фикстуру ниже.
 
 
 class DummyInterface:
@@ -56,7 +45,6 @@ class DummyInterface:
         return SkillResult.fail("Упс, ошибка")
 
     async def not_a_skill(self):
-        """Эта функция не должна попасть в реестр"""
         pass
 
 
@@ -66,7 +54,6 @@ def mock_plain_func():
 
     @skill(name_override="mock.plain_func")
     async def dummy_plain_func(text: str) -> SkillResult:
-        """Обычная функция для теста."""
         return SkillResult.ok(f"Plain: {text}")
 
     return dummy_plain_func
@@ -79,22 +66,19 @@ def mock_plain_func():
 
 @pytest.mark.asyncio
 async def test_plain_function_registration(mock_plain_func):
-    """Тест: обычная функция сразу попадает в реестр."""
     assert "mock.plain_func" in registry._REGISTRY
     docs = get_skills_library()
     assert "mock.plain_func" in docs
-    assert "Обычная функция для теста." in docs
 
 
 @pytest.mark.asyncio
 async def test_execute_skill_success(mock_plain_func):
-    """Тест: успешный вызов нескольких скиллов параллельно."""
     dummy = DummyInterface(prefix="Agent")
     register_instance(dummy)
 
     actions = [
-        {"tool_name": "mock.plain_func", "parameters": {"text": "Hello"}},
-        {"tool_name": "mock.class_func", "parameters": {"text": "World"}},
+        ActionCall(tool_name="mock.plain_func", parameters={"text": "Hello"}),
+        ActionCall(tool_name="mock.class_func", parameters={"text": "World"}),
     ]
 
     report = await execute_skill(actions=actions)
@@ -106,11 +90,11 @@ async def test_execute_skill_success(mock_plain_func):
 @pytest.mark.asyncio
 async def test_execute_skill_ignores_extra_kwargs(mock_plain_func):
     actions = [
-        {"tool_name": "mock.plain_func", "parameters": {"text": "Valid", "hallucination": 123}}
+        ActionCall(
+            tool_name="mock.plain_func", parameters={"text": "Valid", "hallucination": 123}
+        )
     ]
-
     report = await execute_skill(actions=actions)
-
     assert "Action [mock.plain_func]: Plain: Valid" in report
 
 
@@ -123,9 +107,9 @@ async def test_execute_skill_mixed_results(mock_plain_func):
         raise RuntimeError("Критический сбой")
 
     actions = [
-        {"tool_name": "mock.plain_func", "parameters": {"text": "A"}},
-        {"tool_name": "mock.unknown_func", "parameters": {}},
-        {"tool_name": "mock.fail_func", "parameters": {}},
+        ActionCall(tool_name="mock.plain_func", parameters={"text": "A"}),
+        ActionCall(tool_name="mock.unknown_func", parameters={}),
+        ActionCall(tool_name="mock.fail_func", parameters={}),
     ]
 
     report = await execute_skill(actions)

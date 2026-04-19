@@ -31,6 +31,10 @@ class EventConfig(BaseModel):
 
 
 class Events:
+    """
+    Глобальный реестр всех доступных событий в системе JAWL.
+    Определяет уровни важности для корректной работы Heartbeat-акселератора.
+    """
 
     # ============================================
     # Telegram Telethon
@@ -110,7 +114,7 @@ class Events:
     HOST_OS_FILE_DELETED = EventConfig(
         name="HOST_OS_FILE_DELETED",
         description="Файл в песочнице был удален.",
-        level=EventLevel.LOW, # Фоновое уведомление
+        level=EventLevel.LOW,  # Фоновое уведомление
         requires_attention=False,
     )
 

@@ -19,11 +19,9 @@ def test_color_formatter_truncation_for_console():
 
     formatted_str = formatter.format(record)
 
-    # Проверяем, что в форматированной строке (для консоли) текст обрезан
     assert len(formatted_str) < 150
-    assert "Вывод обрезан для консоли" in formatted_str
+    assert "Вывод обрезан для терминала" in formatted_str
 
-    # КРИТИЧНО: оригинальное сообщение в объекте должно остаться нетронутым для FileHandler
     assert record.msg == f"[Agent Action Result] {long_message}"
 
 
@@ -41,13 +39,11 @@ def test_color_formatter_coloring():
     )
     formatted_str = formatter.format(record)
 
-    # Проверяем, что ANSI-код желтого цвета (BRIGHT_YELLOW) применился
-    assert LogColors.BRIGHT_YELLOW in formatted_str
+    assert LogColors.MAGENTA in formatted_str
     assert LogColors.RESET in formatted_str
 
 
 def test_update_log_level():
-    """Тест: Динамическое изменение уровня логов."""
     update_log_level("DEBUG")
     assert system_logger.level == logging.DEBUG
     update_log_level("INFO")

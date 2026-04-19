@@ -25,7 +25,9 @@ def mock_dependencies():
 
     agent_state = AgentState(max_react_steps=3)
 
-    sql_ticks = AsyncMock()
+    sql_ticks = MagicMock()
+    sql_ticks.save_tick = AsyncMock()
+
     token_tracker = MagicMock()
 
     # Фейковая схема

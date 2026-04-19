@@ -7,6 +7,12 @@ from src.utils.logger import system_logger
 
 
 class EventBus:
+    """
+    Асинхронная локальная шина событий (Pub/Sub).
+    Позволяет модулям общаться друг с другом без жесткой связности (Loose Coupling).
+    Поддерживает как синхронные, так и асинхронные обработчики.
+    """
+    
     def __init__(self):
         self.listeners: dict[str, list[Callable[..., Any]]] = {}
         self.background_tasks: set[asyncio.Task] = set()

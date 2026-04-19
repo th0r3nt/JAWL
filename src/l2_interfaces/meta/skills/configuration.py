@@ -11,9 +11,7 @@ class MetaConfiguration:
     async def change_model(self, model_name: str) -> SkillResult:
         """Изменяет используемую агентом языковую модель (LLM)."""
 
-        success = await self.client.update_setting(
-            ["llm", "model_name"], model_name, f"Модель изменена на {model_name}"
-        )
+        success = await self.client.update_setting(["llm", "model_name"], model_name)
         if not success:
             return SkillResult.fail("Ошибка при сохранении файла конфигурации.")
 
@@ -24,9 +22,7 @@ class MetaConfiguration:
     async def change_temperature(self, temperature: float) -> SkillResult:
         """Изменяет temperature языковой модели (от 0.0 до 1.0)."""
 
-        success = await self.client.update_setting(
-            ["llm", "temperature"], temperature, f"Temperature изменена на {temperature}"
-        )
+        success = await self.client.update_setting(["llm", "temperature"], temperature)
         if not success:
             return SkillResult.fail("Ошибка при сохранении конфигурации.")
 
@@ -37,9 +33,7 @@ class MetaConfiguration:
     async def change_max_react_steps(self, steps: int) -> SkillResult:
         """Изменяет максимальное количество шагов в одном цикле ReAct."""
 
-        success = await self.client.update_setting(
-            ["llm", "max_react_steps"], steps, f"Лимит ReAct изменен на {steps}"
-        )
+        success = await self.client.update_setting(["llm", "max_react_steps"], steps)
         if not success:
             return SkillResult.fail("Ошибка при сохранении конфигурации.")
 
@@ -63,6 +57,4 @@ class MetaConfiguration:
         await self.client.bus.publish(
             Events.SYSTEM_CONFIG_UPDATED, key="heartbeat_interval", value=interval_sec
         )
-        return SkillResult.ok(
-            f"Интервал изменен на {interval_sec} сек."
-        )
+        return SkillResult.ok(f"Интервал изменен на {interval_sec} сек.")
