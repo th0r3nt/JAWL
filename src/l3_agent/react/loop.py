@@ -186,6 +186,7 @@ class ReactLoop:
                 # Валидация ответа LLM через Pydantic
                 try:
                     parsed_response = AgentResponse.model_validate_json(args_str)
+                    
                 except ValidationError as e:
                     system_logger.warning(
                         f"[ReAct] Ошибка структуры от LLM. Запрашиваем исправление. Детали: {e}"
@@ -207,25 +208,6 @@ class ReactLoop:
                 if thoughts:
                     system_logger.info(f"[Thoughts]: {thoughts}")
 
-                if not isinstance(actions, list) or any(
-                    not isinstance(a, dict) for a in actions
-                ):
-                    error_msg = "Format Error: 'actions' должен быть массивом объектов (list of dicts). Передавать строки запрещено."
-                    system_logger.warning(
-                        "[ReAct] LLM сгенерировала неверную структуру actions. Запрашиваем исправление."
-                    )
-
-                    messages.append(
-                        {
-                            "role": "tool",
-                            "tool_call_id": tool_call.id,
-                            "name": tool_call.function.name,
-                            "content": error_msg,
-                        }
-                    )
-                    step += 1
-                    continue
-
                 if not actions:
                     system_logger.info(
                         "[ReAct] Агент передал пустой массив действий. ReAct-цикл завершен."
@@ -236,7 +218,6 @@ class ReactLoop:
                     break
 
                 self.agent_state.update_state(AgentStatus.ACTING)
-
                 results_str = await execute_skill(actions=actions)
 
                 await self.sql_ticks.save_tick(
