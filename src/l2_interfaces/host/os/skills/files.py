@@ -3,9 +3,7 @@ import shutil
 import asyncio
 
 from src.utils.logger import system_logger
-
 from src.l2_interfaces.host.os.client import HostOSClient
-
 from src.l3_agent.skills.registry import SkillResult, skill
 
 
@@ -17,6 +15,15 @@ class HostOSFiles:
 
     def __init__(self, host_os_client: HostOSClient):
         self.host_os = host_os_client
+
+    def _format_size(self, size_bytes: int) -> str:
+        """Переводит байты в человекочитаемый формат (KB, MB)."""
+        if size_bytes < 1024:
+            return f"{size_bytes} B"
+        elif size_bytes < 1024 * 1024:
+            return f"{size_bytes / 1024:.1f} KB"
+        else:
+            return f"{size_bytes / (1024 * 1024):.1f} MB"
 
     @skill()
     async def read_file(
@@ -41,36 +48,36 @@ class HostOSFiles:
                     f.seek(0, 2)
                     file_size = f.tell()
 
-                    # Если файл маленький - читаем целиком
                     if file_size <= max_chars:
                         f.seek(0)
-                        return f.read().decode("utf-8", errors="replace"), False
+                        return f.read().decode("utf-8", errors="replace"), False, file_size
 
-                    # Иначе читаем только нужный кусок
                     if read_from == "tail":
                         f.seek(file_size - max_chars)
-                        return f.read().decode("utf-8", errors="replace"), True
+                        return f.read().decode("utf-8", errors="replace"), True, file_size
                     else:
                         f.seek(0)
-                        return f.read(max_chars).decode("utf-8", errors="replace"), True
+                        return (
+                            f.read(max_chars).decode("utf-8", errors="replace"),
+                            True,
+                            file_size,
+                        )
 
-            # Выполняем тяжелый I/O в пуле потоков
-            content, is_truncated = await asyncio.to_thread(_read_fast)
+            content, is_truncated, file_size = await asyncio.to_thread(_read_fast)
+
+            size_str = self._format_size(file_size)
+            header = f"[Файл: {safe_path.name} | Прочитано: {len(content)} симв. | Исходный размер: {size_str}]\n{'='*40}\n"
 
             if is_truncated:
                 if read_from == "tail":
-                    content = (
-                        f"...[Файл обрезан с начала. Показаны последние {max_chars} символов]...\n"
-                        + content
-                    )
+                    content = f"...[Файл обрезан с начала. Показаны последние {max_chars} байт]...\n{content}"
                 else:
-                    content = (
-                        content
-                        + f"\n...[Файл обрезан с конца. Показаны первые {max_chars} символов]..."
-                    )
+                    content = f"{content}\n...[Файл обрезан с конца. Показаны первые {max_chars} байт]..."
 
-            system_logger.info(f"[Host OS] Прочитан файл ({read_from}): {safe_path.name}")
-            return SkillResult.ok(content)
+            system_logger.info(
+                f"[Host OS] Прочитан файл ({read_from}): {safe_path.name} ({size_str})"
+            )
+            return SkillResult.ok(header + content)
 
         except PermissionError as e:
             return SkillResult.fail(str(e))
@@ -89,8 +96,6 @@ class HostOSFiles:
 
         try:
             safe_path = self.host_os.validate_path(filepath, is_write=True)
-
-            # Автоматически создаем родительские директории, если агент указал вложенный путь
             safe_path.parent.mkdir(parents=True, exist_ok=True)
 
             with open(safe_path, mode, encoding="utf-8") as f:
@@ -108,8 +113,7 @@ class HostOSFiles:
 
     @skill()
     async def list_directory(self, path: str = ".") -> SkillResult:
-        """Аналог команды ls. Показывает содержимое папки."""
-
+        """Аналог команды ls. Показывает содержимое папки и размеры файлов."""
         limit = self.host_os.config.file_list_limit
 
         try:
@@ -124,8 +128,15 @@ class HostOSFiles:
                     items.append(f"... [Показано {limit} элементов. Остальные скрыты] ...")
                     break
 
+                try:
+                    size_str = (
+                        self._format_size(item.stat().st_size) if item.is_file() else "DIR"
+                    )
+                except Exception:
+                    size_str = "???"
+
                 prefix = "📁" if item.is_dir() else "📄"
-                items.append(f"{prefix} {item.name}")
+                items.append(f"{prefix} {item.name} ({size_str})")
 
             if not items:
                 return SkillResult.ok(f"Директория '{safe_path.name}' пуста.")
@@ -156,12 +167,21 @@ class HostOSFiles:
             found = []
             for i, file_path in enumerate(safe_path.rglob(pattern)):
                 if i >= limit:
-                    found.append(f"... [Лимит поиска: найдено более {limit} совпадений] ...")
+                    found.append(f"...[Лимит поиска: найдено более {limit} совпадений] ...")
                     break
 
-                # Показываем путь относительно стартовой папки для экономии токенов
                 rel_path = file_path.relative_to(safe_path)
-                found.append(f"- {rel_path}")
+
+                try:
+                    size_str = (
+                        self._format_size(file_path.stat().st_size)
+                        if file_path.is_file()
+                        else "DIR"
+                    )
+                except Exception:
+                    size_str = "???"
+
+                found.append(f"- {rel_path} ({size_str})")
 
             if not found:
                 return SkillResult.ok(f"По маске '{pattern}' ничего не найдено.")
@@ -178,6 +198,7 @@ class HostOSFiles:
     @skill()
     async def delete_file(self, filepath: str) -> SkillResult:
         """Удаляет указанный файл (не папки)."""
+
         try:
             safe_path = self.host_os.validate_path(filepath, is_write=True)
 
@@ -189,7 +210,6 @@ class HostOSFiles:
                 )
 
             safe_path.unlink()
-
             system_logger.info(f"[Host OS] Удален файл: {safe_path.name}")
             return SkillResult.ok(f"Файл {safe_path.name} успешно удален.")
 
@@ -202,6 +222,7 @@ class HostOSFiles:
     @skill()
     async def delete_directory(self, path: str) -> SkillResult:
         """Удаляет указанную директорию вместе со всем её содержимым."""
+
         try:
             safe_path = self.host_os.validate_path(path, is_write=True)
 
@@ -212,7 +233,6 @@ class HostOSFiles:
                     "Ошибка: Это не директория. Для удаления файлов используйте delete_file."
                 )
 
-            # Защита от экзистенциального кризиса агента: не даем снести корень
             if (
                 safe_path == self.host_os.sandbox_dir
                 or safe_path == self.host_os.framework_dir
@@ -221,9 +241,7 @@ class HostOSFiles:
                     "Ошибка: Отказано в доступе. Запрещено удалять корневую директорию песочницы или фреймворка."
                 )
 
-            # Выполняем I/O-операцию в отдельном потоке, чтобы не блокировать event loop
             await asyncio.to_thread(shutil.rmtree, safe_path)
-
             system_logger.info(f"[Host OS] Удалена директория: {safe_path.name}")
             return SkillResult.ok(
                 f"Директория {safe_path.name} и всё её содержимое успешно удалены."
@@ -237,33 +255,25 @@ class HostOSFiles:
 
     @skill()
     async def create_directories(self, paths: list[str]) -> SkillResult:
-        """
-        Создает одну или несколько директорий (папок).
-        Поддерживает создание вложенных структур (например, 'project/src/api').
-        """
+        """Создает одну или несколько директорий (папок)."""
 
         if not paths:
             return SkillResult.fail("Ошибка: Список путей пуст.")
 
-        created = []
-        errors = []
+        created, errors = [], []
 
         for path in paths:
             try:
-                # Гейткипер проверит права на запись
                 safe_path = self.host_os.validate_path(path, is_write=True)
-
-                # Создаем папку вместе со всеми промежуточными
                 await asyncio.to_thread(safe_path.mkdir, parents=True, exist_ok=True)
                 created.append(safe_path.name)
-                
+
             except PermissionError as e:
                 errors.append(f"{path}: {e}")
 
             except Exception as e:
                 errors.append(f"{path}: Ошибка создания ({e})")
 
-        # Формируем итоговый отчет
         if not created and errors:
             return SkillResult.fail("Не удалось создать директории:\n" + "\n".join(errors))
 
@@ -272,4 +282,5 @@ class HostOSFiles:
             msg += "\n\nНо возникли ошибки с этими путями:\n" + "\n".join(errors)
 
         system_logger.info(f"[Host OS] Созданы директории: {', '.join(created)}")
+
         return SkillResult.ok(msg)

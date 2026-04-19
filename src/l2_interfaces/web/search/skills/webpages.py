@@ -13,7 +13,7 @@ class WebPages:
         self.client = client
 
     async def read_raw(self, url: str) -> str | None:
-        """Сырое чтение страницы. Вынесен отдельно для research.py."""
+        """Сырое чтение страницы."""
 
         def _fetch():
             downloaded = trafilatura.fetch_url(url)
@@ -31,7 +31,7 @@ class WebPages:
     @skill()
     async def read_webpage(self, url: str) -> SkillResult:
         """Читает текстовое содержимое веб-страницы по URL."""
-
+        
         try:
             text = await self.read_raw(url)
 
@@ -40,13 +40,22 @@ class WebPages:
                     f"Ошибка: не удалось прочитать {url} (капча или нет текста)."
                 )
 
-            # Защита контекста от "тяжелых" страниц
-            if len(text) > self.client.max_page_chars:
-                text = text[: self.client.max_page_chars] + "\n\n... [Текст обрезан]"
+            total_len = len(text)
+            is_truncated = False
 
-            system_logger.info(f"[Web] Прочитана страница: {url}")
+            if total_len > self.client.max_page_chars:
+                text = text[: self.client.max_page_chars] + "\n\n... [Текст обрезан]"
+                is_truncated = True
+
+            header = f"[Веб-страница | Прочитано: {len(text)}/{total_len} симв.]\n{'='*40}\n"
+
+            if is_truncated:
+                system_logger.info(f"[Web] Прочитана страница (с обрезкой): {url}")
+            else:
+                system_logger.info(f"[Web] Прочитана страница (полностью): {url}")
+
             self.client.state.add_history(f"Чтение страницы: {url}")
-            return SkillResult.ok(text)
+            return SkillResult.ok(header + text)
 
         except Exception as e:
             return SkillResult.fail(f"Ошибка парсинга страницы: {e}")

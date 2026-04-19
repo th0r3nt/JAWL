@@ -1,5 +1,6 @@
 from datetime import timedelta
 from typing import Optional, Union
+from pathlib import Path
 
 from src.l2_interfaces.telegram.telethon.client import TelethonClient
 from src.l3_agent.skills.registry import SkillResult, skill
@@ -8,18 +9,31 @@ from src.utils.logger import system_logger
 
 class TelethonMessages:
     """
-    Навыки агента для прямого взаимодействия с сообщениями (отправка, удаление, редактирование).
+    Навыки агента для прямого взаимодействия с сообщениями (отправка, удаление, редактирование),
+    а также скачивание и отправка файлов из песочницы.
     """
 
     def __init__(self, tg_client: TelethonClient):
         self.tg_client = tg_client
 
     def _parse_entity(self, entity_id: Union[int, str]) -> Union[int, str]:
-        """Утилитный метод: если передали число в виде строки - кастуем в int. Иначе оставляем str (юзернейм)."""
         try:
             return int(entity_id)
         except ValueError:
             return str(entity_id).strip()
+
+    def _validate_sandbox_path(self, filepath: str) -> Path:
+        """Внутренний гейткипер: разрешает работу с файлами строго внутри папки sandbox/."""
+        sandbox_dir = Path.cwd() / "sandbox"
+        sandbox_dir.mkdir(parents=True, exist_ok=True)
+
+        resolved = (sandbox_dir / filepath).resolve()
+        if not resolved.is_relative_to(sandbox_dir):
+            raise PermissionError(
+                "Доступ запрещен: можно отправлять и скачивать файлы только в пределах папки sandbox/"
+            )
+
+        return resolved
 
     @skill()
     async def send_message(
@@ -35,18 +49,12 @@ class TelethonMessages:
         Отправляет текстовое сообщение в группу/чат или канал (если есть права). Важно: to_id может быть как числовым ID, так и юзернеймом.
         Для отправки в конкретный топик форума - использовать аргумент topic_id.
         """
-
         try:
             client = self.tg_client.client()
             entity = self._parse_entity(to_id)
 
-            kwargs = {
-                "entity": entity,
-                "message": text,
-                "silent": is_silent,
-            }
+            kwargs = {"entity": entity, "message": text, "silent": is_silent}
 
-            # Приоритет у ответа на конкретное сообщение (Telegram сам поместит его в нужный топик)
             if reply_to_message_id:
                 kwargs["reply_to"] = int(reply_to_message_id)
             elif topic_id:
@@ -58,7 +66,6 @@ class TelethonMessages:
 
             sent_msg = await client.send_message(**kwargs)
 
-            # Если мы написали в чат - значит мы его гарантированно прочитали
             try:
                 await client.send_read_acknowledge(entity)
             except Exception:
@@ -67,19 +74,82 @@ class TelethonMessages:
             schedule_info = f" (отложено на {time_delay} сек)" if time_delay else ""
             msg = f"Сообщение успешно отправлено{schedule_info}. ID: {sent_msg.id}"
 
-            # И так будет логгироваться в Agent Action Result
-            # system_logger.info(
-            #     f"[Telegram Telethon] Отправлено сообщение в {entity} (Топик: {topic_id})"
-            # )
             return SkillResult.ok(msg)
 
         except ValueError:
             return SkillResult.fail("Ошибка: Некорректный ID или Username.")
+        except Exception as e:
+            system_logger.error(f"Ошибка при отправке сообщения: {e}")
+            return SkillResult.fail(f"Ошибка при отправке сообщения: {e}")
+
+    @skill()
+    async def send_file(
+        self, chat_id: Union[int, str], file_path: str, caption: str = ""
+    ) -> SkillResult:
+        """Отправляет локальный файл с диска (из папки sandbox/) в указанный чат Telegram."""
+
+        try:
+            safe_path = self._validate_sandbox_path(file_path)
+
+            if not safe_path.is_file():
+                return SkillResult.fail(
+                    f"Ошибка: Файл не найден или это директория ({safe_path.name})."
+                )
+
+            client = self.tg_client.client()
+            entity = self._parse_entity(chat_id)
+
+            await client.send_file(entity, file=str(safe_path), caption=caption)
+
+            system_logger.info(
+                f"[Telegram Telethon] Файл {safe_path.name} отправлен в чат {chat_id}"
+            )
+            return SkillResult.ok(f"Файл {safe_path.name} успешно отправлен.")
+
+        except PermissionError as e:
+            return SkillResult.fail(str(e))
+        except Exception as e:
+            return SkillResult.fail(f"Ошибка при отправке файла: {e}")
+
+    @skill()
+    async def download_file(
+        self, chat_id: Union[int, str], message_id: int, dest_filename: str
+    ) -> SkillResult:
+        """Скачивает медиа-вложение (картинку, гс, документ) из сообщения в Telegram в локальную папку sandbox/."""
+
+        try:
+            safe_path = self._validate_sandbox_path(dest_filename)
+            client = self.tg_client.client()
+            entity = self._parse_entity(chat_id)
+
+            msg = await client.get_messages(entity, ids=int(message_id))
+            if not msg or not msg.media:
+                return SkillResult.fail(
+                    "Ошибка: Сообщение не найдено или не содержит медиа-вложений."
+                )
+
+            system_logger.info(
+                f"[Telegram Telethon] Скачивание файла из сообщения {message_id}..."
+            )
+
+            # Запускаем скачивание напрямую по указанному пути
+            downloaded_path = await client.download_media(msg, file=str(safe_path))
+
+            if not downloaded_path:
+                return SkillResult.fail(
+                    "Не удалось скачать файл (возможно, формат не поддерживается)."
+                )
+
+            system_logger.info(f"[Telegram Telethon] Файл скачан: {safe_path.name}")
+            return SkillResult.ok(
+                f"Файл успешно скачан и сохранен как: sandbox/{safe_path.name}"
+            )
+
+        except PermissionError as e:
+            return SkillResult.fail(str(e))
 
         except Exception as e:
-            msg = f"Ошибка при отправке сообщения: {e}"
-            system_logger.error(msg)
-            return SkillResult.fail(msg)
+            return SkillResult.fail(f"Ошибка при скачивании файла: {e}")
 
     @skill()
     async def forward_message(
@@ -96,13 +166,13 @@ class TelethonMessages:
             )
             system_logger.info(f"[Telegram Telethon] Пересылка сообщения {msg_id} в {to_id}")
             return SkillResult.ok(f"Сообщение {msg_id} успешно переслано.")
+
         except Exception as e:
             return SkillResult.fail(f"Ошибка при пересылке сообщения: {e}")
 
     @skill()
     async def delete_message(self, msg_id: int, chat_id: Union[int, str]) -> SkillResult:
         """Удаляет сообщение (для себя и для всех, если есть права)."""
-
         try:
             client = self.tg_client.client()
             await client.delete_messages(
@@ -112,6 +182,7 @@ class TelethonMessages:
                 f"[Telegram Telethon] Сообщение {msg_id} удалено в чате {chat_id}"
             )
             return SkillResult.ok(f"Сообщение {msg_id} успешно удалено.")
+
         except Exception as e:
             return SkillResult.fail(f"Ошибка при удалении сообщения: {e}")
 
@@ -128,6 +199,7 @@ class TelethonMessages:
             )
             system_logger.info(f"[Telegram Telethon] Сообщение {msg_id} отредактировано")
             return SkillResult.ok(f"Текст сообщения {msg_id} успешно изменен.")
+
         except Exception as e:
             return SkillResult.fail(f"Ошибка при редактировании сообщения: {e}")
 
@@ -137,20 +209,18 @@ class TelethonMessages:
     ) -> SkillResult:
         """
         Нажимает inline-кнопку (встроенную под сообщением ботов).
-        button_text: точный или частичный текст кнопки.
+        button_text: частичный или точный текст кнопки.
         """
 
         try:
             client = self.tg_client.client()
             msg = await client.get_messages(self._parse_entity(chat_id), ids=int(message_id))
 
-            if not msg:
-                return SkillResult.fail("Ошибка: Сообщение не найдено.")
+            if not msg or not msg.buttons:
+                return SkillResult.fail(
+                    "Ошибка: Сообщение не найдено или у него нет inline-кнопок."
+                )
 
-            if not msg.buttons:
-                return SkillResult.fail("Ошибка: У этого сообщения нет inline-кнопок.")
-
-            # Ищем кнопку по тексту (частичное совпадение, без учета регистра)
             target_i, target_j = None, None
             for i, row in enumerate(msg.buttons):
                 for j, button in enumerate(row):
@@ -161,28 +231,30 @@ class TelethonMessages:
                     break
 
             if target_i is None:
-                available_buttons = [
-                    btn.text for row in msg.buttons for btn in row if btn.text
-                ]
+                available = [btn.text for row in msg.buttons for btn in row if btn.text]
                 return SkillResult.fail(
-                    f"Ошибка: Кнопка с текстом '{button_text}' не найдена. Доступные кнопки: {available_buttons}"
+                    f"Ошибка: Кнопка '{button_text}' не найдена. Доступные: {available}"
                 )
 
-            # Нажимаем кнопку по её координатам
             result = await msg.click(target_i, target_j)
 
-            # Если это callback кнопка, бот может вернуть всплывающее уведомление
-            if result and hasattr(result, "message") and result.message:
-                return SkillResult.ok(f"Успешно. Ответ бота: {result.message}")
-
+            msg_callback = (
+                result.message
+                if (result and hasattr(result, "message") and result.message)
+                else ""
+            )
             system_logger.info(
                 f"[Telegram Telethon] Нажата кнопка '{button_text}' в сообщении {message_id}"
             )
-            return SkillResult.ok("Кнопка успешно нажата.")
+
+            return SkillResult.ok(
+                f"Кнопка успешно нажата. Ответ бота: {msg_callback}"
+                if msg_callback
+                else "Кнопка успешно нажата."
+            )
 
         except ValueError:
             return SkillResult.fail("Ошибка: Некорректный ID чата или сообщения.")
+
         except Exception as e:
-            msg_err = f"Ошибка при нажатии кнопки: {e}"
-            system_logger.error(msg_err)
-            return SkillResult.fail(msg_err)
+            return SkillResult.fail(f"Ошибка при нажатии кнопки: {e}")
