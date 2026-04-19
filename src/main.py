@@ -133,6 +133,7 @@ class System:
             embedding_model_path=self.local_data_dir / "embeddings",
             embedding_model_name=self.settings.system.vector_db.embedding_model,
             vector_size=self.settings.system.vector_db.vector_size,
+            similarity_threshold=self.settings.system.vector_db.similarity_threshold,
             timezone=self.settings.system.timezone,
         )
         await self.vector.connect()

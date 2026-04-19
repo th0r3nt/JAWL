@@ -19,6 +19,7 @@ class VectorManager:
         embedding_model_path: Path,
         embedding_model_name: str,
         vector_size: int = 384,
+        similarity_threshold: float = 0.43,
         timezone: int = 0,
     ):
         self.collection_name_knowledge = "knowledge"
@@ -41,12 +42,14 @@ class VectorManager:
             db=self.db,
             collection=knowledge_col,
             embedding_model=self.embedding,
+            similarity_threshold=similarity_threshold,
             timezone=timezone,
         )
         self.thoughts = VectorThoughts(
             db=self.db,
             collection=thoughts_col,
             embedding_model=self.embedding,
+            similarity_threshold=similarity_threshold,
             timezone=timezone,
         )
 

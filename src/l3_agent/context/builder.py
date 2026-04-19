@@ -74,7 +74,7 @@ class ContextBuilder:
         ordered_parts.append(f"## HEARTBEAT\n{wake_up_reason}")
 
         # Склеиваем с мощным отступом для чистоты Markdown
-        return "\n\n\n".join(ordered_parts).strip()
+        return "\n\n\n\n\n".join(ordered_parts).strip()
 
     def _build_wake_up_reason(
         self, event_name: str, payload: Dict[str, Any], missed_events: List[str]

@@ -1,5 +1,5 @@
 identity:
-  agent_name: AgentName
+  agent_name: AgentName # Имя вашего агента
 
 llm:
   model_name: gemini-3.1-pro-preview # Можно поставить любую
@@ -10,10 +10,10 @@ system:
   timezone: 3  # Смещение от UTC в часах (например, 3 для МСК)
 
   vector_db:
-    similarity_threshold: 0.43
+    similarity_threshold: 0.40
     embedding_model: "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
     vector_size: 384
-    auto_rag_top_k: 3
+    auto_rag_top_k: 2
     
   # Интервал между циклами (в секундах)
   heartbeat_interval: 300
@@ -31,7 +31,7 @@ system:
     background_multiplier: 0.8
 
   context_depth:
-    ticks: 30 # Tick у LLM = Наблюдение > Мысли > Действие > Результат
+    ticks: 15 # Tick у LLM = Наблюдение > Мысли > Действие > Результат
     tick_result_max_chars: 5000 # Обрезает длинные ответы от функций в контексте агента
 
   max_mental_state_entities: 10 # Макс. количество сущностей, которые может запомнить агент

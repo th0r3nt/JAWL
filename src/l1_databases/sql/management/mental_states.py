@@ -173,6 +173,6 @@ class SQLMentalStates:
         Провайдер контекста для ContextRegistry.
         Отдает отформатированный блок для контекста агента.
         """
-        
+
         res = await self.get_mental_states()
-        return f"## MENTAL STATES\nMax number of entities that can be remembered:{self.max_entities}\n\n{res.message}"
+        return f"## MENTAL STATES\nMax number of entities that can be remembered: {self.max_entities}\n\n{res.message}"
