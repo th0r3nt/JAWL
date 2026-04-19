@@ -18,17 +18,20 @@ class SQLManager:
         db_path: Path,
         max_mental_state_entities: int = 10,
         ticks_limit: int = 30,
+        detailed_ticks: int = 2,
+        tick_action_max_chars: int = 2000,
         tick_result_max_chars: int = 5000,
         timezone: int = 0,
     ):
         self.db = SQLDB(db_path=str(db_path))
 
-        # CRUD-интерфейсы
         self.tasks = SQLTasks(db=self.db)
 
         self.ticks = SQLTicks(
             db=self.db,
             limit=ticks_limit,
+            detailed_ticks=detailed_ticks,
+            action_max_chars=tick_action_max_chars,
             result_max_chars=tick_result_max_chars,
             tz_offset=timezone,
         )

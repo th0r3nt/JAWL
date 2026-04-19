@@ -117,6 +117,8 @@ class System:
             db_path=self.local_data_dir / "sql_db" / "agent.db",
             max_mental_state_entities=self.settings.system.max_mental_state_entities,
             ticks_limit=self.settings.system.context_depth.ticks,
+            detailed_ticks=self.settings.system.context_depth.detailed_ticks,
+            tick_action_max_chars=self.settings.system.context_depth.tick_action_max_chars,
             tick_result_max_chars=self.settings.system.context_depth.tick_result_max_chars,
             timezone=self.settings.system.timezone,
         )

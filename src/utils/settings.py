@@ -83,7 +83,9 @@ class VectorDBConfig(BaseModel):
 
 class ContextDepthConfig(BaseModel):
     ticks: int
-    tick_result_max_chars: int  # Лимит на размер результата тулза в контексте
+    detailed_ticks: int
+    tick_action_max_chars: int
+    tick_result_max_chars: int
 
 
 class EventAccelerationConfig(BaseModel):

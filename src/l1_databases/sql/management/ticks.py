@@ -1,3 +1,4 @@
+import re
 import json
 import uuid
 from typing import TYPE_CHECKING, Any
@@ -17,10 +18,18 @@ class SQLTicks:
     """
 
     def __init__(
-        self, db: "SQLDB", limit: int = 30, result_max_chars: int = 5000, tz_offset: int = 0
+        self,
+        db: "SQLDB",
+        limit: int = 15,
+        detailed_ticks: int = 2,
+        action_max_chars: int = 2000,
+        result_max_chars: int = 5000,
+        tz_offset: int = 0,
     ):
         self.db = db
-        self.limit = limit
+        self.ticks_limit = limit
+        self.detailed_ticks = detailed_ticks
+        self.action_max_chars = action_max_chars
         self.result_max_chars = result_max_chars
         self.tz_offset = tz_offset
 
@@ -57,7 +66,7 @@ class SQLTicks:
         Отдает отформатированный блок для контекста агента.
         """
 
-        ticks = await self.get_ticks(limit=self.limit)
+        ticks = await self.get_ticks(limit=self.ticks_limit)
 
         if not ticks:
             return "## RECENT TICKS\nНет предыдущих тиков."
@@ -66,64 +75,80 @@ class SQLTicks:
         total_ticks = len(ticks)
 
         for i, t in enumerate(ticks):
-            # Определяем, является ли этот тик самым последним (свежим)
-            is_last_tick = i == total_ticks - 1
+            # Проверяем, попадает ли тик в последние N детализированных
+            is_detailed = i >= total_ticks - self.detailed_ticks
 
             # ПАРСИНГ ДЕЙСТВИЙ
+            action_limit = self.action_max_chars if is_detailed else 150
             actions_list = []
-            if isinstance(t.actions, list):
-                for a in t.actions:
-                    if isinstance(a, dict):
-                        t_name = a.get("tool_name", "unknown")
-                        params = a.get("parameters", {})
-                        actions_list.append(
-                            f"`{t_name}`({json.dumps(params, ensure_ascii=False)})"
+
+            # Унифицируем к списку (защита от галлюцинаций LLM)
+            actions_raw = t.actions
+            if isinstance(actions_raw, dict):
+                actions_raw = [actions_raw]
+            elif not isinstance(actions_raw, list):
+                actions_raw = [actions_raw]
+
+            for a in actions_raw:
+                if isinstance(a, dict):
+                    t_name = a.get("tool_name", "unknown")
+                    params = a.get("parameters", {})
+                    act_str = f"`{t_name}`({json.dumps(params, ensure_ascii=False)})"
+                else:
+                    act_str = str(a)
+
+                # Обрезаем каждое действие индивидуально
+                if len(act_str) > action_limit:
+                    act_str = act_str[:action_limit] + " ...[Параметры обрезаны]"
+
+                actions_list.append(act_str)
+
+            actions_str = "\n".join(actions_list) if actions_list else "None"
+
+            # ПАРСИНГ РЕЗУЛЬТАТОВ
+            res_limit = self.result_max_chars if is_detailed else 150
+
+            if t.results and isinstance(t.results, dict) and "execution_report" in t.results:
+                raw_report = str(t.results["execution_report"])
+
+                # Разбиваем строку по маркеру "Action [...]: "
+                parts = re.split(r"(?=^Action \[[^\]]+\]: )", raw_report, flags=re.MULTILINE)
+
+                formatted_parts = []
+                for part in parts:
+                    part = part.strip()
+                    if not part:
+                        continue
+
+                    # Обрезаем каждый результат индивидуально
+                    if len(part) > res_limit:
+                        formatted_parts.append(
+                            part[:res_limit]
+                            + f"\n...[Результат обрезан. Лимит {res_limit} симв.]"
                         )
                     else:
-                        actions_list.append(str(a))
+                        formatted_parts.append(part)
 
-            elif isinstance(t.actions, dict):
-                t_name = t.actions.get("tool_name", "unknown")
-                params = t.actions.get("parameters", {})
-                actions_list.append(f"`{t_name}`({json.dumps(params, ensure_ascii=False)})")
-
-            else:
-                actions_list.append(str(t.actions))
-
-            actions_str = ", ".join(actions_list) if actions_list else "None"
-
-            # Динамическая обрезка действий: 1500 символов для последнего, 500 для истории
-
-            action_limit = 1500 if is_last_tick else 500
-            if len(actions_str) > action_limit:
-                actions_str = actions_str[:action_limit] + " ...[Параметры обрезаны]"
-
-            # Парсинг результатов
-            if t.results and isinstance(t.results, dict) and "execution_report" in t.results:
-                res_str = str(t.results["execution_report"])
+                res_str = "\n".join(formatted_parts)
 
             elif t.results:
                 res_str = json.dumps(t.results, ensure_ascii=False, indent=2)
-
+                if len(res_str) > res_limit:
+                    res_str = (
+                        res_str[:res_limit]
+                        + f"\n...[Результат обрезан. Лимит {res_limit} симв.]"
+                    )
             else:
                 res_str = "None"
 
-            # Динамическая обрезка результатов: лимит из конфига для последнего, 500 для истории
-            res_limit = self.result_max_chars if is_last_tick else 500
-            if len(res_str) > res_limit:
-                res_str = (
-                    res_str[:res_limit]
-                    + f"\n...[Результат обрезан. Превышен лимит истории в {res_limit} символов]"
-                )
-
-            # Форматирование времени через нашу новую утилиту
+            # Форматирование времени
             time_str = format_datetime(t.created_at, self.tz_offset)
             short_id = t.id[:8]
 
             blocks.append(
-                f"#### [Tick ID: {short_id}] ({time_str})\n"
+                f"####[Tick ID: {short_id}] ({time_str})\n"
                 f"*Thoughts*: {t.thoughts}\n"
-                f"*Actions*: {actions_str}\n"
+                f"*Actions*:\n{actions_str}\n"
                 f"*Result*:\n```\n{res_str}\n```"
             )
 
