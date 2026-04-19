@@ -101,7 +101,7 @@ class VectorKnowledge:
                 text = point.payload.get("text", "")
                 time_str = self._format_time(point.payload.get("created_at"))
 
-                md_block = f"[ID: `{point.id}`][Время: {time_str}] Релевантность: {score}/{self.similarity_threshold}\n{text}"
+                md_block = f"[ID: `{point.id}`] [Время: {time_str}] Релевантность: {score}/{self.similarity_threshold}\n{text}"
                 formatted_results.append(md_block)
 
             return SkillResult.ok("\n\n".join(formatted_results))
@@ -152,7 +152,7 @@ class VectorKnowledge:
                 text = point.payload.get("text", "")
                 time_str = self._format_time(point.payload.get("created_at"))
 
-                md_block = f"[ID: `{point.id}`][Время: {time_str}]\n{text}"
+                md_block = f"[ID: `{point.id}`] [Время: {time_str}]\n{text}"
                 formatted_results.append(md_block)
 
             return SkillResult.ok("\n\n".join(formatted_results))

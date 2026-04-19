@@ -8,9 +8,14 @@ from telethon.tl.functions.channels import (
     LeaveChannelRequest,
     GetFullChannelRequest,
     InviteToChannelRequest,
-    GetForumTopicsRequest,  # Добавлен импорт Raw API для работы с топиками
 )
 from telethon.tl.functions.messages import ImportChatInviteRequest
+
+# Безопасный импорт для поддержки старых версий Telethon
+try:
+    from telethon.tl.functions.channels import GetForumTopicsRequest
+except ImportError:
+    GetForumTopicsRequest = None
 
 from src.utils.logger import system_logger
 from src.utils.dtime import format_datetime
@@ -36,6 +41,12 @@ class TelethonChats:
 
     async def _get_topics(self, client: Any, entity: Any, limit: int = 100) -> list:
         """Хелпер: получает список топиков форума через Raw API Telethon."""
+        if not GetForumTopicsRequest:
+            system_logger.debug(
+                "[TelethonChats] GetForumTopicsRequest недоступен. Топики форумов игнорируются."
+            )
+            return []
+
         try:
             result = await client(
                 GetForumTopicsRequest(
@@ -49,6 +60,7 @@ class TelethonChats:
             )
             # Возвращаем список объектов ForumTopic
             return getattr(result, "topics", [])
+        
         except Exception as e:
             system_logger.error(f"[TelethonChats] Ошибка _get_topics: {e}")
             return []

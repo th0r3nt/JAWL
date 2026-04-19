@@ -60,7 +60,7 @@ class Heartbeat:
         time_str = get_now_formatted(self.timezone, fmt="%H:%M:%S")
         payload_str = ", ".join(f"{k}={v}" for k, v in payload.items()) if payload else "empty"
 
-        event_str = f"[{time_str}][{level.name}] {event_name} | Payload: {payload_str}"
+        event_str = f"[{time_str}] [{level.name}] {event_name} | Payload: {payload_str}"
 
         # Пробрасываем событие прямо в активный цикл, если агент сейчас думает
         if self._active_react_task and not self._active_react_task.done():
