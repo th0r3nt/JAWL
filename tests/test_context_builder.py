@@ -7,7 +7,7 @@ from src.l0_state.interfaces.state import (
     TelethonState,
     AiogramState,
     HostTerminalState,
-    WebState,
+    WebSearchState,
 )
 from src.l0_state.agent.state import AgentState
 from src.l3_agent.skills.registry import SkillResult
@@ -80,7 +80,7 @@ async def test_context_builder_build(mock_states, mock_dbs):
         telethon_state=telethon_state,
         aiogram_state=aiogram_state,
         terminal_state=terminal_state,
-        web_state=WebState(),
+        web_search_state=WebSearchState(),
         agent_state=agent_state,
         sql_ticks=sql_ticks,
         sql_tasks=sql_tasks,
@@ -134,7 +134,7 @@ async def test_build_rag_memories_regex(mock_states, mock_dbs):
         telethon_state=telethon_state,
         aiogram_state=aiogram_state,
         terminal_state=terminal_state,
-        web_state=MagicMock(),
+        web_search_state=MagicMock(),
         agent_state=agent_state,
         sql_ticks=sql_ticks,
         sql_tasks=sql_tasks,

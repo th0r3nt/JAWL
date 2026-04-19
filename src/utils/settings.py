@@ -38,10 +38,14 @@ class TelegramConfig(BaseModel):
     aiogram: AiogramConfig
 
 
-class WebConfig(BaseModel):
+class WebSearchConfig(BaseModel):
     enabled: bool
     request_timeout_sec: int
     max_page_chars: int
+
+
+class WebConfig(BaseModel):
+    search: WebSearchConfig
 
 
 class MetaConfig(BaseModel):

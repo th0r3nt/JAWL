@@ -4,17 +4,17 @@ from typing import Any
 
 from src.utils.logger import system_logger
 from src.l3_agent.skills.registry import skill, SkillResult
-from src.l2_interfaces.web.client import WebClient
+from src.l2_interfaces.web.search.client import WebClient
 
 
-class WebSearch:
+class DuckDuckGoSearch:
     """Навыки поиска информации в интернете (DuckDuckGo)."""
 
     def __init__(self, client: WebClient):
         self.client = client
 
     async def search_raw(self, query: str, max_results: int = 5) -> list[dict[str, Any]]:
-        """Сырой поиск. Вынесен отдельно для переиспользования в research.py."""
+        """Сырой поиск."""
 
         def _do_search():
             with DDGS() as ddgs:

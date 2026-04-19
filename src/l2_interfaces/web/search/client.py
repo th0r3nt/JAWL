@@ -1,4 +1,4 @@
-from src.l0_state.interfaces.state import WebState
+from src.l0_state.interfaces.state import WebSearchState
 
 
 class WebClient:
@@ -8,7 +8,7 @@ class WebClient:
     """
 
     def __init__(
-        self, state: WebState, request_timeout: int = 15, max_page_chars: int = 15000
+        self, state: WebSearchState, request_timeout: int = 15, max_page_chars: int = 15000
     ):
         self.state = state
         self.timeout = request_timeout

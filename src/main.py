@@ -25,7 +25,7 @@ from src.l0_state.interfaces.state import (
     HostTerminalState,
     TelethonState,
     AiogramState,
-    WebState,
+    WebSearchState,
 )
 
 # ==========================================
@@ -39,42 +39,7 @@ from src.l1_databases.sql.manager import SQLManager
 # L2 Interfaces
 # ==========================================
 
-# Host OS
-from src.l2_interfaces.host.os.client import HostOSClient
-from src.l2_interfaces.host.os.events import HostOSEvents
-from src.l2_interfaces.host.os.skills.execution import HostOSExecution
-from src.l2_interfaces.host.os.skills.files import HostOSFiles
-from src.l2_interfaces.host.os.skills.network import HostOSNetwork
-from src.l2_interfaces.host.os.skills.system import HostOSSystem
-from src.l2_interfaces.host.os.skills.monitoring import HostOSMonitoring
-
-# Meta
-from src.l2_interfaces.meta.client import MetaClient
-from src.l2_interfaces.meta.skills.configuration import MetaConfiguration
-from src.l2_interfaces.meta.skills.system import MetaSystem
-
-# Telethon
-from src.l2_interfaces.telegram.telethon.client import TelethonClient
-from src.l2_interfaces.telegram.telethon.events import TelethonEvents
-from src.l2_interfaces.telegram.telethon.skills.account import TelethonAccount
-from src.l2_interfaces.telegram.telethon.skills.chats import TelethonChats
-from src.l2_interfaces.telegram.telethon.skills.messages import TelethonMessages
-from src.l2_interfaces.telegram.telethon.skills.moderation import TelethonModeration
-from src.l2_interfaces.telegram.telethon.skills.polls import TelethonPolls
-from src.l2_interfaces.telegram.telethon.skills.reactions import TelethonReactions
-
-# Aiogram
-from src.l2_interfaces.telegram.aiogram.client import AiogramClient
-from src.l2_interfaces.telegram.aiogram.events import AiogramEvents
-from src.l2_interfaces.telegram.aiogram.skills.chats import AiogramChats
-from src.l2_interfaces.telegram.aiogram.skills.messages import AiogramMessages
-from src.l2_interfaces.telegram.aiogram.skills.moderation import AiogramModeration
-
-# Web
-from src.l2_interfaces.web.client import WebClient
-from src.l2_interfaces.web.skills.search import WebSearch
-from src.l2_interfaces.web.skills.webpages import WebPages
-from src.l2_interfaces.web.skills.research import WebResearch
+from src.l2_interfaces.initializer import initialize_l2_interfaces
 
 # ==========================================
 # L3 Agent
@@ -109,8 +74,10 @@ class System:
         self.root_dir = Path.cwd()
         self.local_data_dir = self.root_dir / "src" / "utils" / "local" / "data"
 
-        # Хранилище компонентов, у которых есть методы start() и stop()
+        # Хранилище компонентов, которые нужно запустить (например, поллинг Telethon)
         self._lifecycle_components: list[Any] = []
+
+        # Возвращает в конце работы
         self._exit_code: int = 0  # 0 - выключение, 1 - перезагрузка
 
         # Заглушки для безопасного вызова stop() при раннем падении
@@ -120,7 +87,8 @@ class System:
         self.llm_client: Optional[LLMClient] = None
 
     def setup_l0_state(self):
-        """Создает стейты. Создаем все, даже если интерфейс выключен (во избежание NoneType)."""
+        """Создает стейты. Создает все, даже если интерфейс выключен (во избежание NoneType)."""
+
         system_logger.info("[System] Инициализация L0 State.")
 
         self.agent_state = AgentState(
@@ -133,10 +101,11 @@ class System:
         self.terminal_state = HostTerminalState()
         self.telethon_state = TelethonState()
         self.aiogram_state = AiogramState()
-        self.web_state = WebState()
+        self.web_search_state = WebSearchState()
 
     async def setup_l1_databases(self):
         """Поднимает базы данных и регистрирует их CRUD-скиллы."""
+
         system_logger.info("[System] Инициализация L1 Databases.")
 
         # SQL DB
@@ -146,6 +115,7 @@ class System:
         )
         await self.sql.connect()
 
+        # Регистрация навыков для агента
         register_instance(self.sql.tasks)
         register_instance(self.sql.personality_traits)
         register_instance(self.sql.mental_states)
@@ -174,122 +144,15 @@ class System:
 
         system_logger.info("[System] Инициализация L2 Interfaces.")
 
-        # HOST OS
-        if self.interfaces_config.host.os.enabled:
-            os_client = HostOSClient(
-                base_dir=self.root_dir,
-                config=self.interfaces_config.host.os,
-                state=self.os_state,
-                timezone=self.settings.system.timezone,
-            )
-            os_events = HostOSEvents(
-                host_os_client=os_client, state=self.os_state, event_bus=self.event_bus
-            )
+        env_vars = {
+            "TELETHON_API_ID": telethon_api_id,
+            "TELETHON_API_HASH": telethon_api_hash,
+            "AIOGRAM_BOT_TOKEN": aiogram_bot_token,
+        }
 
-            # Регистрация навыков для агента
-            register_instance(HostOSExecution(os_client))
-            register_instance(HostOSFiles(os_client))
-            register_instance(HostOSNetwork(os_client))
-            register_instance(HostOSSystem(os_client))
-            register_instance(HostOSMonitoring(os_client, os_events))
-
-            self._lifecycle_components.append(os_events)
-            system_logger.info("[System] Интерфейс Host OS загружен.")
-
-        # META
-        if (
-            getattr(self.interfaces_config, "meta", None)
-            and self.interfaces_config.meta.enabled
-        ):
-            settings_path = self.root_dir / "config" / "settings.yaml"
-            meta_client = MetaClient(self.agent_state, self.event_bus, settings_path)
-
-            # Регистрация навыков для агента
-            register_instance(MetaConfiguration(meta_client))
-            register_instance(MetaSystem(meta_client))
-
-            system_logger.info("[System]  Интерфейс Meta загружен.")
-
-        # TELEGRAM: TELETHON
-        if self.interfaces_config.telegram.telethon.enabled:
-
-            if not telethon_api_id or not telethon_api_hash:
-                system_logger.error(
-                    "[System] TELETHON_API_ID или TELETHON_API_HASH не найдены в .env. Telethon отключен."
-                )
-            else:
-                session_path = str(
-                    self.local_data_dir
-                    / "telethon"
-                    / self.interfaces_config.telegram.telethon.session_name
-                )
-                tel_client = TelethonClient(
-                    state=self.telethon_state,
-                    api_id=telethon_api_id,
-                    api_hash=telethon_api_hash,
-                    session_path=session_path,
-                    timezone=self.settings.system.timezone,
-                )
-                tel_events = TelethonEvents(
-                    tg_client=tel_client, state=self.telethon_state, event_bus=self.event_bus
-                )
-
-                # Регистрация навыков для агента
-                register_instance(TelethonAccount(tel_client))
-                register_instance(TelethonChats(tel_client))
-                register_instance(TelethonMessages(tel_client))
-                register_instance(TelethonModeration(tel_client))
-                register_instance(TelethonPolls(tel_client))
-                register_instance(TelethonReactions(tel_client))
-
-                self._lifecycle_components.extend([tel_client, tel_events])
-                system_logger.info("[System] Интерфейс Telethon загружен.")
-
-        # TELEGRAM: AIOGRAM
-        if self.interfaces_config.telegram.aiogram.enabled:
-            if not aiogram_bot_token:
-                system_logger.error(
-                    "[System] AIOGRAM_BOT_TOKEN не найден в .env. Aiogram отключен."
-                )
-            else:
-                aio_client = AiogramClient(
-                    bot_token=aiogram_bot_token, state=self.aiogram_state
-                )
-                aio_events = AiogramEvents(
-                    aiogram_client=aio_client,
-                    state=self.aiogram_state,
-                    event_bus=self.event_bus,
-                )
-
-                # Регистрация навыков для агента
-                register_instance(AiogramChats(aio_client, self.aiogram_state))
-                register_instance(AiogramMessages(aio_client))
-                register_instance(AiogramModeration(aio_client))
-
-                self._lifecycle_components.extend([aio_client, aio_events])
-                system_logger.info("[System] Интерфейс Aiogram загружен.")
-
-        # WEB
-        if self.interfaces_config.web.enabled:
-            web_config = self.interfaces_config.web
-            web_client = WebClient(
-                state=self.web_state,
-                request_timeout=web_config.request_timeout_sec,
-                max_page_chars=web_config.max_page_chars,
-            )
-
-            web_search = WebSearch(client=web_client)
-            web_pages = WebPages(client=web_client)
-            web_research = WebResearch(
-                client=web_client, search_skill=web_search, pages_skill=web_pages
-            )
-
-            # Регистрация навыков для агента
-            register_instance(web_search)
-            register_instance(web_pages)
-            register_instance(web_research)
-
-            system_logger.info("[System] Web интерфейс загружен.")
+        # Вся магия сборки интерфейсов скрыта здесь
+        components = initialize_l2_interfaces(self, env_vars)
+        self._lifecycle_components.extend(components)
 
     def setup_l3_agent(self, llm_api_url: str, llm_api_keys: list[str]):
         """Сборка мозга агента."""
@@ -310,7 +173,7 @@ class System:
             aiogram_state=self.aiogram_state,
             terminal_state=self.terminal_state,
             agent_state=self.agent_state,
-            web_state=self.web_state,
+            web_search_state=self.web_search_state,
             # SQL
             sql_ticks=self.sql.ticks,
             sql_tasks=self.sql.tasks,
@@ -452,14 +315,13 @@ class System:
                     f"[System] Ошибка при остановке {component.__class__.__name__}: {e}"
                 )
 
+        # Отрубаем всё к чертям
         if self.vector:
             await self.vector.disconnect()
         if self.sql:
             await self.sql.disconnect()
-
         if self.event_bus:
             await self.event_bus.stop()
-
         if self.llm_client:
             await self.llm_client.close()
 

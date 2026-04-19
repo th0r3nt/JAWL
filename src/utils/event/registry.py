@@ -121,14 +121,14 @@ class Events:
     SYSTEM_CORE_START = EventConfig(
         name="SYSTEM_CORE_START",
         description="Запуск всей системы.",
-        level=EventLevel.HIGH,
+        level=EventLevel.CRITICAL,
         requires_attention=True,
     )
 
     SYSTEM_CORE_STOP = EventConfig(
         name="SYSTEM_CORE_STOP",
         description="Отключение всей системы.",
-        level=EventLevel.HIGH,
+        level=EventLevel.CRITICAL,
         requires_attention=False,
     )
 
@@ -149,14 +149,14 @@ class Events:
     SYSTEM_SHUTDOWN_REQUESTED = EventConfig(
         name="SYSTEM_SHUTDOWN_REQUESTED",
         description="Агент запросил полное выключение системы.",
-        level=EventLevel.HIGH,
+        level=EventLevel.CRITICAL,
         requires_attention=False,
     )
 
     SYSTEM_REBOOT_REQUESTED = EventConfig(
         name="SYSTEM_REBOOT_REQUESTED",
         description="Агент запросил перезагрузку системы.",
-        level=EventLevel.HIGH,
+        level=EventLevel.CRITICAL,
         requires_attention=False,
     )
 

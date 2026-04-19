@@ -3,7 +3,7 @@ from src.l0_state.interfaces.state import (
     AiogramState,
     HostOSState,
     HostTerminalState,
-    WebState,
+    WebSearchState,
 )
 
 
@@ -32,9 +32,9 @@ def test_host_terminal_state_init():
     assert state.messages == ""
 
 
-def test_web_state_mru():
-    """Тест: WebState вытесняет старые записи при превышении лимита (MRU Cache)."""
-    state = WebState(history_limit=2)
+def test_web_search_state_mru():
+    """Тест: WebSearchState вытесняет старые записи при превышении лимита (MRU Cache)."""
+    state = WebSearchState(history_limit=2)
 
     state.add_history("site_A")
     state.add_history("site_B")

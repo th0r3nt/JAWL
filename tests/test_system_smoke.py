@@ -69,7 +69,7 @@ async def test_system_di_assembly_smoke(
         system.setup_l3_agent(llm_api_url="http://test", llm_api_keys=["key1"])
 
         assert system.agent_state is not None
-        assert system.web_state is not None
+        assert system.web_search_state is not None
         assert system.llm_client is not None
         assert system.heartbeat is not None
 

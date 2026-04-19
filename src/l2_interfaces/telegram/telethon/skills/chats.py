@@ -1,6 +1,6 @@
 import re
 from datetime import timezone, timedelta
-from typing import Optional
+from typing import Optional, Union
 
 from telethon import utils
 from telethon.tl.functions.contacts import SearchRequest
@@ -8,6 +8,7 @@ from telethon.tl.functions.channels import (
     JoinChannelRequest,
     LeaveChannelRequest,
     GetFullChannelRequest,
+    InviteToChannelRequest,
 )
 from telethon.tl.functions.messages import ImportChatInviteRequest
 
@@ -18,16 +19,22 @@ from src.utils.logger import system_logger
 
 class TelethonChats:
     """
-    Навыки для работы со списком чатов и чтения сообщений.
+    Навыки для работы со списком чатов, чтения сообщений и управления участием.
     """
 
     def __init__(self, tg_client: TelethonClient):
         self.tg_client = tg_client
 
+    def _parse_entity(self, entity_id: Union[int, str]) -> Union[int, str]:
+        """Утилитный метод для преобразования строковых ID в числа."""
+        try:
+            return int(entity_id)
+        except ValueError:
+            return str(entity_id).strip()
+
     @skill()
     async def get_chats(self, limit: int = 10) -> SkillResult:
         """Возвращает список последних чатов (пользователи, группы, каналы). Если это форум, возвращает топики."""
-
         try:
             client = self.tg_client.client()
             chats = []
@@ -37,7 +44,7 @@ class TelethonChats:
                     "User" if dialog.is_user else "Group" if dialog.is_group else "Channel"
                 )
                 unread = (
-                    f" [Непрочитанных: {dialog.unread_count}]"
+                    f"[Непрочитанных: {dialog.unread_count}]"
                     if dialog.unread_count > 0
                     else ""
                 )
@@ -49,7 +56,6 @@ class TelethonChats:
                     chat_type = "Forum"
                     topics = []
                     try:
-                        # Получаем последние 10 топиков форума
                         async for topic in client.iter_forum_topics(dialog.entity, limit=10):
                             t_unread = (
                                 f" ({topic.unread_count} непр.)"
@@ -80,12 +86,10 @@ class TelethonChats:
     @skill()
     async def get_unread_chats(self) -> SkillResult:
         """Возвращает список чатов, в которых есть непрочитанные сообщения (включая топики форумов)."""
-
         try:
             client = self.tg_client.client()
             chats = []
 
-            # Ограничиваем скан первыми 50 диалогами, чтобы не нагружать API
             async for dialog in client.iter_dialogs(limit=50):
                 if dialog.unread_count > 0:
                     chat_type = (
@@ -99,7 +103,6 @@ class TelethonChats:
                         chat_type = "Forum"
                         topics = []
                         try:
-                            # В форумах выводим только те топики, где реально есть непрочитанные
                             async for topic in client.iter_forum_topics(dialog.entity):
                                 unread = getattr(topic, "unread_count", 0)
                                 if unread > 0:
@@ -126,16 +129,15 @@ class TelethonChats:
 
     @skill()
     async def read_chat(
-        self, chat_id: int, limit: int = 10, topic_id: Optional[int] = None
+        self, chat_id: Union[int, str], limit: int = 10, topic_id: Optional[int] = None
     ) -> SkillResult:
         """
         Читает историю указанного чата.
         Если чат является форумом, следует передать topic_id, чтобы прочитать конкретный топик.
         """
-
         try:
             client = self.tg_client.client()
-            target_entity = await client.get_entity(int(chat_id))
+            target_entity = await client.get_entity(self._parse_entity(chat_id))
 
             try:
                 await client.send_read_acknowledge(target_entity)
@@ -143,14 +145,11 @@ class TelethonChats:
                 pass
 
             messages = []
-
-            # Поддержка топиков (для Telethon топик — это просто reply_to_msg_id корневого сообщения)
             kwargs = {"limit": limit}
             if topic_id:
                 kwargs["reply_to"] = int(topic_id)
 
             async for msg in client.iter_messages(target_entity, **kwargs):
-                # 1. Отправитель
                 sender_name = "Unknown"
                 if msg.sender:
                     name = utils.get_display_name(msg.sender)
@@ -158,7 +157,6 @@ class TelethonChats:
                 elif msg.sender_id:
                     sender_name = f"Unknown (ID: {msg.sender_id})"
 
-                # 2. Формирование контента
                 content_parts = []
                 if msg.action:
                     content_parts.append("[Системное сообщение]")
@@ -186,13 +184,11 @@ class TelethonChats:
 
                 final_text = " ".join(content_parts) if content_parts else "[Пустое сообщение]"
 
-                # Обработка Reply (Ответов)
                 reply_context = ""
                 is_actual_reply = msg.is_reply and msg.reply_to_msg_id
                 if is_actual_reply and str(msg.reply_to_msg_id) != str(topic_id):
                     try:
                         orig_msg = await msg.get_reply_message()
-
                         orig_sender = "Unknown"
                         if orig_msg and orig_msg.sender:
                             orig_name = utils.get_display_name(orig_msg.sender)
@@ -210,7 +206,6 @@ class TelethonChats:
                             f"\n  ↳ (В ответ на сообщение ID {msg.reply_to_msg_id})"
                         )
 
-                # 4. Сборка итоговой строки
                 tz = timezone(timedelta(hours=self.tg_client.timezone))
                 time_str = msg.date.astimezone(tz).strftime("%Y-%m-%d %H:%M")
                 messages.append(
@@ -224,23 +219,20 @@ class TelethonChats:
                     )
                 return SkillResult.ok("В этом чате нет сообщений.")
 
-            # Разворачиваем, чтобы диалог читался сверху вниз (старые -> новые)
             messages.reverse()
             return SkillResult.ok("\n\n".join(messages))
 
         except ValueError:
             return SkillResult.fail(f"Ошибка: Некорректный ID чата ({chat_id}).")
-
         except Exception as e:
             return SkillResult.fail(f"Ошибка при чтении чата {chat_id}: {e}")
 
     @skill()
-    async def mark_as_read(self, chat_id: int) -> SkillResult:
+    async def mark_as_read(self, chat_id: Union[int, str]) -> SkillResult:
         """Помечает все сообщения в чате как прочитанные."""
-
         try:
             client = self.tg_client.client()
-            target_entity = await client.get_entity(int(chat_id))
+            target_entity = await client.get_entity(self._parse_entity(chat_id))
             await client.send_read_acknowledge(target_entity)
             return SkillResult.ok(f"Чат {chat_id} успешно помечен как прочитанный.")
         except Exception as e:
@@ -249,7 +241,6 @@ class TelethonChats:
     @skill()
     async def search_public_chats(self, query: str, limit: int = 5) -> SkillResult:
         """Ищет публичные группы и каналы в глобальном поиске Telegram по запросу."""
-
         try:
             client = self.tg_client.client()
             result = await client(SearchRequest(q=query, limit=limit))
@@ -269,7 +260,6 @@ class TelethonChats:
     @skill()
     async def join_chat(self, link_or_username: str) -> SkillResult:
         """Вступает в канал или группу по юзернейму или ссылке."""
-
         try:
             client = self.tg_client.client()
             target = link_or_username.strip()
@@ -284,38 +274,34 @@ class TelethonChats:
             else:
                 await client(JoinChannelRequest(target))
 
-            system_logger.info(f"Агент вступил в чат: {target}")
+            system_logger.info(f"[Telegram Telethon] Агент вступил в чат: {target}")
             return SkillResult.ok(f"Успешно вступили в чат: {target}")
         except Exception as e:
             msg = str(e)
-            if "UserAlreadyParticipant" in msg or "USER_ALREADY_PARTICIPANT" in msg:
+            if "USER_ALREADY_PARTICIPANT" in msg:
                 return SkillResult.ok(f"Вы уже состоите в этом чате ({target}).")
             return SkillResult.fail(f"Ошибка при вступлении в чат: {e}")
 
     @skill()
-    async def leave_chat(self, chat_id: int) -> SkillResult:
-        """Покидает канал или группу по её числовому ID."""
-
+    async def leave_chat(self, chat_id: Union[int, str]) -> SkillResult:
+        """Покидает канал или группу."""
         try:
             client = self.tg_client.client()
-            entity = await client.get_input_entity(int(chat_id))
+            entity = await client.get_input_entity(self._parse_entity(chat_id))
             await client(LeaveChannelRequest(entity))
-            system_logger.info(f"Агент покинул чат: {chat_id}")
+            system_logger.info(f"[Telegram Telethon] Агент покинул чат: {chat_id}")
             return SkillResult.ok(f"Успешно покинули чат {chat_id}.")
         except ValueError:
-            return SkillResult.fail(
-                "Ошибка: Некорректный ID чата. Убедитесь, что передаете число."
-            )
+            return SkillResult.fail("Ошибка: Некорректный формат ID чата.")
         except Exception as e:
             return SkillResult.fail(f"Ошибка при выходе из чата: {e}")
 
     @skill()
-    async def join_channel_discussion(self, channel_id: int) -> SkillResult:
+    async def join_channel_discussion(self, channel_id: Union[int, str]) -> SkillResult:
         """Узнает ID привязанной группы для комментариев у канала и вступает в нее."""
-
         try:
             client = self.tg_client.client()
-            target_entity = await client.get_input_entity(int(channel_id))
+            target_entity = await client.get_input_entity(self._parse_entity(channel_id))
             full_channel = await client(GetFullChannelRequest(target_entity))
             linked_chat_id = full_channel.full_chat.linked_chat_id
 
@@ -331,7 +317,6 @@ class TelethonChats:
             return SkillResult.ok(
                 f"Успешное вступление в группу обсуждений (ID: {linked_chat_id})."
             )
-
         except ValueError:
             return SkillResult.fail("Ошибка: Некорректный ID канала.")
 
@@ -339,3 +324,56 @@ class TelethonChats:
             if "USER_ALREADY_PARTICIPANT" in str(e):
                 return SkillResult.ok("Вы уже состоите в группе обсуждений этого канала.")
             return SkillResult.fail(f"Ошибка при вступлении в обсуждение: {e}")
+
+    @skill()
+    async def invite_to_chat(
+        self, chat_id: Union[int, str], users: list[Union[int, str]]
+    ) -> SkillResult:
+        """
+        Приглашает одного или нескольких пользователей в группу или канал.
+        users: Список из числовых ID или юзернеймов (@username).
+        """
+        if not users:
+            return SkillResult.fail("Ошибка: Список пользователей пуст.")
+
+        try:
+            client = self.tg_client.client()
+            chat_entity = await client.get_input_entity(self._parse_entity(chat_id))
+
+            user_entities = []
+            for u in users:
+                try:
+                    user_entities.append(await client.get_input_entity(self._parse_entity(u)))
+                except ValueError:
+                    return SkillResult.fail(
+                        f"Ошибка: Пользователь '{u}' не найден. Проверьте правильность юзернейма."
+                    )
+
+            await client(InviteToChannelRequest(channel=chat_entity, users=user_entities))
+
+            system_logger.info(
+                f"[Telegram Telethon] Пользователи {users} приглашены в чат {chat_id}"
+            )
+            return SkillResult.ok(f"Успешно. Пользователи {users} приглашены в чат {chat_id}.")
+
+        except Exception as e:
+            msg = str(e)
+            if "USER_PRIVACY_RESTRICTED" in msg:
+                return SkillResult.fail(
+                    "Ошибка: Настройки приватности ограничивают добавление кого-то из списка."
+                )
+
+            if "CHAT_ADMIN_REQUIRED" in msg:
+                return SkillResult.fail("Ошибка: Нет прав на приглашение в этот чат.")
+
+            if "USER_ALREADY_PARTICIPANT" in msg:
+                return SkillResult.ok(
+                    "Запрос выполнен, некоторые (или все) пользователи уже состоят в чате."
+                )
+
+            if "USER_NOT_MUTUAL_CONTACT" in msg:
+                return SkillResult.fail(
+                    "Ошибка: Пользователя можно пригласить только если вы взаимные контакты."
+                )
+
+            return SkillResult.fail(f"Ошибка при инвайтинге: {e}")

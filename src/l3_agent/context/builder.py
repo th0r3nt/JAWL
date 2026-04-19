@@ -16,7 +16,7 @@ if TYPE_CHECKING:
         TelethonState,
         AiogramState,
         HostTerminalState,
-        WebState,
+        WebSearchState,
     )
     from src.l0_state.agent.state import AgentState
 
@@ -43,7 +43,7 @@ class ContextBuilder:
         telethon_state: "TelethonState",
         aiogram_state: "AiogramState",
         terminal_state: "HostTerminalState",
-        web_state: "WebState",
+        web_search_state: "WebSearchState",
         agent_state: "AgentState",
         # SQL
         sql_ticks: "SQLTicks",
@@ -65,7 +65,7 @@ class ContextBuilder:
         self.aiogram_state = aiogram_state
         self.terminal_state = terminal_state
         self.agent_state = agent_state
-        self.web_state = web_state
+        self.web_search_state = web_search_state
 
         # SQL
         self.sql_ticks = sql_ticks
@@ -122,7 +122,7 @@ class ContextBuilder:
             f"## PERSONALITY TRAITS \n{personality_traits}",
             f"## SKILLS \n{skills}",
             f"## TASKS \n{tasks}",
-            f"## MENTAL STATES \nMax number of entities that can be remembered: {self.sql_mental_states.max_entities} \n{mental_states}",
+            f"## MENTAL STATES \nMax number of entities that can be remembered: \n{self.sql_mental_states.max_entities} \n{mental_states}",
             f"## STATE \n{state}",
         ]
 
@@ -245,12 +245,13 @@ class ContextBuilder:
         if not read_chat_func:
             return ""
 
+        limit = 15
         history_blocks = []
         for chat_id in chat_ids:
             try:
-                res = await read_chat_func(chat_id=chat_id, limit=15)
+                res = await read_chat_func(chat_id=chat_id, limit=limit)
                 if res.is_success:
-                    history_blocks.append(f"### История чата ID: {chat_id}\n{res.message}")
+                    history_blocks.append(f"### История чата ID: {chat_id} \n[Последние {limit} сообщений] \n{res.message}")
             except Exception:
                 pass
 
@@ -271,7 +272,7 @@ class ContextBuilder:
         os_status = "ON" if self.host_os_state.is_online else "OFF"
         tel_status = "ON" if self.telethon_state.is_online else "OFF"
         aio_status = "ON" if self.aiogram_state.is_online else "OFF"
-        web_status = "ON" if self.web_state.is_online else "OFF"
+        web_status = "ON" if self.web_search_state.is_online else "OFF"
 
         # Читаем статус Meta интерфейса напрямую из конфига
         meta_enabled = (
@@ -291,7 +292,7 @@ class ContextBuilder:
             self.aiogram_state.last_chats if aio_status == "ON" else "Интерфейс отключен."
         )
         web_data = (
-            self.web_state.browser_history if web_status == "ON" else "Интерфейс отключен."
+            self.web_search_state.browser_history if web_status == "ON" else "Интерфейс отключен."
         )
         meta_data = (
             "Навыки изменения конфигурации в рантайме доступны."
@@ -341,7 +342,7 @@ class ContextBuilder:
             return "Нет предыдущих тиков."
 
         blocks = []
-        history_max_chars = 1500
+        history_max_chars = 800
 
         for t in ticks:
             actions_list = []

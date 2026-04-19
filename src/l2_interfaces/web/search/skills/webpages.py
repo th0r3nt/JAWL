@@ -3,7 +3,7 @@ import trafilatura
 
 from src.utils.logger import system_logger
 from src.l3_agent.skills.registry import skill, SkillResult
-from src.l2_interfaces.web.client import WebClient
+from src.l2_interfaces.web.search.client import WebClient
 
 
 class WebPages:
