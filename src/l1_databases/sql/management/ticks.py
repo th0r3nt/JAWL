@@ -146,7 +146,7 @@ class SQLTicks:
             short_id = t.id[:8]
 
             blocks.append(
-                f"####[Tick ID: {short_id}] ({time_str})\n"
+                f"#### [Tick ID: {short_id}] ({time_str})\n"
                 f"*Thoughts*: {t.thoughts}\n"
                 f"*Actions*:\n{actions_str}\n"
                 f"*Result*:\n```\n{res_str}\n```"

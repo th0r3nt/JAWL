@@ -20,7 +20,7 @@ class APIKeyRotator:
         self._current_index: int = 0
 
         system_logger.info(
-            f"[System] APIKeyRotator инициализирован. Ключей в пуле: {len(self.keys)}."
+            f"[LLM] APIKeyRotator инициализирован. Ключей в пуле: {len(self.keys)}."
         )
 
     def get_next_key(self) -> str:

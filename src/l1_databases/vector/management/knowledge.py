@@ -58,7 +58,7 @@ class VectorKnowledge:
             )
 
             msg = f"[Vector DB] Знание успешно сохранено в базе данных (ID: {point_id})."
-            system_logger.info(msg)
+            # system_logger.info(msg) # Видно в Agent Action Result
             return SkillResult.ok(msg)
 
         except Exception as e:

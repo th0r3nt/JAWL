@@ -51,9 +51,8 @@ class MetaConfiguration:
         """Изменяет интервал между пробуждениями агента (в секундах)."""
 
         success = await self.client.update_setting(
-            ["system", "heartbeat_interval"],
-            interval_sec,
-            f"Интервал Heartbeat изменен на {interval_sec} сек",
+            path_keys=["system", "heartbeat_interval"],
+            new_value=interval_sec,
         )
         if not success:
             return SkillResult.fail("Ошибка при сохранении конфигурации.")
@@ -65,5 +64,5 @@ class MetaConfiguration:
             Events.SYSTEM_CONFIG_UPDATED, key="heartbeat_interval", value=interval_sec
         )
         return SkillResult.ok(
-            f"Интервал изменен на {interval_sec} сек. Изменение вступит в силу незамедлительно."
+            f"Интервал изменен на {interval_sec} сек."
         )

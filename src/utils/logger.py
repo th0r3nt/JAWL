@@ -28,25 +28,28 @@ class LogColors:
 class ColorFormatter(logging.Formatter):
     # Порядок имеет значение: более специфичные теги лучше держать выше
     PREFIX_COLORS = {
-        "[Thoughts]": LogColors.BRIGHT_YELLOW,
-        "[Agent Action]": LogColors.BRIGHT_MAGENTA,
-        "[Agent Action Result]": LogColors.GRAY,
-        "[ReAct]": LogColors.BRIGHT_CYAN,
-        
-        "[LLM]": LogColors.BRIGHT_BLUE,
-        "[Web]": LogColors.CYAN,
-        "[Host OS]": LogColors.BRIGHT_GREEN,
-        "[Telegram Telethon]": LogColors.BRIGHT_BLUE,
-        "[Telegram Aiogram]": LogColors.BLUE,
-        
-        "[SQL DB]": LogColors.YELLOW,
-        "[Vector DB]": LogColors.BRIGHT_YELLOW,
-        "[EventBus]": LogColors.MAGENTA,
-        
-        "[System]": LogColors.BRIGHT_WHITE,
+        # === Жизненный цикл и Логика (Агент) ===
+        "[Heartbeat]": LogColors.BRIGHT_MAGENTA,  # Пульс системы (сердцебиение)
+        "[ReAct]": LogColors.BRIGHT_CYAN,  # Основной цикл мышления
+        "[Thoughts]": LogColors.BRIGHT_YELLOW,  # Внутренний монолог агента
+        "[Agent Action]": LogColors.BRIGHT_GREEN,  # Вызов инструмента (успешный старт)
+        "[Agent Action Result]": LogColors.GRAY,  # Результаты функций (приглушаем, чтобы не отвлекали)
+        # === Внешние интерфейсы (L2) ===
+        "[LLM]": LogColors.BRIGHT_BLUE,  # Запросы к API нейросетей
+        "[Host OS]": LogColors.GREEN,  # Терминал, ОС, Файлы (Хакерский вайб)
+        "[Web]": LogColors.MAGENTA,  # Поиск в интернете и парсинг
+        "[Telegram Telethon]": LogColors.CYAN,  # Telegram User-API (Юзербот)
+        "[Telegram Aiogram]": LogColors.BLUE,  # Telegram Bot-API (Классический бот)
+        "[Meta]": LogColors.WHITE,  # Управление конфигурацией в рантайме
+        # === Хранилища (L1) ===
+        "[SQL DB]": LogColors.YELLOW,  # Традиционная база данных
+        "[Vector DB]": LogColors.BRIGHT_WHITE,  # Семантическая память (векторы)
+        # === Ядро и Системные шины ===
+        "[EventBus]": LogColors.GRAY,  # Шина событий (фоновый роутинг, тоже приглушаем)
+        "[System]": LogColors.BRIGHT_WHITE,  # Системные уведомления (старт/стоп оркестратора)
     }
 
-    def __init__(self, fmt=None, datefmt=None, max_console_length=500):
+    def __init__(self, fmt=None, datefmt=None, max_console_length=800):
         super().__init__(fmt=fmt, datefmt=datefmt)
         self.max_console_length = max_console_length
 
@@ -56,30 +59,34 @@ class ColorFormatter(logging.Formatter):
         try:
             msg_str = str(original_msg)
 
-            # Временно обрезаем сообщение для терминала, если это огромный вывод тулзы
-            if "[Agent Action Result]" in msg_str and len(msg_str) > self.max_console_length:
+            # Универсальная защита консоли от гигантских простыней текста.
+            # Теперь режет не только Action Result, а вообще любой огромный вывод.
+            if len(msg_str) > self.max_console_length:
                 record.msg = (
                     msg_str[: self.max_console_length]
-                    + "\n...[Вывод обрезан для консоли. Оригинал сохранен в system.log]"
+                    + f"\n{LogColors.GRAY}...[Вывод обрезан для терминала. Полный дамп сохранен в system.log]{LogColors.RESET}"
                 )
 
             log_message = super().format(record)
 
+            # Жесткий перехват для ошибок и предупреждений (они важнее любых префиксов)
             if record.levelno >= logging.ERROR:
                 return f"{LogColors.BRIGHT_RED}{log_message}{LogColors.RESET}"
 
             if record.levelno == logging.WARNING:
                 return f"{LogColors.BRIGHT_YELLOW}{log_message}{LogColors.RESET}"
 
-            # Проверяем оригинальный текст сообщения, чтобы найти префикс для раскраски
+            # Применение цветовой палитры по префиксам
             for prefix, color in self.PREFIX_COLORS.items():
                 if prefix in msg_str:
                     return f"{color}{log_message}{LogColors.RESET}"
 
+            # Фолбек для сообщений без префикса
             return log_message
+
         finally:
             # ОБЯЗАТЕЛЬНО возвращаем оригинальное сообщение обратно в объект Record.
-            # Благодаря этому FileHandler (который пишет в файл system.log) запишет его целиком без обрезки
+            # Благодаря этому FileHandler (который пишет в файл) сохранит строку целиком без ANSI-кодов и обрезки.
             record.msg = original_msg
 
 

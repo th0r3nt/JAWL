@@ -32,7 +32,7 @@ class ReactLoop:
         sql_ticks: SQLTicks,
         token_tracker: TokenTracker,
         tools: list,  # ACTION SCHEMA
-        cooldown_sec: int = 30
+        cooldown_sec: int = 30,
     ):
         self.llm = llm_client
         self.prompt_builder = prompt_builder
@@ -41,7 +41,9 @@ class ReactLoop:
         self.sql_ticks = sql_ticks
         self.tracker = token_tracker
         self.tools = tools
-        self.cooldown_sec = cooldown_sec # Если API ключ ллмки уйдет в минутный RateLimit - он отдыхает n сек
+        self.cooldown_sec = (
+            cooldown_sec  # Если API ключ ллмки уйдет в минутный RateLimit - он отдыхает n сек
+        )
 
     def _dump_context_to_file(self, messages: list):
         """
@@ -69,23 +71,30 @@ class ReactLoop:
         try:
             self.agent_state.reset_step()
             system_logger.info(
-                f"[Thoughts] ReAct-цикл инициирован. Причина: {event_name} (LLM Model: {self.agent_state.llm_model})."
+                f"[ReAct] Цикл инициирован. Причина: {event_name} (LLM Model: {self.agent_state.llm_model})."
             )
 
+            # Системный промпт статический, собираем один раз
             prompt = self.prompt_builder.build()
-            context = await self.context_builder.build(event_name, payload, missed_events)
-
-            self.tracker.add_input_record(prompt=prompt, context=context)
 
             messages = [
                 {"role": "system", "content": prompt},
-                {"role": "user", "content": context},
+                {"role": "user", "content": ""},  # Будет перезаписываться на каждом шаге
             ]
 
             step = 1
             while step <= self.agent_state.max_react_steps:
                 self.agent_state.current_step = step
                 self.agent_state.update_state(AgentStatus.THINKING)
+
+                # Собираем свежий контекст с актуальными состояниями (L0), временем и шагом
+                context = await self.context_builder.build(event_name, payload, missed_events)
+
+                # Обновляем блок контекста пользователя в истории сообщений
+                messages[1]["content"] = context
+
+                # Трекаем токены перед каждым вызовом LLM (что точнее отражает затраты)
+                self.tracker.add_input_record(prompt=prompt, context=context)
 
                 system_logger.info(f"[ReAct] Шаг {step}/{self.agent_state.max_react_steps}.")
 
@@ -182,19 +191,31 @@ class ReactLoop:
                 thoughts = args.get("thoughts", "")
                 actions = args.get("actions", [])
 
+                # Схлопываем все переносы строк, табы и лишние пробелы в одну строку
+                if thoughts and isinstance(thoughts, str):
+                    thoughts = " ".join(thoughts.split())
+
+                actions = args.get("actions", [])
+
                 if thoughts:
                     system_logger.info(f"[Thoughts]: {thoughts}")
 
-                if not isinstance(actions, list) or any(not isinstance(a, dict) for a in actions):
+                if not isinstance(actions, list) or any(
+                    not isinstance(a, dict) for a in actions
+                ):
                     error_msg = "Format Error: 'actions' должен быть массивом объектов (list of dicts). Передавать строки запрещено."
-                    system_logger.warning("[ReAct] LLM сгенерировала неверную структуру actions. Запрашиваем исправление.")
-                    
-                    messages.append({
-                        "role": "tool",
-                        "tool_call_id": tool_call.id,
-                        "name": tool_call.function.name,
-                        "content": error_msg,
-                    })
+                    system_logger.warning(
+                        "[ReAct] LLM сгенерировала неверную структуру actions. Запрашиваем исправление."
+                    )
+
+                    messages.append(
+                        {
+                            "role": "tool",
+                            "tool_call_id": tool_call.id,
+                            "name": tool_call.function.name,
+                            "content": error_msg,
+                        }
+                    )
                     step += 1
                     continue
 

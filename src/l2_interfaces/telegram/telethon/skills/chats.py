@@ -267,11 +267,27 @@ class TelethonChats:
 
                 reaction_context = ""
 
-                if getattr(msg, "reactions", None) and getattr(msg.reactions, "results", None):
+                if getattr(msg, "reactions", None):
                     r_list = []
-                    for r in msg.reactions.results:
-                        emo = getattr(r.reaction, "emoticon", "[CustomEmoji]")
-                        r_list.append(f"{emo} {r.count}")
+
+                    # Пытаемся достать детализацию: кто именно поставил реакцию (recent_reactions)
+                    if getattr(msg.reactions, "recent_reactions", None):
+                        for r in msg.reactions.recent_reactions:
+                            emo = getattr(r.reaction, "emoticon", "[CustomEmoji]")
+                            try:
+                                # Берем имя пользователя из локального кэша Telethon (это быстро)
+                                peer = await client.get_entity(r.peer_id)
+                                name = utils.get_display_name(peer) or "Unknown"
+                                r_list.append(f"{emo} от {name}")
+                            except Exception:
+                                # Если юзера нет в кэше, просто выводим эмодзи
+                                r_list.append(f"{emo}")
+
+                    # Если детализации нет, выводим общие счетчики как фоллбэк
+                    elif getattr(msg.reactions, "results", None):
+                        for r in msg.reactions.results:
+                            emo = getattr(r.reaction, "emoticon", "[CustomEmoji]")
+                            r_list.append(f"{emo} x{r.count}")
 
                     if r_list:
                         reaction_context = f"\n  ↳[Реакции: {', '.join(r_list)}]"
@@ -365,8 +381,10 @@ class TelethonChats:
             else:
                 await client(JoinChannelRequest(target))
 
-            system_logger.info(f"[Telegram Telethon] Агент вступил в чат: {target}")
+            # И так логгируется в Agent Action Result
+            # system_logger.info(f"[Telegram Telethon] Агент вступил в чат: {target}")
             return SkillResult.ok(f"Успешно вступили в чат: {target}")
+
         except Exception as e:
             msg = str(e)
             if "USER_ALREADY_PARTICIPANT" in msg:
@@ -469,7 +487,6 @@ class TelethonChats:
 
             return SkillResult.fail(f"Ошибка при инвайтинге: {e}")
 
-
     @skill()
     async def add_contact(
         self, user_id: Union[int, str], first_name: str, last_name: str = ""
@@ -481,21 +498,29 @@ class TelethonChats:
             client = self.tg_client.client()
             target_entity = await client.get_input_entity(self._parse_entity(user_id))
 
-            # Telethon позволяет добавить контакт без номера телефона, 
+            # Telethon позволяет добавить контакт без номера телефона,
             # если мы укажем пустую строку и передадим InputUser объект (target_entity)
-            await client(AddContactRequest(
-                id=target_entity,
-                first_name=first_name,
-                last_name=last_name,
-                phone="",
-                add_phone_privacy_exception=False
-            ))
+            await client(
+                AddContactRequest(
+                    id=target_entity,
+                    first_name=first_name,
+                    last_name=last_name,
+                    phone="",
+                    add_phone_privacy_exception=False,
+                )
+            )
 
             name_str = f"{first_name} {last_name}".strip()
-            system_logger.info(f"[Telegram Telethon] Пользователь {user_id} добавлен в контакты как '{name_str}'")
-            return SkillResult.ok(f"Успешно. Пользователь {user_id} добавлен в контакты как '{name_str}'.")
+            system_logger.info(
+                f"[Telegram Telethon] Пользователь {user_id} добавлен в контакты как '{name_str}'"
+            )
+            return SkillResult.ok(
+                f"Успешно. Пользователь {user_id} добавлен в контакты как '{name_str}'."
+            )
 
         except ValueError:
-            return SkillResult.fail(f"Ошибка: Пользователь '{user_id}' не найден. Проверьте правильность ID или юзернейма.")
+            return SkillResult.fail(
+                f"Ошибка: Пользователь '{user_id}' не найден. Проверьте правильность ID или юзернейма."
+            )
         except Exception as e:
             return SkillResult.fail(f"Ошибка при добавлении в контакты: {e}")

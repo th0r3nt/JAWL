@@ -97,7 +97,7 @@ class Heartbeat:
             # Если сон срезан в ноль (или изначально был нулем при старте) - это экстренное пробуждение
             if new_remaining <= 0.01:
                 system_logger.info(
-                    f"[System] Heartbeat: '{event_name}' ({level.name}). Мгновенное пробуждение."
+                    f"[Heartbeat] Входящее событие: '{event_name}' ({level.name}). Пробуждение."
                 )
                 self._wake_reason = event_name
                 self._wake_payload = payload
@@ -120,7 +120,7 @@ class Heartbeat:
             return
 
         self._is_running = True
-        system_logger.info("[System] Heartbeat запущен. Агент переведен в автономный режим.")
+        system_logger.info("[Heartbeat] Агент переведен в автономный режим.")
 
         if self._next_tick_time == 0.0:
             self._next_tick_time = time.time() + self.heartbeat_interval

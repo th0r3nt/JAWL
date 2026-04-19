@@ -67,9 +67,10 @@ class TelethonMessages:
             schedule_info = f" (отложено на {time_delay} сек)" if time_delay else ""
             msg = f"Сообщение успешно отправлено{schedule_info}. ID: {sent_msg.id}"
 
-            system_logger.info(
-                f"[Telegram Telethon] Отправлено сообщение в {entity} (Топик: {topic_id})"
-            )
+            # И так будет логгироваться в Agent Action Result
+            # system_logger.info(
+            #     f"[Telegram Telethon] Отправлено сообщение в {entity} (Топик: {topic_id})"
+            # )
             return SkillResult.ok(msg)
 
         except ValueError:

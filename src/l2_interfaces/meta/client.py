@@ -16,7 +16,7 @@ class MetaClient:
         self.yaml = YAML()
         self.yaml.preserve_quotes = True
 
-    async def update_setting(self, path_keys: list[str], new_value, log_msg: str) -> bool:
+    async def update_setting(self, path_keys: list[str], new_value) -> bool:
         """
         Универсальный метод для обновления settings.yaml.
         path_keys - путь до ключа (например, ["system", "heartbeat_interval"])
@@ -35,8 +35,8 @@ class MetaClient:
             with open(self.settings_path, "w", encoding="utf-8") as f:
                 self.yaml.dump(data, f)
 
-            system_logger.info(f"[Meta] {log_msg}")
             return True
+        
         except Exception as e:
             system_logger.error(f"[Meta] Ошибка обновления settings.yaml: {e}")
             return False
