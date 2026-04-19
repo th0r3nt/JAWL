@@ -1,8 +1,8 @@
 import re
-from typing import Optional, Union
+from typing import Optional, Union, Tuple, Any
 
 from telethon import utils
-from telethon.tl.functions.contacts import SearchRequest, AddContactRequest
+from telethon.tl.functions.contacts import SearchRequest
 from telethon.tl.functions.channels import (
     JoinChannelRequest,
     LeaveChannelRequest,
@@ -11,11 +11,10 @@ from telethon.tl.functions.channels import (
 )
 from telethon.tl.functions.messages import ImportChatInviteRequest
 
-from src.utils.logger import system_logger
+# from src.utils.logger import system_logger
 from src.utils.dtime import format_datetime
 
 from src.l2_interfaces.telegram.telethon.client import TelethonClient
-
 from src.l3_agent.skills.registry import SkillResult, skill
 
 
@@ -34,9 +33,174 @@ class TelethonChats:
         except ValueError:
             return str(entity_id).strip()
 
+    # =================================================================
+    # Хелперы для парсинга сообщений (SRP)
+    # =================================================================
+
+    def _get_sender_name(self, msg: Any) -> str:
+        """Определяет имя отправителя сообщения."""
+
+        if msg.sender:
+            name = utils.get_display_name(msg.sender)
+            return f"{name} (ID: {msg.sender_id})" if msg.sender_id else name
+        elif msg.sender_id:
+            return f"Unknown (ID: {msg.sender_id})"
+        return "Unknown"
+
+    def _determine_reply(
+        self, msg: Any, topic_id: Optional[int]
+    ) -> Tuple[bool, Optional[int]]:
+        """
+        Определяет, является ли сообщение реальным ответом на другое сообщение.
+        Отсекает баги форумов.
+        """
+
+        if not msg.reply_to:
+            return False, None
+
+        reply_id = None
+        is_actual_reply = False
+
+        if getattr(msg.reply_to, "forum_topic", False):
+            top_id = getattr(msg.reply_to, "reply_to_top_id", None)
+            if top_id and msg.reply_to.reply_to_msg_id != top_id:
+                is_actual_reply = True
+                reply_id = msg.reply_to.reply_to_msg_id
+        else:
+            is_actual_reply = True
+            reply_id = msg.reply_to.reply_to_msg_id
+
+        # Если читаем конкретный топик, первый пост ссылается сам на себя - игнорируем
+        if is_actual_reply and str(reply_id) == str(topic_id):
+            is_actual_reply = False
+
+        return is_actual_reply, reply_id
+
+    def _parse_media(self, msg: Any) -> str:
+        """Анализирует наличие медиа-вложений или системных действий."""
+
+        if msg.action:
+            return "[Системное сообщение]"
+        if not msg.media:
+            return ""
+
+        if msg.photo:
+            return "[Фотография]"
+
+        if msg.sticker:
+            emoji = msg.file.emoji if (hasattr(msg, "file") and msg.file) else ""
+            return f"[Стикер {emoji}]" if emoji else "[Стикер]"
+
+        if getattr(msg, "gif", None):
+            return "[GIF]"
+
+        if msg.voice:
+            return "[Голосовое сообщение]"
+
+        if msg.video or msg.video_note:
+            return "[Видео]"
+
+        if msg.document:
+            return "[Файл]"
+
+        if msg.poll:
+            return "[Опрос]"
+
+        return "[Медиа]"
+
+    async def _parse_forward(self, msg: Any) -> str:
+        """Получает инфу о пересланном сообщении."""
+
+        if not msg.fwd_from:
+            return ""
+
+        try:
+            fwd_sender = await msg.get_forward_sender()
+            if fwd_sender:
+                return f"\n  ↳[Переслано от: {utils.get_display_name(fwd_sender)}]"
+            elif msg.fwd_from.from_name:
+                return f"\n  ↳[Переслано от: {msg.fwd_from.from_name}]"
+
+        except Exception:
+            pass
+
+        return "\n  ↳ [Переслано]"
+
+    async def _parse_reply(
+        self, client: Any, target_entity: Any, is_reply: bool, reply_id: Optional[int]
+    ) -> str:
+        """Формирует строку-контекст ответа (кто и кому ответил)."""
+
+        if not is_reply or not reply_id:
+            return ""
+
+        try:
+            orig_msg = await client.get_messages(target_entity, ids=reply_id)
+            if orig_msg and orig_msg.sender:
+                orig_name = utils.get_display_name(orig_msg.sender)
+                orig_sender = (
+                    f"{orig_name} (ID: {orig_msg.sender_id})"
+                    if orig_msg.sender_id
+                    else orig_name
+                )
+
+            elif orig_msg and orig_msg.sender_id:
+                orig_sender = f"Unknown (ID: {orig_msg.sender_id})"
+
+            else:
+                orig_sender = "Unknown"
+
+            return f"\n  ↳ (В ответ на сообщение ID {reply_id} от {orig_sender})"
+
+        except Exception:
+            return f"\n  ↳ (В ответ на сообщение ID {reply_id})"
+
+    async def _parse_reactions(self, client: Any, msg: Any) -> str:
+        """Стягивает информацию о реакциях и том, кто их поставил."""
+
+        if not getattr(msg, "reactions", None):
+            return ""
+
+        r_list = []
+
+        if getattr(msg.reactions, "recent_reactions", None):
+            for r in msg.reactions.recent_reactions:
+                emo = getattr(r.reaction, "emoticon", "[CustomEmoji]")
+                try:
+                    peer = await client.get_entity(r.peer_id)
+                    name = utils.get_display_name(peer) or "Unknown"
+                    r_list.append(f"{emo} от {name}")
+
+                except Exception:
+                    r_list.append(f"{emo}")
+
+        elif getattr(msg.reactions, "results", None):
+            for r in msg.reactions.results:
+                emo = getattr(r.reaction, "emoticon", "[CustomEmoji]")
+                r_list.append(f"{emo} x{r.count}")
+
+        return f"\n  ↳[Реакции: {', '.join(r_list)}]" if r_list else ""
+
+    def _parse_buttons(self, msg: Any) -> str:
+        """Парсит inline-клавиатуру, если она есть."""
+
+        if not getattr(msg, "buttons", None):
+            return ""
+
+        btn_texts = [f"[{btn.text}]" for row in msg.buttons for btn in row if btn.text]
+        return f"\n  ↳[Кнопки: {', '.join(btn_texts)}]" if btn_texts else ""
+
+    # =================================================================
+    # Навыки
+    # =================================================================
+
     @skill()
     async def get_chats(self, limit: int = 10) -> SkillResult:
-        """Возвращает список последних чатов (пользователи, группы, каналы). Если это форум, возвращает топики."""
+        """
+        Возвращает список последних чатов (пользователи, группы, каналы).
+        Если это форум, возвращает топики.
+        """
+
         try:
             client = self.tg_client.client()
             chats = []
@@ -51,10 +215,8 @@ class TelethonChats:
                     else ""
                 )
 
-                is_forum = getattr(dialog.entity, "forum", False)
                 forum_str = ""
-
-                if is_forum:
+                if getattr(dialog.entity, "forum", False):
                     chat_type = "Forum"
                     topics = []
                     try:
@@ -67,6 +229,7 @@ class TelethonChats:
                             topics.append(
                                 f"      ↳ Топик '{topic.title}' (ID: {topic.id}){t_unread}"
                             )
+
                     except Exception:
                         pass
 
@@ -86,22 +249,22 @@ class TelethonChats:
             return SkillResult.fail(f"Ошибка при получении списка чатов: {e}")
 
     @skill()
-    async def get_unread_chats(self) -> SkillResult:
-        """Возвращает список чатов, в которых есть непрочитанные сообщения (включая топики форумов)."""
+    async def get_unread_chats(self, limit: int = 20) -> SkillResult:
+        """
+        Возвращает список чатов, в которых есть непрочитанные сообщения.
+        """
         try:
             client = self.tg_client.client()
             chats = []
 
-            async for dialog in client.iter_dialogs(limit=50):
+            async for dialog in client.iter_dialogs(limit=limit):
                 if dialog.unread_count > 0:
                     chat_type = (
                         "User" if dialog.is_user else "Group" if dialog.is_group else "Channel"
                     )
-
-                    is_forum = getattr(dialog.entity, "forum", False)
                     forum_str = ""
 
-                    if is_forum:
+                    if getattr(dialog.entity, "forum", False):
                         chat_type = "Forum"
                         topics = []
                         try:
@@ -152,186 +315,44 @@ class TelethonChats:
                 kwargs["reply_to"] = int(topic_id)
 
             async for msg in client.iter_messages(target_entity, **kwargs):
-                sender_name = "Unknown"
-                if msg.sender:
-                    name = utils.get_display_name(msg.sender)
-                    sender_name = f"{name} (ID: {msg.sender_id})" if msg.sender_id else name
-                elif msg.sender_id:
-                    sender_name = f"Unknown (ID: {msg.sender_id})"
 
-                # Логика определения реальных ответов (отсечение костылей Telegram-форумов)
-                is_actual_reply = False
-                reply_id = None
+                # Получаем имя сообщения
+                sender_name = self._get_sender_name(msg)
 
-                if msg.reply_to:
-                    if getattr(msg.reply_to, "forum_topic", False):
-                        # В топиках форума обычные сообщения имеют reply_to_msg_id == ID топика
-                        top_id = getattr(msg.reply_to, "reply_to_top_id", None)
-                        # Если top_id существует, и reply_to_msg_id не равен top_id, значит это реальный ответ
-                        if top_id and msg.reply_to.reply_to_msg_id != top_id:
-                            is_actual_reply = True
-                            reply_id = msg.reply_to.reply_to_msg_id
-                    else:
-                        # В обычных группах и ЛС всё просто
-                        is_actual_reply = True
-                        reply_id = msg.reply_to.reply_to_msg_id
+                # Проверяем наличие reply
+                is_reply, reply_id = self._determine_reply(msg, topic_id)
 
-                # Если мы принудительно читаем историю конкретного топика (иногда первый пост ссылается сам на себя)
-                if is_actual_reply and str(reply_id) == str(topic_id):
-                    is_actual_reply = False
+                # Собираем остальные части сообщения
+                parts = [
+                    self._parse_media(msg),
+                    msg.text or "",
+                    await self._parse_forward(msg),
+                    await self._parse_reply(client, target_entity, is_reply, reply_id),
+                    await self._parse_reactions(client, msg),
+                    self._parse_buttons(msg),
+                ]
 
-                # =================================================================
-                # МЕДИА
-
-                content_parts = []
-
-                if msg.action:
-                    content_parts.append("[Системное сообщение]")
-
-                if msg.media:
-                    if msg.photo:
-                        content_parts.append("[Фотография]")
-
-                    elif msg.sticker:
-                        emoji = msg.file.emoji if (hasattr(msg, "file") and msg.file) else ""
-                        sticker_text = f"[Стикер {emoji}]" if emoji else "[Стикер]"
-                        content_parts.append(sticker_text)
-
-                    elif getattr(msg, "gif", None):
-                        content_parts.append("[GIF]")
-
-                    elif msg.voice:
-                        content_parts.append("[Голосовое сообщение]")
-
-                    elif msg.video or msg.video_note:
-                        content_parts.append("[Видео]")
-
-                    elif msg.document:
-                        content_parts.append("[Файл]")
-
-                    elif msg.poll:
-                        content_parts.append("[Опрос]")
-
-                    else:
-                        content_parts.append("[Медиа]")
-
-                if msg.text:
-                    content_parts.append(msg.text)
-
-                # =================================================================
-                # ПЕРЕСЛАННЫЕ СООБЩЕНИЯ
-
-                forward_context = ""
-
-                if msg.fwd_from:
-                    try:
-                        fwd_sender = await msg.get_forward_sender()
-                        if fwd_sender:
-                            fwd_name = utils.get_display_name(fwd_sender)
-                            forward_context = f"\n  ↳[Переслано от: {fwd_name}]"
-                        elif msg.fwd_from.from_name:
-                            forward_context = f"\n  ↳[Переслано от: {msg.fwd_from.from_name}]"
-                        else:
-                            forward_context = "\n  ↳ [Переслано]"
-                    except Exception:
-                        forward_context = "\n  ↳ [Переслано]"
-
-                # =================================================================
-                # REPLY
-
-                reply_context = ""
-
-                if is_actual_reply and reply_id:
-                    try:
-                        # Запрашиваем оригинальное сообщение, на которое был дан ответ
-                        orig_msg = await client.get_messages(target_entity, ids=reply_id)
-                        orig_sender = "Unknown"
-                        if orig_msg and orig_msg.sender:
-                            orig_name = utils.get_display_name(orig_msg.sender)
-                            orig_sender = (
-                                f"{orig_name} (ID: {orig_msg.sender_id})"
-                                if orig_msg.sender_id
-                                else orig_name
-                            )
-                        elif orig_msg and orig_msg.sender_id:
-                            orig_sender = f"Unknown (ID: {orig_msg.sender_id})"
-
-                        reply_context = (
-                            f"\n  ↳ (В ответ на сообщение ID {reply_id} от {orig_sender})"
-                        )
-                    except Exception:
-                        reply_context = f"\n  ↳ (В ответ на сообщение ID {reply_id})"
-
-                # =================================================================
-                # РЕАКЦИИ
-
-                reaction_context = ""
-
-                if getattr(msg, "reactions", None):
-                    r_list = []
-
-                    # Пытаемся достать детализацию: кто именно поставил реакцию (recent_reactions)
-                    if getattr(msg.reactions, "recent_reactions", None):
-                        for r in msg.reactions.recent_reactions:
-                            emo = getattr(r.reaction, "emoticon", "[CustomEmoji]")
-                            try:
-                                # Берем имя пользователя из локального кэша Telethon (это быстро)
-                                peer = await client.get_entity(r.peer_id)
-                                name = utils.get_display_name(peer) or "Unknown"
-                                r_list.append(f"{emo} от {name}")
-                            except Exception:
-                                # Если юзера нет в кэше, просто выводим эмодзи
-                                r_list.append(f"{emo}")
-
-                    # Если детализации нет, выводим общие счетчики как фоллбэк
-                    elif getattr(msg.reactions, "results", None):
-                        for r in msg.reactions.results:
-                            emo = getattr(r.reaction, "emoticon", "[CustomEmoji]")
-                            r_list.append(f"{emo} x{r.count}")
-
-                    if r_list:
-                        reaction_context = f"\n  ↳[Реакции: {', '.join(r_list)}]"
-
-                # =================================================================
-                # INLINE КНОПКИ
-
-                buttons_context = ""
-
-                if getattr(msg, "buttons", None):
-                    btn_texts = []
-                    for row in msg.buttons:
-                        for btn in row:
-                            if btn.text:
-                                btn_texts.append(f"[{btn.text}]")
-                    if btn_texts:
-                        buttons_context = f"\n  ↳[Кнопки: {', '.join(btn_texts)}]"
-
-                # =================================================================
-                # СКЛЕИВАНИЕ СООБЩЕНИЯ
-
-                final_text = " ".join(content_parts) if content_parts else "[Пустое сообщение]"
-
+                # Фильтруем пустые элементы и склеиваем
+                final_text = " ".join(filter(bool, parts)) or "[Пустое сообщение]"
                 time_str = format_datetime(
                     msg.date, self.tg_client.timezone, fmt="%Y-%m-%d %H:%M"
                 )
 
-                messages.append(
-                    f"[{time_str}] [ID: {msg.id}] {sender_name}: {final_text}{forward_context}{reply_context}{reaction_context}{buttons_context}"  # Помогите
-                )
+                messages.append(f"[{time_str}] [ID: {msg.id}] {sender_name}: {final_text}")
 
             if not messages:
-                if topic_id:
-                    return SkillResult.ok(
-                        "В этом топике нет сообщений (или он не существует)."
-                    )
-                return SkillResult.ok("В этом чате нет сообщений.")
+                return SkillResult.ok(
+                    "В этом топике нет сообщений."
+                    if topic_id
+                    else "В этом чате нет сообщений."
+                )
 
             messages.reverse()
             return SkillResult.ok("\n\n".join(messages))
 
         except ValueError:
             return SkillResult.fail(f"Ошибка: Некорректный ID чата ({chat_id}).")
-        
+
         except Exception as e:
             return SkillResult.fail(f"Ошибка при чтении чата {chat_id}: {e}")
 
@@ -352,6 +373,7 @@ class TelethonChats:
         try:
             client = self.tg_client.client()
             result = await client(SearchRequest(q=query, limit=limit))
+
             chats = []
             for chat in result.chats:
                 chat_type = "Channel" if getattr(chat, "broadcast", False) else "Group"
@@ -359,9 +381,12 @@ class TelethonChats:
                 chats.append(
                     f"- {chat_type} | ID: `{chat.id}` | Название: {chat.title} | Юзернейм: {username}"
                 )
+
             if not chats:
                 return SkillResult.ok(f"По глобальному запросу '{query}' ничего не найдено.")
+
             return SkillResult.ok("\n".join(chats))
+
         except Exception as e:
             return SkillResult.fail(f"Ошибка при поиске чатов: {e}")
 
@@ -379,30 +404,33 @@ class TelethonChats:
                         "Ошибка: Не удалось извлечь хэш из пригласительной ссылки."
                     )
                 await client(ImportChatInviteRequest(hash_match.group(1)))
+
             else:
                 await client(JoinChannelRequest(target))
 
-            # И так логгируется в Agent Action Result
-            # system_logger.info(f"[Telegram Telethon] Агент вступил в чат: {target}")
             return SkillResult.ok(f"Успешно вступили в чат: {target}")
 
         except Exception as e:
-            msg = str(e)
-            if "USER_ALREADY_PARTICIPANT" in msg:
+            if "USER_ALREADY_PARTICIPANT" in str(e):
                 return SkillResult.ok(f"Вы уже состоите в этом чате ({target}).")
+
             return SkillResult.fail(f"Ошибка при вступлении в чат: {e}")
 
     @skill()
     async def leave_chat(self, chat_id: Union[int, str]) -> SkillResult:
         """Покидает канал или группу."""
+
         try:
             client = self.tg_client.client()
             entity = await client.get_input_entity(self._parse_entity(chat_id))
             await client(LeaveChannelRequest(entity))
-            system_logger.info(f"[Telegram Telethon] Агент покинул чат: {chat_id}")
+
+            # system_logger.info(f"[Telegram Telethon] Агент покинул чат: {chat_id}")
             return SkillResult.ok(f"Успешно покинули чат {chat_id}.")
+
         except ValueError:
             return SkillResult.fail("Ошибка: Некорректный формат ID чата.")
+
         except Exception as e:
             return SkillResult.fail(f"Ошибка при выходе из чата: {e}")
 
@@ -421,15 +449,16 @@ class TelethonChats:
                 )
 
             await client(JoinChannelRequest(await client.get_input_entity(linked_chat_id)))
-            system_logger.info(
-                f"[Telegram Telethon] Успешное вступление в группу обсуждений (ID: {linked_chat_id})"
-            )
+            # system_logger.info(
+            #     f"[Telegram Telethon] Успешное вступление в группу обсуждений (ID: {linked_chat_id})"
+            # )
+
             return SkillResult.ok(
                 f"Успешное вступление в группу обсуждений (ID: {linked_chat_id})."
             )
+
         except ValueError:
             return SkillResult.fail("Ошибка: Некорректный ID канала.")
-
         except Exception as e:
             if "USER_ALREADY_PARTICIPANT" in str(e):
                 return SkillResult.ok("Вы уже состоите в группе обсуждений этого канала.")
@@ -461,13 +490,14 @@ class TelethonChats:
 
             await client(InviteToChannelRequest(channel=chat_entity, users=user_entities))
 
-            system_logger.info(
-                f"[Telegram Telethon] Пользователи {users} приглашены в чат {chat_id}"
-            )
+            # system_logger.info(
+            #     f"[Telegram Telethon] Пользователи {users} приглашены в чат {chat_id}"
+            # )
             return SkillResult.ok(f"Успешно. Пользователи {users} приглашены в чат {chat_id}.")
 
         except Exception as e:
             msg = str(e)
+
             if "USER_PRIVACY_RESTRICTED" in msg:
                 return SkillResult.fail(
                     "Ошибка: Настройки приватности ограничивают добавление кого-то из списка."
@@ -487,41 +517,3 @@ class TelethonChats:
                 )
 
             return SkillResult.fail(f"Ошибка при инвайтинге: {e}")
-
-    @skill()
-    async def add_contact(
-        self, user_id: Union[int, str], first_name: str, last_name: str = ""
-    ) -> SkillResult:
-        """
-        Добавляет пользователя в контакты Telegram.
-        """
-        try:
-            client = self.tg_client.client()
-            target_entity = await client.get_input_entity(self._parse_entity(user_id))
-
-            # Telethon позволяет добавить контакт без номера телефона,
-            # если мы укажем пустую строку и передадим InputUser объект (target_entity)
-            await client(
-                AddContactRequest(
-                    id=target_entity,
-                    first_name=first_name,
-                    last_name=last_name,
-                    phone="",
-                    add_phone_privacy_exception=False,
-                )
-            )
-
-            name_str = f"{first_name} {last_name}".strip()
-            system_logger.info(
-                f"[Telegram Telethon] Пользователь {user_id} добавлен в контакты как '{name_str}'"
-            )
-            return SkillResult.ok(
-                f"Успешно. Пользователь {user_id} добавлен в контакты как '{name_str}'."
-            )
-
-        except ValueError:
-            return SkillResult.fail(
-                f"Ошибка: Пользователь '{user_id}' не найден. Проверьте правильность ID или юзернейма."
-            )
-        except Exception as e:
-            return SkillResult.fail(f"Ошибка при добавлении в контакты: {e}")
