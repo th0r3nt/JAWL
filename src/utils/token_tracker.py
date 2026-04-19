@@ -1,6 +1,6 @@
 import tiktoken
 from collections import deque
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 from src.utils.logger import system_logger
 
@@ -8,75 +8,75 @@ from src.utils.logger import system_logger
 class TokenTracker:
     """
     Отслеживает статистику использования токенов.
-    Использует tiktoken (энкодер от OpenAI) для точного подсчета.
+    Использует tiktoken для точного подсчета.
     """
 
     def __init__(self, maxlen: int = 100):
+
         self.input_history: deque[Dict[str, Any]] = deque(maxlen=maxlen)
         self.output_history: deque[Dict[str, Any]] = deque(maxlen=maxlen)
         try:
-            # o200k_base - актуальный энкодер
             self.encoding = tiktoken.get_encoding("o200k_base")
         except Exception:
-            # Fallback на старый, если что-то пойдет не так
             self.encoding = tiktoken.get_encoding("cl100k_base")
 
     def _approximate_tokens(self, text: str) -> int:
-        """Точный подсчет токенов через tiktoken."""
+        """Точный подсчет токенов для строки."""
+
         if not text:
             return 0
         try:
-            # disallowed_special=() разрешает энкодеру глотать спец-токены, если они попадутся
             return len(self.encoding.encode(text, disallowed_special=()))
         except Exception:
-            # Fallback на случай непредвиденных крашей кодировщика
             return max(1, len(text) // 4)
 
-    def add_input_record(self, prompt: str, context: str) -> None:
-        """Записывает входящие токены текущего цикла."""
-        prompt_tokens = self._approximate_tokens(prompt)
-        context_tokens = self._approximate_tokens(context)
+    def count_messages_tokens(self, messages: List[Dict[str, Any]]) -> int:
+        """
+        Подсчитывает токены для всего списка сообщений (chat history).
+        Учитывает накладные расходы на структуру (роли, имена).
+        """
 
-        total_tokens = prompt_tokens + context_tokens
+        num_tokens = 0
+        for message in messages:
+            num_tokens += 3  # Каждое сообщение обрамляется метаданными
+            for key, value in message.items():
+                if isinstance(value, str):
+                    num_tokens += self._approximate_tokens(value)
+                elif isinstance(value, list):  # Для сложных структур tool_calls
+                    num_tokens += self._approximate_tokens(str(value))
+        num_tokens += 3  # Ответ ассистента начинается с метаданных
+        return num_tokens
 
-        self.input_history.append(
-            {"prompt": prompt_tokens, "context": context_tokens, "total": total_tokens}
-        )
+    def add_input_record(self, messages: List[Dict[str, Any]]) -> None:
+        """Записывает реальное количество входных токенов всего запроса."""
 
-        system_logger.info(
-            f"[LLM] Input tokens: {total_tokens} (prompt: {prompt_tokens}, context: {context_tokens})."
-        )
+        total_tokens = self.count_messages_tokens(messages)
+
+        self.input_history.append({"total": total_tokens})
+
+        system_logger.info(f"[LLM] Input tokens (total window): {total_tokens}.")
 
     def add_output_record(self, output_text: str) -> None:
-        """Записывает исходящие (сгенерированные) токены текущего цикла."""
+        """Записывает исходящие токены."""
 
         output_tokens = self._approximate_tokens(output_text)
-
         self.output_history.append({"total": output_tokens})
-
         system_logger.info(f"[LLM] Output tokens: {output_tokens}.")
 
     def get_token_statistics(self) -> str:
-        """Возвращает статистику входящих и исходящих токенов."""
+        """Возвращает статистику использования."""
 
         stats_lines = []
-
         if self.input_history:
             total_in = sum(item["total"] for item in self.input_history)
             avg_in = total_in // len(self.input_history)
             stats_lines.append(
-                f"Input: за последние {len(self.input_history)} API вызовов: {total_in} входных токенов (в среднем {avg_in}/вызов)."
+                f"Input: за последние {len(self.input_history)} API вызовов: {total_in} токенов (среднее {avg_in}/вызов)."
             )
-        else:
-            stats_lines.append("Input: No data yet.")
-
         if self.output_history:
             total_out = sum(item["total"] for item in self.output_history)
             avg_out = total_out // len(self.output_history)
             stats_lines.append(
-                f"Output: за последние {len(self.output_history)} API вызовов: {total_out} выходных токенов (в среднем {avg_out}/вызов)."
+                f"Output: за последние {len(self.output_history)} API вызовов: {total_out} токенов (среднее {avg_out}/вызов)."
             )
-        else:
-            stats_lines.append("Output: No data yet.")
-
         return "\n".join(stats_lines)

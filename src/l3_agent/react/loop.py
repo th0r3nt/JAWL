@@ -108,8 +108,8 @@ class ReactLoop:
                 # Обновляем блок контекста пользователя в истории сообщений
                 messages[1]["content"] = context
 
-                # Трекаем токены перед каждым вызовом LLM (что точнее отражает затраты)
-                self.tracker.add_input_record(prompt=prompt, context=context)
+                # Трекаем dct токены на каждом из шагов, которые реально улетают в API (включая историю шагов)
+                self.tracker.add_input_record(messages=messages)
 
                 system_logger.info(f"[ReAct] Шаг {step}/{self.agent_state.max_react_steps}.")
 
@@ -186,7 +186,7 @@ class ReactLoop:
                 # Валидация ответа LLM через Pydantic
                 try:
                     parsed_response = AgentResponse.model_validate_json(args_str)
-                    
+
                 except ValidationError as e:
                     system_logger.warning(
                         f"[ReAct] Ошибка структуры от LLM. Запрашиваем исправление. Детали: {e}"
