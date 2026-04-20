@@ -226,7 +226,6 @@ async def test_send_message_skill(mock_tg_client):
     """Тест навыка агента: отправка сообщения."""
     skills = TelethonMessages(mock_tg_client)
 
-    # Имитируем возвращаемый объект отправленного сообщения
     sent_msg = MagicMock()
     sent_msg.id = 999
     mock_tg_client.client().send_message = AsyncMock(return_value=sent_msg)
@@ -236,8 +235,9 @@ async def test_send_message_skill(mock_tg_client):
     assert res.is_success is True
     assert "999" in res.message
 
+    # Добавлен parse_mode="md"
     mock_tg_client.client().send_message.assert_called_once_with(
-        entity=123, message="Test", silent=False
+        entity=123, message="Test", silent=False, parse_mode="md"
     )
 
 
@@ -250,15 +250,14 @@ async def test_send_message_with_topic_skill(mock_tg_client):
     sent_msg.id = 777
     mock_tg_client.client().send_message = AsyncMock(return_value=sent_msg)
 
-    # Передаем topic_id = 5238
     res = await skills.send_message(to_id=-100123, text="Test Topic", topic_id=5238)
 
     assert res.is_success is True
     assert "777" in res.message
 
-    # Telethon под капотом использует reply_to для отправки в топики
+    # Добавлен parse_mode="md"
     mock_tg_client.client().send_message.assert_called_once_with(
-        entity=-100123, message="Test Topic", silent=False, reply_to=5238
+        entity=-100123, message="Test Topic", silent=False, reply_to=5238, parse_mode="md"
     )
 
 
@@ -289,14 +288,24 @@ async def test_account_change_bio(mock_tg_client):
 
 
 @pytest.mark.asyncio
-@patch("os.path.exists", return_value=True)
-async def test_account_change_avatar(mock_exists, mock_tg_client):
+@patch(
+    "src.l2_interfaces.telegram.telethon.skills.account.TelethonAccount._validate_sandbox_path"
+)
+async def test_account_change_avatar(mock_validate, mock_tg_client):
     skills = TelethonAccount(mock_tg_client)
+
+    # Мокаем проверку пути
+    mock_path = MagicMock()
+    mock_path.name = "avatar.jpg"
+    mock_path.exists.return_value = True
+    mock_validate.return_value = mock_path
+
     mock_tg_client.client().upload_file = AsyncMock(return_value="mocked_file")
 
-    res = await skills.change_avatar(filepath="/fake/path/avatar.jpg")
+    res = await skills.change_avatar(filepath="avatar.jpg")
+
     assert res.is_success is True
-    mock_tg_client.client().upload_file.assert_called_once_with("/fake/path/avatar.jpg")
+    mock_tg_client.client().upload_file.assert_called_once()
 
 
 @pytest.mark.asyncio
@@ -310,6 +319,60 @@ async def test_account_add_contact(mock_tg_client):
     assert res.is_success is True
     assert "добавлен в контакты" in res.message
     assert mock_tg_client.client().call_count >= 1
+
+
+@pytest.mark.asyncio
+async def test_account_get_user_info(mock_tg_client):
+    """Тест: разведка профиля юзера."""
+    skills = TelethonAccount(mock_tg_client)
+
+    # Мокаем ответ GetFullUserRequest
+    mock_full_user = MagicMock()
+    mock_user = MagicMock()
+    mock_user.first_name = "Pavel"
+    mock_user.last_name = "Durov"
+    mock_user.username = "durov"
+    mock_user.bot = False
+    mock_user.restricted = False
+    mock_user.scam = False
+    mock_full_user.users = [mock_user]
+    mock_full_user.full_user.about = "Founder of Telegram"
+
+    # Подменяем __call__ клиента
+    mock_tg_client.client().side_effect = AsyncMock(return_value=mock_full_user)
+
+    res = await skills.get_user_info("durov")
+
+    assert res.is_success is True
+    assert "Pavel Durov" in res.message
+    assert "@durov" in res.message
+    assert "Founder of Telegram" in res.message
+
+
+@pytest.mark.asyncio
+@patch(
+    "src.l2_interfaces.telegram.telethon.skills.account.TelethonAccount._validate_sandbox_path"
+)
+async def test_account_download_avatar(mock_validate, mock_tg_client):
+    """Тест: скачивание аватара."""
+    skills = TelethonAccount(mock_tg_client)
+
+    # Мокаем проверку пути и сам путь
+    mock_path = MagicMock()
+    mock_path.name = "avatar.jpg"
+    mock_path.stat.return_value.st_size = 1048576  # 1 MB
+    mock_validate.return_value = mock_path
+
+    # Мокаем возвращение истории фоток
+    mock_photo = MagicMock()
+    mock_tg_client.client().get_profile_photos = AsyncMock(return_value=[mock_photo])
+    mock_tg_client.client().download_media = AsyncMock(return_value="/sandbox/avatar.jpg")
+
+    res = await skills.download_avatar(user_or_chat_id="durov", dest_filename="avatar.jpg")
+
+    assert res.is_success is True
+    assert "1.0 MB" in res.message  # Проверка работы format_size
+    assert "avatar.jpg" in res.message
 
 
 # ===================================================================
@@ -363,8 +426,9 @@ async def test_messages_edit_message(mock_tg_client):
     res = await skills.edit_message(msg_id=42, new_text="Fixed", chat_id=123)
 
     assert res.is_success is True
+    # Добавлен parse_mode="md"
     mock_tg_client.client().edit_message.assert_called_once_with(
-        entity=123, message=42, text="Fixed"
+        entity=123, message=42, text="Fixed", parse_mode="md"
     )
 
 
@@ -386,6 +450,35 @@ async def test_messages_click_inline_button(mock_tg_client):
     assert res.is_success is True
     assert "Success callback" in res.message
     mock_msg.click.assert_called_once_with(0, 0)  # Координаты кнопки i, j
+
+
+@pytest.mark.asyncio
+@patch(
+    "src.l2_interfaces.telegram.telethon._message_parser.TelethonMessageParser.build_string"
+)
+async def test_messages_search_messages(mock_build_string, mock_tg_client):
+    """Тест: локальный поиск сообщений в чате."""
+
+    mock_tg_client.timezone = 3
+
+    skills = TelethonMessages(mock_tg_client)
+
+    # Мокаем генератор поиска
+    mock_msg_1 = MagicMock(id=1)
+    mock_msg_2 = MagicMock(id=2)
+
+    async def mock_search_gen(*args, **kwargs):
+        for m in [mock_msg_1, mock_msg_2]:
+            yield m
+
+    mock_tg_client.client().iter_messages = mock_search_gen
+    mock_build_string.side_effect = ["Formatted 1", "Formatted 2"]
+
+    res = await skills.search_messages(chat_id=123, query="test")
+
+    assert res.is_success is True
+    assert "Formatted 1" in res.message
+    assert "Formatted 2" in res.message
 
 
 # ===================================================================
@@ -414,6 +507,37 @@ async def test_moderation_ban_in_chat(mock_tg_client):
     mock_tg_client.client().edit_permissions.assert_called_once_with(
         -100500, 123, view_messages=False
     )
+
+
+@pytest.mark.asyncio
+async def test_moderation_kick_user(mock_tg_client):
+    """Тест: кик пользователя из группы."""
+    skills = TelethonModeration(mock_tg_client)
+    mock_tg_client.client().kick_participant = AsyncMock()
+
+    res = await skills.kick_user(user_id=123, chat_id=-100500)
+
+    assert res.is_success is True
+    assert "выгнан (kick)" in res.message
+    mock_tg_client.client().kick_participant.assert_called_once_with(-100500, 123)
+
+
+@pytest.mark.asyncio
+async def test_moderation_mute_user(mock_tg_client):
+    """Тест: мут пользователя (Read-Only)."""
+    skills = TelethonModeration(mock_tg_client)
+    mock_tg_client.client().edit_permissions = AsyncMock()
+
+    res = await skills.mute_user(user_id=123, chat_id=-100500, duration_minutes=60)
+
+    assert res.is_success is True
+    assert "замучен на 60 минут" in res.message
+
+    # Проверяем, что была вызвана функция редактирования прав
+    call_args = mock_tg_client.client().edit_permissions.call_args
+    assert call_args[0] == (-100500, 123)
+    assert call_args[1]["send_messages"] is False
+    assert call_args[1]["until_date"] is not None
 
 
 # ===================================================================
@@ -637,3 +761,69 @@ async def test_admin_demote_user(mock_tg_client):
         user=777,
         is_admin=False,
     )
+
+
+@pytest.mark.asyncio
+async def test_admin_edit_chat_description(mock_tg_client):
+    """Тест: изменение описания чата."""
+    skills = TelethonAdmin(mock_tg_client)
+    mock_tg_client.client().side_effect = AsyncMock()
+
+    res = await skills.edit_chat_description(chat_id=-100500, new_description="New Bio")
+
+    assert res.is_success is True
+    assert "Описание чата успешно изменено" in res.message
+    mock_tg_client.client().side_effect.assert_called_once()
+
+
+@pytest.mark.asyncio
+@patch("src.l2_interfaces.telegram.telethon.skills.admin.TelethonAdmin._validate_sandbox_path")
+async def test_admin_edit_chat_avatar(mock_validate, mock_tg_client):
+    """Тест: изменение аватара чата (группы/канала)."""
+    skills = TelethonAdmin(mock_tg_client)
+
+    mock_path = MagicMock()
+    mock_path.name = "new_avatar.jpg"
+    mock_path.is_file.return_value = True
+    mock_validate.return_value = mock_path
+
+    mock_tg_client.client().upload_file = AsyncMock(return_value="uploaded_photo_obj")
+
+    # Мокаем тип сущности (канал)
+    from telethon.tl.types import InputPeerChannel
+
+    mock_tg_client.client().get_input_entity = AsyncMock(
+        return_value=InputPeerChannel(123, 456)
+    )
+    mock_tg_client.client().side_effect = AsyncMock()
+
+    res = await skills.edit_chat_avatar(chat_id=-100500, filepath="new_avatar.jpg")
+
+    assert res.is_success is True
+    assert "Аватар чата успешно изменен" in res.message
+
+
+@pytest.mark.asyncio
+async def test_admin_create_topic(mock_tg_client):
+    """Тест: создание топика форума."""
+
+    # Защита от старых версий Telethon в тестах
+    import src.l2_interfaces.telegram.telethon.skills.admin as admin_module
+
+    if not admin_module.CreateForumTopicRequest:
+        pytest.skip("Установленная версия Telethon не поддерживает CreateForumTopicRequest")
+
+    skills = TelethonAdmin(mock_tg_client)
+
+    # Мокаем ответ CreateForumTopicRequest
+    mock_update = MagicMock()
+    mock_update.message.id = 555
+    mock_result = MagicMock()
+    mock_result.updates = [mock_update]
+
+    mock_tg_client.client().side_effect = AsyncMock(return_value=mock_result)
+
+    res = await skills.create_topic(chat_id=-100500, title="Новый топик")
+
+    assert res.is_success is True
+    assert "ID топика: 555" in res.message

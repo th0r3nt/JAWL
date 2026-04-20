@@ -1,12 +1,21 @@
 from typing import Union
+from pathlib import Path
 
 from telethon import utils
 from telethon.tl.functions.channels import CreateChannelRequest, EditTitleRequest
+from telethon.tl.functions.channels import EditPhotoRequest as ChannelEditPhotoRequest
 from telethon.tl.functions.messages import ExportChatInviteRequest, EditChatTitleRequest
+from telethon.tl.functions.messages import EditChatAboutRequest, EditChatPhotoRequest
+from telethon.tl.types import InputChatUploadedPhoto, InputPeerChannel, InputPeerChat
 
 from src.utils.logger import system_logger
 from src.l2_interfaces.telegram.telethon.client import TelethonClient
 from src.l3_agent.skills.registry import SkillResult, skill
+
+try:
+    from telethon.tl.functions.channels import CreateForumTopicRequest
+except ImportError:
+    CreateForumTopicRequest = None
 
 
 class TelethonAdmin:
@@ -25,6 +34,25 @@ class TelethonAdmin:
         except ValueError:
             return str(entity_id).strip()
 
+    # TODO: подобные валидирующие функции расплодились. Надо бы перенести в utils/_tools.py
+    def _validate_sandbox_path(self, filepath: str) -> Path:
+        """Внутренний гейткипер: разрешает работу с файлами строго внутри папки sandbox/."""
+
+        sandbox_dir = (Path.cwd() / "sandbox").resolve()
+        sandbox_dir.mkdir(parents=True, exist_ok=True)
+
+        path_str = str(filepath).replace("\\", "/")
+        if path_str.startswith("sandbox/"):
+            path_str = path_str[8:]
+
+        resolved = (sandbox_dir / path_str).resolve()
+        if not resolved.is_relative_to(sandbox_dir):
+            raise PermissionError(
+                "Доступ запрещен: можно работать с файлами только в пределах папки sandbox/"
+            )
+
+        return resolved
+
     @skill()
     async def create_channel(
         self, title: str, about: str = "", is_megagroup: bool = False
@@ -32,15 +60,14 @@ class TelethonAdmin:
         """
         Создает новый публичный или приватный канал (или супергруппу).
         is_megagroup: Если True, будет создана группа для общения (супергруппа). Если False - канал (только для публикаций).
-
         """
+
         try:
             client = self.tg_client.client()
             result = await client(
                 CreateChannelRequest(title=title, about=about, megagroup=is_megagroup)
             )
 
-            # Извлекаем ID созданного чата. Формат -100XXXX... нужен для супергрупп и каналов.
             chat_id = f"-100{result.chats[0].id}"
             chat_type = "Супергруппа" if is_megagroup else "Канал"
 
@@ -59,7 +86,6 @@ class TelethonAdmin:
             client = self.tg_client.client()
             entity = await client.get_entity(self._parse_entity(chat_id))
 
-            # Telethon разделяет смену имени для каналов/супергрупп и обычных маленьких групп
             try:
                 await client(EditTitleRequest(channel=entity, title=new_title))
             except Exception:
@@ -76,6 +102,64 @@ class TelethonAdmin:
             return SkillResult.fail(f"Ошибка при изменении названия чата: {e}")
 
     @skill()
+    async def edit_chat_description(
+        self, chat_id: Union[int, str], new_description: str
+    ) -> SkillResult:
+        """Изменяет описание (about/bio) группы или канала. Требуются права администратора."""
+        try:
+            client = self.tg_client.client()
+            entity = await client.get_input_entity(self._parse_entity(chat_id))
+
+            await client(EditChatAboutRequest(peer=entity, about=new_description))
+
+            system_logger.info(
+                f"[Telegram Telethon] Описание чата {chat_id} успешно изменено."
+            )
+            return SkillResult.ok("Описание чата успешно изменено.")
+        except ValueError:
+            return SkillResult.fail("Ошибка: Некорректный ID чата.")
+        except Exception as e:
+            return SkillResult.fail(f"Ошибка при изменении описания чата: {e}")
+
+    @skill()
+    async def edit_chat_avatar(self, chat_id: Union[int, str], filepath: str) -> SkillResult:
+        """Изменяет аватар группы или канала. Файл должен лежать в sandbox/."""
+        try:
+            safe_path = self._validate_sandbox_path(filepath)
+            if not safe_path.is_file():
+                return SkillResult.fail(f"Ошибка: Файл {safe_path.name} не найден.")
+
+            client = self.tg_client.client()
+            entity = await client.get_input_entity(self._parse_entity(chat_id))
+
+            uploaded_file = await client.upload_file(str(safe_path))
+            photo = InputChatUploadedPhoto(file=uploaded_file)
+
+            # Telethon использует разные функции для обычных чатов и каналов/супергрупп
+            if isinstance(entity, InputPeerChannel):
+                await client(ChannelEditPhotoRequest(channel=entity, photo=photo))
+            elif isinstance(entity, InputPeerChat):
+                await client(EditChatPhotoRequest(chat_id=entity.chat_id, photo=photo))
+            else:
+                return SkillResult.fail(
+                    "Ошибка: Этот тип чата не поддерживает смену аватара (возможно это ЛС)."
+                )
+
+            system_logger.info(
+                f"[Telegram Telethon] Аватар чата {chat_id} изменен на {safe_path.name}"
+            )
+            return SkillResult.ok("Аватар чата успешно изменен.")
+
+        except PermissionError as e:
+            return SkillResult.fail(str(e))
+
+        except ValueError:
+            return SkillResult.fail("Ошибка: Некорректный ID чата.")
+
+        except Exception as e:
+            return SkillResult.fail(f"Ошибка при изменении аватара чата: {e}")
+
+    @skill()
     async def create_invite_link(self, chat_id: Union[int, str]) -> SkillResult:
         """Генерирует новую пригласительную ссылку для указанного чата."""
 
@@ -85,14 +169,15 @@ class TelethonAdmin:
 
             result = await client(ExportChatInviteRequest(peer=entity))
 
-            system_logger.info(f"[Telegram Telethon] Создана ссылка для чата {chat_id}")
             return SkillResult.ok(f"Пригласительная ссылка сгенерирована: {result.link}")
 
         except Exception as e:
             return SkillResult.fail(f"Ошибка при генерации ссылки: {e}")
 
     @skill()
-    async def get_participants(self, chat_id: Union[int, str], limit: int = 100) -> SkillResult:
+    async def get_participants(
+        self, chat_id: Union[int, str], limit: int = 100
+    ) -> SkillResult:
         """Возвращает список участников группы или канала."""
 
         try:
@@ -108,7 +193,9 @@ class TelethonAdmin:
             if not participants:
                 return SkillResult.ok("Список участников пуст (или нет прав на его просмотр).")
 
-            return SkillResult.ok(f"Участники (последние {limit} чел.):\n" + "\n".join(participants))
+            return SkillResult.ok(
+                f"Участники (последние {limit} чел.):\n" + "\n".join(participants)
+            )
 
         except Exception as e:
             return SkillResult.fail(f"Ошибка при получении участников: {e}")
@@ -139,9 +226,6 @@ class TelethonAdmin:
                 add_admins=add_admins,
             )
 
-            system_logger.info(
-                f"[Telegram Telethon] Пользователь {user_id} назначен администратором в {chat_id}"
-            )
             return SkillResult.ok(f"Пользователь {user_id} успешно повышен до администратора.")
 
         except Exception as e:
@@ -162,9 +246,6 @@ class TelethonAdmin:
                 is_admin=False,
             )
 
-            system_logger.info(
-                f"[Telegram Telethon] Пользователь {user_id} лишен прав администратора в {chat_id}"
-            )
             return SkillResult.ok(f"Пользователь {user_id} понижен до обычного участника.")
 
         except Exception as e:
@@ -207,3 +288,43 @@ class TelethonAdmin:
 
         except Exception as e:
             return SkillResult.fail(f"Ошибка при откреплении сообщения: {e}")
+
+    @skill()
+    async def create_topic(self, chat_id: Union[int, str], title: str) -> SkillResult:
+        """
+        Создает новый топик (раздел) в группе с включенными темами (Форуме).
+        Возвращает ID созданного топика (его нужно использовать как topic_id для отправки сообщений туда).
+        """
+        if not CreateForumTopicRequest:
+            return SkillResult.fail(
+                "Ошибка: Установленная версия библиотеки Telethon не поддерживает создание топиков."
+            )
+
+        try:
+            client = self.tg_client.client()
+            entity = await client.get_input_entity(self._parse_entity(chat_id))
+
+            result = await client(CreateForumTopicRequest(channel=entity, title=title))
+
+            # Получаем ID созданного топика из Updates
+            topic_id = None
+            for update in result.updates:
+                if hasattr(update, "message") and hasattr(update.message, "id"):
+                    topic_id = update.message.id
+                    break
+
+            if not topic_id:
+                return SkillResult.fail("Топик создан, но не удалось извлечь его ID.")
+
+            msg = f"Топик '{title}' успешно создан. ID топика: {topic_id}"
+            system_logger.info(f"[Telegram Telethon] {msg} (чат {chat_id})")
+            return SkillResult.ok(msg)
+
+        except ValueError:
+            return SkillResult.fail("Ошибка: Некорректный ID чата.")
+        except Exception as e:
+            if "CHAT_NOT_MODIFIED" in str(e) or "not a forum" in str(e).lower():
+                return SkillResult.fail(
+                    "Ошибка: Этот чат не является форумом (в нем не включены темы)."
+                )
+            return SkillResult.fail(f"Ошибка при создании топика: {e}")

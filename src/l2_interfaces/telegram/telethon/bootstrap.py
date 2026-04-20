@@ -11,6 +11,7 @@ from src.l2_interfaces.telegram.telethon.skills.messages import TelethonMessages
 from src.l2_interfaces.telegram.telethon.skills.moderation import TelethonModeration
 from src.l2_interfaces.telegram.telethon.skills.polls import TelethonPolls
 from src.l2_interfaces.telegram.telethon.skills.reactions import TelethonReactions
+from src.l2_interfaces.telegram.telethon.skills.admin import TelethonAdmin
 
 if TYPE_CHECKING:
     from src.main import System
@@ -49,9 +50,12 @@ def setup_telethon(system: "System", api_id: str | None, api_hash: str | None) -
     register_instance(TelethonModeration(client))
     register_instance(TelethonPolls(client))
     register_instance(TelethonReactions(client))
+    register_instance(TelethonAdmin(client))
 
     # Регистрация провайдеров контекста (отдают Markdown блоки в промпт агента)
-    system.context_registry.register_provider(name="telethon", provider_func=client.get_context_block, priority=80)
+    system.context_registry.register_provider(
+        name="telethon", provider_func=client.get_context_block, priority=80
+    )
 
     system_logger.info("[System] Интерфейс Telethon загружен.")
 

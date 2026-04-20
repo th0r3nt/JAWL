@@ -33,7 +33,7 @@ def mock_dependencies():
     # Фейковая схема
     tools = [{"type": "function", "function": {"name": "execute_skill"}}]
 
-    cooldown_sec = 2
+    cooldown_sec = 0.2
 
     return {
         "llm_client": llm_client,

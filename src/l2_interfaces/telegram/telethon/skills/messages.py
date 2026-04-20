@@ -284,3 +284,46 @@ class TelethonMessages:
 
         except Exception as e:
             return SkillResult.fail(f"Ошибка при нажатии кнопки: {e}")
+
+    @skill()
+    async def search_messages(
+        self, chat_id: Union[int, str], query: str, limit: int = 10
+    ) -> SkillResult:
+        """
+        Ищет сообщения в чате по ключевому слову.
+        Рекомендуется для поиска старой информации без необходимости читать весь чат.
+        """
+        try:
+            client = self.tg_client.client()
+            entity = self._parse_entity(chat_id)
+
+            from src.l2_interfaces.telegram.telethon._message_parser import (
+                TelethonMessageParser,
+            )
+
+            messages = []
+            # Используем встроенный поиск Telethon
+            async for msg in client.iter_messages(entity, search=query, limit=limit):
+                formatted = await TelethonMessageParser.build_string(
+                    client=client,
+                    target_entity=entity,
+                    msg=msg,
+                    timezone=self.tg_client.timezone,
+                    truncate_text=True,
+                )
+                messages.append(formatted)
+
+            if not messages:
+                return SkillResult.ok(
+                    f"По запросу '{query}' в чате {chat_id} ничего не найдено."
+                )
+
+            # Разворачиваем, чтобы старые были сверху
+            messages.reverse()
+
+            return SkillResult.ok(
+                f"Результаты поиска по '{query}':\n\n" + "\n\n".join(messages)
+            )
+
+        except Exception as e:
+            return SkillResult.fail(f"Ошибка при поиске сообщений: {e}")
