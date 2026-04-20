@@ -233,14 +233,19 @@ class System:
         """Подписывает Heartbeat на все системные события."""
 
         def create_handler(evt):
-            # Замыкание, чтобы передать правильные данные в wake_up
             def handler(**kwargs):
+                # Если система уже останавливается — игнорируем любые события
+                if evt == Events.SYSTEM_CORE_STOP:
+                    return
+                
                 self.heartbeat.wake_up(level=evt.level, event_name=evt.name, payload=kwargs)
 
             return handler
 
-        # Базовая подписка: будим агента на любые события
+        # Базовая подписка: будим агента на любые события, кроме остановки
         for event in Events.all():
+            if event == Events.SYSTEM_CORE_STOP:
+                continue
             self.event_bus.subscribe(event, create_handler(event))
 
         # Специфичные подписки
@@ -357,7 +362,7 @@ async def main() -> int:
     интерфейсы и запускает Heartbeat агента.
     Возвращает код завершения (0 - выключение, 1 - перезагрузка).
     """
-    
+
     # Загружаем переменные окружения
     load_dotenv()
 

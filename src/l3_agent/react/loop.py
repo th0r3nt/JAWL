@@ -241,3 +241,5 @@ class ReactLoop:
             # Обязательно сбрасываем кэш при любом исходе
             self.sql_ticks.clear_session_cache()
             self.agent_state.update_state(AgentStatus.IDLE)
+
+            self.tracker.finalize_tick()
