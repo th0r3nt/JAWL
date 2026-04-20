@@ -54,14 +54,21 @@ class TelethonMessages:
         time_delay: Optional[int] = None,
     ) -> SkillResult:
         """
-        Отправляет текстовое сообщение в группу/чат или канал (если есть права). Важно: to_id может быть как числовым ID, так и юзернеймом.
+        Отправляет текстовое сообщение в группу/чат или канал. Важно: to_id может быть как числовым ID, так и юзернеймом.
         Для отправки в конкретный топик форума - использовать аргумент topic_id.
+        Поддерживается Markdown форматирование: **жирный**, __курсив__, ~~зачеркнутый~~, ||спойлер||, `код`.
         """
         try:
             client = self.tg_client.client()
             entity = self._parse_entity(to_id)
 
-            kwargs = {"entity": entity, "message": text, "silent": is_silent}
+            # Явно указываем parse_mode, чтобы Telethon 100% считывал разметку
+            kwargs = {
+                "entity": entity,
+                "message": text,
+                "silent": is_silent,
+                "parse_mode": "md",
+            }
 
             if reply_to_message_id:
                 kwargs["reply_to"] = int(reply_to_message_id)
@@ -203,12 +210,18 @@ class TelethonMessages:
     async def edit_message(
         self, msg_id: int, new_text: str, chat_id: Union[int, str]
     ) -> SkillResult:
-        """Изменяет текст уже отправленного сообщения."""
+        """
+        Изменяет текст уже отправленного сообщения.
+        Поддерживается Markdown форматирование: **жирный**, __курсив__, ~~зачеркнутый~~, ||спойлер||, `код`.
+        """
 
         try:
             client = self.tg_client.client()
             await client.edit_message(
-                entity=self._parse_entity(chat_id), message=int(msg_id), text=new_text
+                entity=self._parse_entity(chat_id),
+                message=int(msg_id),
+                text=new_text,
+                parse_mode="md",
             )
             system_logger.info(f"[Telegram Telethon] Сообщение {msg_id} отредактировано")
             return SkillResult.ok(f"Текст сообщения {msg_id} успешно изменен.")
