@@ -31,11 +31,13 @@ class ColorFormatter(logging.Formatter):
     """
 
     PREFIX_COLORS = {
+        # Агент
         "[Heartbeat]": LogColors.BRIGHT_MAGENTA,
         "[ReAct]": LogColors.BRIGHT_CYAN,
         "[Thoughts]": LogColors.MAGENTA,
         "[Agent Action]": LogColors.BRIGHT_GREEN,
         "[Agent Action Result]": LogColors.GRAY,
+        # Скиллы/интерфейсы
         "[Skills]": LogColors.GRAY,
         "[LLM]": LogColors.BRIGHT_BLUE,
         "[Host OS]": LogColors.GREEN,
@@ -43,9 +45,12 @@ class ColorFormatter(logging.Formatter):
         "[Telegram Telethon]": LogColors.CYAN,
         "[Telegram Aiogram]": LogColors.BLUE,
         "[Meta]": LogColors.WHITE,
+        "[Multimodality]": LogColors.BRIGHT_YELLOW,
+        # Базы данных
         "[SQL DB]": LogColors.YELLOW,
         "[Vector DB]": LogColors.YELLOW,
         "[EventBus]": LogColors.GRAY,
+        # Общее
         "[System]": LogColors.BRIGHT_WHITE,
     }
 
@@ -87,7 +92,7 @@ def setup_specific_logger(name: str, log_file: str, level: Union[int, str]) -> l
     Инициализирует логгер с двойным выводом (терминал + файл).
     Защищает от дублирования хендлеров при перезагрузках системы.
     """
-    
+
     log_dir = Path("logs")
     log_dir.mkdir(exist_ok=True)
 

@@ -3,6 +3,7 @@ identity:
 
 llm:
   model_name: gemini-3.1-pro-preview # Можно поставить любую
+  is_multimodal: false # Поставьте true, если model_name мультимодальна
   temperature: 0.7
   max_react_steps: 15
 

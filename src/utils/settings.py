@@ -52,11 +52,16 @@ class MetaConfig(BaseModel):
     enabled: bool
 
 
+class MultimodalityConfig(BaseModel):
+    enabled: bool
+
+
 class InterfacesConfig(BaseModel):
     host: HostConfig
     telegram: TelegramConfig
     web: WebConfig
     meta: MetaConfig
+    multimodality: MultimodalityConfig
 
 
 # ==========================================
@@ -70,6 +75,7 @@ class IdentityConfig(BaseModel):
 
 class LLMConfig(BaseModel):
     model_name: str
+    is_multimodal: bool = False
     temperature: float
     max_react_steps: int
 

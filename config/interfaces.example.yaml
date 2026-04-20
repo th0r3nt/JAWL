@@ -36,3 +36,6 @@ web:
 # Интерфейс, позволяющий агенту менять свои параметры в settings.yaml и управлять системой сразу в рантайме
 meta:
   enabled: false 
+
+multimodality:
+  enabled: false # Поставьте true, если модель мультимодальна

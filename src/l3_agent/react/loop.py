@@ -3,6 +3,12 @@ import asyncio
 from typing import Dict, Any
 from pydantic import ValidationError
 
+# Для анализа медиа
+import base64
+import re
+import copy
+from pathlib import Path
+
 from src.utils.logger import system_logger
 from src.utils.token_tracker import TokenTracker
 
@@ -46,29 +52,10 @@ class ReactLoop:
 
         self.current_events: list[str] = []  # Хранилище событий для текущего цикла
 
-    def _dump_context_to_file(self, messages: list):
-        """
-        Сохраняет финальный промпт в Markdown-файл для отладки.
-        Безопасно парсит как обычные dict, так и объекты OpenAI.
-        """
-
-        try:
-            with open("logs/last_prompt.md", "w", encoding="utf-8") as f:
-                for m in messages:
-                    role = getattr(
-                        m,
-                        "role",
-                        m.get("role", "unknown") if isinstance(m, dict) else "unknown",
-                    )
-                    content = getattr(
-                        m, "content", m.get("content", "") if isinstance(m, dict) else ""
-                    )
-                    f.write(f"### Role: {role}\n{content}\n\n---\n")
-
-        except Exception as e:
-            system_logger.error(f"[System] Не удалось сохранить промпт: {e}")
-
     def add_realtime_event(self, event_str: str):
+        """
+        Добавляет входящее событие в контекст в том случае, если агент уже думает.
+        """
         self.current_events.append(event_str)
 
     async def run(self, event_name: str, payload: Dict[str, Any], missed_events: list[str]):
@@ -111,16 +98,20 @@ class ReactLoop:
 
                 # Трекаем токены на каждом из шагов, которые реально улетают в API (включая историю шагов)
                 self.tracker.add_input_record(messages=messages)
+                
+                # Делаем глубокое копирование, чтобы Base64 не попал в БД тиков и логи
+                api_messages = copy.deepcopy(messages)
+                api_messages = self._inject_images_to_payload(api_messages)
+
+                self._dump_context_to_file(api_messages)
+
 
                 system_logger.info(f"[ReAct] Шаг {step}/{self.agent_state.max_react_steps}.")
-
-                self._dump_context_to_file(messages)
-
                 try:
                     session = self.llm.get_session()
                     response = await session.chat.completions.create(
                         model=self.agent_state.llm_model,
-                        messages=messages,
+                        messages=api_messages,
                         tools=self.tools,
                         tool_choice={
                             "type": "function",
@@ -263,3 +254,81 @@ class ReactLoop:
             # Обязательно сбрасываем кэш при любом исходе
             self.sql_ticks.clear_session_cache()
             self.agent_state.update_state(AgentStatus.IDLE)
+
+    # ============================================================================
+    # СЛУЖЕБНЫЕ МЕТОДЫ
+    # ============================================================================
+
+    def _dump_context_to_file(self, messages: list):
+        """
+        Сохраняет финальный промпт в Markdown-файл для отладки.
+        Безопасно парсит как обычные dict, так и объекты OpenAI.
+        """
+
+        try:
+            with open("logs/last_prompt.md", "w", encoding="utf-8") as f:
+                for m in messages:
+                    role = getattr(
+                        m,
+                        "role",
+                        m.get("role", "unknown") if isinstance(m, dict) else "unknown",
+                    )
+                    content = getattr(
+                        m, "content", m.get("content", "") if isinstance(m, dict) else ""
+                    )
+                    f.write(f"### Role: {role}\n{content}\n\n---\n")
+
+        except Exception as e:
+            system_logger.error(f"[System] Не удалось сохранить промпт: {e}")
+
+    def _encode_image(self, image_path: str) -> str:
+        with open(image_path, "rb") as image_file:
+            return base64.b64encode(image_file.read()).decode("utf-8")
+
+    def _inject_images_to_payload(self, messages: list) -> list:
+        """
+        Сканирует историю сообщений на наличие маркера [IMAGE_REQUEST: /path/...].
+        Если находит, добавляет Base64 картинку в текущий user-контекст.
+        """
+
+        image_paths = []
+
+        # Сканируем последние 3 сообщения на наличие маркеров
+        for msg in messages[-3:]:
+            content = msg.get("content", "")
+            if content and isinstance(content, str):
+                matches = re.findall(r"\[IMAGE_REQUEST:\s*(.+?)\]", content)
+                image_paths.extend(matches)
+
+        if not image_paths:
+            return messages
+
+        # Берем последний элемент (всегда user prompt на каждом шаге)
+        last_user_msg = messages[-1]
+
+        if last_user_msg["role"] == "user":
+            new_content = [{"type": "text", "text": last_user_msg["content"]}]
+
+            for img_path in set(image_paths):  # set, чтобы не дублировать
+                try:
+                    path_obj = Path(img_path)
+                    if path_obj.exists():
+                        base64_data = self._encode_image(str(path_obj))
+                        ext = path_obj.suffix.lower()
+                        mime = "image/jpeg" if ext in [".jpg", ".jpeg"] else f"image/{ext[1:]}"
+
+                        new_content.append(
+                            {
+                                "type": "image_url",
+                                "image_url": {"url": f"data:{mime};base64,{base64_data}"},
+                            }
+                        )
+                        system_logger.info(
+                            f"[ReAct] Изображение {path_obj.name} успешно инжектировано в промпт."
+                        )
+                except Exception as e:
+                    system_logger.error(f"[ReAct] Ошибка инжектирования Base64: {e}")
+
+            last_user_msg["content"] = new_content
+
+        return messages

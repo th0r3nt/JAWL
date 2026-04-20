@@ -5,6 +5,7 @@ from src.l2_interfaces.meta.bootstrap import setup_meta
 from src.l2_interfaces.telegram.telethon.bootstrap import setup_telethon
 from src.l2_interfaces.telegram.aiogram.bootstrap import setup_aiogram
 from src.l2_interfaces.web.search.bootstrap import setup_web_search
+from src.l2_interfaces.multimodality.bootstrap import setup_multimodality
 
 # TODO: from src.l2_interfaces.web.http.bootstrap import setup_web_http
 
@@ -27,13 +28,6 @@ def initialize_l2_interfaces(system: "System", env_vars: Dict[str, str | None]) 
 
     if config.host.os.enabled:
         components.extend(setup_host_os(system))
-
-    # ================================================================
-    # META
-    # ================================================================
-
-    if getattr(config, "meta", None) and config.meta.enabled:
-        components.extend(setup_meta(system))
 
     # ================================================================
     # TELEGRAM TELETHON
@@ -66,6 +60,20 @@ def initialize_l2_interfaces(system: "System", env_vars: Dict[str, str | None]) 
 
     if config.web.search.enabled:
         components.extend(setup_web_search(system))
+
+    # ================================================================
+    # META
+    # ================================================================
+
+    if getattr(config, "meta", None) and config.meta.enabled:
+        components.extend(setup_meta(system))
+
+    # ================================================================
+    # MULTIMODALITY
+    # ================================================================
+
+    if getattr(config, "multimodality", None) and config.multimodality.enabled:
+        components.extend(setup_multimodality(system))
 
     # ================================================================
 

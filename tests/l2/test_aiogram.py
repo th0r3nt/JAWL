@@ -124,10 +124,11 @@ async def test_on_private_message(aiogram_events, mock_bus):
     await aiogram_events._on_private_message(msg)
 
     mock_bus.publish.assert_called_once_with(
-        Events.AIOGRAM_MESSAGE_INCOMING,
-        message="Привет",
+        Events.TELETHON_MESSAGE_INCOMING,
+        message="Привет, агент!",
         sender_name="Alex",
-        chat_id=100,
+        chat_name="Unknown",
+        chat_id=12345,
     )
 
 

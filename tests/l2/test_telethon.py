@@ -141,6 +141,7 @@ async def test_on_group_message_mentioned(telethon_events, mock_bus):
         Events.TELETHON_GROUP_MENTION,
         message="@agent, как дела?",
         sender_name="Unknown",
+        chat_name="Unknown",
         chat_id=-100999,
     )
 
@@ -162,6 +163,7 @@ async def test_on_group_message_ignored(telethon_events, mock_bus):
         Events.TELETHON_GROUP_MESSAGE,
         message="Просто текст",
         sender_name="Unknown",
+        chat_name="Unknown",  # <--- добавить
         chat_id=-100999,
     )
 

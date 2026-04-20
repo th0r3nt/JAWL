@@ -61,8 +61,6 @@ class TelethonEvents:
     # ==========================================================
     # ЭВЕНТЫ
     # ==========================================================
-
-    # Отслеживание сообщений в личку
     async def _on_private_message(self, event: events.NewMessage.Event) -> None:
         try:
             await event.message.mark_read()
@@ -71,16 +69,31 @@ class TelethonEvents:
 
         await self._update_state()
 
-        sender = await event.get_sender()
-        sender_name = utils.get_display_name(sender) if sender else "Unknown"
-        sender_name = sender_name or "Unknown"
+        client = self.tg_client.client()
+
+        # Получаем имя отправителя через умный парсер (решает проблему "Unknown" в каналах)
+        sender_name = TelethonMessageParser.get_sender_name(event.message)
+
+        # Получаем имя чата
+        chat = await event.get_chat()
+        chat_name = utils.get_display_name(chat) if chat else "Unknown"
+
+        # Обогащаем сообщение (реплаи, форварды, медиа)
+        msg_obj = event.message
+        fwd_info = await TelethonMessageParser.parse_forward(msg_obj)
+        is_reply, reply_id = TelethonMessageParser.determine_reply(msg_obj, None)
+        reply_info = await TelethonMessageParser.parse_reply(client, chat, is_reply, reply_id)
+
+        base_text = msg_obj.text or TelethonMessageParser.parse_media(msg_obj)
+        enriched_message = f"{base_text}{fwd_info}{reply_info}".strip()
 
         # Тянем историю
         history = await self._fetch_recent_history(event.chat_id, limit=5)
 
         payload = {
-            "message": event.text or "[Медиа]",
+            "message": enriched_message,
             "sender_name": sender_name,
+            "chat_name": chat_name,
             "chat_id": event.chat_id,
         }
         if history:
@@ -101,17 +114,29 @@ class TelethonEvents:
 
         await self._update_state()
 
-        sender = await event.get_sender()
-        sender_name = utils.get_display_name(sender) if sender else "Unknown"
-        sender_name = sender_name or "Unknown"
+        client = self.tg_client.client()
+
+        sender_name = TelethonMessageParser.get_sender_name(event.message)
+
+        chat = await event.get_chat()
+        chat_name = utils.get_display_name(chat) if chat else "Unknown"
+
+        msg_obj = event.message
+        fwd_info = await TelethonMessageParser.parse_forward(msg_obj)
+        is_reply, reply_id = TelethonMessageParser.determine_reply(msg_obj, None)
+        reply_info = await TelethonMessageParser.parse_reply(client, chat, is_reply, reply_id)
+
+        base_text = msg_obj.text or TelethonMessageParser.parse_media(msg_obj)
+        enriched_message = f"{base_text}{fwd_info}{reply_info}".strip()
 
         payload = {
-            "message": event.text or "[Медиа]",
+            "message": enriched_message,
             "sender_name": sender_name,
+            "chat_name": chat_name,
             "chat_id": event.chat_id,
         }
 
-        # В группах подтягиваем контекст ТОЛЬКО если нас упомянули (экономим запросы)
+        # В группах подтягиваем историю ТОЛЬКО если нас упомянули (экономим запросы)
         if event.mentioned:
             history = await self._fetch_recent_history(event.chat_id, limit=5)
             if history:
