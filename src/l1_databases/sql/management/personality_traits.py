@@ -1,6 +1,6 @@
 import uuid
 from typing import Optional, TYPE_CHECKING
-from sqlalchemy import select, delete
+from sqlalchemy import select, delete, func
 
 from src.l3_agent.skills.registry import skill, SkillResult
 from src.utils.logger import system_logger
@@ -13,18 +13,31 @@ if TYPE_CHECKING:
 class SQLPersonalityTraits:
     """CRUD для управления приобретенными чертами характера агента."""
 
-    def __init__(self, db: "SQLDB"):
+    def __init__(self, db: "SQLDB", max_traits: int = 10):
         self.db = db
+        self.max_traits = max_traits
 
     @skill()
     async def add_trait(
-        self, name: str, description: str, reason: Optional[str] = None, context: Optional[str] = None
+        self,
+        name: str,
+        description: str,
+        reason: Optional[str] = None,
+        context: Optional[str] = None,
     ) -> SkillResult:
         """Добавляет новую приобретенную черту личности."""
 
         trait_id = str(uuid.uuid4())[:8]
 
         async with self.db.session_factory() as session:
+            # Проверка лимита
+            count_res = await session.execute(select(func.count(PersonalityTraitTable.id)))
+            if count_res.scalar_one() >= self.max_traits:
+                return SkillResult.fail(
+                    f"Достигнут лимит макс. количества приобретенных черт личности ({self.max_traits}). "
+                    "Рекомендуется удалить неактуальные."
+                )
+
             new_trait = PersonalityTraitTable(
                 id=trait_id, name=name, description=description, reason=reason, context=context
             )
@@ -49,9 +62,7 @@ class SQLPersonalityTraits:
         for t in traits:
             reason_str = f" | Причина: {t.reason}" if t.reason else ""
             ctx_str = f" | Контекст: {t.context}" if t.context else ""
-            lines.append(
-                f"- [ID: `{t.id}`] '{t.name}': {t.description}{reason_str}{ctx_str}"
-            )
+            lines.append(f"- [ID: `{t.id}`] '{t.name}': {t.description}{reason_str}{ctx_str}")
 
         return SkillResult.ok("\n".join(lines))
 
@@ -59,7 +70,9 @@ class SQLPersonalityTraits:
     async def remove_trait(self, trait_id: str) -> SkillResult:
         """Удаляет черту личности по ID, если она больше не актуальна."""
         async with self.db.session_factory() as session:
-            result = await session.execute(delete(PersonalityTraitTable).where(PersonalityTraitTable.id == trait_id))
+            result = await session.execute(
+                delete(PersonalityTraitTable).where(PersonalityTraitTable.id == trait_id)
+            )
             await session.commit()
 
             if result.rowcount == 0:

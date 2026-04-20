@@ -31,19 +31,24 @@ class ContextBuilder:
         )
 
         ordered_parts = []
+        
+        # ================================================
+        # ## DRIVES
+        if "sql_drives" in blocks:
+            ordered_parts.append(blocks["sql_drives"])
 
-        # Строгий порядок блоков контейста
-
+        # ================================================
         # ## PERSONALITY TRAITS
         if "sql_traits" in blocks:
             ordered_parts.append(blocks["sql_traits"])
 
+        # ================================================
         # ## SKILLS
         ordered_parts.append(f"## SKILLS\n{get_skills_library()}")
 
+        # ================================================
         # ## INTERFACES STATE
-        # Указываем порядок вывода интерфейсов друг за другом
-        interface_keys = [
+        interface_keys = [  # Указываем порядок вывода интерфейсов друг за другом
             "agent_state",
             "host os",
             "meta",
@@ -57,22 +62,27 @@ class ContextBuilder:
         if interfaces:
             ordered_parts.append("\n\n".join(interfaces))
 
+        # ================================================
         # ## MENTAL STATES
         if "sql_mental_states" in blocks:
             ordered_parts.append(blocks["sql_mental_states"])
 
+        # ================================================
         # ## TASKS
         if "sql_tasks" in blocks:
             ordered_parts.append(blocks["sql_tasks"])
 
+        # ================================================
         # ## RAG MEMORIES
         if "rag memories" in blocks:
             ordered_parts.append(blocks["rag memories"])
 
+        # ================================================
         # ## RECENT TICKS
         if "sql_ticks" in blocks:
             ordered_parts.append(blocks["sql_ticks"])
 
+        # ================================================
         # ## HEARTBEAT & EVENT LOGS (Причина пробуждения - всегда в самом низу)
         wake_up_reason = self._build_wake_up_reason(event_name, payload, missed_events)
         ordered_parts.append(f"## HEARTBEAT\n{wake_up_reason}")

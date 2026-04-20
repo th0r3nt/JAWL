@@ -1,6 +1,6 @@
 import uuid
 from typing import Optional, TYPE_CHECKING
-from sqlalchemy import select, delete
+from sqlalchemy import select, delete, func
 
 from src.l3_agent.skills.registry import skill, SkillResult
 from src.utils.logger import system_logger
@@ -13,17 +13,25 @@ if TYPE_CHECKING:
 class SQLTasks:
     """CRUD для управления долгосрочными задачами агента."""
 
-    def __init__(self, db: "SQLDB"):
+    def __init__(self, db: "SQLDB", max_tasks: int = 15):
         self.db = db
+        self.max_tasks = max_tasks
 
     @skill()
     async def create_task(
         self, description: str, term: Optional[str] = None, context: Optional[str] = None
     ) -> SkillResult:
         """Создает новую долгосрочную задачу в базе данных."""
-        task_id = str(uuid.uuid4())[:8]  # Короткий ID для удобства LLM
+        task_id = str(uuid.uuid4())[:8]
 
         async with self.db.session_factory() as session:
+            # Проверка лимита
+            count_res = await session.execute(select(func.count(TaskTable.id)))
+            if count_res.scalar_one() >= self.max_tasks:
+                return SkillResult.fail(
+                    f"Достигнут лимит задач ({self.max_tasks}). Рекомендуется завершить или удалить старые задачи перед созданием новых."
+                )
+
             new_task = TaskTable(
                 id=task_id, description=description, term=term, context=context
             )

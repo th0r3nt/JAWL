@@ -9,6 +9,7 @@ from src.l1_databases.sql.management.tasks import SQLTasks
 from src.l1_databases.sql.management.ticks import SQLTicks
 from src.l1_databases.sql.management.personality_traits import SQLPersonalityTraits
 from src.l1_databases.sql.management.mental_states import SQLMentalStates
+from src.l1_databases.sql.management.drives import SQLDrives
 
 # ===================================================================
 # FIXTURES
@@ -35,18 +36,26 @@ async def memory_db():
 
 
 @pytest.fixture
-def tasks_manager(memory_db):
-    return SQLTasks(db=memory_db)
-
-
-@pytest.fixture
 def ticks_manager(memory_db):
     return SQLTicks(db=memory_db)
 
 
 @pytest.fixture
+def tasks_manager(memory_db):
+    return SQLTasks(db=memory_db, max_tasks=2)
+
+
+@pytest.fixture
 def traits_manager(memory_db):
-    return SQLPersonalityTraits(db=memory_db)
+    return SQLPersonalityTraits(db=memory_db, max_traits=2)
+
+
+@pytest.fixture
+def drives_manager(memory_db):
+    # Ставим маленькие лимиты для теста
+    return SQLDrives(
+        db=memory_db, default_decay_rate=5.0, max_history=3, max_custom=2, tz_offset=3
+    )
 
 
 # ===================================================================
@@ -98,6 +107,17 @@ async def test_delete_task(tasks_manager):
     # Проверяем, что пусто
     res_get = await tasks_manager.get_tasks()
     assert "Список задач пуст" in res_get.message
+
+
+@pytest.mark.asyncio
+async def test_add_task_limit(tasks_manager):
+    """Тест: лимит на количество задач соблюдается."""
+    await tasks_manager.create_task("Task 1")
+    await tasks_manager.create_task("Task 2")
+
+    res_fail = await tasks_manager.create_task("Task 3")
+    assert res_fail.is_success is False
+    assert "Достигнут лимит" in res_fail.message
 
 
 # ===================================================================
@@ -169,6 +189,17 @@ async def test_remove_trait(traits_manager):
     assert "Список приобретенных черт личности пуст" in res_get.message
 
 
+@pytest.mark.asyncio
+async def test_add_trait_limit(traits_manager):
+    await traits_manager.add_trait("Trait 1", "Desc")
+    await traits_manager.add_trait("Trait 2", "Desc")
+
+    # Третий должен упасть в лимит
+    res_fail = await traits_manager.add_trait("Trait 3", "Desc")
+    assert res_fail.is_success is False
+    assert "Достигнут лимит" in res_fail.message
+
+
 # ===================================================================
 # TESTS: MENTAL STATES
 # ===================================================================
@@ -206,3 +237,73 @@ async def test_mental_states_crud(mental_states_manager):
 
     res_get_empty = await mental_states_manager.get_mental_states()
     assert "Список MentalState пуст" in res_get_empty.message
+
+
+# ===================================================================
+# TESTS: DRIVES
+# ===================================================================
+
+
+@pytest.mark.asyncio
+async def test_drives_bootstrap_and_context(drives_manager):
+    """Тест: Базовые драйвы успешно создаются при первом запуске, дефицит считается корректно."""
+
+    # 1. Бутстрап (должно создаться 3 базовых мотивации: Curiosity, Social, Mastery)
+    await drives_manager.bootstrap_fundamental_drives()
+
+    # 2. Проверяем контекст
+    context = await drives_manager.get_context_block()
+    assert "Curiosity" in context
+    assert "Social" in context
+    assert "Mastery" in context
+    # При создании last_satisfied_at = сейчас, значит дефицит должен быть 0/100
+    assert "Дефицит: 0/100" in context
+
+
+@pytest.mark.asyncio
+async def test_drives_satisfy_drive(drives_manager):
+    """Тест: удовлетворение драйва обновляет рефлексию и историю."""
+
+    await drives_manager.bootstrap_fundamental_drives()
+
+    # Агент удовлетворил любопытство
+    res = await drives_manager.satisfy_drive(
+        drive_name="curiosity", reflection_summary="Прочитала статью на Хабре про вектора."
+    )
+    assert res.is_success is True
+
+    context = await drives_manager.get_context_block()
+    assert "Прочитала статью на Хабре про вектора." in context
+
+
+@pytest.mark.asyncio
+async def test_drives_custom_crud_and_limits(drives_manager):
+    """Тест: Создание кастомного драйва, лимиты и удаление."""
+
+    # Создаем кастомные (используем точный регистр для надежности SQLite)
+    res_1 = await drives_manager.create_custom_drive("Мониторинг логов", "Чек ошибок")
+    res_2 = await drives_manager.create_custom_drive("Проверка почты", "Чек писем")
+
+    assert res_1.is_success is True
+    assert res_2.is_success is True
+
+    # Пытаемся превысить лимит (max_custom = 2)
+    res_fail = await drives_manager.create_custom_drive("Лишний", "Не влезет")
+    assert res_fail.is_success is False
+    assert "Достигнут лимит" in res_fail.message
+
+    # Удаляем кастомный (передаем в том же регистре)
+    res_del = await drives_manager.delete_custom_drive("Мониторинг логов")
+    assert res_del.is_success is True
+
+
+@pytest.mark.asyncio
+async def test_drives_cannot_delete_fundamental(drives_manager):
+    """Тест: Система защищает базовые драйвы от удаления агентом."""
+
+    await drives_manager.bootstrap_fundamental_drives()
+
+    # Пытаемся удалить вшитый драйв (с большой буквы, как он создается в БД)
+    res_del = await drives_manager.delete_custom_drive("Social")
+    assert res_del.is_success is False
+    assert "Базовые (Fundamental) драйвы нельзя удалить" in res_del.message

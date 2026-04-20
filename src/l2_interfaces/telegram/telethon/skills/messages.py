@@ -24,10 +24,15 @@ class TelethonMessages:
 
     def _validate_sandbox_path(self, filepath: str) -> Path:
         """Внутренний гейткипер: разрешает работу с файлами строго внутри папки sandbox/."""
-        sandbox_dir = Path.cwd() / "sandbox"
+
+        sandbox_dir = (Path.cwd() / "sandbox").resolve()
         sandbox_dir.mkdir(parents=True, exist_ok=True)
 
-        resolved = (sandbox_dir / filepath).resolve()
+        path_str = str(filepath).replace("\\", "/")
+        if path_str.startswith("sandbox/"):
+            path_str = path_str[8:]
+
+        resolved = (sandbox_dir / path_str).resolve()
         if not resolved.is_relative_to(sandbox_dir):
             raise PermissionError(
                 "Доступ запрещен: можно отправлять и скачивать файлы только в пределах папки sandbox/"

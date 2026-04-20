@@ -22,7 +22,21 @@ def mock_configs():
     settings.system.timezone = 3
     settings.system.heartbeat_interval = 30
     settings.system.continuous_cycle = False
-    settings.system.max_mental_state_entities = 10
+
+    # Новые моки для когнитивных модулей
+    settings.system.sql.tasks.enabled = True
+    settings.system.sql.tasks.max_tasks = 15
+
+    settings.system.sql.personality_traits.enabled = True
+    settings.system.sql.personality_traits.max_traits = 10
+
+    settings.system.sql.mental_states.enabled = True
+    settings.system.sql.mental_states.max_entities = 10
+
+    settings.system.sql.drives.enabled = True
+    settings.system.sql.drives.default_decay_rate_per_hour = 5.0
+    settings.system.sql.drives.max_reflections_history = 3
+    settings.system.sql.drives.max_custom_drives = 5
 
     # Identity
     settings.identity.agent_name = "TestAgent"

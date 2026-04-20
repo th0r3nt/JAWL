@@ -102,6 +102,35 @@ class EventAccelerationConfig(BaseModel):
     background_multiplier: float
 
 
+class TasksConfig(BaseModel):
+    enabled: bool
+    max_tasks: int 
+
+
+class PersonalityTraitsConfig(BaseModel):
+    enabled: bool
+    max_traits: int
+
+
+class MentalStatesConfig(BaseModel):
+    enabled: bool
+    max_entities: int
+
+
+class DrivesConfig(BaseModel):
+    enabled: bool
+    default_decay_rate_per_hour: float
+    max_reflections_history: int
+    max_custom_drives: int
+
+
+class SQLConfig(BaseModel):
+    tasks: TasksConfig
+    personality_traits: PersonalityTraitsConfig
+    mental_states: MentalStatesConfig
+    drives: DrivesConfig
+
+
 class SystemConfig(BaseModel):
     timezone: int
     vector_db: VectorDBConfig
@@ -109,7 +138,8 @@ class SystemConfig(BaseModel):
     continuous_cycle: bool
     event_acceleration: EventAccelerationConfig
     context_depth: ContextDepthConfig
-    max_mental_state_entities: int
+
+    sql: SQLConfig
 
 
 class SettingsConfig(BaseModel):

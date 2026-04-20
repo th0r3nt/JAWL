@@ -8,12 +8,15 @@ from src.l0_state.interfaces.state import TelethonState
 
 from src.l2_interfaces.telegram.telethon.client import TelethonClient
 from src.l2_interfaces.telegram.telethon.events import TelethonEvents
+
+# Классы скиллов
 from src.l2_interfaces.telegram.telethon.skills.messages import TelethonMessages
 from src.l2_interfaces.telegram.telethon.skills.account import TelethonAccount
 from src.l2_interfaces.telegram.telethon.skills.chats import TelethonChats
 from src.l2_interfaces.telegram.telethon.skills.moderation import TelethonModeration
 from src.l2_interfaces.telegram.telethon.skills.polls import TelethonPolls
 from src.l2_interfaces.telegram.telethon.skills.reactions import TelethonReactions
+from src.l2_interfaces.telegram.telethon.skills.admin import TelethonAdmin
 
 
 # ===================================================================
@@ -169,8 +172,8 @@ async def test_on_group_message_ignored(mock_get_display_name, telethon_events, 
 
     event = MagicMock()
     event.chat_id = -100999
-    event.mentioned = False 
-    
+    event.mentioned = False
+
     chat_mock = MagicMock()
     event.get_chat = AsyncMock(return_value=chat_mock)
 
@@ -560,3 +563,77 @@ async def test_chats_add_contact(mock_tg_client):
     assert res.is_success is True
     assert "добавлен в контакты" in res.message
     assert mock_tg_client.client().call_count >= 1
+
+
+# ===================================================================
+# TESTS: TELETHON ADMIN
+# ===================================================================
+
+
+@pytest.mark.asyncio
+async def test_admin_create_channel(mock_tg_client):
+    """Тест: создание канала/супергруппы."""
+    skills = TelethonAdmin(mock_tg_client)
+
+    # Мокаем сырой вызов client(...)
+    mock_result = MagicMock()
+    mock_result.chats = [MagicMock(id=999999)]
+    # Используем side_effect, так как TelethonClient.__call__ реализован нестандартно
+    mock_tg_client.client().side_effect = AsyncMock(return_value=mock_result)
+
+    res = await skills.create_channel(title="JAWL Logs", is_megagroup=True)
+
+    assert res.is_success is True
+    # Telethon возвращает ID без префикса -100, скилл должен его добавить
+    assert "-100999999" in res.message
+
+
+@pytest.mark.asyncio
+async def test_admin_pin_message(mock_tg_client):
+    """Тест: закрепление сообщения в чате."""
+    skills = TelethonAdmin(mock_tg_client)
+
+    res = await skills.pin_message(chat_id=12345, message_id=42, notify=True)
+
+    assert res.is_success is True
+    mock_tg_client.client().pin_message.assert_called_once_with(
+        entity=12345, message=42, notify=True
+    )
+
+
+@pytest.mark.asyncio
+async def test_admin_promote_user(mock_tg_client):
+    """Тест: выдача прав администратора."""
+    skills = TelethonAdmin(mock_tg_client)
+
+    res = await skills.promote_user(chat_id=-100500, user_id=777, add_admins=False)
+
+    assert res.is_success is True
+    mock_tg_client.client().edit_admin.assert_called_once_with(
+        entity=-100500,
+        user=777,
+        is_admin=True,
+        change_info=True,
+        post_messages=True,
+        edit_messages=True,
+        delete_messages=True,
+        ban_users=True,
+        invite_users=True,
+        pin_messages=True,
+        add_admins=False,
+    )
+
+
+@pytest.mark.asyncio
+async def test_admin_demote_user(mock_tg_client):
+    """Тест: снятие прав администратора."""
+    skills = TelethonAdmin(mock_tg_client)
+
+    res = await skills.demote_user(chat_id=-100500, user_id=777)
+
+    assert res.is_success is True
+    mock_tg_client.client().edit_admin.assert_called_once_with(
+        entity=-100500,
+        user=777,
+        is_admin=False,
+    )

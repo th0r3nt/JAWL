@@ -289,33 +289,34 @@ class ReactLoop:
         Сканирует историю сообщений на наличие маркера [IMAGE_REQUEST: /path/...].
         Если находит, добавляет Base64 картинку в текущий user-контекст.
         """
-
         image_paths = []
 
-        # 1. Безопасно сканируем последние 3 сообщения (они могут быть словарями ИЛИ объектами)
-        for msg in messages[-3:]:
+        # Ищем маркеры ТОЛЬКО в ответах инструментов (role == "tool")
+        # внутри текущего ReAct-цикла. Строго игнорируем role == "user",
+        # чтобы не вытянуть старый маркер из контекста прошлых тиков (баг залипания картинок)
+        for msg in messages:
             if isinstance(msg, dict):
+                role = msg.get("role")
                 content = msg.get("content", "")
             else:
+                role = getattr(msg, "role", "")
                 content = getattr(msg, "content", "")
 
-            if content and isinstance(content, str):
+            if role == "tool" and content and isinstance(content, str):
                 matches = re.findall(r"\[IMAGE_REQUEST:\s*(.+?)\]", content)
                 image_paths.extend(matches)
 
         if not image_paths:
             return messages
 
-        # 2. Инжектим картинку строго в messages[1]
-        # В JAWL messages[1] - это всегда "user" сообщение с актуальным контекстом шага.
-        # Роль "tool" (messages[-1]) картинки не поддерживает по спецификации API
+        # Инжектим картинку строго в messages[1] (блок контекста пользователя)
         user_msg = messages[1]
 
         if isinstance(user_msg, dict) and user_msg.get("role") == "user":
             original_text = user_msg["content"]
             new_content = [{"type": "text", "text": original_text}]
 
-            for img_path in set(image_paths):  # set, чтобы не дублировать картинки
+            for img_path in set(image_paths):  # set, чтобы не дублировать
                 try:
                     path_obj = Path(img_path)
                     if path_obj.exists():

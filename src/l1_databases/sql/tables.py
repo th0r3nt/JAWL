@@ -72,3 +72,23 @@ class MentalStateTable(Base):
     status: Mapped[str]
     context: Mapped[Optional[str]]
     related_information: Mapped[Optional[str]]
+
+
+class DriveTable(Base):
+    """Таблица внутренних мотиваторов агента (Drives)."""
+
+    __tablename__ = "drives"
+
+    id: Mapped[str] = mapped_column(primary_key=True)
+    name: Mapped[str]
+    type: Mapped[str]  # "fundamental" (постоянные) или "custom" (созданные самим агентом)
+    description: Mapped[str]
+    decay_rate: Mapped[float]  # Скорость роста дефицита (% в час)
+
+    # Время последнего удовлетворения мотивации (UTC)
+    last_satisfied_at: Mapped[datetime] = mapped_column(
+        default=lambda: datetime.now(timezone.utc)
+    )
+
+    # Хранит список строк (последние рефлексии агента)
+    recent_reflections: Mapped[list[str]] = mapped_column(JSON, default=list)

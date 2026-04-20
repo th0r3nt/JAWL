@@ -43,11 +43,26 @@ class HostOSClient:
         self.state.is_online = True
 
     def validate_path(self, target_path: str | Path, is_write: bool = False) -> Path:
-        resolved_path = Path(target_path).resolve()
+        """
+        Проверяет переданный путь на безопасность
+        + уровни доступа агента к файловой системе.
+        """
+
+        path_obj = Path(target_path)
+
+        # Smart Resolve: если путь относительный,
+        # резолвим его относительно песочницы, очищая от дубликатов "sandbox/"
+        if not path_obj.is_absolute():
+            path_str = str(path_obj).replace("\\", "/")
+            if path_str.startswith("sandbox/"):
+                path_str = path_str[8:]  # Отрезаем префикс "sandbox/"
+            resolved_path = (self.sandbox_dir / path_str).resolve()
+        else:
+            resolved_path = path_obj.resolve()
 
         if not self.config.env_access and ".env" in resolved_path.name.lower():
             raise PermissionError(
-                f"SYSTEM DENIED: Доступ к файлам конфигурации ({resolved_path.name}) строго запрещен."
+                f"SYSTEM DENIED: Доступ к файлам конфигурации ({resolved_path.name}) запрещен."
             )
 
         if self.access_level == HostOSAccessLevel.ROOT:
@@ -56,13 +71,16 @@ class HostOSClient:
         if self.access_level == HostOSAccessLevel.OPERATOR:
             if is_write and not resolved_path.is_relative_to(self.framework_dir):
                 raise PermissionError("OPERATOR: Запись разрешена только в директории JAWL.")
+            
             return resolved_path
 
         if self.access_level == HostOSAccessLevel.OBSERVER:
             if is_write and not resolved_path.is_relative_to(self.sandbox_dir):
                 raise PermissionError("OBSERVER: Запись разрешена строго в папке sandbox/.")
+            
             if not is_write and not resolved_path.is_relative_to(self.framework_dir):
                 raise PermissionError("OBSERVER: Чтение разрешено только в пределах JAWL.")
+            
             return resolved_path
 
         if not resolved_path.is_relative_to(self.sandbox_dir):

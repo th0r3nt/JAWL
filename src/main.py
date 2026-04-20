@@ -110,24 +110,72 @@ class System:
     async def setup_l1_databases(self):
         """Поднимает базы данных и регистрирует их CRUD-скиллы."""
 
+        sys_cfg = self.settings.system
         system_logger.info("[System] Инициализация L1 Databases.")
 
         # SQL DB
         self.sql = SQLManager(
             db_path=self.local_data_dir / "sql_db" / "agent.db",
-            max_mental_state_entities=self.settings.system.max_mental_state_entities,
-            ticks_limit=self.settings.system.context_depth.ticks,
-            detailed_ticks=self.settings.system.context_depth.detailed_ticks,
-            tick_action_max_chars=self.settings.system.context_depth.tick_action_max_chars,
-            tick_result_max_chars=self.settings.system.context_depth.tick_result_max_chars,
-            timezone=self.settings.system.timezone,
+            # Ticks
+            ticks_limit=sys_cfg.context_depth.ticks,
+            detailed_ticks=sys_cfg.context_depth.detailed_ticks,
+            tick_action_max_chars=sys_cfg.context_depth.tick_action_max_chars,
+            tick_result_max_chars=sys_cfg.context_depth.tick_result_max_chars,
+            # Tasks
+            max_tasks=sys_cfg.sql.tasks.max_tasks,
+            # Mental State
+            max_mental_state_entities=sys_cfg.sql.mental_states.max_entities,
+            # Personality Traits
+            max_traits=sys_cfg.sql.personality_traits.max_traits,
+            # Drives
+            drives_enabled=sys_cfg.sql.drives.enabled,
+            default_decay_rate=sys_cfg.sql.drives.default_decay_rate_per_hour,
+            max_history_drives=sys_cfg.sql.drives.max_reflections_history,
+            max_custom_drives=sys_cfg.sql.drives.max_custom_drives,
+            # Время
+            timezone=sys_cfg.timezone,
         )
         await self.sql.connect()
 
-        # Регистрация навыков для агента
-        register_instance(self.sql.tasks)
-        register_instance(self.sql.personality_traits)
-        register_instance(self.sql.mental_states)
+        # =========================================================
+        # ДИНАМИЧЕСКАЯ РЕГИСТРАЦИЯ SQL НАВЫКОВ И КОНТЕКСТА
+        # =========================================================
+
+        # TASKS
+        if sys_cfg.sql.tasks.enabled:
+            register_instance(self.sql.tasks)
+            self.context_registry.register_provider(
+                "sql_tasks", self.sql.tasks.get_context_block
+            )
+
+        # PERSONALITY TRAITS
+        if sys_cfg.sql.personality_traits.enabled:
+            register_instance(self.sql.personality_traits)
+            self.context_registry.register_provider(
+                "sql_traits", self.sql.personality_traits.get_context_block
+            )
+
+        # MENTAL STATES
+        if sys_cfg.sql.mental_states.enabled:
+            register_instance(self.sql.mental_states)
+            self.context_registry.register_provider(
+                "sql_mental_states", self.sql.mental_states.get_context_block
+            )
+
+        # DRIVES
+        if sys_cfg.sql.drives.enabled:
+            register_instance(self.sql.drives)
+            self.context_registry.register_provider(
+                "sql_drives", self.sql.drives.get_context_block
+            )
+
+        # Базовые вещи регистрируются всегда
+        # TICKS
+        self.context_registry.register_provider("sql_ticks", self.sql.ticks.get_context_block)
+        # AGENT STATE
+        self.context_registry.register_provider(
+            "agent_state", self.agent_state.get_context_block
+        )
 
         # Vector DB
         self.vector = VectorManager(
@@ -143,23 +191,6 @@ class System:
         # Регистрация навыков для агента
         register_instance(self.vector.knowledge)
         register_instance(self.vector.thoughts)
-
-        # Регистрация провайдеров контекста (отдают Markdown блоки в промпт)
-        self.context_registry.register_provider(
-            name="sql_tasks", provider_func=self.sql.tasks.get_context_block
-        )
-        self.context_registry.register_provider(
-            name="sql_traits", provider_func=self.sql.personality_traits.get_context_block
-        )
-        self.context_registry.register_provider(
-            name="sql_mental_states", provider_func=self.sql.mental_states.get_context_block
-        )
-        self.context_registry.register_provider(
-            name="sql_ticks", provider_func=self.sql.ticks.get_context_block
-        )
-        self.context_registry.register_provider(
-            "agent_state", self.agent_state.get_context_block
-        )
 
     def setup_l2_interfaces(
         self,
@@ -238,7 +269,7 @@ class System:
                 # Если система уже останавливается — игнорируем любые события
                 if evt == Events.SYSTEM_CORE_STOP:
                     return
-                
+
                 self.heartbeat.wake_up(level=evt.level, event_name=evt.name, payload=kwargs)
 
             return handler
