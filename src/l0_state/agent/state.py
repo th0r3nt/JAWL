@@ -26,8 +26,21 @@ class AgentState(BaseModel):
     max_react_steps: int = 15
     heartbeat_interval: int = 180
 
-    # Время запуска (записывается автоматически при создании объекта)
+    # Аптайм, время первого запуска (записывается автоматически при создании объекта)
     start_time: float = Field(default_factory=time.time)
+
+    # Краткосрочная память для ассоциативного RAG (когда шаг ReAct цикла > 1)
+    last_thoughts: str = ""
+    last_action_args: list[str] = Field(default_factory=list)
+    last_action_error: str = ""
+    # По ним будет осуществляться RAG-поиск по базам данных каждый шаг в текущем ReAct-цикле, 
+    # чтобы у агента автоматически всплывали воспоминания по своим мыслям/действиям
+
+    def reset_step(self):
+        self.current_step = 1
+        self.last_thoughts = ""
+        self.last_action_args.clear()
+        self.last_action_error = ""
 
     def update_state(self, new_state: AgentStatus):
         self.state = new_state
@@ -35,10 +48,6 @@ class AgentState(BaseModel):
     def next_step(self):
         """Увеличивает счетчик шагов в рамках текущего тика."""
         self.current_step += 1
-
-    def reset_step(self):
-        """Сбрасывает счетчик в начале нового тика."""
-        self.current_step = 1
 
     def get_uptime(self) -> str:
         """Считает, сколько времени жив сам агент (не ОС хоста)."""

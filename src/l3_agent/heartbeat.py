@@ -49,6 +49,7 @@ class Heartbeat:
         # Флаг намеренного прерывания, чтобы отличать логику агента от Ctrl+C
         self._is_interrupted: bool = False
 
+    # TODO: переделать название функции (сейчас не интуитивно понятно как-то, можно сделать как-нибудь "asnwer_to_event" или хз)
     def wake_up(
         self, level: EventLevel, event_name: str, payload: Optional[Dict[str, Any]] = None
     ):
@@ -59,39 +60,55 @@ class Heartbeat:
 
         time_str = get_now_formatted(self.timezone, fmt="%H:%M:%S")
         payload_str = ", ".join(f"{k}={v}" for k, v in payload.items()) if payload else "empty"
-
         event_str = f"[{time_str}] [{level.name}] {event_name} | Payload: {payload_str}"
 
-        # Пробрасываем событие прямо в активный цикл, если агент сейчас думает
-        if self._active_react_task and not self._active_react_task.done():
-            self.react_loop.add_realtime_event(event_str)
-
-        # Либо же копим в памяти сна, если агент сейчас спит
-        else:
-            self._sleep_memory.append(event_str)
-
-        remaining = self._next_tick_time - now
-
-        # Умножаем остаток времени в зависимости от важности события
+        # Определяем множитель важности события
         multiplier = 1.0
         if level == EventLevel.CRITICAL:
             multiplier = self.accel_config.critical_multiplier
-
         elif level == EventLevel.HIGH:
             multiplier = self.accel_config.high_multiplier
-
         elif level == EventLevel.MEDIUM:
             multiplier = self.accel_config.medium_multiplier
-
         elif level == EventLevel.LOW:
             multiplier = self.accel_config.low_multiplier
-
         elif level == EventLevel.BACKGROUND:
             multiplier = self.accel_config.background_multiplier
 
+        is_awake = self._active_react_task and not self._active_react_task.done()
+
+        # =========================================================
+        # Логика для бодрствующего в данный момент агента
+        # =========================================================
+
+        if is_awake:
+            # Пробрасываем событие прямо в активный цикл
+            self.react_loop.add_realtime_event(event_str)
+
+            # Если множитель 0.0 - это жесткое прерывание текущего процесса (например, SYSTEM_SHUTDOWN)
+            if multiplier <= 0.01:
+                system_logger.warning(
+                    f"[Heartbeat] Прерывание текущего ReAct-цикла из-за события: {event_name}"
+                )
+                self._wake_reason = event_name
+                self._wake_payload = payload
+                self._is_interrupted = True
+                self._active_react_task.cancel()
+
+            # Таймер следующего сна (_next_tick_time) НЕ трогаем
+            return
+
+        # =========================================================
+        # Логика для спящего в данный момент агента
+        # =========================================================
+
+        self._sleep_memory.append(event_str)
+
+        remaining = self._next_tick_time - now
+
         # Если множитель < 1, значит событие должно повлиять на таймер
         if multiplier < 1.0:
-            # Защита от отрицательного remaining (например, если Heartbeat только инициализирован)
+            # Защита от отрицательного remaining (если Heartbeat только стартовал)
             safe_remaining = max(0.0, remaining)
 
             new_remaining = safe_remaining * multiplier
@@ -100,25 +117,17 @@ class Heartbeat:
             self._next_tick_time = now + new_remaining
             self._wake_event.set()
 
-            # Если сон срезан в ноль (или изначально был нулем при старте) - это экстренное пробуждение
+            # Если сон срезан в ноль - это экстренное пробуждение
             if new_remaining <= 0.01:
                 system_logger.info(
-                    f"[Heartbeat] Входящее событие: '{event_name}' ({level.name}). Пробуждение."
+                    f"[Heartbeat] Входящее событие: '{event_name}' ({level.name}). Инициализация вызова LLM."
                 )
                 self._wake_reason = event_name
                 self._wake_payload = payload
-
-                # Жесткое прерывание: если агент сейчас думает, убиваем процесс
-                if self._active_react_task and not self._active_react_task.done():
-                    system_logger.warning(
-                        f"[Heartbeat] Прерывание текущего ReAct-цикла из-за события: {event_name}"
-                    )
-                    self._is_interrupted = True
-                    self._active_react_task.cancel()
             else:
                 if safe_remaining > 0:
                     system_logger.info(
-                        f"[Heartbeat] Входящее событие '{event_name}' ({level.name}). Сон сокращен на {reduced_by:.1f} сек. До пробуждения: {new_remaining:.1f} сек."
+                        f"[Heartbeat] Входящее событие: '{event_name}' ({level.name}). Следующий вызов LLM сокращен на {reduced_by:.1f} сек. До пробуждения: {new_remaining:.1f} сек."
                     )
 
     async def start(self) -> None:

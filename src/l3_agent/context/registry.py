@@ -19,7 +19,7 @@ class ContextRegistry:
         system_logger.debug(f"[System] Зарегистрирован провайдер контекста: {name}")
 
     async def gather_all(
-        self, event_name: str, payload: Dict[str, Any], missed_events: List[str]
+        self, event_name: str, payload: Dict[str, Any], missed_events: List[str], agent_state
     ) -> Dict[str, str]:
         """
         Опрашивает все зарегистрированные модули одновременно.
@@ -30,7 +30,12 @@ class ContextRegistry:
 
         provider_names = list(self._providers.keys())
         tasks = [
-            provider(event_name=event_name, payload=payload, missed_events=missed_events)
+            provider(
+                event_name=event_name,
+                payload=payload,
+                missed_events=missed_events,
+                agent_state=agent_state,
+            )
             for provider in self._providers.values()
         ]
 

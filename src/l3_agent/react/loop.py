@@ -51,7 +51,7 @@ class ReactLoop:
         Сохраняет финальный промпт в Markdown-файл для отладки.
         Безопасно парсит как обычные dict, так и объекты OpenAI.
         """
-        
+
         try:
             with open("logs/last_prompt.md", "w", encoding="utf-8") as f:
                 for m in messages:
@@ -92,7 +92,7 @@ class ReactLoop:
             prompt = self.prompt_builder.build()
 
             messages = [
-                {"role": "system", "content": prompt}, # Статичный промпт
+                {"role": "system", "content": prompt},  # Статичный промпт
                 {"role": "user", "content": ""},  # Будет перезаписываться на каждом шаге
             ]
 
@@ -127,6 +127,7 @@ class ReactLoop:
                             "function": {"name": "execute_skill"},
                         },
                         temperature=self.agent_state.temperature,
+                        max_tokens=4096,
                     )
 
                     message_obj = response.choices[0].message
@@ -220,6 +221,26 @@ class ReactLoop:
 
                 self.agent_state.update_state(AgentStatus.ACTING)
                 results_str = await execute_skill(actions=actions)
+
+                # Сохраняем данные для RAG на следующем шаге
+                self.agent_state.last_thoughts = thoughts
+
+                # Вытаскиваем только строковые аргументы из функций (длиннее 3 символов)
+                args_to_rag = []
+                for act in actions:
+                    for val in act.parameters.values():
+                        if isinstance(val, str) and len(val) > 3:
+                            args_to_rag.append(val)
+                self.agent_state.last_action_args = args_to_rag
+
+                # Если в ответе есть слово "Ошибка" или "Error" и ответ короткий - сохраняем
+                self.agent_state.last_action_error = ""
+                if len(results_str) < 500 and (
+                    "ошибка" in results_str.lower()
+                    or "error" in results_str.lower()
+                    or "fail" in results_str.lower()
+                ):
+                    self.agent_state.last_action_error = results_str
 
                 await self.sql_ticks.save_tick(
                     thoughts=thoughts,

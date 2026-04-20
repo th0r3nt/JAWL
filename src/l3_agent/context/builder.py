@@ -24,7 +24,10 @@ class ContextBuilder:
         """Собирает итоговый контекст для агента в строгом порядке."""
 
         blocks = await self.registry.gather_all(
-            event_name=event_name, payload=payload, missed_events=missed_events
+            event_name=event_name,
+            payload=payload,
+            missed_events=missed_events,
+            agent_state=self.agent_state, # Agent State нужен для RAG поиска по последним мыслям/действиям агента на разных ReAct-шагах
         )
 
         ordered_parts = []

@@ -7,6 +7,7 @@ from src.utils.event.registry import Events
 
 from src.l0_state.interfaces.state import TelethonState
 from src.l2_interfaces.telegram.telethon.client import TelethonClient
+from src.l2_interfaces.telegram.telethon._message_parser import TelethonMessageParser
 
 
 class TelethonEvents:
@@ -57,8 +58,12 @@ class TelethonEvents:
 
         self.state.last_chats = "\n".join(chats) if chats else "Список диалогов пуст."
 
-    async def _on_private_message(self, event: events.NewMessage.Event):
-        # Автоматически помечаем прочитанным на уровне Telegram, чтобы не триггерить агента позже
+    # ==========================================================
+    # ЭВЕНТЫ
+    # ==========================================================
+
+    # Отслеживание сообщений в личку
+    async def _on_private_message(self, event: events.NewMessage.Event) -> None:
         try:
             await event.message.mark_read()
         except Exception:
@@ -70,17 +75,23 @@ class TelethonEvents:
         sender_name = utils.get_display_name(sender) if sender else "Unknown"
         sender_name = sender_name or "Unknown"
 
-        await self.bus.publish(
-            Events.TELETHON_MESSAGE_INCOMING,
-            message=event.text,
-            sender_name=sender_name,
-            chat_id=event.chat_id,
-        )
+        # Тянем историю
+        history = await self._fetch_recent_history(event.chat_id, limit=5)
 
+        payload = {
+            "message": event.text or "[Медиа]",
+            "sender_name": sender_name,
+            "chat_id": event.chat_id,
+        }
+        if history:
+            payload["recent_history"] = history
+
+        await self.bus.publish(Events.TELETHON_MESSAGE_INCOMING, **payload)
+
+    # Отслеживание сообщений в группах
     async def _on_group_message(self, event: events.NewMessage.Event):
         if event.mentioned:
             event_type = Events.TELETHON_GROUP_MENTION
-            # Если нас тегнули, сбрасываем счетчик непрочитанных
             try:
                 await event.message.mark_read()
             except Exception:
@@ -94,14 +105,22 @@ class TelethonEvents:
         sender_name = utils.get_display_name(sender) if sender else "Unknown"
         sender_name = sender_name or "Unknown"
 
-        await self.bus.publish(
-            event_type,
-            message=event.text,
-            sender_name=sender_name,
-            chat_id=event.chat_id,
-        )
+        payload = {
+            "message": event.text or "[Медиа]",
+            "sender_name": sender_name,
+            "chat_id": event.chat_id,
+        }
 
-    async def _on_reaction(self, event):
+        # В группах подтягиваем контекст ТОЛЬКО если нас упомянули (экономим запросы)
+        if event.mentioned:
+            history = await self._fetch_recent_history(event.chat_id, limit=5)
+            if history:
+                payload["recent_history"] = history
+
+        await self.bus.publish(event_type, **payload)
+
+    # Отслеживание реакций
+    async def _on_reaction(self, event) -> None:
         if not isinstance(event, UpdateMessageReactions):
             return
 
@@ -130,3 +149,34 @@ class TelethonEvents:
             message_id=event.msg_id,
             reactions=reactions_str,
         )
+
+    # ==========================================================
+    # СЛУЖЕБНЫЕ МЕТОДЫ
+    # ==========================================================
+
+    async def _fetch_recent_history(self, chat_id: int, limit: int = 5) -> str:
+        """KISS: Быстро подтягивает последние N сообщений в идеальном форматировании."""
+        try:
+            client = self.tg_client.client()
+            target_entity = await client.get_entity(chat_id)
+            msgs = await client.get_messages(target_entity, limit=limit + 1)
+
+            if len(msgs) <= 1:
+                return ""
+
+            lines = []
+            # Переворачиваем, чтобы читать сверху вниз
+            for msg in reversed(msgs[1:]):
+                formatted = await TelethonMessageParser.build_string(
+                    client=client,
+                    target_entity=target_entity,
+                    msg=msg,
+                    timezone=self.tg_client.timezone,
+                    truncate_text=True,  # Защита от простыней текста в контексте
+                )
+                lines.append(formatted)
+
+            return "\n" + "\n\n".join(lines)
+        except Exception as e:
+            system_logger.debug(f"[TelethonEvents] Не удалось подтянуть предысторию: {e}")
+            return ""
