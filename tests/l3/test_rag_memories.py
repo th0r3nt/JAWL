@@ -2,6 +2,7 @@ import pytest
 from unittest.mock import AsyncMock, MagicMock
 from src.l3_agent.context.rag.memories import RAGMemories
 from src.l3_agent.skills.registry import SkillResult
+from src.l0_state.agent.state import AgentState
 
 
 @pytest.mark.asyncio
@@ -21,7 +22,17 @@ async def test_rag_memories_context_extraction():
     mock_telethon_state = MagicMock()
     mock_telethon_state.last_chats = "User | ID: 123 | Название: John_Admin [Непрочитанных: 1]"
 
-    rag = RAGMemories(mock_knowledge, mock_thoughts, mock_telethon_state, auto_rag_top_k=2)
+    # Имитируем стейт агента
+    mock_agent_state = AgentState()
+
+    # Добавлен agent_state=mock_agent_state
+    rag = RAGMemories(
+        mock_knowledge,
+        mock_thoughts,
+        mock_telethon_state,
+        agent_state=mock_agent_state,
+        auto_rag_top_k=2,
+    )
 
     # Имитируем входящее сообщение и пропущенные ивенты
     payload = {"sender_name": "Alice", "message": "Где сервер?"}

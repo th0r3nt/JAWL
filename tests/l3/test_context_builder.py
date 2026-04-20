@@ -20,9 +20,9 @@ async def test_context_builder_build():
     payload = {"chat_id": 123, "text": "Hello Agent"}
     context = await builder.build(event_name="TEST_EVENT", payload=payload, missed_events=[])
 
-    # Проверяем, что реестр был вызван с нужными параметрами
+    # Проверяем, что реестр был вызван с нужными параметрами (Добавлен agent_state)
     mock_registry.gather_all.assert_awaited_once_with(
-        event_name="TEST_EVENT", payload=payload, missed_events=[]
+        event_name="TEST_EVENT", payload=payload, missed_events=[], agent_state=agent_state
     )
 
     # Проверяем, что в итоговом тексте есть куски от всех систем
@@ -39,6 +39,7 @@ async def test_context_registry_resilience():
     from src.l3_agent.context.registry import ContextRegistry
 
     registry = ContextRegistry()
+    agent_state = AgentState()  # <--- Добавлено
 
     async def success_provider(**kwargs):
         return "Успешный блок"
@@ -49,7 +50,8 @@ async def test_context_registry_resilience():
     registry.register_provider("good", success_provider)
     registry.register_provider("bad", failing_provider)
 
-    results = await registry.gather_all("EVENT", {}, [])
+    # Добавлен agent_state в параметры
+    results = await registry.gather_all("EVENT", {}, [], agent_state=agent_state)
 
     # Реестр должен проглотить ошибку failing_provider и вернуть только good
     assert "good" in results

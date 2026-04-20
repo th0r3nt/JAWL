@@ -197,6 +197,7 @@ class System:
             vector_knowledge=self.vector.knowledge,
             vector_thoughts=self.vector.thoughts,
             telethon_state=self.telethon_state,
+            agent_state=self.agent_state,
             auto_rag_top_k=self.settings.system.vector_db.auto_rag_top_k,
         )
         self.context_registry.register_provider("rag memories", rag_memories.get_context_block)
