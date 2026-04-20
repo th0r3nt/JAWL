@@ -34,7 +34,8 @@ def mock_configs():
     settings.system.sql.mental_states.max_entities = 10
 
     settings.system.sql.drives.enabled = True
-    settings.system.sql.drives.default_decay_rate_per_hour = 5.0
+    settings.system.sql.drives.decay_rate = 5.0
+    settings.system.sql.drives.decay_interval_sec = 3600 
     settings.system.sql.drives.max_reflections_history = 3
     settings.system.sql.drives.max_custom_drives = 5
 

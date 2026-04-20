@@ -119,7 +119,8 @@ class MentalStatesConfig(BaseModel):
 
 class DrivesConfig(BaseModel):
     enabled: bool
-    default_decay_rate_per_hour: float
+    decay_rate: float
+    decay_interval_sec: int
     max_reflections_history: int
     max_custom_drives: int
 

@@ -33,7 +33,8 @@ class SQLManager:
         max_mental_state_entities: int = 10,
         # Drives
         drives_enabled: bool = True,
-        default_decay_rate: float = 5.0,
+        decay_rate: float = 5.0,
+        decay_interval_sec: int = 3600,
         max_history_drives: int = 3,
         max_custom_drives: int = 5,
         # Время
@@ -66,7 +67,8 @@ class SQLManager:
         # Drives
         self.drives = SQLDrives(
             db=self.db,
-            default_decay_rate=default_decay_rate,
+            decay_rate=decay_rate,
+            decay_interval_sec=decay_interval_sec,
             max_history=max_history_drives,
             max_custom=max_custom_drives,
             tz_offset=timezone,

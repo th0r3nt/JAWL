@@ -129,7 +129,8 @@ class System:
             max_traits=sys_cfg.sql.personality_traits.max_traits,
             # Drives
             drives_enabled=sys_cfg.sql.drives.enabled,
-            default_decay_rate=sys_cfg.sql.drives.default_decay_rate_per_hour,
+            decay_rate=sys_cfg.sql.drives.decay_rate,
+            decay_interval_sec=sys_cfg.sql.drives.decay_interval_sec,
             max_history_drives=sys_cfg.sql.drives.max_reflections_history,
             max_custom_drives=sys_cfg.sql.drives.max_custom_drives,
             # Время

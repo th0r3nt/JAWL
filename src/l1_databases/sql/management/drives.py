@@ -18,13 +18,15 @@ class SQLDrives:
     def __init__(
         self,
         db: "SQLDB",
-        default_decay_rate: float = 2.5,
+        decay_rate: float = 2.5,
+        decay_interval_sec: int = 3600,
         max_history: int = 3,
         max_custom: int = 5,
         tz_offset: int = 0,
     ):
         self.db = db
-        self.default_decay_rate = default_decay_rate
+        self.decay_rate = decay_rate
+        self.decay_interval_sec = decay_interval_sec
         self.max_history = max_history
         self.max_custom = max_custom
         self.tz_offset = tz_offset
@@ -58,7 +60,7 @@ class SQLDrives:
                         name=d["name"],
                         type="fundamental",
                         description=d["description"],
-                        decay_rate=self.default_decay_rate,
+                        decay_rate=self.decay_rate,
                         last_satisfied_at=datetime.now(timezone.utc),
                         recent_reflections=[],
                     )
@@ -99,7 +101,7 @@ class SQLDrives:
 
     @skill()
     async def create_custom_drive(
-        self, name: str, description: str, decay_rate_per_hour: float = 2.5
+        self, name: str, description: str, decay_rate: float = 2.5
     ) -> SkillResult:
         """Создает новую кастомную потребность/мотивацию."""
 
@@ -117,7 +119,7 @@ class SQLDrives:
                 name=name,
                 type="custom",
                 description=description,
-                decay_rate=decay_rate_per_hour,
+                decay_rate=decay_rate,
                 last_satisfied_at=datetime.now(timezone.utc),
                 recent_reflections=[],
             )
@@ -169,15 +171,15 @@ class SQLDrives:
 
         for d in drives:
             # Считаем дефицит на лету
-            # Если tzinfo потерялся, восстанавливаем
             last_sat = (
                 d.last_satisfied_at.replace(tzinfo=timezone.utc)
                 if d.last_satisfied_at.tzinfo is None
                 else d.last_satisfied_at
             )
-            hours_passed = (now - last_sat).total_seconds() / 3600.0
 
-            deficit = min(100.0, hours_passed * d.decay_rate)
+            intervals_passed = (now - last_sat).total_seconds() / self.decay_interval_sec
+            deficit = min(100.0, intervals_passed * d.decay_rate)
+
             deficit_int = int(deficit)
 
             # Эмодзи статуса

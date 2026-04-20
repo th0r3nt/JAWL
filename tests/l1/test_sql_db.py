@@ -54,7 +54,7 @@ def traits_manager(memory_db):
 def drives_manager(memory_db):
     # Ставим маленькие лимиты для теста
     return SQLDrives(
-        db=memory_db, default_decay_rate=5.0, max_history=3, max_custom=2, tz_offset=3
+        db=memory_db, decay_rate=5.0, decay_interval_sec=3600, max_history=3, max_custom=2, tz_offset=3
     )
 
 
