@@ -3,7 +3,10 @@ import shutil
 import asyncio
 
 from src.utils.logger import system_logger
+from src.utils._tools import format_size
+
 from src.l2_interfaces.host.os.client import HostOSClient
+
 from src.l3_agent.skills.registry import SkillResult, skill
 
 
@@ -15,15 +18,6 @@ class HostOSFiles:
 
     def __init__(self, host_os_client: HostOSClient):
         self.host_os = host_os_client
-
-    def _format_size(self, size_bytes: int) -> str:
-        """Переводит байты в человекочитаемый формат (KB, MB)."""
-        if size_bytes < 1024:
-            return f"{size_bytes} B"
-        elif size_bytes < 1024 * 1024:
-            return f"{size_bytes / 1024:.1f} KB"
-        else:
-            return f"{size_bytes / (1024 * 1024):.1f} MB"
 
     @skill()
     async def read_file(
@@ -65,7 +59,7 @@ class HostOSFiles:
 
             content, is_truncated, file_size = await asyncio.to_thread(_read_fast)
 
-            size_str = self._format_size(file_size)
+            size_str = format_size(file_size)
             header = f"[Файл: {safe_path.name} | Прочитано: {len(content)} симв. | Исходный размер: {size_str}]\n{'='*40}\n"
 
             if is_truncated:
@@ -101,9 +95,13 @@ class HostOSFiles:
             with open(safe_path, mode, encoding="utf-8") as f:
                 f.write(content)
 
+            size_str = format_size(safe_path.stat().st_size)
             action_type = "Перезаписан" if mode == "w" else "Обновлен"
-            system_logger.info(f"[Host OS] {action_type} файл: {safe_path.name}")
-            return SkillResult.ok(f"Файл {safe_path.name} успешно сохранен.")
+
+            system_logger.info(f"[Host OS] {action_type} файл: {safe_path.name} ({size_str})")
+            return SkillResult.ok(
+                f"Файл {safe_path.name} успешно {action_type.lower()}. Записано: {len(content)} симв. Итоговый размер: {size_str}."
+            )
 
         except PermissionError as e:
             return SkillResult.fail(str(e))
@@ -129,9 +127,7 @@ class HostOSFiles:
                     break
 
                 try:
-                    size_str = (
-                        self._format_size(item.stat().st_size) if item.is_file() else "DIR"
-                    )
+                    size_str = format_size(item.stat().st_size) if item.is_file() else "DIR"
                 except Exception:
                     size_str = "???"
 
@@ -174,9 +170,7 @@ class HostOSFiles:
 
                 try:
                     size_str = (
-                        self._format_size(file_path.stat().st_size)
-                        if file_path.is_file()
-                        else "DIR"
+                        format_size(file_path.stat().st_size) if file_path.is_file() else "DIR"
                     )
                 except Exception:
                     size_str = "???"
@@ -204,14 +198,17 @@ class HostOSFiles:
 
             if not safe_path.exists():
                 return SkillResult.fail(f"Ошибка: Файл не существует ({filepath}).")
+            
             if not safe_path.is_file():
                 return SkillResult.fail(
                     "Ошибка: Это не файл, удаление директорий через этот инструмент запрещено."
                 )
 
+            size_str = format_size(safe_path.stat().st_size)
             safe_path.unlink()
-            system_logger.info(f"[Host OS] Удален файл: {safe_path.name}")
-            return SkillResult.ok(f"Файл {safe_path.name} успешно удален.")
+
+            system_logger.info(f"[Host OS] Удален файл: {safe_path.name} ({size_str})")
+            return SkillResult.ok(f"Файл {safe_path.name} ({size_str}) успешно удален.")
 
         except PermissionError as e:
             return SkillResult.fail(str(e))

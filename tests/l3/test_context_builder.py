@@ -1,29 +1,27 @@
 import pytest
-from unittest.mock import AsyncMock
 from src.l3_agent.context.builder import ContextBuilder
 from src.l0_state.agent.state import AgentState
+from src.l3_agent.context.registry import ContextRegistry
 
 
 @pytest.mark.asyncio
 async def test_context_builder_build():
-    """Тест: ContextBuilder успешно делегирует сборку реестру."""
+    """Тест: ContextBuilder успешно делегирует сборку реестру и склеивает результаты."""
     agent_state = AgentState()
     agent_state.llm_model = "test-model"
 
-    # Мокаем Registry
-    mock_registry = AsyncMock()
-    # Имитируем, что разные провайдеры вернули свои блоки
-    mock_registry.gather_all.return_value = {"telethon": "### TELETHON [ON]\nAccount info..."}
+    registry = ContextRegistry()
 
-    builder = ContextBuilder(agent_state=agent_state, registry=mock_registry)
+    # Добавляем фейковый провайдер, как это делают интерфейсы
+    async def fake_telethon(**kwargs):
+        return "### TELETHON [ON]\nAccount info..."
+
+    registry.register_provider("telethon", fake_telethon, priority=80)
+
+    builder = ContextBuilder(agent_state=agent_state, registry=registry)
 
     payload = {"chat_id": 123, "text": "Hello Agent"}
     context = await builder.build(event_name="TEST_EVENT", payload=payload, missed_events=[])
-
-    # Проверяем, что реестр был вызван с нужными параметрами (Добавлен agent_state)
-    mock_registry.gather_all.assert_awaited_once_with(
-        event_name="TEST_EVENT", payload=payload, missed_events=[], agent_state=agent_state
-    )
 
     # Проверяем, что в итоговом тексте есть куски от всех систем
     assert "## SKILLS" in context
@@ -36,10 +34,8 @@ async def test_context_builder_build():
 @pytest.mark.asyncio
 async def test_context_registry_resilience():
     """Тест: Если один провайдер падает, реестр игнорирует его и отдает остальные."""
-    from src.l3_agent.context.registry import ContextRegistry
-
     registry = ContextRegistry()
-    agent_state = AgentState()  # <--- Добавлено
+    agent_state = AgentState()
 
     async def success_provider(**kwargs):
         return "Успешный блок"
@@ -47,10 +43,9 @@ async def test_context_registry_resilience():
     async def failing_provider(**kwargs):
         raise ValueError("Критическая ошибка БД/Сети")
 
-    registry.register_provider("good", success_provider)
-    registry.register_provider("bad", failing_provider)
+    registry.register_provider("good", success_provider, priority=10)
+    registry.register_provider("bad", failing_provider, priority=20)
 
-    # Добавлен agent_state в параметры
     results = await registry.gather_all("EVENT", {}, [], agent_state=agent_state)
 
     # Реестр должен проглотить ошибку failing_provider и вернуть только good

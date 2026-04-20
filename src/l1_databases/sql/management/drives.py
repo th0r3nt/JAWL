@@ -155,7 +155,7 @@ class SQLDrives:
         return SkillResult.ok(f"Драйв '{drive_name}' удален.")
 
     async def get_context_block(self, **kwargs) -> str:
-        """Считает дефицит на лету и отдает блок контекста."""
+        """Считает дефицит на лету и отдает блок контекста с подробным объяснением механики."""
 
         async with self.db.session_factory() as session:
             result = await session.execute(select(DriveTable))
@@ -164,9 +164,12 @@ class SQLDrives:
         if not drives:
             return ""
 
+        # Добавляем агенту понимание механики роста дефицита прямо в контекст
         lines = [
-            "## DRIVES \nДолгосрочные векторы поведения. Рекомендуется снижать дефицит, когда он высокий."
+            "## DRIVES \nДолгосрочные векторы поведения. Рекомендуется снижать дефицит, когда он высокий.",
+            f"Длительность 1 интервала: {self.decay_interval_sec} сек.",
         ]
+
         now = datetime.now(timezone.utc)
 
         for d in drives:
@@ -179,19 +182,27 @@ class SQLDrives:
 
             intervals_passed = (now - last_sat).total_seconds() / self.decay_interval_sec
             deficit = min(100.0, intervals_passed * d.decay_rate)
-
             deficit_int = int(deficit)
 
-            # Эмодзи статуса
-            if deficit_int >= 80:
-                status = "Высокий"
-            elif deficit_int >= 40:
-                status = "Растет"
+            # Более детализированный контекст
+            if deficit_int >= 90:
+                status = "(Очень высокий: рекомендуется принять меры для удовлетворения потребности)"
+
+            elif deficit_int >= 70:
+                status = "(Высокий: требует внимания в ближайшее время)"
+
+            elif deficit_int >= 50:
+                status = "(Растет: рекомендуется запланировать действия по снижению дефицита)"
+                
+            elif deficit_int >= 30:
+                status = "(Лёгкий дефицит: не критично, можно отложить)"
+
             else:
-                status = "В норме"
+                status = "(В норме: потребность удовлетворена)"
 
             lines.append(f"\n[{d.type.upper()}] {d.name}")
             lines.append(f"* Дефицит: {deficit_int}/100 {status}")
+            lines.append(f"* Рост дефицита: +{d.decay_rate}% за 1 интервал")
             lines.append(f"* Описание: {d.description}")
 
             if d.recent_reflections:

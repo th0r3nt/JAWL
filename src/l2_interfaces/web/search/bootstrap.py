@@ -29,8 +29,7 @@ def setup_web_search(system: "System") -> List[Any]:
     register_instance(web_pages)
 
     # Регистрация провайдеров контекста (отдают Markdown блоки в промпт агента)
-    system.context_registry.register_provider(name="web search", provider_func=client.get_context_block)
-
+    system.context_registry.register_provider(name="web search", provider_func=client.get_context_block, priority=100)
     system_logger.info("[System] Интерфейс Web загружен.")
 
     return []

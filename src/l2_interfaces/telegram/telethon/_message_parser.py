@@ -5,6 +5,7 @@ from src.utils.dtime import format_datetime
 # TODO: может, перенести этот файл в отдельную папку telethon/utils/?
 # Сейчас он в корне telethon/, моя тонкая душевная организация перфекциониста недовольна
 
+
 class TelethonMessageParser:
     """Утилита для глубокого парсинга сообщений Telethon (реакции, реплаи, медиа, кнопки)."""
 
@@ -150,8 +151,8 @@ class TelethonMessageParser:
 
     @staticmethod
     def parse_buttons(msg: Any) -> str:
-        """Определяет, есть ли inline кнопки под сообщением бота. """
-        
+        """Определяет, есть ли inline кнопки под сообщением бота."""
+
         if not getattr(msg, "buttons", None):
             return ""
         btn_texts = [f"[{btn.text}]" for row in msg.buttons for btn in row if btn.text]
@@ -193,4 +194,17 @@ class TelethonMessageParser:
         final_text = " ".join(filter(bool, parts)) or "[Пустое сообщение]"
         time_str = format_datetime(msg.date, timezone, fmt="%Y-%m-%d %H:%M")
 
-        return f"[{time_str}] [ID: {msg.id}]{read_status} {sender_name}: {final_text}"
+        topic_str = ""
+        # Если мы читаем весь чат целиком (topic_id не передан принудительно) и сообщение из топика
+        if (
+            not topic_id
+            and getattr(msg, "reply_to", None)
+            and getattr(msg.reply_to, "forum_topic", False)
+        ):
+            t_id = msg.reply_to.reply_to_top_id or msg.reply_to.reply_to_msg_id
+            if t_id:
+                topic_str = f" [Topic: {t_id}]"
+
+        return (
+            f"[{time_str}] [ID: {msg.id}]{topic_str}{read_status} {sender_name}: {final_text}"
+        )

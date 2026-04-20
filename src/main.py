@@ -142,40 +142,40 @@ class System:
         # ДИНАМИЧЕСКАЯ РЕГИСТРАЦИЯ SQL НАВЫКОВ И КОНТЕКСТА
         # =========================================================
 
-        # TASKS
-        if sys_cfg.sql.tasks.enabled:
-            register_instance(self.sql.tasks)
+        # DRIVES
+        if sys_cfg.sql.drives.enabled:
+            register_instance(self.sql.drives)
             self.context_registry.register_provider(
-                "sql_tasks", self.sql.tasks.get_context_block
+                "sql_drives", self.sql.drives.get_context_block, priority=10
             )
 
         # PERSONALITY TRAITS
         if sys_cfg.sql.personality_traits.enabled:
             register_instance(self.sql.personality_traits)
             self.context_registry.register_provider(
-                "sql_traits", self.sql.personality_traits.get_context_block
+                "sql_traits", self.sql.personality_traits.get_context_block, priority=20
+            )
+
+        # TASKS
+        if sys_cfg.sql.tasks.enabled:
+            register_instance(self.sql.tasks)
+            self.context_registry.register_provider(
+                "sql_tasks", self.sql.tasks.get_context_block, priority=120
             )
 
         # MENTAL STATES
         if sys_cfg.sql.mental_states.enabled:
             register_instance(self.sql.mental_states)
             self.context_registry.register_provider(
-                "sql_mental_states", self.sql.mental_states.get_context_block
-            )
-
-        # DRIVES
-        if sys_cfg.sql.drives.enabled:
-            register_instance(self.sql.drives)
-            self.context_registry.register_provider(
-                "sql_drives", self.sql.drives.get_context_block
+                "sql_mental_states", self.sql.mental_states.get_context_block, priority=110
             )
 
         # Базовые вещи регистрируются всегда
-        # TICKS
-        self.context_registry.register_provider("sql_ticks", self.sql.ticks.get_context_block)
-        # AGENT STATE
         self.context_registry.register_provider(
-            "agent_state", self.agent_state.get_context_block
+            "sql_ticks", self.sql.ticks.get_context_block, priority=140
+        )
+        self.context_registry.register_provider(
+            "agent_state", self.agent_state.get_context_block, priority=40
         )
 
         # Vector DB
@@ -232,7 +232,9 @@ class System:
             agent_state=self.agent_state,
             auto_rag_top_k=self.settings.system.vector_db.auto_rag_top_k,
         )
-        self.context_registry.register_provider("rag memories", rag_memories.get_context_block)
+        self.context_registry.register_provider(
+            "rag memories", rag_memories.get_context_block, priority=130
+        )
 
         # Инициализируем тонкий ContextBuilder
         context_builder = ContextBuilder(

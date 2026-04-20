@@ -37,7 +37,7 @@ def setup_host_os(system: "System") -> List[Any]:
 
     # Регистрация провайдеров контекста (отдают Markdown блоки в промпт агента)
     system.context_registry.register_provider(
-        name="host os", provider_func=client.get_context_block
+        name="host os", provider_func=client.get_context_block, priority=50
     )
 
     system_logger.info("[Host OS] Интерфейс загружен.")

@@ -36,7 +36,9 @@ def setup_multimodality(system: "System") -> List[Any]:
 
     # Регистрируем стейт интерфейса в контексте
     client.is_online = True
-    system.context_registry.register_provider(name="multimodality", provider_func=client.get_context_block)
+    system.context_registry.register_provider(
+        name="multimodality", provider_func=client.get_context_block, priority=70
+    )
 
     system_logger.info("[Multimodality] Интерфейс загружен. Агент прозрел.")
 

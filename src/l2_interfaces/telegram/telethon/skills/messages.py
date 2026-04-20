@@ -2,9 +2,12 @@ from datetime import timedelta
 from typing import Optional, Union
 from pathlib import Path
 
-from src.l2_interfaces.telegram.telethon.client import TelethonClient
-from src.l3_agent.skills.registry import SkillResult, skill
+from src.utils._tools import format_size
 from src.utils.logger import system_logger
+
+from src.l2_interfaces.telegram.telethon.client import TelethonClient
+
+from src.l3_agent.skills.registry import SkillResult, skill
 
 
 class TelethonMessages:
@@ -101,15 +104,16 @@ class TelethonMessages:
                     f"Ошибка: Файл не найден или это директория ({safe_path.name})."
                 )
 
+            size_str = format_size(safe_path.stat().st_size)
             client = self.tg_client.client()
             entity = self._parse_entity(chat_id)
 
             await client.send_file(entity, file=str(safe_path), caption=caption)
 
             system_logger.info(
-                f"[Telegram Telethon] Файл {safe_path.name} отправлен в чат {chat_id}"
+                f"[Telegram Telethon] Файл {safe_path.name} ({size_str}) отправлен в чат {chat_id}"
             )
-            return SkillResult.ok(f"Файл {safe_path.name} успешно отправлен.")
+            return SkillResult.ok(f"Файл {safe_path.name} ({size_str}) успешно отправлен.")
 
         except PermissionError as e:
             return SkillResult.fail(str(e))
@@ -145,9 +149,13 @@ class TelethonMessages:
                     "Не удалось скачать файл (возможно, формат не поддерживается)."
                 )
 
-            system_logger.info(f"[Telegram Telethon] Файл скачан: {safe_path.name}")
+            size_str = format_size(safe_path.stat().st_size)
+            system_logger.info(
+                f"[Telegram Telethon] Файл скачан: {safe_path.name} ({size_str})"
+            )
+
             return SkillResult.ok(
-                f"Файл успешно скачан и сохранен как: sandbox/{safe_path.name}"
+                f"Файл успешно скачан и сохранен как: sandbox/{safe_path.name} ({size_str})"
             )
 
         except PermissionError as e:

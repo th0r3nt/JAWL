@@ -51,7 +51,7 @@ def setup_telethon(system: "System", api_id: str | None, api_hash: str | None) -
     register_instance(TelethonReactions(client))
 
     # Регистрация провайдеров контекста (отдают Markdown блоки в промпт агента)
-    system.context_registry.register_provider(name="telethon", provider_func=client.get_context_block)
+    system.context_registry.register_provider(name="telethon", provider_func=client.get_context_block, priority=80)
 
     system_logger.info("[System] Интерфейс Telethon загружен.")
 

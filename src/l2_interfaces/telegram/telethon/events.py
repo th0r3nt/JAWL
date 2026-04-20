@@ -115,9 +115,7 @@ class TelethonEvents:
         await self._update_state()
 
         client = self.tg_client.client()
-
         sender_name = TelethonMessageParser.get_sender_name(event.message)
-
         chat = await event.get_chat()
         chat_name = utils.get_display_name(chat) if chat else "Unknown"
 
@@ -129,6 +127,12 @@ class TelethonEvents:
         base_text = msg_obj.text or TelethonMessageParser.parse_media(msg_obj)
         enriched_message = f"{base_text}{fwd_info}{reply_info}".strip()
 
+        topic_id = None
+        if getattr(msg_obj, "reply_to", None) and getattr(
+            msg_obj.reply_to, "forum_topic", False
+        ):
+            topic_id = msg_obj.reply_to.reply_to_top_id or msg_obj.reply_to.reply_to_msg_id
+
         payload = {
             "message": enriched_message,
             "sender_name": sender_name,
@@ -136,9 +140,13 @@ class TelethonEvents:
             "chat_id": event.chat_id,
         }
 
+        # Если это форумный топик - прокидываем его агенту
+        if topic_id:
+            payload["topic_id"] = topic_id
+
         # В группах подтягиваем историю ТОЛЬКО если нас упомянули (экономим запросы)
         if event.mentioned:
-            history = await self._fetch_recent_history(event.chat_id, limit=5)
+            history = await self._fetch_recent_history(event.chat_id, limit=10)
             if history:
                 payload["recent_history"] = history
 

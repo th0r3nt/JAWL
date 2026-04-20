@@ -33,8 +33,10 @@ def setup_aiogram(system: "System", bot_token: str | None) -> List[Any]:
     register_instance(AiogramModeration(client))
 
     # Регистрация провайдеров контекста (отдают Markdown блоки в промпт агента)
-    system.context_registry.register_provider(name="aiogram", provider_func=client.get_context_block)
+    system.context_registry.register_provider(
+        name="aiogram", provider_func=client.get_context_block, priority=90
+    )
 
-    system_logger.info("[System] Интерфейс Aiogram загружен.")
+    system_logger.info("[Telethon Aiogram] Интерфейс загружен.")
 
     return [client, events]

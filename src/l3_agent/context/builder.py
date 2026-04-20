@@ -18,6 +18,10 @@ class ContextBuilder:
         self.agent_state = agent_state
         self.registry = registry
 
+        # Регистрируем встроенные провайдеры напрямую (с нужным приоритетом)
+        self.registry.register_provider("skills", self._skills_provider, priority=30)
+        self.registry.register_provider("heartbeat", self._heartbeat_provider, priority=999)
+
     async def build(
         self, event_name: str, payload: Dict[str, Any], missed_events: List[str]
     ) -> str:
@@ -27,72 +31,35 @@ class ContextBuilder:
             event_name=event_name,
             payload=payload,
             missed_events=missed_events,
-            agent_state=self.agent_state,  # Agent State нужен для RAG поиска по последним мыслям/действиям агента на разных ReAct-шагах
+            agent_state=self.agent_state,
         )
 
-        ordered_parts = []
-        
-        # ================================================
-        # ## DRIVES
-        if "sql_drives" in blocks:
-            ordered_parts.append(blocks["sql_drives"])
+        # blocks уже отсортированы по приоритетам
+        # Просто склеиваем их с мощным отступом для чистоты Markdown
+        return "\n\n\n\n\n".join(blocks.values()).strip()
 
-        # ================================================
-        # ## PERSONALITY TRAITS
-        if "sql_traits" in blocks:
-            ordered_parts.append(blocks["sql_traits"])
+    # =================================================================
+    # СЛУЖЕБНЫЕ МЕТОДЫ
+    # =================================================================
 
-        # ================================================
-        # ## SKILLS
-        ordered_parts.append(f"## SKILLS\n{get_skills_library()}")
+    async def _skills_provider(self, **kwargs) -> str:
+        """Возвращает отформатированный блок контекста доступных скиллов для агента."""
 
-        # ================================================
-        # ## INTERFACES STATE
-        interface_keys = [  # Указываем порядок вывода интерфейсов друг за другом
-            "agent_state",
-            "host os",
-            "meta",
-            "multimodality",
-            "telethon",
-            "aiogram",
-            "web search",
-        ]
-        interfaces = [blocks[k] for k in interface_keys if k in blocks and blocks[k]]
+        return f"## SKILLS\n{get_skills_library()}"
 
-        if interfaces:
-            ordered_parts.append("\n\n".join(interfaces))
+    async def _heartbeat_provider(
+        self, event_name: str, payload: Dict[str, Any], missed_events: List[str], **kwargs
+    ) -> str:
+        """Возвращает отформатированный блок контекста текущего Heartbeat для агента."""
 
-        # ================================================
-        # ## MENTAL STATES
-        if "sql_mental_states" in blocks:
-            ordered_parts.append(blocks["sql_mental_states"])
-
-        # ================================================
-        # ## TASKS
-        if "sql_tasks" in blocks:
-            ordered_parts.append(blocks["sql_tasks"])
-
-        # ================================================
-        # ## RAG MEMORIES
-        if "rag memories" in blocks:
-            ordered_parts.append(blocks["rag memories"])
-
-        # ================================================
-        # ## RECENT TICKS
-        if "sql_ticks" in blocks:
-            ordered_parts.append(blocks["sql_ticks"])
-
-        # ================================================
-        # ## HEARTBEAT & EVENT LOGS (Причина пробуждения - всегда в самом низу)
         wake_up_reason = self._build_wake_up_reason(event_name, payload, missed_events)
-        ordered_parts.append(f"## HEARTBEAT\n{wake_up_reason}")
-
-        # Склеиваем с мощным отступом для чистоты Markdown
-        return "\n\n\n\n\n".join(ordered_parts).strip()
+        return f"## HEARTBEAT\n{wake_up_reason}"
 
     def _build_wake_up_reason(
         self, event_name: str, payload: Dict[str, Any], missed_events: List[str]
     ) -> str:
+        """Возвращает отформатированный блок контекста фоновых событий для агента."""
+
         payload_lines = [f"{k}: {v}" for k, v in payload.items()]
         payload_str = (
             "\n".join(payload_lines) if payload_lines else "Нет дополнительных данных"
