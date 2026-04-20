@@ -98,13 +98,12 @@ class ReactLoop:
 
                 # Трекаем токены на каждом из шагов, которые реально улетают в API (включая историю шагов)
                 self.tracker.add_input_record(messages=messages)
-                
+
                 # Делаем глубокое копирование, чтобы Base64 не попал в БД тиков и логи
                 api_messages = copy.deepcopy(messages)
                 api_messages = self._inject_images_to_payload(api_messages)
 
                 self._dump_context_to_file(api_messages)
-
 
                 system_logger.info(f"[ReAct] Шаг {step}/{self.agent_state.max_react_steps}.")
                 try:
@@ -293,9 +292,13 @@ class ReactLoop:
 
         image_paths = []
 
-        # Сканируем последние 3 сообщения на наличие маркеров
+        # 1. Безопасно сканируем последние 3 сообщения (они могут быть словарями ИЛИ объектами)
         for msg in messages[-3:]:
-            content = msg.get("content", "")
+            if isinstance(msg, dict):
+                content = msg.get("content", "")
+            else:
+                content = getattr(msg, "content", "")
+
             if content and isinstance(content, str):
                 matches = re.findall(r"\[IMAGE_REQUEST:\s*(.+?)\]", content)
                 image_paths.extend(matches)
@@ -303,13 +306,16 @@ class ReactLoop:
         if not image_paths:
             return messages
 
-        # Берем последний элемент (всегда user prompt на каждом шаге)
-        last_user_msg = messages[-1]
+        # 2. Инжектим картинку строго в messages[1]
+        # В JAWL messages[1] - это всегда "user" сообщение с актуальным контекстом шага.
+        # Роль "tool" (messages[-1]) картинки не поддерживает по спецификации API
+        user_msg = messages[1]
 
-        if last_user_msg["role"] == "user":
-            new_content = [{"type": "text", "text": last_user_msg["content"]}]
+        if isinstance(user_msg, dict) and user_msg.get("role") == "user":
+            original_text = user_msg["content"]
+            new_content = [{"type": "text", "text": original_text}]
 
-            for img_path in set(image_paths):  # set, чтобы не дублировать
+            for img_path in set(image_paths):  # set, чтобы не дублировать картинки
                 try:
                     path_obj = Path(img_path)
                     if path_obj.exists():
@@ -329,6 +335,6 @@ class ReactLoop:
                 except Exception as e:
                     system_logger.error(f"[ReAct] Ошибка инжектирования Base64: {e}")
 
-            last_user_msg["content"] = new_content
+            user_msg["content"] = new_content
 
         return messages
