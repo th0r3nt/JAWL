@@ -98,40 +98,54 @@ async def test_update_state(telethon_events, mock_tg_client, state):
 @patch("src.l2_interfaces.telegram.telethon.events.utils.get_display_name")
 async def test_on_private_message(mock_get_display_name, telethon_events, mock_bus):
     """Тест: личное сообщение публикует правильный ивент."""
-
-    # Заставляем утилиту Telethon всегда возвращать "Alex" в рамках этого теста
+    # Заставляем утилиту Telethon возвращать "Alex"
     mock_get_display_name.return_value = "Alex"
 
-    # Имитируем входящий ивент (сообщение)
     event = MagicMock()
-    event.text = "Привет, агент!"
     event.chat_id = 12345
+    event.get_chat = AsyncMock(return_value=MagicMock())
 
-    sender = MagicMock()
-    event.get_sender = AsyncMock(return_value=sender)
+    event.message = MagicMock()
+    event.message.text = "Привет, агент!"
+    event.message.fwd_from = None
+    event.message.reply_to = None
+    event.message.media = None
+    event.message.sender_id = None
 
-    # Пустая история диалогов, чтобы _update_state не упал
     telethon_events.tg_client.client().iter_dialogs.return_value = async_generator([])
 
     await telethon_events._on_private_message(event)
 
-    # Проверяем публикацию в шину
     mock_bus.publish.assert_called_once_with(
         Events.TELETHON_MESSAGE_INCOMING,
         message="Привет, агент!",
         sender_name="Alex",
+        chat_name="Alex",
         chat_id=12345,
     )
 
 
 @pytest.mark.asyncio
-async def test_on_group_message_mentioned(telethon_events, mock_bus):
+@patch("src.l2_interfaces.telegram.telethon.events.utils.get_display_name")
+async def test_on_group_message_mentioned(mock_get_display_name, telethon_events, mock_bus):
     """Тест: сообщение в группе с упоминанием публикует MENTION ивент."""
+    # Говорим утилите Telethon'а вернуть "Dev Chat"
+    mock_get_display_name.return_value = "Dev Chat"
+
     event = MagicMock()
-    event.text = "@agent, как дела?"
     event.chat_id = -100999
-    event.mentioned = True  # НАС ТЕГНУЛИ
-    event.get_sender = AsyncMock(return_value=None)  # Без имени
+    event.mentioned = True
+
+    chat_mock = MagicMock()
+    event.get_chat = AsyncMock(return_value=chat_mock)
+
+    event.message = MagicMock()
+    event.message.text = "@agent, как дела?"
+    event.message.fwd_from = None
+    event.message.reply_to = None
+    event.message.media = None
+    event.message.sender = None
+    event.message.sender_id = None
 
     telethon_events.tg_client.client().iter_dialogs.return_value = async_generator([])
 
@@ -141,19 +155,32 @@ async def test_on_group_message_mentioned(telethon_events, mock_bus):
         Events.TELETHON_GROUP_MENTION,
         message="@agent, как дела?",
         sender_name="Unknown",
-        chat_name="Unknown",
+        chat_name="Dev Chat",
         chat_id=-100999,
     )
 
 
 @pytest.mark.asyncio
-async def test_on_group_message_ignored(telethon_events, mock_bus):
+@patch("src.l2_interfaces.telegram.telethon.events.utils.get_display_name")
+async def test_on_group_message_ignored(mock_get_display_name, telethon_events, mock_bus):
     """Тест: обычное сообщение в группе публикует фоновый ивент (шум)."""
+    # Говорим утилите Telethon'а вернуть "Dev Chat"
+    mock_get_display_name.return_value = "Dev Chat"
+
     event = MagicMock()
-    event.text = "Просто текст"
     event.chat_id = -100999
-    event.mentioned = False  # НАС НЕ ТЕГАЛИ
-    event.get_sender = AsyncMock(return_value=None)
+    event.mentioned = False 
+    
+    chat_mock = MagicMock()
+    event.get_chat = AsyncMock(return_value=chat_mock)
+
+    event.message = MagicMock()
+    event.message.text = "Просто текст"
+    event.message.fwd_from = None
+    event.message.reply_to = None
+    event.message.media = None
+    event.message.sender = None
+    event.message.sender_id = None
 
     telethon_events.tg_client.client().iter_dialogs.return_value = async_generator([])
 
@@ -163,7 +190,7 @@ async def test_on_group_message_ignored(telethon_events, mock_bus):
         Events.TELETHON_GROUP_MESSAGE,
         message="Просто текст",
         sender_name="Unknown",
-        chat_name="Unknown",  # <--- добавить
+        chat_name="Dev Chat",
         chat_id=-100999,
     )
 

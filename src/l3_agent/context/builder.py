@@ -27,7 +27,7 @@ class ContextBuilder:
             event_name=event_name,
             payload=payload,
             missed_events=missed_events,
-            agent_state=self.agent_state, # Agent State нужен для RAG поиска по последним мыслям/действиям агента на разных ReAct-шагах
+            agent_state=self.agent_state,  # Agent State нужен для RAG поиска по последним мыслям/действиям агента на разных ReAct-шагах
         )
 
         ordered_parts = []
@@ -41,12 +41,13 @@ class ContextBuilder:
         # ## SKILLS
         ordered_parts.append(f"## SKILLS\n{get_skills_library()}")
 
-        # ## INTERFACES
+        # ## INTERFACES STATE
         # Указываем порядок вывода интерфейсов друг за другом
         interface_keys = [
             "agent_state",
             "host os",
             "meta",
+            "multimodality",
             "telethon",
             "aiogram",
             "web search",

@@ -119,15 +119,14 @@ async def test_update_state_mru_logic(aiogram_events, state):
 @pytest.mark.asyncio
 async def test_on_private_message(aiogram_events, mock_bus):
     """Тест: личное сообщение генерирует правильный ивент."""
-    msg = create_mock_message(100, "private", "Привет", "Alex")
+    msg = create_mock_message(12345, "private", "Привет", "Alex")
 
     await aiogram_events._on_private_message(msg)
 
     mock_bus.publish.assert_called_once_with(
-        Events.TELETHON_MESSAGE_INCOMING,
-        message="Привет, агент!",
+        Events.AIOGRAM_MESSAGE_INCOMING,
+        message="Привет",
         sender_name="Alex",
-        chat_name="Unknown",
         chat_id=12345,
     )
 

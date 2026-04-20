@@ -229,3 +229,52 @@ async def test_react_no_tool_calls(mock_dependencies):
     # Стейт должен вернуться в IDLE без ошибок и без вызова функций
     assert deps["agent_state"].state == AgentStatus.IDLE
     deps["sql_ticks"].save_tick.assert_not_called()
+
+
+def test_react_inject_images_no_markers(mock_dependencies):
+    """Тест: если маркеров нет, функция должна вернуть список без изменений."""
+    deps = mock_dependencies
+    loop = ReactLoop(**deps)
+
+    messages = [
+        {"role": "tool", "content": "Обычный ответ тулзы"},
+        {"role": "user", "content": "Контекст агента"},
+    ]
+
+    result = loop._inject_images_to_payload(messages.copy())
+
+    assert result == messages
+    # Контент user-сообщения остался строкой
+    assert isinstance(result[-1]["content"], str)
+
+
+def test_react_inject_images_success(mock_dependencies, tmp_path):
+    """Тест: если есть маркер, функция читает картинку, кодирует в Base64 и меняет формат messages."""
+    deps = mock_dependencies
+    loop = ReactLoop(**deps)
+
+    # Создаем настоящую (но крошечную) фейковую картинку
+    fake_img = tmp_path / "test.jpg"
+    fake_img.write_bytes(b"hello")  # Base64 для 'hello' это 'aGVsbG8='
+
+    # Имитируем историю, где на прошлом шаге тулза вернула маркер
+    messages = [
+        {"role": "tool", "content": f"Result: [IMAGE_REQUEST: {fake_img.resolve()}]"},
+        {"role": "user", "content": "Анализируй"},
+    ]
+
+    result = loop._inject_images_to_payload(messages.copy())
+
+    last_msg_content = result[-1]["content"]
+
+    # Проверяем, что строка превратилась в массив
+    assert isinstance(last_msg_content, list)
+
+    # Текст никуда не делся
+    assert last_msg_content[0]["type"] == "text"
+    assert last_msg_content[0]["text"] == "Анализируй"
+
+    # Картинка подсосалась
+    assert last_msg_content[1]["type"] == "image_url"
+    assert "image/jpeg" in last_msg_content[1]["image_url"]["url"]
+    assert "aGVsbG8=" in last_msg_content[1]["image_url"]["url"]  # Проверка кодировки
