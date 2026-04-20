@@ -51,6 +51,7 @@ class ReactLoop:
         Сохраняет финальный промпт в Markdown-файл для отладки.
         Безопасно парсит как обычные dict, так и объекты OpenAI.
         """
+        
         try:
             with open("logs/last_prompt.md", "w", encoding="utf-8") as f:
                 for m in messages:
@@ -91,7 +92,7 @@ class ReactLoop:
             prompt = self.prompt_builder.build()
 
             messages = [
-                {"role": "system", "content": prompt},
+                {"role": "system", "content": prompt}, # Статичный промпт
                 {"role": "user", "content": ""},  # Будет перезаписываться на каждом шаге
             ]
 
@@ -105,10 +106,10 @@ class ReactLoop:
                     event_name, payload, self.current_events
                 )
 
-                # Обновляем блок контекста пользователя в истории сообщений
+                # Обновляем блок контекста в истории сообщений
                 messages[1]["content"] = context
 
-                # Трекаем dct токены на каждом из шагов, которые реально улетают в API (включая историю шагов)
+                # Трекаем токены на каждом из шагов, которые реально улетают в API (включая историю шагов)
                 self.tracker.add_input_record(messages=messages)
 
                 system_logger.info(f"[ReAct] Шаг {step}/{self.agent_state.max_react_steps}.")
@@ -241,5 +242,3 @@ class ReactLoop:
             # Обязательно сбрасываем кэш при любом исходе
             self.sql_ticks.clear_session_cache()
             self.agent_state.update_state(AgentStatus.IDLE)
-
-            self.tracker.finalize_tick()

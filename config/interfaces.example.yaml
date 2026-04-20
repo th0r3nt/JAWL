@@ -20,13 +20,14 @@ host:
 
 telegram:
   telethon:
-    enabled: false
-    session_name: "agent_telethon"
+    enabled: false # Перед включением введите TELETHON_API_ID и TELETHON_API_HASH в .env
+    session_name: "agent_telethon" # Находится в src/utils/local/data/telethon/
 
   aiogram:
-    enabled: false # Перед включением введите токен бота в .env
+    enabled: false # Перед включением введите AIOGRAM_BOT_TOKEN в .env
 
 web:
+  # Поиск через DuckDuckGo и чтение страниц
   search:
     enabled: true
     request_timeout_sec: 15
