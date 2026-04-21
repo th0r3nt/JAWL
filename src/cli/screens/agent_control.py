@@ -1,6 +1,7 @@
 import sys
 import os
 import shutil
+import time
 import subprocess
 from pathlib import Path
 import psutil
@@ -14,6 +15,7 @@ PID_FILE = ROOT_DIR / "src" / "utils" / "local" / "data" / "agent.pid"
 ENV_FILE = ROOT_DIR / ".env"
 ENV_EXAMPLE = ROOT_DIR / ".env.example"
 MAIN_SCRIPT = ROOT_DIR / "src" / "main.py"
+STOP_FILE = ROOT_DIR / "src" / "utils" / "local" / "data" / "agent.stop"
 
 
 def _is_agent_running() -> bool:
@@ -101,24 +103,33 @@ def start_agent_screen() -> None:
     print_info(" Инициализация систем агента.")
     PID_FILE.parent.mkdir(parents=True, exist_ok=True)
 
-    # Создаем директорию для логов, если её нет
     logs_dir = ROOT_DIR / "logs"
     logs_dir.mkdir(parents=True, exist_ok=True)
     crash_log_path = logs_dir / "crash.log"
 
-    # Прокидываем PYTHONPATH, чтобы импорты 'src...' работали в новом процессе
     env = os.environ.copy()
     env["PYTHONPATH"] = str(ROOT_DIR)
+    # Жестко указываем Python выводить ошибки в UTF-8, чтобы избежать крякозябр
+    env["PYTHONIOENCODING"] = "utf-8"
+
+    # Изолируем процесс агента от терминала, чтобы Ctrl+C в логах не убивал его
+    kwargs = {}
+    if os.name == "nt":
+        # Windows: создаем новую группу процессов
+        kwargs["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP
+    else:
+        # Linux/Mac: создаем новую сессию
+        kwargs["start_new_session"] = True
 
     try:
-        # Перенаправляем stderr в файл crash.log, чтобы не терять фатальные ошибки
         with open(crash_log_path, "a", encoding="utf-8") as crash_log:
             process = subprocess.Popen(
                 [sys.executable, str(MAIN_SCRIPT)],
                 stdout=subprocess.DEVNULL,
                 stderr=crash_log,
                 cwd=str(ROOT_DIR),
-                env=env,  # <-- Передаем окружение
+                env=env,
+                **kwargs,  # <-- Распаковываем аргументы изоляции
             )
 
         PID_FILE.write_text(str(process.pid))
@@ -136,6 +147,7 @@ def start_agent_screen() -> None:
 
 def stop_agent_screen() -> None:
     """Экран остановки агента."""
+
     if not _is_agent_running():
         print_info(" Агент в данный момент не запущен.")
         if PID_FILE.exists():
@@ -147,18 +159,34 @@ def stop_agent_screen() -> None:
         pid = int(PID_FILE.read_text().strip())
         process = psutil.Process(pid)
 
-        print_info("Отправка сигнала на завершение (SIGTERM).")
-        process.terminate()
+        print_info("Отправка сигнала на плавное завершение (Graceful Shutdown)...")
+        # Создаем флаг-файл, агент его увидит и начнет сворачиваться
+        STOP_FILE.touch(exist_ok=True)
 
-        try:
-            process.wait(timeout=10)
-            print_success("Агент успешно остановлен.")
-        except psutil.TimeoutExpired:
-            print_error("Агент не отвечает. Принудительное убийство (SIGKILL).")
+        # Ждем до 15 секунд, пока агент корректно закроет БД и завершится
+        timeout = 15
+        is_dead = False
+
+        for _ in range(timeout):
+            if not process.is_running():
+                is_dead = True
+                break
+            time.sleep(1)
+
+        if is_dead:
+            print_success("Агент успешно и безопасно остановлен.")
+        else:
+            print_error(
+                f"Агент не ответил за {timeout} секунд. Принудительное убийство (SIGKILL)."
+            )
             process.kill()
             print_success("Процесс агента выслежен и убит.")
 
-        PID_FILE.unlink()
+        # Убираем за собой мусор
+        if PID_FILE.exists():
+            PID_FILE.unlink()
+        if STOP_FILE.exists():
+            STOP_FILE.unlink()
 
     except Exception as e:
         print_error(f"Ошибка при попытке остановить агента: {e}")

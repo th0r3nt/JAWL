@@ -80,6 +80,6 @@ def is_agent_running() -> bool:
         if pid_file.exists():
             try:
                 pid_file.unlink()
-            except:
+            except Exception:
                 pass
         return False

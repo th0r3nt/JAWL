@@ -43,7 +43,11 @@ class ContextRegistry:
         )
 
     async def gather_all(
-        self, event_name: str, payload: Dict[str, Any], missed_events: List[str], agent_state
+        self,
+        event_name: str,
+        payload: Dict[str, Any],
+        missed_events: List[Dict[str, Any]],
+        agent_state,
     ) -> Dict[str, str]:
 
         if not self._providers:

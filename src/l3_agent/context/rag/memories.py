@@ -20,24 +20,23 @@ class RAGMemories:
         vector_knowledge: "VectorKnowledge",
         vector_thoughts: "VectorThoughts",
         telethon_state: "TelethonState",
-        agent_state: "AgentState",  # <--- ДОБАВЛЕНО
+        agent_state: "AgentState",
         auto_rag_top_k: int = 5,
     ):
         self.vector_knowledge = vector_knowledge
         self.vector_thoughts = vector_thoughts
         self.telethon_state = telethon_state
-        self.agent_state = agent_state  # <--- ДОБАВЛЕНО
+        self.agent_state = agent_state
         self.auto_rag_top_k = auto_rag_top_k
 
     async def get_context_block(
         self,
         payload: Dict[str, Any],
-        missed_events: List[str],
+        missed_events: List[Dict[str, Any]],
         **kwargs,
     ) -> str:
 
         queries = set()
-
         # ==================================================================
         # RAG поиск для первого шага ReAct-цикла
         # ==================================================================
@@ -53,17 +52,17 @@ class RAGMemories:
             if len(msg) > 10 or len(msg.split()) > 2:
                 queries.add(msg.strip())
 
-            # Из логов пропущенных событий
+            # Из логов пропущенных событий (ИСПРАВЛЕНО)
             for event in missed_events:
-                match_sender = re.search(r"sender_name=([^,]+)", event)
-                if match_sender and match_sender.group(1).lower() != "unknown":
-                    queries.add(match_sender.group(1).strip())
+                evt_payload = event.get("payload", {})
 
-                match_msg = re.search(r"message=([^,]+)", event)
-                if match_msg:
-                    text = match_msg.group(1).strip()
-                    if len(text) > 15 or len(text.split()) > 3:
-                        queries.add(text)
+                match_sender = evt_payload.get("sender_name")
+                if match_sender and match_sender.lower() != "unknown":
+                    queries.add(match_sender.strip())
+
+                match_msg = evt_payload.get("message", "")
+                if len(match_msg) > 15 or len(match_msg.split()) > 3:
+                    queries.add(match_msg.strip())
 
             # Из названий чатов с непрочитанными сообщениями
             for line in self.telethon_state.last_chats.split("\n"):
@@ -87,12 +86,12 @@ class RAGMemories:
             if self.agent_state.last_action_error:
                 queries.add(self.agent_state.last_action_error)
 
-            # Проверяем свежие события, прилетевшие во время раздумий
+            # Проверяем свежие события, прилетевшие во время раздумий (ИСПРАВЛЕНО)
             if missed_events:
                 last_evt = missed_events[-1]
-                match_msg = re.search(r"message=([^,]+)", last_evt)
+                match_msg = last_evt.get("payload", {}).get("message", "")
                 if match_msg:
-                    queries.add(match_msg.group(1).strip())
+                    queries.add(match_msg.strip())
 
         if not queries:
             return ""

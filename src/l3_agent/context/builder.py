@@ -27,7 +27,7 @@ class ContextBuilder:
         )
 
     async def build(
-        self, event_name: str, payload: Dict[str, Any], missed_events: List[str]
+        self, event_name: str, payload: Dict[str, Any], missed_events: List[Dict[str, Any]]
     ) -> str:
         """Собирает итоговый контекст для агента в строгом порядке."""
 
@@ -87,7 +87,7 @@ class ContextBuilder:
 """.strip()
 
     def _build_answer_to_event_reason(
-        self, event_name: str, payload: Dict[str, Any], missed_events: List[str]
+        self, event_name: str, payload: Dict[str, Any], missed_events: List[Dict[str, Any]]
     ) -> str:
         """Возвращает отформатированный блок контекста фоновых событий для агента."""
 

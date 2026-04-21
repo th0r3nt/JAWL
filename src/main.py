@@ -286,7 +286,7 @@ class System:
 
         def create_handler(evt):
             def handler(**kwargs):
-                # Если система уже останавливается — игнорируем любые события
+                # Если система уже останавливается - игнорируем любые события
                 if evt == Events.SYSTEM_CORE_STOP:
                     return
 
@@ -383,10 +383,16 @@ class System:
             )
             await self.event_bus.publish(Events.SYSTEM_CORE_START, status="online")
 
-            # Точка входа в бесконечный цикл
+            # Запускаем фоновую следилку за файлом остановки
+            stop_watcher_task = asyncio.create_task(self._watch_for_stop_file())
+
+            # Точка входа в бесконечный цикл (тут код заблокируется, пока агент работает)
             await self.heartbeat.start()
 
-            # Если мы дошли сюда — агент остановился штатно
+            # Как только агент остановился - отменяем таску, чтобы она не висела в памяти
+            stop_watcher_task.cancel()
+
+            # Если мы дошли сюда - агент остановился штатно
             return self._exit_code
 
         finally:
@@ -394,6 +400,39 @@ class System:
             if pid_file.exists():
                 pid_file.unlink()
                 system_logger.info("[System] PID-файл удален.")
+
+    async def _watch_for_stop_file(self):
+        """Фоновая задача: ждет появления файла agent.stop от CLI для плавной остановки."""
+
+        stop_file = self.local_data_dir / "agent.stop"
+
+        # Очищаем старый файл, если он остался от прошлых крашей
+        if stop_file.exists():
+            try:
+                stop_file.unlink()
+            except Exception:
+                pass
+
+        try:
+            while True:
+                if stop_file.exists():
+                    system_logger.info(
+                        "[System] Получен сигнал от CLI (agent.stop). Запускаем плавную остановку."
+                    )
+                    try:
+                        stop_file.unlink()
+                    except Exception:
+                        pass
+
+                    # Дергаем ту же ручку, как если бы агент сам решил выключиться
+                    await self.event_bus.publish(
+                        Events.SYSTEM_SHUTDOWN_REQUESTED,
+                        reason="Остановка пользователем из меню",
+                    )
+                    break
+                await asyncio.sleep(1)
+        except asyncio.CancelledError:
+            pass
 
     async def stop(self) -> None:
         """Остановка и очистка ресурсов."""
