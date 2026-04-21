@@ -4,6 +4,7 @@
 """
 
 import sys
+import time
 import questionary
 
 from src.cli.widgets.ui import draw_header, print_info, get_custom_style
@@ -26,9 +27,9 @@ def main_menu() -> None:
             "Добро пожаловать в JAWL. Выберите действие:",
             choices=[
                 questionary.Choice("🚀 Запустить агента", "start"),
-                questionary.Choice("⏹️  Остановить агента", "stop"),
+                questionary.Choice("⏹️ Остановить агента", "stop"),
                 questionary.Choice("📋 Открыть логи", "logs"),
-                questionary.Choice("⚙️  Мастер настройки интерфейсов", "setup"),
+                questionary.Choice("⚙️ Мастер настройки интерфейсов", "setup"),
                 questionary.Choice("🧹 Полный сброс памяти", "reset"),
                 questionary.Separator(" "),  # Заменяем дефисы на пустую строку для воздуха
                 questionary.Choice("❌ Выход", "exit"),
@@ -40,6 +41,7 @@ def main_menu() -> None:
 
         if choice is None or choice == "exit":
             print_info("Отключение. До встречи.")
+            time.sleep(2)
             sys.exit(0)
 
         # Маршрутизация

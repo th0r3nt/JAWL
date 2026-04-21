@@ -125,7 +125,7 @@ def setup_wizard_screen() -> None:
         choices.append(questionary.Choice("❌ Выход в главное меню", "exit"))
 
         choice = questionary.select(
-            "Выберите интерфейс, нажмите Enter и измените значение:",
+            "Выберите интерфейс, нажмите Enter и измените значение:\n",
             choices=choices,
             style=style,
             instruction="(Стрелочки ↑/↓ для навигации)",
