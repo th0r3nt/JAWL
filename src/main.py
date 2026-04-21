@@ -106,10 +106,10 @@ class System:
             heartbeat_interval=self.settings.system.heartbeat_interval,
         )
         self.os_state = HostOSState()
-        self.terminal_state = HostTerminalState()
-        self.telethon_state = TelethonState()
-        self.aiogram_state = AiogramState()
-        self.web_search_state = WebSearchState()
+        self.terminal_state = HostTerminalState(number_of_last_messages=15)
+        self.telethon_state = TelethonState(number_of_last_chats=15)
+        self.aiogram_state = AiogramState(number_of_last_chats=15)
+        self.web_search_state = WebSearchState(history_limit=10)
 
     async def setup_l1_databases(self):
         """Поднимает базы данных и регистрирует их CRUD-скиллы."""

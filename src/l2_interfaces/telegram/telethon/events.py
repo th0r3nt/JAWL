@@ -1,3 +1,5 @@
+from typing import Any
+
 from telethon import events, utils
 from telethon.tl.types import UpdateMessageReactions
 
@@ -100,7 +102,7 @@ class TelethonEvents:
         enriched_message = f"{base_text}{fwd_info}{reply_info}".strip()
 
         # Тянем историю
-        history = await self._fetch_recent_history(event.chat_id, limit=5)
+        history = await self._fetch_recent_history(chat, limit=5)
 
         payload = {
             "message": enriched_message,
@@ -158,7 +160,7 @@ class TelethonEvents:
 
         # В группах подтягиваем историю ТОЛЬКО если нас упомянули (экономим запросы)
         if event.mentioned:
-            history = await self._fetch_recent_history(event.chat_id, limit=10)
+            history = await self._fetch_recent_history(chat, limit=10)
             if history:
                 payload["recent_history"] = history
 
@@ -268,12 +270,15 @@ class TelethonEvents:
     # ==========================================================
     # СЛУЖЕБНЫЕ МЕТОДЫ
     # ==========================================================
+    async def _fetch_recent_history(self, target_entity: Any, limit: int = 5) -> str:
+        """Быстро подтягивает последние N сообщений в идеальном форматировании."""
+        
+        if not target_entity:
+            return ""
 
-    async def _fetch_recent_history(self, chat_id: int, limit: int = 5) -> str:
-        """KISS: Быстро подтягивает последние N сообщений в идеальном форматировании."""
         try:
             client = self.tg_client.client()
-            target_entity = await client.get_entity(chat_id)
+            # Убрали client.get_entity(chat_id), используем готовую сущность
             msgs = await client.get_messages(target_entity, limit=limit + 1)
 
             if len(msgs) <= 1:

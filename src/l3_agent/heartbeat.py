@@ -66,10 +66,13 @@ class Heartbeat:
         multiplier = 1.0
         if level == EventLevel.CRITICAL:
             multiplier = self.accel_config.critical_multiplier
+            
         elif level == EventLevel.HIGH:
             multiplier = self.accel_config.high_multiplier
+
         elif level == EventLevel.MEDIUM:
             multiplier = self.accel_config.medium_multiplier
+
         elif level == EventLevel.LOW:
             multiplier = self.accel_config.low_multiplier
         elif level == EventLevel.BACKGROUND:
