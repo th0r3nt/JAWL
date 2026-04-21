@@ -27,7 +27,6 @@ from src.l0_state.interfaces.state import (
     AiogramState,
     WebSearchState,
     CalendarState,
-    RedditState,
 )
 
 # ==========================================
@@ -113,7 +112,6 @@ class System:
         self.aiogram_state = AiogramState(number_of_last_chats=15)
         self.web_search_state = WebSearchState(history_limit=10)
         self.calendar_state = CalendarState()
-        self.reddit_state = RedditState(history_limit=10)
 
     async def setup_l1_databases(self):
         """Поднимает базы данных и регистрирует их CRUD-скиллы."""
@@ -214,9 +212,6 @@ class System:
         telethon_api_hash: Optional[str] = None,
         # Aiogram
         aiogram_bot_token: Optional[str] = None,
-        # Reddit
-        reddit_client_id: Optional[str] = None,
-        reddit_client_secret: Optional[str] = None,
     ):
         """Читает конфиг, поднимает нужные интерфейсы и регистрирует их скиллы."""
 
@@ -228,9 +223,6 @@ class System:
             "TELETHON_API_HASH": telethon_api_hash,
             # Aiogram
             "AIOGRAM_BOT_TOKEN": aiogram_bot_token,
-            # Reddit
-            "REDDIT_CLIENT_ID": reddit_client_id,
-            "REDDIT_CLIENT_SECRET": reddit_client_secret,
         }
 
         # Вся магия сборки интерфейсов скрыта здесь
@@ -344,9 +336,6 @@ class System:
         telethon_api_hash: Optional[str] = None,
         # Aiogram
         aiogram_bot_token: Optional[str] = None,
-        # Reddit
-        reddit_client_id: Optional[str] = None,
-        reddit_client_secret: Optional[str] = None,
     ) -> int:
         """Запуск системы."""
 
@@ -365,9 +354,6 @@ class System:
             telethon_api_hash=telethon_api_hash,
             # Aiogram
             aiogram_bot_token=aiogram_bot_token,
-            # Reddit
-            reddit_client_id=reddit_client_id,
-            reddit_client_secret=reddit_client_secret,
         )
 
         # L3 AGENT
@@ -457,9 +443,6 @@ async def main() -> int:
         TELETHON_API_HASH = os.getenv("TELETHON_API_HASH", None)
         # Aiogram
         AIOGRAM_BOT_TOKEN = os.getenv("AIOGRAM_BOT_TOKEN", None)
-        # Reddit
-        REDDIT_CLIENT_ID = os.getenv("REDDIT_CLIENT_ID", None)
-        REDDIT_CLIENT_SECRET = os.getenv("REDDIT_CLIENT_SECRET", None)
 
         # Динамически собираем все ключи, которые начинаются с LLM_API_KEY_
         LLM_API_URL = os.getenv("LLM_API_URL", None)
@@ -477,9 +460,6 @@ async def main() -> int:
             telethon_api_hash=TELETHON_API_HASH,
             # Aiogram
             aiogram_bot_token=AIOGRAM_BOT_TOKEN,
-            # Reddit
-            reddit_client_id=REDDIT_CLIENT_ID,           # <--- Новое
-            reddit_client_secret=REDDIT_CLIENT_SECRET,
         )
         return exit_code
 

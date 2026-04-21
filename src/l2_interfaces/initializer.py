@@ -11,7 +11,6 @@ from src.l2_interfaces.telegram.aiogram.bootstrap import setup_aiogram
 from src.l2_interfaces.web.search.bootstrap import setup_web_search
 from src.l2_interfaces.multimodality.bootstrap import setup_multimodality
 from src.l2_interfaces.calendar.bootstrap import setup_calendar
-from src.l2_interfaces.reddit.bootstrap import setup_reddit
 
 # Импортируйте сюда свой кастомный интерфейс
 # from src.l2_interfaces.interface_name.bootstrap import setup_interface
@@ -85,18 +84,6 @@ def initialize_l2_interfaces(system: "System", env_vars: Dict[str, str | None]) 
 
     if getattr(config, "calendar", None) and config.calendar.enabled:
         components.extend(setup_calendar(system))
-
-    # ================================================================
-    # REDDIT
-    # ================================================================
-    if getattr(config, "reddit", None) and config.reddit.enabled:
-        components.extend(
-            setup_reddit(
-                system=system,
-                client_id=env_vars.get("REDDIT_CLIENT_ID"),
-                client_secret=env_vars.get("REDDIT_CLIENT_SECRET"),
-            )
-        )
 
     # ================================================================
 

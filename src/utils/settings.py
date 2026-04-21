@@ -69,12 +69,6 @@ class CalendarConfig(BaseModel):
     polling_interval_sec: int
 
 
-class RedditConfig(BaseModel):
-    enabled: bool
-    agent_account: bool
-    read_limit: int
-
-
 class InterfacesConfig(BaseModel):
     host: HostConfig
     telegram: TelegramConfig
@@ -82,7 +76,6 @@ class InterfacesConfig(BaseModel):
     meta: MetaConfig
     multimodality: MultimodalityConfig
     calendar: CalendarConfig
-    reddit: RedditConfig 
 
 
 # ==========================================

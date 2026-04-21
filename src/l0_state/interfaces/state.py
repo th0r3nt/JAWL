@@ -152,32 +152,3 @@ class CalendarState:
     def __init__(self):
         self.is_online = False
         self.upcoming_events = "Событий нет."
-
-
-# ==================================================================
-# Reddit
-# ==================================================================
-
-
-class RedditState:
-    """
-    Хранит состояние Reddit-клиента (история активности агента).
-    Позволяет агенту помнить, какие посты/сабреддиты он недавно читал.
-    """
-
-    def __init__(self, history_limit: int = 10):
-        self.is_online = False
-        self.history_limit = history_limit
-        self.history: list[str] = []
-
-    def add_history(self, entry: str):
-        """Добавляет запись в начало истории."""
-        self.history.insert(0, entry)
-        if len(self.history) > self.history_limit:
-            self.history.pop()
-
-    @property
-    def recent_activity(self) -> str:
-        if not self.history:
-            return "История активности пуста."
-        return "\n".join(f"- {item}" for item in self.history)
