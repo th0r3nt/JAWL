@@ -50,3 +50,17 @@ class PromptBuilder:
                 raise RuntimeError(f"Ошибка чтения файла промпта {file_path}: {e}")
 
         return "\n\n".join(parts)
+
+    def build(self) -> str:
+        """
+        Собирает итоговый системный промпт.
+        Порядок важен: Характер -> Инструкции -> Тулзы.
+        """
+
+        # Сначала собираем Личность
+        personality = self._gather_markdown("personality")
+
+        # Затем собираем Системные правила
+        system_rules = self._gather_markdown("system")
+
+        return f"{personality}\n\n\n\n{system_rules}".strip()

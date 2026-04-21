@@ -48,7 +48,7 @@ def _check_and_setup_env() -> bool:
     if not ENV_FILE.exists():
         if ENV_EXAMPLE.exists():
             shutil.copy(ENV_EXAMPLE, ENV_FILE)
-            print_info("Создан базовый файл .env из .env.example")
+            print_info(" Создан базовый файл .env из .env.example")
         else:
             print_error("Не найден ни .env, ни .env.example.")
             return False
@@ -93,7 +93,7 @@ def _check_and_setup_prompts() -> None:
         return
 
     created_any = False
-    
+
     for example_file in PROMPTS_DIR.rglob("*.example.md"):
         # Формируем имя без .example (например: SOUL.example.md -> SOUL.md)
         target_name = example_file.name.replace(".example.md", ".md")
@@ -101,12 +101,12 @@ def _check_and_setup_prompts() -> None:
 
         if not target_file.exists():
             shutil.copy(example_file, target_file)
-            print_info(f"Создан базовый файл личности: {target_name}")
+            print_info(f" Создан базовый файл личности: {target_name}")
             created_any = True
             
     if created_any:
         print_info(
-            "Напоминание: вы можете полностью кастомизировать характер агента, редактируя эти файлы "
+            " Напоминание: вы можете полностью кастомизировать характер агента, редактируя эти файлы "
             "или добавляя любые новые .md документы в папку src/l3_agent/prompt/personality/"
         )
 
