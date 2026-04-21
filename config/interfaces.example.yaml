@@ -56,3 +56,10 @@ multimodality:
 calendar:
   enabled: true
   polling_interval_sec: 60
+
+
+# Логика взаимодействия с Reddit
+reddit:
+  enabled: true
+  agent_account: false # Если true, агент сможет писать посты и комменты (потребуется указать имя и пароль аккаунта агента в .env)
+  read_limit: 10       # Сколько постов/комментов парсить за раз, чтобы не убить контекст

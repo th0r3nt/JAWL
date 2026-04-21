@@ -27,6 +27,7 @@ from src.l0_state.interfaces.state import (
     AiogramState,
     WebSearchState,
     CalendarState,
+    RedditState,
 )
 
 # ==========================================
@@ -112,6 +113,7 @@ class System:
         self.aiogram_state = AiogramState(number_of_last_chats=15)
         self.web_search_state = WebSearchState(history_limit=10)
         self.calendar_state = CalendarState()
+        self.reddit_state = RedditState(history_limit=10)
 
     async def setup_l1_databases(self):
         """Поднимает базы данных и регистрирует их CRUD-скиллы."""
@@ -207,18 +209,28 @@ class System:
 
     def setup_l2_interfaces(
         self,
+        # Telethon
         telethon_api_id: Optional[str] = None,
         telethon_api_hash: Optional[str] = None,
+        # Aiogram
         aiogram_bot_token: Optional[str] = None,
+        # Reddit
+        reddit_client_id: Optional[str] = None,
+        reddit_client_secret: Optional[str] = None,
     ):
         """Читает конфиг, поднимает нужные интерфейсы и регистрирует их скиллы."""
 
         system_logger.info("[System] Инициализация L2 Interfaces.")
 
         env_vars = {
+            # Telethon
             "TELETHON_API_ID": telethon_api_id,
             "TELETHON_API_HASH": telethon_api_hash,
+            # Aiogram
             "AIOGRAM_BOT_TOKEN": aiogram_bot_token,
+            # Reddit
+            "REDDIT_CLIENT_ID": reddit_client_id,
+            "REDDIT_CLIENT_SECRET": reddit_client_secret,
         }
 
         # Вся магия сборки интерфейсов скрыта здесь
@@ -327,21 +339,38 @@ class System:
         self,
         llm_api_url: str,
         llm_api_keys: list[str],
+        # Telethon
         telethon_api_id: Optional[str] = None,
         telethon_api_hash: Optional[str] = None,
+        # Aiogram
         aiogram_bot_token: Optional[str] = None,
+        # Reddit
+        reddit_client_id: Optional[str] = None,
+        reddit_client_secret: Optional[str] = None,
     ) -> int:
         """Запуск системы."""
 
         system_logger.info("[System] Инициализация JAWL.")
 
+        # L1 STATE
         self.setup_l0_state()
+
+        # L2 DATABASES
         await self.setup_l1_databases()
+
+        # L2 INTERFACES
         self.setup_l2_interfaces(
+            # Telethon
             telethon_api_id=telethon_api_id,
             telethon_api_hash=telethon_api_hash,
+            # Aiogram
             aiogram_bot_token=aiogram_bot_token,
+            # Reddit
+            reddit_client_id=reddit_client_id,
+            reddit_client_secret=reddit_client_secret,
         )
+
+        # L3 AGENT
         self.setup_l3_agent(llm_api_url=llm_api_url, llm_api_keys=llm_api_keys)
 
         # Запускаем все фоновые задачи (клиенты и слушатели событий) отказоустройство
@@ -422,12 +451,18 @@ async def main() -> int:
         interfaces_config=interfaces_config,
     )
     try:
-        LLM_API_URL = os.getenv("LLM_API_URL", None)
+        # Пробуем взять .env токены/API для интерфейсов
+        # Telethon
         TELETHON_API_ID = os.getenv("TELETHON_API_ID", None)
         TELETHON_API_HASH = os.getenv("TELETHON_API_HASH", None)
+        # Aiogram
         AIOGRAM_BOT_TOKEN = os.getenv("AIOGRAM_BOT_TOKEN", None)
+        # Reddit
+        REDDIT_CLIENT_ID = os.getenv("REDDIT_CLIENT_ID", None)
+        REDDIT_CLIENT_SECRET = os.getenv("REDDIT_CLIENT_SECRET", None)
 
         # Динамически собираем все ключи, которые начинаются с LLM_API_KEY_
+        LLM_API_URL = os.getenv("LLM_API_URL", None)
         LLM_API_KEYS = [
             v
             for k, v in sorted(os.environ.items())
@@ -437,9 +472,14 @@ async def main() -> int:
         exit_code = await system.run(
             llm_api_url=LLM_API_URL,
             llm_api_keys=LLM_API_KEYS,
+            # Telethon
             telethon_api_id=TELETHON_API_ID,
             telethon_api_hash=TELETHON_API_HASH,
+            # Aiogram
             aiogram_bot_token=AIOGRAM_BOT_TOKEN,
+            # Reddit
+            reddit_client_id=REDDIT_CLIENT_ID,           # <--- Новое
+            reddit_client_secret=REDDIT_CLIENT_SECRET,
         )
         return exit_code
 
