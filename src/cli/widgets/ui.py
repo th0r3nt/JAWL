@@ -17,8 +17,8 @@ LOGO = """
      ██║ ██╔══██╗ ██║    ██║ ██║
      ██║ ███████║ ██║ █╗ ██║ ██║
 ██   ██║ ██╔══██║ ██║███╗██║ ██║
-   ╚█████╔╝ ██║  ██║ ╚███╔███╔╝ ███████╗
-    ╚════╝  ╚═╝  ╚═╝  ╚══╝╚══╝  ╚══════╝
+╚█████╔╝ ██║  ██║ ╚███╔███╔╝ ███████╗
+ ╚════╝  ╚═╝  ╚═╝  ╚══╝╚══╝  ╚══════╝
          Just A While Loop
 """
 
@@ -78,7 +78,7 @@ def draw_header(version: str = "v0.9.0") -> None:
     logo_text = Text(LOGO.strip("\n"), style="bold cyan")
 
     # 2. Версия (добавляем \n в конце для отступа перед статусом)
-    version_text = Text(f"Version: {version}\n", style="dim cyan")
+    version_text = Text(f"{version}\n", style="dim cyan")
 
     # 3. Плашка статуса
     status_text = Text()
