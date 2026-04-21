@@ -54,7 +54,12 @@ class HostOSExecution:
                 cmd = [sys.executable, str(safe_path)]
 
             elif ext == ".sh":
-                cmd = ["bash", str(safe_path)]
+                # Fallback: используем 'sh', который есть в 100% UNIX-систем,
+                # если скрипт вдруг попадет на Alpine Linux
+                import shutil
+
+                shell_exec = "bash" if shutil.which("bash") else "sh"
+                cmd = [shell_exec, str(safe_path)]
 
             elif ext in (".bat", ".cmd"):
                 cmd = ["cmd.exe", "/c", str(safe_path)]

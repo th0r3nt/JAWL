@@ -7,6 +7,7 @@
 import os
 import sys
 import subprocess
+import time
 import venv
 from pathlib import Path
 
@@ -73,6 +74,7 @@ def setup_and_run() -> None:
     except ModuleNotFoundError as e:
         print(f"\n[*] Сбой: отсутствует модуль {e.name}. Похоже, зависимости были повреждены.")
         print("[*] Запуск автоматического восстановления.")
+        time.sleep(2) # Даем юзеру время на чтение сообщения о восстановлении
 
         subprocess.run([sys.executable, "-m", "pip", "install", "-r", str(req_file)])
 
