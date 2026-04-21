@@ -1,6 +1,7 @@
 import time
 from enum import Enum
 from pydantic import BaseModel, Field
+from src.utils.dtime import seconds_to_duration_str
 
 
 class AgentStatus(str, Enum):
@@ -33,7 +34,7 @@ class AgentState(BaseModel):
     last_thoughts: str = ""
     last_action_args: list[str] = Field(default_factory=list)
     last_action_error: str = ""
-    # По ним будет осуществляться RAG-поиск по базам данных каждый шаг в текущем ReAct-цикле, 
+    # По ним будет осуществляться RAG-поиск по базам данных каждый шаг в текущем ReAct-цикле,
     # чтобы у агента автоматически всплывали воспоминания по своим мыслям/действиям
 
     def reset_step(self):
@@ -51,10 +52,7 @@ class AgentState(BaseModel):
 
     def get_uptime(self) -> str:
         """Считает, сколько времени жив сам агент (не ОС хоста)."""
-        uptime_seconds = int(time.time() - self.start_time)
-        hours, remainder = divmod(uptime_seconds, 3600)
-        minutes, seconds = divmod(remainder, 60)
-        return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
+        return seconds_to_duration_str(time.time() - self.start_time)
 
     # P.S. Функцию сборки контекста засунул сюда, ибо это самое подходящее место
     async def get_context_block(self, **kwargs) -> str:

@@ -2,8 +2,11 @@ import asyncio
 import trafilatura
 
 from src.utils.logger import system_logger
-from src.l3_agent.skills.registry import skill, SkillResult
+from src.utils._tools import truncate_text
+
 from src.l2_interfaces.web.search.client import WebSearchClient
+
+from src.l3_agent.skills.registry import skill, SkillResult
 
 
 class WebPages:
@@ -31,7 +34,7 @@ class WebPages:
     @skill()
     async def read_webpage(self, url: str) -> SkillResult:
         """Читает текстовое содержимое веб-страницы по URL."""
-        
+
         try:
             text = await self.read_raw(url)
 
@@ -41,18 +44,14 @@ class WebPages:
                 )
 
             total_len = len(text)
-            is_truncated = False
 
             if total_len > self.client.max_page_chars:
-                text = text[: self.client.max_page_chars] + "\n\n... [Текст обрезан]"
-                is_truncated = True
-
-            header = f"[Веб-страница | Прочитано: {len(text)}/{total_len} симв.]\n{'='*40}\n"
-
-            if is_truncated:
+                text = truncate_text(text, self.client.max_page_chars, "... [Текст обрезан]")
                 system_logger.info(f"[Web] Прочитана страница (с обрезкой): {url}")
             else:
                 system_logger.info(f"[Web] Прочитана страница (полностью): {url}")
+
+            header = f"[Веб-страница | Прочитано: {len(text)}/{total_len} симв.]\n{'='*40}\n"
 
             self.client.state.add_history(f"Чтение страницы: {url}")
             return SkillResult.ok(header + text)

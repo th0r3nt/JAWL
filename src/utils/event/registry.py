@@ -61,6 +61,20 @@ class Events:
         requires_attention=False,
     )
 
+    TELETHON_CHANNEL_MESSAGE = EventConfig(
+        name="TELETHON_CHANNEL_MESSAGE",
+        description="Обычное сообщение в канале (Telethon).",
+        level=EventLevel.BACKGROUND,
+        requires_attention=False,
+    )
+
+    TELETHON_CHAT_ACTION = EventConfig(
+        name="TELETHON_CHAT_ACTION",
+        description="Системное действие в чате (вход/выход юзера, смена названия, закреп и т.д.).",
+        level=EventLevel.LOW,
+        requires_attention=False,
+    )
+
     TELETHON_GROUP_MESSAGE = EventConfig(
         name="TELETHON_GROUP_MESSAGE",
         description="Обычное сообщение в чате.",
@@ -86,6 +100,13 @@ class Events:
         requires_attention=True,
     )
 
+    AIOGRAM_CHAT_ACTION = EventConfig(
+        name="AIOGRAM_CHAT_ACTION",
+        description="Системное действие в чате бота (вход/выход юзера, смена названия, закреп).",
+        level=EventLevel.LOW,
+        requires_attention=False,
+    )
+    
     AIOGRAM_GROUP_MESSAGE = EventConfig(
         name="AIOGRAM_GROUP_MESSAGE",
         description="Обычное сообщение в группе, где есть бот.",

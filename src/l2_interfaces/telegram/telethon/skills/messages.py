@@ -1,8 +1,7 @@
 from datetime import timedelta
 from typing import Optional, Union
-from pathlib import Path
 
-from src.utils._tools import format_size
+from src.utils._tools import format_size, validate_sandbox_path, parse_int_or_str
 from src.utils.logger import system_logger
 
 from src.l2_interfaces.telegram.telethon.client import TelethonClient
@@ -18,30 +17,6 @@ class TelethonMessages:
 
     def __init__(self, tg_client: TelethonClient):
         self.tg_client = tg_client
-
-    def _parse_entity(self, entity_id: Union[int, str]) -> Union[int, str]:
-        try:
-            return int(entity_id)
-        except ValueError:
-            return str(entity_id).strip()
-
-    def _validate_sandbox_path(self, filepath: str) -> Path:
-        """Внутренний гейткипер: разрешает работу с файлами строго внутри папки sandbox/."""
-
-        sandbox_dir = (Path.cwd() / "sandbox").resolve()
-        sandbox_dir.mkdir(parents=True, exist_ok=True)
-
-        path_str = str(filepath).replace("\\", "/")
-        if path_str.startswith("sandbox/"):
-            path_str = path_str[8:]
-
-        resolved = (sandbox_dir / path_str).resolve()
-        if not resolved.is_relative_to(sandbox_dir):
-            raise PermissionError(
-                "Доступ запрещен: можно отправлять и скачивать файлы только в пределах папки sandbox/"
-            )
-
-        return resolved
 
     @skill()
     async def send_message(
@@ -60,7 +35,7 @@ class TelethonMessages:
         """
         try:
             client = self.tg_client.client()
-            entity = self._parse_entity(to_id)
+            entity = parse_int_or_str(to_id)
 
             # Явно указываем parse_mode, чтобы Telethon 100% считывал разметку
             kwargs = {
@@ -104,7 +79,7 @@ class TelethonMessages:
         """Отправляет локальный файл с диска (из папки sandbox/) в указанный чат Telegram."""
 
         try:
-            safe_path = self._validate_sandbox_path(file_path)
+            safe_path = validate_sandbox_path(file_path)
 
             if not safe_path.is_file():
                 return SkillResult.fail(
@@ -113,7 +88,7 @@ class TelethonMessages:
 
             size_str = format_size(safe_path.stat().st_size)
             client = self.tg_client.client()
-            entity = self._parse_entity(chat_id)
+            entity = parse_int_or_str(chat_id)
 
             await client.send_file(entity, file=str(safe_path), caption=caption)
 
@@ -134,9 +109,9 @@ class TelethonMessages:
         """Скачивает медиа-вложение (картинку, гс, документ) из сообщения в Telegram в локальную папку sandbox/."""
 
         try:
-            safe_path = self._validate_sandbox_path(dest_filename)
+            safe_path = validate_sandbox_path(dest_filename)
             client = self.tg_client.client()
-            entity = self._parse_entity(chat_id)
+            entity = parse_int_or_str(chat_id)
 
             msg = await client.get_messages(entity, ids=int(message_id))
             if not msg or not msg.media:
@@ -180,9 +155,9 @@ class TelethonMessages:
         try:
             client = self.tg_client.client()
             await client.forward_messages(
-                entity=self._parse_entity(to_id),
+                entity=parse_int_or_str(to_id),
                 messages=int(msg_id),
-                from_peer=self._parse_entity(from_id),
+                from_peer=parse_int_or_str(from_id),
             )
             system_logger.info(f"[Telegram Telethon] Пересылка сообщения {msg_id} в {to_id}")
             return SkillResult.ok(f"Сообщение {msg_id} успешно переслано.")
@@ -196,7 +171,7 @@ class TelethonMessages:
         try:
             client = self.tg_client.client()
             await client.delete_messages(
-                entity=self._parse_entity(chat_id), message_ids=[int(msg_id)]
+                entity=parse_int_or_str(chat_id), message_ids=[int(msg_id)]
             )
             system_logger.info(
                 f"[Telegram Telethon] Сообщение {msg_id} удалено в чате {chat_id}"
@@ -218,7 +193,7 @@ class TelethonMessages:
         try:
             client = self.tg_client.client()
             await client.edit_message(
-                entity=self._parse_entity(chat_id),
+                entity=parse_int_or_str(chat_id),
                 message=int(msg_id),
                 text=new_text,
                 parse_mode="md",
@@ -240,7 +215,7 @@ class TelethonMessages:
 
         try:
             client = self.tg_client.client()
-            msg = await client.get_messages(self._parse_entity(chat_id), ids=int(message_id))
+            msg = await client.get_messages(parse_int_or_str(chat_id), ids=int(message_id))
 
             if not msg or not msg.buttons:
                 return SkillResult.fail(
@@ -295,7 +270,7 @@ class TelethonMessages:
         """
         try:
             client = self.tg_client.client()
-            entity = self._parse_entity(chat_id)
+            entity = parse_int_or_str(chat_id)
 
             from src.l2_interfaces.telegram.telethon._message_parser import (
                 TelethonMessageParser,

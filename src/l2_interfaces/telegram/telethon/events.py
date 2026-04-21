@@ -35,6 +35,18 @@ class TelethonEvents:
             events.NewMessage(incoming=True, func=lambda e: e.is_group),
         )
 
+        # Слушатель для каналов
+        client.add_event_handler(
+            self._on_channel_message,
+            events.NewMessage(incoming=True, func=lambda e: e.is_channel and not e.is_group),
+        )
+
+        # Слушатель для системных действий (ChatAction)
+        client.add_event_handler(
+            self._on_chat_action,
+            events.ChatAction(),
+        )
+
         client.add_event_handler(
             self._on_reaction,
             events.Raw(),
@@ -182,6 +194,76 @@ class TelethonEvents:
             message_id=event.msg_id,
             reactions=reactions_str,
         )
+
+    # Отслеживание сообщений в каналах
+    async def _on_channel_message(self, event: events.NewMessage.Event):
+        await self._update_state()
+
+        client = self.tg_client.client()
+        sender_name = TelethonMessageParser.get_sender_name(event.message)
+        chat = await event.get_chat()
+        chat_name = utils.get_display_name(chat) if chat else "Unknown"
+
+        msg_obj = event.message
+        fwd_info = await TelethonMessageParser.parse_forward(msg_obj)
+        is_reply, reply_id = TelethonMessageParser.determine_reply(msg_obj, None)
+        reply_info = await TelethonMessageParser.parse_reply(client, chat, is_reply, reply_id)
+
+        base_text = msg_obj.text or TelethonMessageParser.parse_media(msg_obj)
+        enriched_message = f"{base_text}{fwd_info}{reply_info}".strip()
+
+        payload = {
+            "message": enriched_message,
+            "sender_name": sender_name,
+            "chat_name": chat_name,
+            "chat_id": event.chat_id,
+        }
+
+        await self.bus.publish(Events.TELETHON_CHANNEL_MESSAGE, **payload)
+
+    # Отслеживание системных сообщений (ChatAction)
+    async def _on_chat_action(self, event: events.ChatAction.Event):
+        await self._update_state()
+
+        chat = await event.get_chat()
+        chat_name = utils.get_display_name(chat) if chat else "Unknown"
+
+        action_text = "[Системное действие] Произошло системное событие в чате."
+
+        users = []
+        if event.users:
+            users = [utils.get_display_name(u) for u in event.users]
+        users_str = ", ".join(users) if users else "Кто-то"
+
+        if event.user_joined:
+            action_text = f"[Системное действие] {users_str} присоединился к чату."
+        elif event.user_added:
+            action_text = f"[Системное действие] {users_str} был добавлен в чат."
+        elif event.user_left:
+            action_text = f"[Системное действие] {users_str} покинул чат."
+        elif event.user_kicked:
+            action_text = f"[Системное действие] {users_str} был исключен."
+        elif event.created:
+            action_text = (
+                f"[Системное действие] Чат '{event.new_title or chat_name}' был создан."
+            )
+        elif event.new_title:
+            action_text = (
+                f"[Системное действие] Название чата изменено на '{event.new_title}'."
+            )
+        elif event.new_photo or event.photo_deleted:
+            action_text = "[Системное действие] В чате обновлено или удалено фото."
+        elif event.new_pin:
+            action_text = "[Системное действие] В чате закреплено новое сообщение."
+
+        payload = {
+            "message": action_text,
+            "sender_name": "System",
+            "chat_name": chat_name,
+            "chat_id": event.chat_id,
+        }
+
+        await self.bus.publish(Events.TELETHON_CHAT_ACTION, **payload)
 
     # ==========================================================
     # СЛУЖЕБНЫЕ МЕТОДЫ

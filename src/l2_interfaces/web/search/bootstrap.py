@@ -1,11 +1,13 @@
 from typing import List, Any, TYPE_CHECKING
 
 from src.utils.logger import system_logger
-from src.l3_agent.skills.registry import register_instance
 
 from src.l2_interfaces.web.search.client import WebSearchClient
 from src.l2_interfaces.web.search.skills.duckduckgo import DuckDuckGoSearch
 from src.l2_interfaces.web.search.skills.webpages import WebPages
+
+from src.l3_agent.skills.registry import register_instance
+from src.l3_agent.context.registry import ContextSection 
 
 if TYPE_CHECKING:
     from src.main import System
@@ -29,7 +31,11 @@ def setup_web_search(system: "System") -> List[Any]:
     register_instance(web_pages)
 
     # Регистрация провайдеров контекста (отдают Markdown блоки в промпт агента)
-    system.context_registry.register_provider(name="web search", provider_func=client.get_context_block, priority=100)
-    system_logger.info("[System] Интерфейс Web загружен.")
+    system.context_registry.register_provider(
+        name="web search",
+        provider_func=client.get_context_block,
+        section=ContextSection.INTERFACES,
+    )
+    system_logger.info("[Web] Интерфейс загружен.")
 
     return []

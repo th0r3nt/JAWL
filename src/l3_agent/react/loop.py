@@ -194,7 +194,9 @@ class ReactLoop:
                     step += 1
                     continue
 
-                thoughts = " ".join(parsed_response.thoughts.split())
+                _thoughts = " ".join(parsed_response.thoughts.split())
+                
+                thoughts = _thoughts.replace("\n", " \\n ")
                 actions = parsed_response.actions
 
                 if thoughts:

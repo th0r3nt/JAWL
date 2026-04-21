@@ -45,16 +45,20 @@ from src.l2_interfaces.initializer import initialize_l2_interfaces
 # L3 Agent
 # ==========================================
 
-from src.l3_agent.llm.api_keys.rotator import APIKeyRotator
 from src.l3_agent.llm.client import LLMClient
+from src.l3_agent.llm.api_keys.rotator import APIKeyRotator
+
 from src.l3_agent.prompt.builder import PromptBuilder
 from src.l3_agent.context.builder import ContextBuilder
+from src.l3_agent.context.registry import ContextRegistry, ContextSection
+from src.l3_agent.context.rag.memories import RAGMemories
+
 from src.l3_agent.react.loop import ReactLoop
+
 from src.l3_agent.heartbeat import Heartbeat
+
 from src.l3_agent.skills.registry import register_instance
 from src.l3_agent.skills.schema import ACTION_SCHEMA
-from src.l3_agent.context.registry import ContextRegistry
-from src.l3_agent.context.rag.memories import RAGMemories
 
 
 class System:
@@ -146,36 +150,36 @@ class System:
         if sys_cfg.sql.drives.enabled:
             register_instance(self.sql.drives)
             self.context_registry.register_provider(
-                "sql_drives", self.sql.drives.get_context_block, priority=10
+                "sql_drives", self.sql.drives.get_context_block, section=ContextSection.DRIVES
             )
 
         # PERSONALITY TRAITS
         if sys_cfg.sql.personality_traits.enabled:
             register_instance(self.sql.personality_traits)
             self.context_registry.register_provider(
-                "sql_traits", self.sql.personality_traits.get_context_block, priority=20
+                "sql_traits", self.sql.personality_traits.get_context_block, section=ContextSection.TRAITS
             )
 
         # TASKS
         if sys_cfg.sql.tasks.enabled:
             register_instance(self.sql.tasks)
             self.context_registry.register_provider(
-                "sql_tasks", self.sql.tasks.get_context_block, priority=120
+                "sql_tasks", self.sql.tasks.get_context_block, section=ContextSection.TASKS
             )
 
         # MENTAL STATES
         if sys_cfg.sql.mental_states.enabled:
             register_instance(self.sql.mental_states)
             self.context_registry.register_provider(
-                "sql_mental_states", self.sql.mental_states.get_context_block, priority=110
+                "sql_mental_states", self.sql.mental_states.get_context_block, section=ContextSection.MENTAL_STATES
             )
 
         # Базовые вещи регистрируются всегда
         self.context_registry.register_provider(
-            "sql_ticks", self.sql.ticks.get_context_block, priority=140
+            "sql_ticks", self.sql.ticks.get_context_block, section=ContextSection.RECENT_TICKS
         )
         self.context_registry.register_provider(
-            "agent_state", self.agent_state.get_context_block, priority=40
+            "agent_state", self.agent_state.get_context_block, section=ContextSection.AGENT_STATE
         )
 
         # Vector DB
@@ -233,7 +237,7 @@ class System:
             auto_rag_top_k=self.settings.system.vector_db.auto_rag_top_k,
         )
         self.context_registry.register_provider(
-            "rag memories", rag_memories.get_context_block, priority=130
+            "rag memories", rag_memories.get_context_block, section=ContextSection.RAG_MEMORIES
         )
 
         # Инициализируем тонкий ContextBuilder

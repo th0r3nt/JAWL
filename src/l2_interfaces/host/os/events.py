@@ -14,7 +14,7 @@ from watchdog.events import FileSystemEventHandler
 from src.utils.event.bus import EventBus
 from src.utils.event.registry import Events
 from src.utils.logger import system_logger
-from src.utils.dtime import get_now_formatted
+from src.utils.dtime import get_now_formatted, seconds_to_duration_str
 
 from src.l0_state.interfaces.state import HostOSState
 from src.l2_interfaces.host.os.client import HostOSClient
@@ -292,18 +292,8 @@ class HostOSEvents:
 
     def _update_datetime_and_uptime(self):
         self.state.datetime = get_now_formatted(self.host_os.timezone)
-
-        # Аптайм
         boot_time = psutil.boot_time()
-        uptime_seconds = int(time.time() - boot_time)
-        hours, remainder = divmod(uptime_seconds, 3600)
-        minutes, seconds = divmod(remainder, 60)
-        days, hours = divmod(hours, 24)
-
-        if days > 0:
-            self.state.uptime = f"{days} дней, {hours:02d}:{minutes:02d}:{seconds:02d}"
-        else:
-            self.state.uptime = f"{hours:02d}:{minutes:02d}:{seconds:02d}"
+        self.state.uptime = seconds_to_duration_str(time.time() - boot_time)
 
     def _update_telemetry(self):
         cpu = psutil.cpu_percent(interval=None)

@@ -1,9 +1,9 @@
 import time
 import uuid
-from typing import Optional, TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any
 from qdrant_client import models
 
-from src.utils.dtime import format_timestamp
+from src.utils.dtime import safe_format_timestamp
 from src.utils.logger import system_logger
 
 from src.l3_agent.skills.registry import skill, SkillResult
@@ -32,11 +32,6 @@ class VectorKnowledge:
         self.embedding_model = embedding_model
         self.similarity_threshold = similarity_threshold
         self.timezone = timezone
-
-    def _format_time(self, timestamp: Optional[float]) -> str:
-        if not timestamp:
-            return "Неизвестно"
-        return format_timestamp(timestamp, self.timezone)
 
     @skill()
     async def save_knowledge(self, knowledge_text: str) -> SkillResult:
@@ -99,7 +94,7 @@ class VectorKnowledge:
             for point in points:
                 score = round(point.score, 2)
                 text = point.payload.get("text", "")
-                time_str = self._format_time(point.payload.get("created_at"))
+                time_str = safe_format_timestamp(point.payload.get("created_at"), self.timezone)
 
                 md_block = f"[ID: `{point.id}`] [Время: {time_str}] Релевантность: {score}/{self.similarity_threshold}\n{text}"
                 formatted_results.append(md_block)
@@ -150,7 +145,7 @@ class VectorKnowledge:
             formatted_results = []
             for point in records:
                 text = point.payload.get("text", "")
-                time_str = self._format_time(point.payload.get("created_at"))
+                time_str = safe_format_timestamp(point.payload.get("created_at"), self.timezone)
 
                 md_block = f"[ID: `{point.id}`] [Время: {time_str}]\n{text}"
                 formatted_results.append(md_block)

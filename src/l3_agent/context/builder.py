@@ -1,6 +1,6 @@
 from typing import Any, Dict, List
 from src.l0_state.agent.state import AgentState
-from src.l3_agent.context.registry import ContextRegistry
+from src.l3_agent.context.registry import ContextRegistry, ContextSection
 from src.l3_agent.skills.registry import get_skills_library
 
 
@@ -19,8 +19,12 @@ class ContextBuilder:
         self.registry = registry
 
         # Регистрируем встроенные провайдеры напрямую (с нужным приоритетом)
-        self.registry.register_provider("skills", self._skills_provider, priority=30)
-        self.registry.register_provider("heartbeat", self._heartbeat_provider, priority=999)
+        self.registry.register_provider(
+            "skills", self._skills_provider, section=ContextSection.SKILLS
+        )
+        self.registry.register_provider(
+            "heartbeat", self._heartbeat_provider, section=ContextSection.HEARTBEAT
+        )
 
     async def build(
         self, event_name: str, payload: Dict[str, Any], missed_events: List[str]

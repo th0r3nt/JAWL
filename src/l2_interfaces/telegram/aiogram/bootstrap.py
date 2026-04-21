@@ -1,13 +1,15 @@
 from typing import List, Any, TYPE_CHECKING
 
 from src.utils.logger import system_logger
-from src.l3_agent.skills.registry import register_instance
 
 from src.l2_interfaces.telegram.aiogram.client import AiogramClient
 from src.l2_interfaces.telegram.aiogram.events import AiogramEvents
 from src.l2_interfaces.telegram.aiogram.skills.chats import AiogramChats
 from src.l2_interfaces.telegram.aiogram.skills.messages import AiogramMessages
 from src.l2_interfaces.telegram.aiogram.skills.moderation import AiogramModeration
+
+from src.l3_agent.skills.registry import register_instance
+from src.l3_agent.context.registry import ContextSection 
 
 if TYPE_CHECKING:
     from src.main import System
@@ -34,8 +36,8 @@ def setup_aiogram(system: "System", bot_token: str | None) -> List[Any]:
 
     # Регистрация провайдеров контекста (отдают Markdown блоки в промпт агента)
     system.context_registry.register_provider(
-        name="aiogram", provider_func=client.get_context_block, priority=90
-    )
+            name="aiogram", provider_func=client.get_context_block, section=ContextSection.INTERFACES
+        )
 
     system_logger.info("[Telethon Aiogram] Интерфейс загружен.")
 

@@ -1,5 +1,4 @@
 from typing import Union
-from pathlib import Path
 
 from telethon.tl.functions.account import UpdateProfileRequest
 from telethon.tl.functions.photos import UploadProfilePhotoRequest
@@ -7,7 +6,8 @@ from telethon.tl.functions.contacts import AddContactRequest
 from telethon.tl.functions.users import GetFullUserRequest
 
 from src.utils.logger import system_logger
-from src.utils._tools import format_size
+from src.utils._tools import format_size, validate_sandbox_path, parse_int_or_str
+
 from src.l2_interfaces.telegram.telethon.client import TelethonClient
 from src.l3_agent.skills.registry import SkillResult, skill
 
@@ -19,32 +19,6 @@ class TelethonAccount:
 
     def __init__(self, tg_client: TelethonClient):
         self.tg_client = tg_client
-
-    def _parse_entity(self, entity_id: Union[int, str]) -> Union[int, str]:
-        """Утилитный метод для преобразования строковых ID в числа."""
-        try:
-            return int(entity_id)
-        except ValueError:
-            return str(entity_id).strip()
-
-    # TODO: подобные валидирующие функции расплодились. Надо бы перенести в utils/_tools.py
-    def _validate_sandbox_path(self, filepath: str) -> Path:
-        """Внутренний гейткипер: разрешает работу с файлами строго внутри папки sandbox/."""
-
-        sandbox_dir = (Path.cwd() / "sandbox").resolve()
-        sandbox_dir.mkdir(parents=True, exist_ok=True)
-
-        path_str = str(filepath).replace("\\", "/")
-        if path_str.startswith("sandbox/"):
-            path_str = path_str[8:]
-
-        resolved = (sandbox_dir / path_str).resolve()
-        if not resolved.is_relative_to(sandbox_dir):
-            raise PermissionError(
-                "Доступ запрещен: можно работать с файлами только в пределах папки sandbox/"
-            )
-
-        return resolved
 
     @skill()
     async def change_username(self, name: str, surname: str = "") -> SkillResult:
@@ -80,7 +54,7 @@ class TelethonAccount:
     async def change_avatar(self, filepath: str) -> SkillResult:
         """Изменяет аватар профиля агента. Файл должен быть в sandbox/."""
         try:
-            safe_path = self._validate_sandbox_path(filepath)
+            safe_path = validate_sandbox_path(filepath)
 
             if not safe_path.exists():
                 return SkillResult.fail(
@@ -106,7 +80,7 @@ class TelethonAccount:
         """Добавляет пользователя в контакты Telegram."""
         try:
             client = self.tg_client.client()
-            target_entity = await client.get_input_entity(self._parse_entity(user_id))
+            target_entity = await client.get_input_entity(parse_int_or_str(user_id))
 
             await client(
                 AddContactRequest(
@@ -139,9 +113,9 @@ class TelethonAccount:
         avatar_index: 0 - текущий аватар, 1 - предыдущий и т.д. (если доступна история фото).
         """
         try:
-            safe_path = self._validate_sandbox_path(dest_filename)
+            safe_path = validate_sandbox_path(dest_filename)
             client = self.tg_client.client()
-            entity = await client.get_entity(self._parse_entity(user_or_chat_id))
+            entity = await client.get_entity(parse_int_or_str(user_or_chat_id))
 
             # Запрашиваем историю фотографий (до нужного нам индекса)
             photos = await client.get_profile_photos(entity, limit=avatar_index + 1)
@@ -185,7 +159,7 @@ class TelethonAccount:
         """Получает подробную информацию о конкретном пользователе (имя, био, статус)."""
         try:
             client = self.tg_client.client()
-            target_entity = await client.get_input_entity(self._parse_entity(user_id))
+            target_entity = await client.get_input_entity(parse_int_or_str(user_id))
 
             full_user = await client(GetFullUserRequest(target_entity))
             user = full_user.users[0]

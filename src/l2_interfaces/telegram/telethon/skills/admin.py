@@ -1,5 +1,4 @@
 from typing import Union
-from pathlib import Path
 
 from telethon import utils
 from telethon.tl.functions.channels import CreateChannelRequest, EditTitleRequest
@@ -8,6 +7,7 @@ from telethon.tl.functions.messages import ExportChatInviteRequest, EditChatTitl
 from telethon.tl.functions.messages import EditChatAboutRequest, EditChatPhotoRequest
 from telethon.tl.types import InputChatUploadedPhoto, InputPeerChannel, InputPeerChat
 
+from src.utils._tools import validate_sandbox_path, parse_int_or_str
 from src.utils.logger import system_logger
 from src.l2_interfaces.telegram.telethon.client import TelethonClient
 from src.l3_agent.skills.registry import SkillResult, skill
@@ -26,32 +26,6 @@ class TelethonAdmin:
     def __init__(self, tg_client: TelethonClient):
         self.tg_client = tg_client
 
-    def _parse_entity(self, entity_id: Union[int, str]) -> Union[int, str]:
-        """Утилитный метод для преобразования строковых ID в числа."""
-
-        try:
-            return int(entity_id)
-        except ValueError:
-            return str(entity_id).strip()
-
-    # TODO: подобные валидирующие функции расплодились. Надо бы перенести в utils/_tools.py
-    def _validate_sandbox_path(self, filepath: str) -> Path:
-        """Внутренний гейткипер: разрешает работу с файлами строго внутри папки sandbox/."""
-
-        sandbox_dir = (Path.cwd() / "sandbox").resolve()
-        sandbox_dir.mkdir(parents=True, exist_ok=True)
-
-        path_str = str(filepath).replace("\\", "/")
-        if path_str.startswith("sandbox/"):
-            path_str = path_str[8:]
-
-        resolved = (sandbox_dir / path_str).resolve()
-        if not resolved.is_relative_to(sandbox_dir):
-            raise PermissionError(
-                "Доступ запрещен: можно работать с файлами только в пределах папки sandbox/"
-            )
-
-        return resolved
 
     @skill()
     async def create_channel(
@@ -84,7 +58,7 @@ class TelethonAdmin:
 
         try:
             client = self.tg_client.client()
-            entity = await client.get_entity(self._parse_entity(chat_id))
+            entity = await client.get_entity(parse_int_or_str(chat_id))
 
             try:
                 await client(EditTitleRequest(channel=entity, title=new_title))
@@ -108,7 +82,7 @@ class TelethonAdmin:
         """Изменяет описание (about/bio) группы или канала. Требуются права администратора."""
         try:
             client = self.tg_client.client()
-            entity = await client.get_input_entity(self._parse_entity(chat_id))
+            entity = await client.get_input_entity(parse_int_or_str(chat_id))
 
             await client(EditChatAboutRequest(peer=entity, about=new_description))
 
@@ -125,12 +99,12 @@ class TelethonAdmin:
     async def edit_chat_avatar(self, chat_id: Union[int, str], filepath: str) -> SkillResult:
         """Изменяет аватар группы или канала. Файл должен лежать в sandbox/."""
         try:
-            safe_path = self._validate_sandbox_path(filepath)
+            safe_path = validate_sandbox_path(filepath)
             if not safe_path.is_file():
                 return SkillResult.fail(f"Ошибка: Файл {safe_path.name} не найден.")
 
             client = self.tg_client.client()
-            entity = await client.get_input_entity(self._parse_entity(chat_id))
+            entity = await client.get_input_entity(parse_int_or_str(chat_id))
 
             uploaded_file = await client.upload_file(str(safe_path))
             photo = InputChatUploadedPhoto(file=uploaded_file)
@@ -165,7 +139,7 @@ class TelethonAdmin:
 
         try:
             client = self.tg_client.client()
-            entity = await client.get_input_entity(self._parse_entity(chat_id))
+            entity = await client.get_input_entity(parse_int_or_str(chat_id))
 
             result = await client(ExportChatInviteRequest(peer=entity))
 
@@ -182,7 +156,7 @@ class TelethonAdmin:
 
         try:
             client = self.tg_client.client()
-            entity = await client.get_entity(self._parse_entity(chat_id))
+            entity = await client.get_entity(parse_int_or_str(chat_id))
 
             participants = []
             async for user in client.iter_participants(entity, limit=limit):
@@ -213,8 +187,8 @@ class TelethonAdmin:
             client = self.tg_client.client()
 
             await client.edit_admin(
-                entity=self._parse_entity(chat_id),
-                user=self._parse_entity(user_id),
+                entity=parse_int_or_str(chat_id),
+                user=parse_int_or_str(user_id),
                 is_admin=True,
                 change_info=True,
                 post_messages=True,
@@ -241,8 +215,8 @@ class TelethonAdmin:
             client = self.tg_client.client()
 
             await client.edit_admin(
-                entity=self._parse_entity(chat_id),
-                user=self._parse_entity(user_id),
+                entity=parse_int_or_str(chat_id),
+                user=parse_int_or_str(user_id),
                 is_admin=False,
             )
 
@@ -260,7 +234,7 @@ class TelethonAdmin:
         try:
             client = self.tg_client.client()
             await client.pin_message(
-                entity=self._parse_entity(chat_id), message=int(message_id), notify=notify
+                entity=parse_int_or_str(chat_id), message=int(message_id), notify=notify
             )
 
             system_logger.info(
@@ -278,7 +252,7 @@ class TelethonAdmin:
         try:
             client = self.tg_client.client()
             await client.unpin_message(
-                entity=self._parse_entity(chat_id), message=int(message_id)
+                entity=parse_int_or_str(chat_id), message=int(message_id)
             )
 
             system_logger.info(
@@ -302,7 +276,7 @@ class TelethonAdmin:
 
         try:
             client = self.tg_client.client()
-            entity = await client.get_input_entity(self._parse_entity(chat_id))
+            entity = await client.get_input_entity(parse_int_or_str(chat_id))
 
             result = await client(CreateForumTopicRequest(channel=entity, title=title))
 

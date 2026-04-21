@@ -1,10 +1,10 @@
 from typing import List, Any, TYPE_CHECKING
 
 from src.utils.logger import system_logger
-from src.l3_agent.skills.registry import register_instance
 
 from src.l2_interfaces.telegram.telethon.client import TelethonClient
 from src.l2_interfaces.telegram.telethon.events import TelethonEvents
+
 from src.l2_interfaces.telegram.telethon.skills.account import TelethonAccount
 from src.l2_interfaces.telegram.telethon.skills.chats import TelethonChats
 from src.l2_interfaces.telegram.telethon.skills.messages import TelethonMessages
@@ -12,6 +12,9 @@ from src.l2_interfaces.telegram.telethon.skills.moderation import TelethonModera
 from src.l2_interfaces.telegram.telethon.skills.polls import TelethonPolls
 from src.l2_interfaces.telegram.telethon.skills.reactions import TelethonReactions
 from src.l2_interfaces.telegram.telethon.skills.admin import TelethonAdmin
+
+from src.l3_agent.skills.registry import register_instance
+from src.l3_agent.context.registry import ContextSection
 
 if TYPE_CHECKING:
     from src.main import System
@@ -54,10 +57,12 @@ def setup_telethon(system: "System", api_id: str | None, api_hash: str | None) -
 
     # Регистрация провайдеров контекста (отдают Markdown блоки в промпт агента)
     system.context_registry.register_provider(
-        name="telethon", provider_func=client.get_context_block, priority=80
+        name="telethon",
+        provider_func=client.get_context_block,
+        section=ContextSection.INTERFACES,
     )
 
-    system_logger.info("[System] Интерфейс Telethon загружен.")
+    system_logger.info("[Telegram Telethon] Интерфейс загружен.")
 
     # Возвращаем то, что нужно запустить в главном цикле
     return [client, events]

@@ -3,12 +3,15 @@ from typing import Optional, TYPE_CHECKING, Literal
 from datetime import datetime, timezone
 from sqlalchemy import select, delete, func
 
-from src.l3_agent.skills.registry import skill, SkillResult
 from src.utils.logger import system_logger
+from src.utils.dtime import seconds_to_duration_str
+
 from src.l1_databases.sql.tables import MentalStateTable
 
 if TYPE_CHECKING:
     from src.l1_databases.sql.db import SQLDB
+
+from src.l3_agent.skills.registry import skill, SkillResult
 
 
 class SQLMentalStates:
@@ -80,7 +83,13 @@ class SQLMentalStates:
         lines = []
         for s in states:
             # Высчитываем время с последнего обновления
-            updated_at_aware = s.updated_at.replace(tzinfo=timezone.utc) if s.updated_at.tzinfo is None else s.updated_at
+            updated_at_aware = (
+                s.updated_at.replace(tzinfo=timezone.utc)
+                if s.updated_at.tzinfo is None
+                else s.updated_at
+            )
+            delta = (datetime.now(timezone.utc) - updated_at_aware).total_seconds()
+            time_ago = f"{seconds_to_duration_str(delta)} назад"
             delta = datetime.now(timezone.utc) - updated_at_aware
             hours, remainder = divmod(int(delta.total_seconds()), 3600)
             minutes, _ = divmod(remainder, 60)

@@ -4,7 +4,9 @@ import socket
 import urllib.request
 import urllib.error
 import psutil
+
 from src.utils.logger import system_logger
+from src.utils._tools import truncate_text
 
 from src.l2_interfaces.host.os.client import HostOSClient
 
@@ -113,9 +115,7 @@ class HostOSNetwork:
                 body = e.read().decode("utf-8", errors="replace")
 
             # Обрезаем вывод для защиты контекста
-            if len(body) > limit:
-                body = body[:limit] + "\n... [Ответ обрезан. Превышен лимит символов] ..."
-
+            body = truncate_text(body, limit)
             return status, body
 
         try:

@@ -15,6 +15,7 @@ from telethon.tl.functions.messages import (
 )
 
 from src.utils.logger import system_logger
+from src.utils._tools import parse_int_or_str
 
 from src.l2_interfaces.telegram.telethon.client import TelethonClient
 from src.l2_interfaces.telegram.telethon._message_parser import TelethonMessageParser
@@ -169,7 +170,7 @@ class TelethonChats:
         """Читает историю указанного чата..."""
         try:
             client = self.tg_client.client()
-            target_entity = await client.get_entity(self._parse_entity(chat_id))
+            target_entity = await client.get_entity(parse_int_or_str(chat_id))
 
             await self._mark_chat_read(client, target_entity, topic_id)
 
@@ -221,7 +222,7 @@ class TelethonChats:
         """Помечает все сообщения в чате (или конкретном топике) как прочитанные."""
         try:
             client = self.tg_client.client()
-            target_entity = await client.get_entity(self._parse_entity(chat_id))
+            target_entity = await client.get_entity(parse_int_or_str(chat_id))
 
             if getattr(target_entity, "forum", False) and not topic_id:
                 # Если это форум и топик не указан - нужно перебрать все топики
@@ -299,7 +300,7 @@ class TelethonChats:
 
         try:
             client = self.tg_client.client()
-            entity = await client.get_input_entity(self._parse_entity(chat_id))
+            entity = await client.get_input_entity(parse_int_or_str(chat_id))
             await client(LeaveChannelRequest(entity))
 
             # system_logger.info(f"[Telegram Telethon] Агент покинул чат: {chat_id}")
@@ -316,7 +317,7 @@ class TelethonChats:
         """Узнает ID привязанной группы для комментариев у канала и вступает в нее."""
         try:
             client = self.tg_client.client()
-            target_entity = await client.get_input_entity(self._parse_entity(channel_id))
+            target_entity = await client.get_input_entity(parse_int_or_str(channel_id))
             full_channel = await client(GetFullChannelRequest(target_entity))
             linked_chat_id = full_channel.full_chat.linked_chat_id
 
@@ -354,12 +355,12 @@ class TelethonChats:
 
         try:
             client = self.tg_client.client()
-            chat_entity = await client.get_input_entity(self._parse_entity(chat_id))
+            chat_entity = await client.get_input_entity(parse_int_or_str(chat_id))
 
             user_entities = []
             for u in users:
                 try:
-                    user_entities.append(await client.get_input_entity(self._parse_entity(u)))
+                    user_entities.append(await client.get_input_entity(parse_int_or_str(u)))
                 except ValueError:
                     return SkillResult.fail(
                         f"Ошибка: Пользователь '{u}' не найден. Проверьте правильность юзернейма."
@@ -399,14 +400,6 @@ class TelethonChats:
     # СЛУЖЕБНЫЕ МЕТОДЫ
     # ===============================================================
 
-    def _parse_entity(self, entity_id: Union[int, str]) -> Union[int, str]:
-        """Утилитный метод для преобразования строковых ID в числа."""
-
-        try:
-            return int(entity_id)
-        except ValueError:
-            return str(entity_id).strip()
-
     async def _get_topics(self, client: Any, entity: Any, limit: int = 100) -> list:
         """Хелпер: получает список топиков форума через Raw API Telethon."""
         if not GetForumTopicsRequest:
@@ -436,7 +429,7 @@ class TelethonChats:
         self, client: Any, target_entity: Any, topic_id: Optional[int] = None
     ):
         """Хелпер: Помечает сообщения, меншны и реакции прочитанными."""
-        
+
         try:
             # 1. Читаем сами сообщения
             kwargs_ack = {}

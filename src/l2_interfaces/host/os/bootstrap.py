@@ -1,7 +1,6 @@
 from typing import List, Any, TYPE_CHECKING
 
 from src.utils.logger import system_logger
-from src.l3_agent.skills.registry import register_instance
 
 from src.l2_interfaces.host.os.client import HostOSClient
 from src.l2_interfaces.host.os.events import HostOSEvents
@@ -10,6 +9,9 @@ from src.l2_interfaces.host.os.skills.files import HostOSFiles
 from src.l2_interfaces.host.os.skills.monitoring import HostOSMonitoring
 from src.l2_interfaces.host.os.skills.network import HostOSNetwork
 from src.l2_interfaces.host.os.skills.system import HostOSSystem
+
+from src.l3_agent.skills.registry import register_instance
+from src.l3_agent.context.registry import ContextSection 
 
 if TYPE_CHECKING:
     from src.main import System
@@ -37,8 +39,8 @@ def setup_host_os(system: "System") -> List[Any]:
 
     # Регистрация провайдеров контекста (отдают Markdown блоки в промпт агента)
     system.context_registry.register_provider(
-        name="host os", provider_func=client.get_context_block, priority=50
-    )
+            name="host os", provider_func=client.get_context_block, section=ContextSection.INTERFACES
+        )
 
     system_logger.info("[Host OS] Интерфейс загружен.")
 

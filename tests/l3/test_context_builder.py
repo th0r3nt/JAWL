@@ -1,7 +1,7 @@
 import pytest
 from src.l3_agent.context.builder import ContextBuilder
 from src.l0_state.agent.state import AgentState
-from src.l3_agent.context.registry import ContextRegistry
+from src.l3_agent.context.registry import ContextRegistry, ContextSection 
 
 
 @pytest.mark.asyncio
@@ -16,7 +16,7 @@ async def test_context_builder_build():
     async def fake_telethon(**kwargs):
         return "### TELETHON [ON]\nAccount info..."
 
-    registry.register_provider("telethon", fake_telethon, priority=80)
+    registry.register_provider("telethon", fake_telethon, section=ContextSection.INTERFACES)
 
     builder = ContextBuilder(agent_state=agent_state, registry=registry)
 
@@ -43,8 +43,8 @@ async def test_context_registry_resilience():
     async def failing_provider(**kwargs):
         raise ValueError("Критическая ошибка БД/Сети")
 
-    registry.register_provider("good", success_provider, priority=10)
-    registry.register_provider("bad", failing_provider, priority=20)
+    registry.register_provider("good", success_provider, section=ContextSection.DRIVES)
+    registry.register_provider("bad", failing_provider, section=ContextSection.SKILLS)
 
     results = await registry.gather_all("EVENT", {}, [], agent_state=agent_state)
 

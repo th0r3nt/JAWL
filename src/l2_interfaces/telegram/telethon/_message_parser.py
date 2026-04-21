@@ -1,6 +1,8 @@
 from typing import Optional, Tuple, Any
 from telethon import utils
+
 from src.utils.dtime import format_datetime
+from src.utils._tools import truncate_text
 
 # TODO: может, перенести этот файл в отдельную папку telethon/utils/?
 # Сейчас он в корне telethon/, моя тонкая душевная организация перфекциониста недовольна
@@ -167,7 +169,7 @@ class TelethonMessageParser:
         timezone: int,
         topic_id: Optional[int] = None,
         read_outbox_max_id: int = 0,
-        truncate_text: bool = False,
+        truncate_text_flag: bool = False,
     ) -> str:
         """Собирает полное, мощно отформатированное сообщение."""
 
@@ -179,8 +181,8 @@ class TelethonMessageParser:
         is_reply, reply_id = cls.determine_reply(msg, topic_id)
 
         text = msg.text or ""
-        if truncate_text and len(text) > 200:
-            text = text[:200] + "... [Обрезано системой]"
+        if truncate_text_flag:
+            text = truncate_text(text, 200, "... [Обрезано системой]")
 
         parts = [
             cls.parse_media(msg),

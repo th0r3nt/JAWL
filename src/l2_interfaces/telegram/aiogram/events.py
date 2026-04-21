@@ -43,6 +43,20 @@ class AiogramEvents:
             self._on_group_message, F.chat.type.in_({"group", "supergroup"})
         )
 
+        self.dp.message.register(
+            self._on_system_message,
+            F.content_type.in_(
+                {
+                    "new_chat_members",
+                    "left_chat_member",
+                    "new_chat_title",
+                    "new_chat_photo",
+                    "delete_chat_photo",
+                    "pinned_message",
+                }
+            ),
+        )
+
         # Сбрасываем старые апдейты, чтобы бот не отвечал на то, что накопилось пока он был выключен
         await bot.delete_webhook(drop_pending_updates=True)
 
@@ -130,3 +144,38 @@ class AiogramEvents:
             sender_name=sender_name,
             chat_id=message.chat.id,
         )
+
+    async def _on_system_message(self, message: Message):
+        """Триггер на системные события (вход, выход, смена названия и т.д.)."""
+
+        await self._update_state(message)
+
+        action_text = "[Системное действие]"
+
+        if message.new_chat_members:
+            users = ", ".join([u.first_name for u in message.new_chat_members if u.first_name])
+            action_text = f"[Системное действие] {users} присоединился к чату."
+
+        elif message.left_chat_member:
+            action_text = (
+                f"[Системное действие] {message.left_chat_member.first_name} покинул чат."
+            )
+
+        elif message.new_chat_title:
+            action_text = (
+                f"[Системное действие] Название чата изменено на '{message.new_chat_title}'."
+            )
+
+        elif message.pinned_message:
+            action_text = "[Системное действие] Закреплено новое сообщение."
+
+        elif message.new_chat_photo or message.delete_chat_photo:
+            action_text = "[Системное действие] Фото чата было изменено/удалено."
+
+        payload = {
+            "message": action_text,
+            "sender_name": "System",
+            "chat_id": message.chat.id,
+        }
+
+        await self.bus.publish(Events.AIOGRAM_CHAT_ACTION, **payload)

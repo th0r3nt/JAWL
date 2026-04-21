@@ -288,9 +288,7 @@ async def test_account_change_bio(mock_tg_client):
 
 
 @pytest.mark.asyncio
-@patch(
-    "src.l2_interfaces.telegram.telethon.skills.account.TelethonAccount._validate_sandbox_path"
-)
+@patch("src.l2_interfaces.telegram.telethon.skills.account.validate_sandbox_path")
 async def test_account_change_avatar(mock_validate, mock_tg_client):
     skills = TelethonAccount(mock_tg_client)
 
@@ -350,9 +348,7 @@ async def test_account_get_user_info(mock_tg_client):
 
 
 @pytest.mark.asyncio
-@patch(
-    "src.l2_interfaces.telegram.telethon.skills.account.TelethonAccount._validate_sandbox_path"
-)
+@patch("src.l2_interfaces.telegram.telethon.skills.account.validate_sandbox_path")
 async def test_account_download_avatar(mock_validate, mock_tg_client):
     """Тест: скачивание аватара."""
     skills = TelethonAccount(mock_tg_client)
@@ -777,7 +773,7 @@ async def test_admin_edit_chat_description(mock_tg_client):
 
 
 @pytest.mark.asyncio
-@patch("src.l2_interfaces.telegram.telethon.skills.admin.TelethonAdmin._validate_sandbox_path")
+@patch("src.l2_interfaces.telegram.telethon.skills.admin.validate_sandbox_path")
 async def test_admin_edit_chat_avatar(mock_validate, mock_tg_client):
     """Тест: изменение аватара чата (группы/канала)."""
     skills = TelethonAdmin(mock_tg_client)

@@ -1,7 +1,9 @@
 import asyncio
 import sys
 import psutil
+
 from src.utils.logger import system_logger
+from src.utils._tools import truncate_text
 
 from src.l2_interfaces.host.os.client import HostOSClient, HostOSAccessLevel
 
@@ -17,19 +19,6 @@ class HostOSExecution:
     def __init__(self, host_os_client: HostOSClient):
         self.host_os = host_os_client
 
-    def _truncate_output(self, text: str) -> str:
-        """Обрезает вывод, чтобы огромный лог из консоли не взорвал контекст агента."""
-
-        max_chars = 5000
-
-        if len(text) > max_chars:
-            return (
-                text[:max_chars]
-                + f"\n... [Вывод обрезан. Превышен лимит в {max_chars} символов] ..."
-            )
-
-        return text
-
     @skill()
     async def execute_script(self, filepath: str) -> SkillResult:
         """
@@ -39,7 +28,7 @@ class HostOSExecution:
 
         timeout = self.host_os.config.execution_timeout_sec
 
-        if self.host_os.access_level < HostOSAccessLevel.OBSERVER: 
+        if self.host_os.access_level < HostOSAccessLevel.OBSERVER:
             return SkillResult.fail(
                 "Отказано в доступе: выполнение скриптов разрешено при Access Level >= 1."
             )
@@ -94,11 +83,11 @@ class HostOSExecution:
                     f"Скрипт работал дольше {timeout} секунд и был принудительно убит (Таймаут)."
                 )
 
-            stdout_str = self._truncate_output(
-                stdout.decode("utf-8", errors="replace").strip()
+            stdout_str = truncate_text(
+                stdout.decode("utf-8", errors="replace").strip(), max_chars=5000
             )
-            stderr_str = self._truncate_output(
-                stderr.decode("utf-8", errors="replace").strip()
+            stderr_str = truncate_text(
+                stderr.decode("utf-8", errors="replace").strip(), max_chars=5000
             )
 
             exit_code = process.returncode
@@ -154,11 +143,11 @@ class HostOSExecution:
                     f"Команда работала дольше {timeout} секунд и была убита (Таймаут)."
                 )
 
-            stdout_str = self._truncate_output(
-                stdout.decode("utf-8", errors="replace").strip()
+            stdout_str = truncate_text(
+                stdout.decode("utf-8", errors="replace").strip(), max_chars=5000
             )
-            stderr_str = self._truncate_output(
-                stderr.decode("utf-8", errors="replace").strip()
+            stderr_str = truncate_text(
+                stderr.decode("utf-8", errors="replace").strip(), max_chars=5000
             )
 
             exit_code = process.returncode

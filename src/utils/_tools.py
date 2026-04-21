@@ -1,3 +1,6 @@
+from pathlib import Path
+from typing import Union
+
 def format_size(size_bytes: int) -> str:
     """Переводит байты в человекочитаемый формат (B, KB, MB)."""
 
@@ -7,3 +10,42 @@ def format_size(size_bytes: int) -> str:
         return f"{size_bytes / 1024:.1f} KB"
     else:
         return f"{size_bytes / (1024 * 1024):.1f} MB"
+
+
+def validate_sandbox_path(filepath: str | Path) -> Path:
+    """
+    Гейткипер песочницы: разрешает работу с файлами строго внутри папки sandbox/.
+    Защищает от Path Traversal атак (выхода за пределы директории).
+    """
+    sandbox_dir = (Path.cwd() / "sandbox").resolve()
+    sandbox_dir.mkdir(parents=True, exist_ok=True)
+
+    path_str = str(filepath).replace("\\", "/")
+    if path_str.startswith("sandbox/"):
+        path_str = path_str[8:]
+
+    resolved = (sandbox_dir / path_str).resolve()
+    if not resolved.is_relative_to(sandbox_dir):
+        raise PermissionError(
+            "Доступ запрещен: можно работать с файлами только в пределах папки sandbox/"
+        )
+
+    return resolved
+
+
+def parse_int_or_str(value: Union[int, str]) -> Union[int, str]:
+    """Утилитный метод для преобразования строковых ID Telegram в числа."""
+    try:
+        return int(value)
+    except ValueError:
+        return str(value).strip()
+
+
+def truncate_text(
+    text: str, max_chars: int, suffix: str = "... [Вывод обрезан. Превышен лимит символов] ..."
+) -> str:
+    """Универсальная защита контекста от переполнения огромными текстами."""
+
+    if len(text) > max_chars:
+        return text[:max_chars] + f"\n{suffix}"
+    return text
