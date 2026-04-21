@@ -5,6 +5,7 @@ import subprocess
 from pathlib import Path
 import psutil
 import questionary
+from src.utils._tools import get_pid_file_path
 
 from src.cli.widgets.ui import print_success, print_error, print_info, wait_for_enter
 
@@ -16,14 +17,22 @@ MAIN_SCRIPT = ROOT_DIR / "src" / "main.py"
 
 
 def _is_agent_running() -> bool:
-    """Проверяет, работает ли агент в данный момент."""
-    if not PID_FILE.exists():
+    """Проверяет, работает ли агент на самом деле."""
+    pid_file = get_pid_file_path()
+    if not pid_file.exists():
         return False
 
     try:
-        pid = int(PID_FILE.read_text().strip())
-        return psutil.pid_exists(pid)
-    except ValueError:
+        pid = int(pid_file.read_text().strip())
+        if psutil.pid_exists(pid):
+            # Дополнительная проверка: это всё еще Python-процесс?
+            proc = psutil.Process(pid)
+            return proc.is_running() and "python" in proc.name().lower()
+        return False
+    except (ValueError, psutil.NoSuchProcess, psutil.AccessDenied):
+        # Если файл есть, а процесса нет - файл мусорный, удаляем
+        if pid_file.exists():
+            pid_file.unlink()
         return False
 
 
@@ -76,6 +85,7 @@ def _check_and_setup_env() -> bool:
 
     return True
 
+
 def start_agent_screen() -> None:
     """Экран запуска агента."""
 
@@ -88,9 +98,9 @@ def start_agent_screen() -> None:
         wait_for_enter()
         return
 
-    print_info("Инициализация систем агента.")
+    print_info(" Инициализация систем агента.")
     PID_FILE.parent.mkdir(parents=True, exist_ok=True)
-    
+
     # Создаем директорию для логов, если её нет
     logs_dir = ROOT_DIR / "logs"
     logs_dir.mkdir(parents=True, exist_ok=True)
@@ -108,14 +118,14 @@ def start_agent_screen() -> None:
                 stdout=subprocess.DEVNULL,
                 stderr=crash_log,
                 cwd=str(ROOT_DIR),
-                env=env, # <-- Передаем окружение
+                env=env,  # <-- Передаем окружение
             )
 
         PID_FILE.write_text(str(process.pid))
 
         print_success("Агент успешно запущен в фоновом режиме.")
         print_info(
-            "Для просмотра того, что он делает, выберите 'Открыть логи' в главном меню."
+            " Для просмотра того, что он делает, выберите 'Открыть логи' в главном меню."
         )
 
     except Exception as e:
@@ -127,7 +137,7 @@ def start_agent_screen() -> None:
 def stop_agent_screen() -> None:
     """Экран остановки агента."""
     if not _is_agent_running():
-        print_info("Агент в данный момент не запущен.")
+        print_info(" Агент в данный момент не запущен.")
         if PID_FILE.exists():
             PID_FILE.unlink()
         wait_for_enter()

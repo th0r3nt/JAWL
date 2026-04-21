@@ -56,10 +56,14 @@ class Heartbeat:
 
         now = time.time()
         payload = payload or {}
-
         time_str = get_now_formatted(self.timezone, fmt="%H:%M:%S")
-        payload_str = ", ".join(f"{k}={v}" for k, v in payload.items()) if payload else "empty"
-        event_str = f"[{time_str}] [{level.name}] {event_name} | Payload: {payload_str}"
+
+        event_data = {
+            "time": time_str,
+            "level": level.name,
+            "name": event_name,
+            "payload": payload,
+        }
 
         # Определяем множитель важности события
         multiplier = 1.0
@@ -85,7 +89,7 @@ class Heartbeat:
 
         if is_awake:
             # Пробрасываем событие прямо в активный цикл
-            self.react_loop.add_realtime_event(event_str)
+            self.react_loop.add_realtime_event(event_data)
 
             # Если множитель 0.0 - это жесткое прерывание текущего процесса (например, SYSTEM_SHUTDOWN)
             if multiplier <= 0.01:
@@ -104,7 +108,7 @@ class Heartbeat:
         # Логика для спящего в данный момент агента
         # =========================================================
 
-        self._sleep_memory.append(event_str)
+        self._sleep_memory.append(event_data)
 
         remaining = self._next_tick_time - now
 

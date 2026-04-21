@@ -4,6 +4,7 @@ import traceback
 from pathlib import Path
 from dotenv import load_dotenv
 from typing import Optional, Any
+from src.utils._tools import get_pid_file_path
 
 # ==========================================
 # Утилиты
@@ -289,7 +290,9 @@ class System:
                 if evt == Events.SYSTEM_CORE_STOP:
                     return
 
-                self.heartbeat.answer_to_event(level=evt.level, event_name=evt.name, payload=kwargs)
+                self.heartbeat.answer_to_event(
+                    level=evt.level, event_name=evt.name, payload=kwargs
+                )
 
             return handler
 
@@ -331,57 +334,66 @@ class System:
         self,
         llm_api_url: str,
         llm_api_keys: list[str],
-        # Telethon
         telethon_api_id: Optional[str] = None,
         telethon_api_hash: Optional[str] = None,
-        # Aiogram
         aiogram_bot_token: Optional[str] = None,
     ) -> int:
         """Запуск системы."""
 
-        system_logger.info("[System] Инициализация JAWL.")
+        # Регистрация процесса
+        pid_file = get_pid_file_path()
+        pid_file.parent.mkdir(parents=True, exist_ok=True)
+        pid_file.write_text(str(os.getpid()))
 
-        # L1 STATE
-        self.setup_l0_state()
+        system_logger.info(f"[System] Инициализация JAWL (PID: {os.getpid()}).")
 
-        # L2 DATABASES
-        await self.setup_l1_databases()
+        # Инициализация слоев
+        try:
+            # L1 STATE
+            self.setup_l0_state()
 
-        # L2 INTERFACES
-        self.setup_l2_interfaces(
-            # Telethon
-            telethon_api_id=telethon_api_id,
-            telethon_api_hash=telethon_api_hash,
-            # Aiogram
-            aiogram_bot_token=aiogram_bot_token,
-        )
+            # L2 DATABASES
+            await self.setup_l1_databases()
 
-        # L3 AGENT
-        self.setup_l3_agent(llm_api_url=llm_api_url, llm_api_keys=llm_api_keys)
+            # L2 INTERFACES
+            self.setup_l2_interfaces(
+                telethon_api_id=telethon_api_id,
+                telethon_api_hash=telethon_api_hash,
+                aiogram_bot_token=aiogram_bot_token,
+            )
 
-        # Запускаем все фоновые задачи (клиенты и слушатели событий) отказоустройство
-        started_components = []
-        for component in self._lifecycle_components:
-            try:
-                await component.start()
-                started_components.append(component)
-            except Exception as e:
-                system_logger.error(
-                    f"[System] Ошибка при запуске интерфейса {component.__class__.__name__}: {e}. Компонент отключен."
-                )
+            # L3 AGENT
+            self.setup_l3_agent(llm_api_url=llm_api_url, llm_api_keys=llm_api_keys)
 
-        # Оставляем в пуле только те компоненты, которые успешно запустились (чтобы корректно их стопнуть при выходе)
-        self._lifecycle_components = started_components
+            # Запуск компонентов
+            started_components = []
+            for component in self._lifecycle_components:
+                try:
+                    await component.start()
+                    started_components.append(component)
+                except Exception as e:
+                    system_logger.error(
+                        f"[System] Ошибка запуска {component.__class__.__name__}: {e}"
+                    )
 
-        system_logger.info(
-            f"[System] JAWL успешно запущен. Имя агента: {self.settings.identity.agent_name}."
-        )
-        await self.event_bus.publish(Events.SYSTEM_CORE_START, status="online")
+            self._lifecycle_components = started_components
 
-        # Блокирующий цикл жизни агента
-        await self.heartbeat.start()
+            system_logger.info(
+                f"[System] JAWL успешно запущен. Имя агента: {self.settings.identity.agent_name}."
+            )
+            await self.event_bus.publish(Events.SYSTEM_CORE_START, status="online")
 
-        return self._exit_code
+            # Точка входа в бесконечный цикл
+            await self.heartbeat.start()
+
+            # Если мы дошли сюда — агент остановился штатно
+            return self._exit_code
+
+        finally:
+            # Гарантированная очистка при любом исходе
+            if pid_file.exists():
+                pid_file.unlink()
+                system_logger.info("[System] PID-файл удален.")
 
     async def stop(self) -> None:
         """Остановка и очистка ресурсов."""

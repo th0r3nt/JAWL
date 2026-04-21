@@ -116,6 +116,7 @@ class AiogramEvents:
             message=message.text or message.caption or "[Медиа]",
             sender_name=sender_name,
             chat_id=message.chat.id,
+            msg_id=message.message_id,
         )
 
     async def _on_group_message(self, message: Message):
@@ -143,6 +144,7 @@ class AiogramEvents:
             message=message.text or message.caption or "[Медиа]",
             sender_name=sender_name,
             chat_id=message.chat.id,
+            msg_id=message.message_id,
         )
 
     async def _on_system_message(self, message: Message):

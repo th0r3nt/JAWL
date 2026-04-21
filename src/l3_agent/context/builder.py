@@ -52,12 +52,39 @@ class ContextBuilder:
         return f"## SKILLS\n{get_skills_library()}"
 
     async def _heartbeat_provider(
-        self, event_name: str, payload: Dict[str, Any], missed_events: List[str], **kwargs
+        self,
+        event_name: str,
+        payload: Dict[str, Any],
+        missed_events: List[Dict[str, Any]],
+        **kwargs,
     ) -> str:
-        """Возвращает отформатированный блок контекста текущего Heartbeat для агента."""
+        """Возвращает отформатированный блок контекста текущего Heartbeat."""
 
-        answer_to_event_reason = self._build_answer_to_event_reason(event_name, payload, missed_events)
-        return f"## HEARTBEAT\n{answer_to_event_reason}"
+        # 1. Форматируем текущий триггер (то, почему мы проснулись прямо сейчас)
+        current_trigger = self._format_single_event(event_name, payload)
+
+        # 2. Форматируем список пропущенных событий (Event Log)
+        log_blocks = []
+        for evt in missed_events:
+            # evt теперь словарь из heartbeat.py
+            formatted = self._format_single_event(
+                event_name=evt["name"],
+                payload=evt["payload"],
+                event_time=evt["time"],
+                level=evt["level"],
+            )
+            log_blocks.append(formatted)
+
+        event_log = "\n\n---\n\n".join(log_blocks) if log_blocks else "No other events in log"
+
+        return f"""
+## HEARTBEAT
+### CURRENT TRIGGER
+{current_trigger}
+
+### EVENT LOG (missed while sleeping or thinking)
+{event_log}
+""".strip()
 
     def _build_answer_to_event_reason(
         self, event_name: str, payload: Dict[str, Any], missed_events: List[str]
@@ -76,3 +103,37 @@ class ContextBuilder:
             return f"{main_trigger}\n\nEvent Log:\n{events_log}"
 
         return main_trigger
+
+    def _format_single_event(
+        self,
+        event_name: str,
+        payload: Dict[str, Any],
+        event_time: str = None,
+        level: str = None,
+    ) -> str:
+        """Вспомогательный метод для красивого Markdown-оформления события."""
+
+        header = f"**{event_name}**"
+        if event_time and level:
+            header = f"[{event_time}] [{level}] {header}"
+
+        # Выделяем важные поля, остальное в список
+        msg = payload.get("message", "No message content")
+        sender = payload.get("sender_name", "Unknown")
+        history = payload.get("recent_history", "")
+
+        # Собираем доп. поля (chat_id, msg_id и т.д.), исключая уже обработанные
+        other_meta = [
+            f"* {k}: {v}"
+            for k, v in payload.items()
+            if k not in ["message", "sender_name", "recent_history"]
+        ]
+        meta_str = "\n".join(other_meta)
+
+        block = f"{header}\nSender: {sender}\nMessage: {msg}"
+        if meta_str:
+            block += f"\n{meta_str}"
+        if history:
+            block += f"\n\n#### Recent Chat History:\n{history}"
+
+        return block

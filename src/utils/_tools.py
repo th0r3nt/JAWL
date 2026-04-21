@@ -1,6 +1,7 @@
 from pathlib import Path
 from typing import Union
 
+
 def format_size(size_bytes: int) -> str:
     """Переводит байты в человекочитаемый формат (B, KB, MB)."""
 
@@ -49,3 +50,13 @@ def truncate_text(
     if len(text) > max_chars:
         return text[:max_chars] + f"\n{suffix}"
     return text
+
+
+def get_project_root() -> Path:
+    """Гарантированно возвращает абсолютный путь к корню проекта JAWL."""
+    return Path(__file__).resolve().parent.parent.parent
+
+
+def get_pid_file_path() -> Path:
+    """Единый путь к PID-файлу для всех модулей."""
+    return get_project_root() / "src" / "utils" / "local" / "data" / "agent.pid"

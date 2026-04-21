@@ -109,6 +109,7 @@ class TelethonEvents:
             "sender_name": sender_name,
             "chat_name": chat_name,
             "chat_id": event.chat_id,
+            "msg_id": msg_obj.id,
         }
         if history:
             payload["recent_history"] = history
@@ -152,6 +153,7 @@ class TelethonEvents:
             "sender_name": sender_name,
             "chat_name": chat_name,
             "chat_id": event.chat_id,
+            "msg_id": msg_obj.id,
         }
 
         # Если это форумный топик - прокидываем его агенту
@@ -219,6 +221,7 @@ class TelethonEvents:
             "sender_name": sender_name,
             "chat_name": chat_name,
             "chat_id": event.chat_id,
+            "msg_id": msg_obj.id,
         }
 
         await self.bus.publish(Events.TELETHON_CHANNEL_MESSAGE, **payload)
@@ -297,7 +300,7 @@ class TelethonEvents:
                 lines.append(formatted)
 
             return "\n" + "\n\n".join(lines)
+        
         except Exception as e:
-            # Меняем debug на error, чтобы видеть краши парсера в консоли
-            system_logger.error(f"[TelethonEvents] Не удалось подтянуть предысторию: {e}")
+            system_logger.error(f"[Telegram Telethon] Не удалось подтянуть предысторию: {e}")
             return ""

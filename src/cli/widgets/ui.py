@@ -4,11 +4,15 @@ import psutil
 import yaml
 from pathlib import Path
 
+from src.utils._tools import get_pid_file_path
+
 from rich.console import Console, Group
 from rich.panel import Panel
 from rich.text import Text
 from rich.align import Align
 import questionary
+
+from src.cli.screens.agent_control import _is_agent_running
 
 console = Console()
 
@@ -29,7 +33,10 @@ SETTINGS_FILE = ROOT_DIR / "config" / "settings.yaml"
 
 def _get_agent_status() -> dict:
     """Легковесно собирает статус агента (без IPC, напрямую из ОС и конфигов)."""
-    status = {"is_running": False, "uptime": "00:00", "model": "unknown", "interval": 0}
+
+    is_running = _is_agent_running()
+
+    status = {"is_running": is_running, "uptime": "00:00", "model": "unknown", "interval": 0}
 
     # Читаем конфигурацию
     if SETTINGS_FILE.exists():
@@ -41,24 +48,25 @@ def _get_agent_status() -> dict:
         except Exception:
             pass
 
-    # Проверяем живой ли процесс и считаем аптайм
-    if PID_FILE.exists():
+    # Считаем аптайм, только если процесс реально жив
+    if is_running:
         try:
-            pid = int(PID_FILE.read_text().strip())
-            if psutil.pid_exists(pid):
-                process = psutil.Process(pid)
-                status["is_running"] = True
+            pid_file = get_pid_file_path()
+            pid = int(pid_file.read_text().strip())
+            process = psutil.Process(pid)
 
-                uptime_seconds = time.time() - process.create_time()
-                hours, remainder = divmod(int(uptime_seconds), 3600)
-                minutes, seconds = divmod(remainder, 60)
+            uptime_seconds = time.time() - process.create_time()
+            hours, remainder = divmod(int(uptime_seconds), 3600)
+            minutes, seconds = divmod(remainder, 60)
 
-                if hours > 0:
-                    status["uptime"] = f"{hours}h {minutes}m {seconds}s"
-                else:
-                    status["uptime"] = f"{minutes}m {seconds}s"
-        except (ValueError, psutil.NoSuchProcess, psutil.AccessDenied):
-            pass
+            if hours > 0:
+                status["uptime"] = f"{hours}h {minutes}m {seconds}s"
+            else:
+                status["uptime"] = f"{minutes}m {seconds}s"
+
+        except (ValueError, psutil.NoSuchProcess, psutil.AccessDenied, FileNotFoundError):
+            # Если файл исчез или процесс умер прямо во время замера - не страшно
+            status["is_running"] = False
 
     return status
 

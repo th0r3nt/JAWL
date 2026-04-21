@@ -40,7 +40,7 @@ def main_menu() -> None:
         ).ask()
 
         if choice is None or choice == "exit":
-            print_info("Отключение. До встречи.")
+            print_info(" Отключение. До встречи.")
             time.sleep(2)
             sys.exit(0)
 
