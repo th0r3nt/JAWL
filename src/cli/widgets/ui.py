@@ -2,6 +2,7 @@ import os
 import time
 import psutil
 import yaml
+import sys
 from pathlib import Path
 
 from src.utils._tools import is_agent_running, get_pid_file_path
@@ -32,9 +33,9 @@ SETTINGS_FILE = ROOT_DIR / "config" / "settings.yaml"
 def _get_agent_status() -> dict:
     """Легковесно собирает статус агента (без IPC, напрямую из ОС и конфигов)."""
 
-    is_running = is_agent_running()
-
-    status = {"is_running": is_running, "uptime": "00:00", "model": "unknown", "interval": 0}
+    # Убрали сбор аптайма, так как статичное меню не обновляет время.
+    # is_agent_running() уже сам проверяет наличие и живость процесса через psutil
+    status = {"is_running": is_agent_running(), "model": "unknown", "interval": 0}
 
     # Читаем конфигурацию
     if SETTINGS_FILE.exists():
@@ -46,27 +47,26 @@ def _get_agent_status() -> dict:
         except Exception:
             pass
 
-    # Считаем аптайм, только если процесс реально жив
-    if is_running:
-        try:
-            pid_file = get_pid_file_path()
-            pid = int(pid_file.read_text().strip())
-            process = psutil.Process(pid)
-
-            uptime_seconds = time.time() - process.create_time()
-            hours, remainder = divmod(int(uptime_seconds), 3600)
-            minutes, seconds = divmod(remainder, 60)
-
-            if hours > 0:
-                status["uptime"] = f"{hours}h {minutes}m {seconds}s"
-            else:
-                status["uptime"] = f"{minutes}m {seconds}s"
-
-        except (ValueError, psutil.NoSuchProcess, psutil.AccessDenied, FileNotFoundError):
-            # Если файл исчез или процесс умер прямо во время замера - не страшно
-            status["is_running"] = False
-
     return status
+
+
+def flush_input() -> None:
+    """
+    Кроссплатформенная очистка буфера ввода (stdin).
+    Удаляет все случайные нажатия клавиш, которые накопились, пока CLI был занят.
+    """
+    try:
+        if os.name == "nt":
+            import msvcrt
+
+            while msvcrt.kbhit():
+                msvcrt.getch()
+        else:
+            import termios
+
+            termios.tcflush(sys.stdin, termios.TCIOFLUSH)
+    except Exception:
+        pass
 
 
 def clear_screen() -> None:
@@ -86,12 +86,12 @@ def draw_header(version: str = "v0.9.0") -> None:
     # 2. Версия (добавляем \n в конце для отступа перед статусом)
     version_text = Text(f"{version}\n", style="dim cyan")
 
-    # 3. Плашка статуса
+    # 3. Плашка статуса (без Uptime)
     status_text = Text()
     if status["is_running"]:
         status_text.append("● ONLINE", style="bold green")
         status_text.append(
-            f"  |  Uptime: {status['uptime']}  |  Model: {status['model']}  |  Heartbeat: {status['interval']}s",
+            f"  |  Model: {status['model']}  |  Heartbeat: {status['interval']}s",
             style="bold white",
         )
     else:

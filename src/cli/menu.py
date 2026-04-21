@@ -7,7 +7,7 @@ import sys
 import time
 import questionary
 
-from src.cli.widgets.ui import draw_header, print_info, get_custom_style
+from src.cli.widgets.ui import draw_header, print_info, get_custom_style, flush_input
 
 from src.cli.screens.agent_control import start_agent_screen, stop_agent_screen
 from src.cli.screens.logs import logs_screen
@@ -22,6 +22,10 @@ def main_menu() -> None:
 
     while True:
         draw_header()
+
+        # Сбрасываем фантомные нажатия клавиш (особенно Enter),
+        # чтобы меню не выбирало пункты само по себе
+        flush_input()
 
         choice = questionary.select(
             "Добро пожаловать в JAWL. Выберите действие:",

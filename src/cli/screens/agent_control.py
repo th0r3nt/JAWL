@@ -159,12 +159,12 @@ def stop_agent_screen() -> None:
         pid = int(PID_FILE.read_text().strip())
         process = psutil.Process(pid)
 
-        print_info("Отправка сигнала на плавное завершение (Graceful Shutdown)...")
+        print_info(" Отправка сигнала на плавное завершение (Graceful Shutdown)...")
         # Создаем флаг-файл, агент его увидит и начнет сворачиваться
         STOP_FILE.touch(exist_ok=True)
 
-        # Ждем до 15 секунд, пока агент корректно закроет БД и завершится
-        timeout = 15
+        # Ждем до 5 секунд, пока агент корректно закроет БД и завершится
+        timeout = 5
         is_dead = False
 
         for _ in range(timeout):
