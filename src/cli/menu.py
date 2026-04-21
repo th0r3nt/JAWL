@@ -1,28 +1,58 @@
+"""
+Главное меню CLI-интерфейса JAWL.
+Выступает в роли маршрутизатора между экранами настроек и управления агентом.
+"""
+
+import sys
+import questionary
+
+from src.cli.widgets.ui import draw_header, print_info, get_custom_style
+
+from src.cli.screens.agent_control import start_agent_screen, stop_agent_screen
+from src.cli.screens.logs import logs_screen
+from src.cli.screens.setup_wizard import setup_wizard_screen
+from src.cli.screens.memory_reset import memory_reset_screen
 
 
+def main_menu() -> None:
+    """Главный бесконечный цикл меню."""
 
+    style = get_custom_style()
 
+    while True:
+        draw_header()
 
-# Тут будет подобное главное меню: 
-# Именно оно будет открывать при запуске фреймворка (через файл jawl.py)
+        choice = questionary.select(
+            "Добро пожаловать в JAWL. Выберите действие:",
+            choices=[
+                questionary.Choice("🚀 Запустить агента", "start"),
+                questionary.Choice("⏹️ Остановить агента", "stop"),
+                questionary.Choice("📋 Открыть логи", "logs"),
+                questionary.Choice("⚙️ Мастер настройки интерфейсов", "setup"),
+                questionary.Choice("🧹 Полный сброс памяти", "reset"),
+                questionary.Separator(),
+                questionary.Choice("❌ Выход", "exit"),
+            ],
+            style=style,
+            instruction="(Используйте стрелочки ↑/↓ и Enter)",
+        ).ask()
 
-# ╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-# │                                                                                                                      │
-# │                                                                                                                      │
-# │                                               ██╗  █████╗  ██╗    ██╗ ██╗                                            │
-# │                                               ██║ ██╔══██╗ ██║    ██║ ██║                                            │
-# │                                               ██║ ███████║ ██║ █╗ ██║ ██║                                            │
-# │                                          ██╗  ██║ ██╔══██║ ██║███╗██║ ██║                                            │
-# │                                          ╚█████╔╝ ██║  ██║ ╚███╔███╔╝ ███████╗                                       │
-# │                                           ╚════╝  ╚═╝  ╚═╝  ╚══╝╚══╝  ╚══════╝                                       │
-# │                                                   Just A While Loop                                                  │
-# │                                                                                                                      │
-# ╰─────────────────────────────────────────────────────── v0.9.0 ───────────────────────────────────────────────────────╯
+        if choice is None or choice == "exit":
+            print_info("Отключение пульта JAWL. До встречи!")
+            sys.exit(0)
 
-# Добро пожаловать в JAWL. Выберите действие: (Используйте стрелочки ↑/↓ и Enter)
-#  » 🚀 Запустить агента
-#    ⏹️ Остановить агента
-#    📋 Открыть логи
-#    ⚙️ Мастер настройки
-#    🧹 Полный сброс памяти
-#    ❌ Выход
+        # Маршрутизация
+        if choice == "start":
+            start_agent_screen()
+
+        elif choice == "stop":
+            stop_agent_screen()
+
+        elif choice == "logs":
+            logs_screen()
+
+        elif choice == "setup":
+            setup_wizard_screen()
+
+        elif choice == "reset":
+            memory_reset_screen()
