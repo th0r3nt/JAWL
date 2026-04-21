@@ -38,10 +38,18 @@ class TelegramConfig(BaseModel):
     aiogram: AiogramConfig
 
 
+class DeepResearchConfig(BaseModel):
+    max_queries: int
+    max_results_per_query: int
+    max_pages_to_read: int
+    total_max_chars: int
+
+
 class WebSearchConfig(BaseModel):
     enabled: bool
     request_timeout_sec: int
     max_page_chars: int
+    deep_research: DeepResearchConfig
 
 
 class WebConfig(BaseModel):
@@ -104,7 +112,7 @@ class EventAccelerationConfig(BaseModel):
 
 class TasksConfig(BaseModel):
     enabled: bool
-    max_tasks: int 
+    max_tasks: int
 
 
 class PersonalityTraitsConfig(BaseModel):
