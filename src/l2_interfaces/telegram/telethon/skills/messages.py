@@ -284,7 +284,7 @@ class TelethonMessages:
                     target_entity=entity,
                     msg=msg,
                     timezone=self.tg_client.timezone,
-                    truncate_text=True,
+                    truncate_text_flag=True,
                 )
                 messages.append(formatted)
 

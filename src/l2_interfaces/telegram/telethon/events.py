@@ -272,7 +272,7 @@ class TelethonEvents:
     # ==========================================================
     async def _fetch_recent_history(self, target_entity: Any, limit: int = 5) -> str:
         """Быстро подтягивает последние N сообщений в идеальном форматировании."""
-        
+
         if not target_entity:
             return ""
 
@@ -292,11 +292,12 @@ class TelethonEvents:
                     target_entity=target_entity,
                     msg=msg,
                     timezone=self.tg_client.timezone,
-                    truncate_text=True,  # Защита от простыней текста в контексте
+                    truncate_text_flag=True,
                 )
                 lines.append(formatted)
 
             return "\n" + "\n\n".join(lines)
         except Exception as e:
-            system_logger.debug(f"[TelethonEvents] Не удалось подтянуть предысторию: {e}")
+            # Меняем debug на error, чтобы видеть краши парсера в консоли
+            system_logger.error(f"[TelethonEvents] Не удалось подтянуть предысторию: {e}")
             return ""
