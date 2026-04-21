@@ -298,7 +298,11 @@ class System:
 
         # Базовая подписка: будим агента на любые события, кроме остановки
         for event in Events.all():
-            if event == Events.SYSTEM_CORE_STOP:
+            if event.name in (
+                Events.SYSTEM_CORE_STOP.name,
+                Events.SYSTEM_SHUTDOWN_REQUESTED.name,
+                Events.SYSTEM_REBOOT_REQUESTED.name,
+            ):
                 continue
             self.event_bus.subscribe(event, create_handler(event))
 
@@ -379,7 +383,7 @@ class System:
             self._lifecycle_components = started_components
 
             system_logger.info(
-                f"[System] JAWL успешно запущен. Имя агента: {self.settings.identity.agent_name}."
+                f"[System] JAWL успешно запущен. Имя агента: {self.settings.identity.agent_name}"
             )
             await self.event_bus.publish(Events.SYSTEM_CORE_START, status="online")
 

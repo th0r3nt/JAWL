@@ -32,25 +32,34 @@ PREFIX_COLORS = {
 def _colorize_log_line(line: str) -> Text:
     """
     Раскрашивает чистую текстовую строку лога на лету.
-    Использует объект Text, чтобы избежать конфликтов с тегами rich (типа [Web]).
+    Запоминает последний цвет, чтобы корректно красить многострочные логи.
     """
-    # Убираем перенос строки, так как console.print добавит свой
+
+    global _current_log_color
+
     clean_line = line.rstrip("\n")
     text = Text(clean_line)
 
     if " - ERROR - " in clean_line or " - CRITICAL - " in clean_line:
-        text.stylize("bold red")
+        _current_log_color = "bold red"
+        text.stylize(_current_log_color)
         return text
 
     if " - WARNING - " in clean_line:
-        text.stylize("bold yellow")
+        _current_log_color = "bold yellow"
+        text.stylize(_current_log_color)
         return text
 
     # Красим по префиксу
     for prefix, color in PREFIX_COLORS.items():
         if prefix in clean_line:
+            _current_log_color = color
             text.stylize(color)
             return text
+
+    # Если префикса нет (это многострочный блок), красим в цвет предыдущей строки
+    if _current_log_color:
+        text.stylize(_current_log_color)
 
     return text
 
@@ -102,6 +111,6 @@ def logs_screen() -> None:
 
     except KeyboardInterrupt:
         # Юзер нажал Ctrl+C
-        print_info("\nВыход из режима просмотра логов.")
-        time.sleep(0.5)
+        print_info("Выход из режима просмотра логов.")
+        time.sleep(1.5)
         return

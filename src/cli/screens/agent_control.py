@@ -105,7 +105,6 @@ def start_agent_screen() -> None:
 
     logs_dir = ROOT_DIR / "logs"
     logs_dir.mkdir(parents=True, exist_ok=True)
-    crash_log_path = logs_dir / "crash.log"
 
     env = os.environ.copy()
     env["PYTHONPATH"] = str(ROOT_DIR)
@@ -122,15 +121,14 @@ def start_agent_screen() -> None:
         kwargs["start_new_session"] = True
 
     try:
-        with open(crash_log_path, "a", encoding="utf-8") as crash_log:
-            process = subprocess.Popen(
-                [sys.executable, str(MAIN_SCRIPT)],
-                stdout=subprocess.DEVNULL,
-                stderr=crash_log,
-                cwd=str(ROOT_DIR),
-                env=env,
-                **kwargs,  # <-- Распаковываем аргументы изоляции
-            )
+        process = subprocess.Popen(
+            [sys.executable, str(MAIN_SCRIPT)],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            cwd=str(ROOT_DIR),
+            env=env,
+            **kwargs,
+        )
 
         PID_FILE.write_text(str(process.pid))
 
@@ -159,12 +157,12 @@ def stop_agent_screen() -> None:
         pid = int(PID_FILE.read_text().strip())
         process = psutil.Process(pid)
 
-        print_info(" Отправка сигнала на плавное завершение (Graceful Shutdown)...")
+        print_info(" Отправка сигнала на плавное завершение (Graceful Shutdown).")
         # Создаем флаг-файл, агент его увидит и начнет сворачиваться
         STOP_FILE.touch(exist_ok=True)
 
-        # Ждем до 5 секунд, пока агент корректно закроет БД и завершится
-        timeout = 5
+        # Ждем до 15 секунд, пока агент корректно закроет БД и завершится
+        timeout = 15
         is_dead = False
 
         for _ in range(timeout):
