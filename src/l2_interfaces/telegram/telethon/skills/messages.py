@@ -272,7 +272,7 @@ class TelethonMessages:
             client = self.tg_client.client()
             entity = parse_int_or_str(chat_id)
 
-            from src.l2_interfaces.telegram.telethon._message_parser import (
+            from src.l2_interfaces.telegram.telethon.utils._message_parser import (
                 TelethonMessageParser,
             )
 

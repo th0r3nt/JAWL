@@ -23,6 +23,7 @@ def setup_calendar(system: "System") -> List[Any]:
         state=system.calendar_state,
         data_dir=system.local_data_dir,
         timezone=system.settings.system.timezone,
+        upcoming_events_limit=config.upcoming_events_limit,
     )
 
     events = CalendarEvents(
@@ -43,4 +44,4 @@ def setup_calendar(system: "System") -> List[Any]:
     )
     system_logger.info("[Calendar] Интерфейс загружен.")
 
-    return [events]  # Возвращаем events для запуска фонового поллинга в main.py
+    return [events]

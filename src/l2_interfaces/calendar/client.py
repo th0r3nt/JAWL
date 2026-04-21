@@ -3,6 +3,7 @@ from pathlib import Path
 from typing import List, Dict, Any
 
 from src.l0_state.interfaces.state import CalendarState
+from src.utils.dtime import format_timestamp  # <--- Добавили импорт
 
 
 class CalendarClient:
@@ -11,9 +12,16 @@ class CalendarClient:
     Управляет JSON-файлом событий и провайдером контекста.
     """
 
-    def __init__(self, state: CalendarState, data_dir: Path, timezone: int):
+    def __init__(
+        self,
+        state: CalendarState,
+        data_dir: Path,
+        timezone: int,
+        upcoming_events_limit: int = 10,
+    ):
         self.state = state
         self.timezone = timezone
+        self.upcoming_events_limit = upcoming_events_limit
 
         self.calendar_dir = data_dir / "calendar"
         self.calendar_dir.mkdir(parents=True, exist_ok=True)
@@ -21,6 +29,8 @@ class CalendarClient:
 
         if not self.filepath.exists():
             self._save([])
+        else:
+            self.update_state_view()  # Обновляем стейт при старте из существующего файла
 
     def _load(self) -> List[Dict[str, Any]]:
         """Загружает данные из JSON-календаря."""
@@ -32,10 +42,34 @@ class CalendarClient:
             return []
 
     def _save(self, events: List[Dict[str, Any]]) -> None:
-        """Сохраняет данные в JSON-календарь."""
+        """Сохраняет данные в JSON-календарь и МГНОВЕННО обновляет стейт агента."""
 
         with open(self.filepath, "w", encoding="utf-8") as f:
             json.dump(events, f, indent=4, ensure_ascii=False)
+
+        # Мгновенная синхронизация кэша после любого изменения файла!
+        self.update_state_view()
+
+    def update_state_view(self) -> None:
+        """Обновляет MRU-кэш для CalendarState (ближайшие n событий)."""
+
+        events = self._load()
+        if not events:
+            self.state.upcoming_events = "Запланированных событий нет."
+            return
+
+        # Сортируем по ближайшему времени срабатывания и применяем лимит из конфига
+        sorted_events = sorted(events, key=lambda x: x["trigger_at"])[
+            : self.upcoming_events_limit
+        ]
+
+        lines = ["Ближайшие события:"]
+        for ev in sorted_events:
+            dt_str = format_timestamp(ev["trigger_at"], self.timezone, "%m-%d %H:%M")
+            ev_type = ev["type"].upper()
+            lines.append(f"-[{dt_str}] [ID: `{ev['id'][:6]}`] ({ev_type}) {ev['title']}")
+
+        self.state.upcoming_events = "\n".join(lines)
 
     def get_all_events(self) -> List[Dict[str, Any]]:
         """Возвращает все события в календаре."""
@@ -43,20 +77,18 @@ class CalendarClient:
 
     def add_event(self, event_data: Dict[str, Any]) -> None:
         """Добавляет новое событие в календарь."""
-
         events = self._load()
         events.append(event_data)
         self._save(events)
 
     def update_events(self, events: List[Dict[str, Any]]) -> None:
-        """Полная перезапись списка (нужно при удалении или изменении времени срабатывания)."""
+        """Полная перезапись списка (нужно при удалении или изменении времени)."""
         self._save(events)
 
     async def get_context_block(self, **kwargs) -> str:
         """
         Провайдер контекста для ContextRegistry.
         """
-
         if not self.state.is_online:
             return "### CALENDAR [OFF] \nИнтерфейс отключен."
 

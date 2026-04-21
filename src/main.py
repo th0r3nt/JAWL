@@ -289,7 +289,7 @@ class System:
                 if evt == Events.SYSTEM_CORE_STOP:
                     return
 
-                self.heartbeat.wake_up(level=evt.level, event_name=evt.name, payload=kwargs)
+                self.heartbeat.answer_to_event(level=evt.level, event_name=evt.name, payload=kwargs)
 
             return handler
 

@@ -56,10 +56,10 @@ class ContextBuilder:
     ) -> str:
         """Возвращает отформатированный блок контекста текущего Heartbeat для агента."""
 
-        wake_up_reason = self._build_wake_up_reason(event_name, payload, missed_events)
-        return f"## HEARTBEAT\n{wake_up_reason}"
+        answer_to_event_reason = self._build_answer_to_event_reason(event_name, payload, missed_events)
+        return f"## HEARTBEAT\n{answer_to_event_reason}"
 
-    def _build_wake_up_reason(
+    def _build_answer_to_event_reason(
         self, event_name: str, payload: Dict[str, Any], missed_events: List[str]
     ) -> str:
         """Возвращает отформатированный блок контекста фоновых событий для агента."""

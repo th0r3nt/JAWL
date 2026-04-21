@@ -67,6 +67,7 @@ class MultimodalityConfig(BaseModel):
 class CalendarConfig(BaseModel):
     enabled: bool
     polling_interval_sec: int
+    upcoming_events_limit: int
 
 
 class InterfacesConfig(BaseModel):

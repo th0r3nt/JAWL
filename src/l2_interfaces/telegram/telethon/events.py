@@ -9,7 +9,7 @@ from src.utils.event.registry import Events
 
 from src.l0_state.interfaces.state import TelethonState
 from src.l2_interfaces.telegram.telethon.client import TelethonClient
-from src.l2_interfaces.telegram.telethon._message_parser import TelethonMessageParser
+from src.l2_interfaces.telegram.telethon.utils._message_parser import TelethonMessageParser
 
 
 class TelethonEvents:

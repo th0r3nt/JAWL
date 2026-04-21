@@ -1,4 +1,5 @@
 import logging
+import sys
 from typing import Union
 from pathlib import Path
 
@@ -111,6 +112,9 @@ def setup_specific_logger(name: str, log_file: str, level: Union[int, str]) -> l
     )
     console_handler.setFormatter(color_formatter)
 
+    if "pytest" in sys.modules:
+        console_handler.setLevel(logging.CRITICAL)
+
     specific_logger = logging.getLogger(name)
     specific_logger.setLevel(level)
 
@@ -131,5 +135,9 @@ def update_log_level(level_str: str) -> None:
     """Динамически обновляет уровень логирования (вызывается после загрузки конфига)"""
     numeric_level = getattr(logging, level_str.upper(), logging.INFO)
     system_logger.setLevel(numeric_level)
+
     for handler in system_logger.handlers:
+        # Защищаем нашу тишину в консоли от сброса во время тестов
+        if "pytest" in sys.modules and isinstance(handler, logging.StreamHandler):
+            continue
         handler.setLevel(numeric_level)

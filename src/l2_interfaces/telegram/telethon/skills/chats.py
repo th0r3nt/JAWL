@@ -18,7 +18,7 @@ from src.utils.logger import system_logger
 from src.utils._tools import parse_int_or_str
 
 from src.l2_interfaces.telegram.telethon.client import TelethonClient
-from src.l2_interfaces.telegram.telethon._message_parser import TelethonMessageParser
+from src.l2_interfaces.telegram.telethon.utils._message_parser import TelethonMessageParser
 from src.l3_agent.skills.registry import SkillResult, skill
 
 

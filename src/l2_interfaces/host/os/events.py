@@ -248,6 +248,7 @@ class HostOSEvents:
 
     async def _loop(self):
         """Бесконечный цикл поллинга для телеметрии (раз в 20-30 сек)."""
+        self.state.polling_interval = self.host_os.config.monitoring_interval_sec
 
         while self._is_running:
             try:
@@ -256,7 +257,7 @@ class HostOSEvents:
                 await self._update_network()
                 # Мы всё равно периодически чекаем песочницу на случай, если watchdog что-то пропустил
                 self._check_sandbox()
-
+                
             except asyncio.CancelledError:
                 break
             except Exception as e:

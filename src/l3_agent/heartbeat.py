@@ -49,8 +49,7 @@ class Heartbeat:
         # Флаг намеренного прерывания, чтобы отличать логику агента от Ctrl+C
         self._is_interrupted: bool = False
 
-    # TODO: переделать название функции (сейчас не интуитивно понятно как-то, можно сделать как-нибудь "asnwer_to_event" или хз)
-    def wake_up(
+    def answer_to_event(
         self, level: EventLevel, event_name: str, payload: Optional[Dict[str, Any]] = None
     ):
         """Смотрит на входящее событие и решает, вызывать ли агента."""
@@ -66,7 +65,7 @@ class Heartbeat:
         multiplier = 1.0
         if level == EventLevel.CRITICAL:
             multiplier = self.accel_config.critical_multiplier
-            
+
         elif level == EventLevel.HIGH:
             multiplier = self.accel_config.high_multiplier
 
@@ -188,7 +187,7 @@ class Heartbeat:
 
                 except asyncio.CancelledError:
                     if self._is_interrupted:
-                        # Отмена инициирована нами (wake_up). Глотаем ошибку и идем на новый круг
+                        # Отмена инициирована нами (answer_to_event). Глотаем ошибку и идем на новый круг
                         system_logger.info("[System] Текущий ReAct-цикл успешно прерван.")
                         self._is_interrupted = False
                     else:

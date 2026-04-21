@@ -70,7 +70,7 @@ class TelethonClient:
             self.state.is_online = False
 
     async def update_profile_state(self) -> None:
-        """Запрашивает актуальные данные аккаунта (имя, юзернейм, био) и сохраняет в стейт."""
+        """Запрашивает актуальные данные аккаунта (имя, юзернейм, био, канал) и сохраняет в стейт."""
         if not self._client:
             return
 
@@ -82,11 +82,30 @@ class TelethonClient:
 
             username = f"@{me.username}" if me.username else "Без @username"
 
-            # Для получения "о себе" (bio) нужен FullUser запрос
+            # Для получения "о себе" (bio) и личного канала нужен FullUser запрос
             full_me = await self._client(GetFullUserRequest(me))
             bio = full_me.full_user.about or "Пусто"
 
-            self.state.account_info = f"Профиль: {name} ({username}) | Био: {bio}\n---"
+            # === Ищем личный канал ===
+            channel_info = ""
+            personal_channel_id = getattr(full_me.full_user, "personal_channel_id", None)
+
+            if personal_channel_id:
+                try:
+                    from telethon import utils
+
+                    channel = await self._client.get_entity(personal_channel_id)
+                    channel_name = utils.get_display_name(channel)
+                    channel_info = (
+                        f" | Личный канал: {channel_name} (ID: {personal_channel_id})"
+                    )
+                except Exception:
+                    # Фоллбек, если не удалось получить имя канала
+                    channel_info = f" | Личный канал: ID {personal_channel_id}"
+
+            self.state.account_info = (
+                f"Профиль: {name} ({username}) | Био: {bio}{channel_info}\n---"
+            )
         except Exception as e:
             system_logger.error(f"[Telegram Telethon] Ошибка обновления профиля: {e}")
             self.state.account_info = "Профиль: Ошибка загрузки данных\n---"

@@ -23,7 +23,7 @@ def mock_accel_config():
     )
 
 
-def test_heartbeat_wake_up_high_critical(mock_react_loop, mock_accel_config):
+def test_heartbeat_answer_to_event_high_critical(mock_react_loop, mock_accel_config):
     hb = Heartbeat(
         mock_react_loop,
         heartbeat_interval=60,
@@ -32,14 +32,14 @@ def test_heartbeat_wake_up_high_critical(mock_react_loop, mock_accel_config):
         timezone=3,
     )
     hb._next_tick_time = time.time() + 60
-    hb.wake_up(EventLevel.CRITICAL, "URGENT_EVENT", {"key": "value"})
+    hb.answer_to_event(EventLevel.CRITICAL, "URGENT_EVENT", {"key": "value"})
 
     assert hb._wake_event.is_set()
     assert hb._wake_reason == "URGENT_EVENT"
     assert hb._wake_payload == {"key": "value"}
 
 
-def test_heartbeat_wake_up_medium(mock_react_loop, mock_accel_config):
+def test_heartbeat_answer_to_event_medium(mock_react_loop, mock_accel_config):
     hb = Heartbeat(
         mock_react_loop,
         heartbeat_interval=60,
@@ -49,12 +49,12 @@ def test_heartbeat_wake_up_medium(mock_react_loop, mock_accel_config):
     )
     now = time.time()
     hb._next_tick_time = now + 60
-    hb.wake_up(EventLevel.MEDIUM, "SOME_EVENT")
+    hb.answer_to_event(EventLevel.MEDIUM, "SOME_EVENT")
     expected_time = now + 36  # 60 * 0.6 = 36
     assert abs(hb._next_tick_time - expected_time) < 0.1
 
 
-def test_heartbeat_wake_up_low(mock_react_loop, mock_accel_config):
+def test_heartbeat_answer_to_event_low(mock_react_loop, mock_accel_config):
     hb = Heartbeat(
         mock_react_loop,
         heartbeat_interval=60,
@@ -64,7 +64,7 @@ def test_heartbeat_wake_up_low(mock_react_loop, mock_accel_config):
     )
     now = time.time()
     hb._next_tick_time = now + 60
-    hb.wake_up(EventLevel.BACKGROUND, "TRASH_EVENT")
+    hb.answer_to_event(EventLevel.BACKGROUND, "TRASH_EVENT")
     expected_time = now + 48  # 60 * 0.8 = 48
     assert abs(hb._next_tick_time - expected_time) < 0.1
 
@@ -105,7 +105,7 @@ async def test_heartbeat_loop_event_driven(mock_react_loop, mock_accel_config):
     mock_react_loop.run.side_effect = trigger_event_and_stop
 
     # Это событие попадет в память сна
-    hb.wake_up(EventLevel.CRITICAL, "DB_DOWN", {"error": "timeout"})
+    hb.answer_to_event(EventLevel.CRITICAL, "DB_DOWN", {"error": "timeout"})
 
     await hb.start()
 

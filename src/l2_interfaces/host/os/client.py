@@ -21,6 +21,7 @@ class HostOSClient:
         self.config = config
         self.state = state
         self.timezone = timezone
+        
 
         try:
             self.access_level = HostOSAccessLevel(self.config.access_level)
@@ -98,6 +99,7 @@ class HostOSClient:
         return f"""### HOST OS [ON]
 * OS: {self.state.os_info}
 * Access Level: {self.access_level.value} ({self.access_level.name}) / 3
+* Polling interval: {self.state.polling_interval}
 * Datetime: {self.state.datetime}
 * Uptime: {self.state.uptime}
 * Network: {getattr(self.state, 'network', 'Неизвестно')}

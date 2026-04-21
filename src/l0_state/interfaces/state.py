@@ -90,6 +90,8 @@ class HostOSState:
         self.telemetry = ""  # CPU, ОЗУ, процессы
         self.sandbox_files = ""  # Текущие файлы в Sandbox
 
+        self.polling_interval = ""
+
 
 # ==================================================================
 # Host Terminal

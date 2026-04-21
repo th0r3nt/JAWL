@@ -4,7 +4,6 @@ import asyncio
 from src.utils.logger import system_logger
 from src.utils.event.bus import EventBus
 from src.utils.event.registry import Events
-from src.utils.dtime import format_timestamp
 
 from src.l0_state.interfaces.state import CalendarState
 from src.l2_interfaces.calendar.client import CalendarClient
@@ -33,13 +32,13 @@ class CalendarEvents:
 
     async def start(self) -> None:
         """Запускает фоновый поллинг событий календаря."""
-
+        
         if self._is_running:
             return
 
         self._is_running = True
         self.client.state.is_online = True
-        self._update_state_view()
+        self.client.update_state_view()  # Дергаем обновленный метод из клиента
 
         self._polling_task = asyncio.create_task(self._loop())
         system_logger.info("[Calendar] Фоновый мониторинг времени запущен.")
@@ -54,27 +53,6 @@ class CalendarEvents:
 
         self.client.state.is_online = False
         system_logger.info("[Calendar] Фоновый мониторинг времени остановлен.")
-
-    def _update_state_view(self):
-        """Обновляет MRU-кэш для CalendarState (ближайшие 5 событий)."""
-
-        events = self.client.get_all_events()
-        if not events:
-            self.state.upcoming_events = "Запланированных событий нет."
-            return
-
-        # Сортируем по ближайшему времени срабатывания
-        sorted_events = sorted(events, key=lambda x: x["trigger_at"])[
-            :10
-        ]  # TODO: перенести в yaml
-
-        lines = ["Ближайшие события:"]
-        for ev in sorted_events:
-            dt_str = format_timestamp(ev["trigger_at"], self.client.timezone, "%m-%d %H:%M")
-            ev_type = ev["type"].upper()
-            lines.append(f"- [{dt_str}] [ID: `{ev['id'][:6]}`] ({ev_type}) {ev['title']}")
-
-        self.state.upcoming_events = "\n".join(lines)
 
     async def _loop(self):
         """Бесконечный цикл проверки таймеров."""
@@ -112,9 +90,10 @@ class CalendarEvents:
                     else:
                         active_events.append(ev)
 
+                # Если хотя бы один таймер сработал, перезаписываем JSON
+                # Метод _save() клиента внутри update_events автоматически обновит стейт
                 if modified:
                     self.client.update_events(active_events)
-                    self._update_state_view()
 
             except asyncio.CancelledError:
                 break

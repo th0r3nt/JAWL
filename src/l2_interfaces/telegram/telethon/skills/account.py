@@ -1,6 +1,6 @@
 from typing import Union
 
-from telethon.tl.functions.account import UpdateProfileRequest
+from telethon.tl.functions.account import UpdateProfileRequest, UpdatePersonalChannelRequest
 from telethon.tl.functions.photos import UploadProfilePhotoRequest
 from telethon.tl.functions.contacts import AddContactRequest
 from telethon.tl.functions.users import GetFullUserRequest
@@ -192,3 +192,40 @@ class TelethonAccount:
             )
         except Exception as e:
             return SkillResult.fail(f"Ошибка при получении информации о пользователе: {e}")
+
+    @skill()
+    async def set_personal_channel(self, channel_id: Union[int, str]) -> SkillResult:
+        """
+        Устанавливает указанный канал как личный (будет отображаться в профиле).
+        Для удаления канала из профиля - передать пустую строку "".
+        """
+        try:
+            client = self.tg_client.client()
+
+            # Обрабатываем удаление канала
+            if not channel_id or str(channel_id).strip() == "":
+                target_entity = None
+            else:
+                target_entity = await client.get_input_entity(parse_int_or_str(channel_id))
+
+            # Отправляем запрос на обновление профиля
+            await client(UpdatePersonalChannelRequest(channel=target_entity))
+
+            # Актуализируем стейт агента, чтобы он сразу "осознал", что профиль обновился
+            await self.tg_client.update_profile_state()
+
+            if target_entity:
+                return SkillResult.ok(f"Успешно. Канал '{channel_id}' установлен как личный.")
+            else:
+                return SkillResult.ok("Успешно. Личный канал убран из профиля.")
+
+        except ValueError:
+            return SkillResult.fail(
+                f"Ошибка: Канал '{channel_id}' не найден. Проверьте ID или юзернейм."
+            )
+        except Exception as e:
+            if "CHANNEL_PRIVATE" in str(e):
+                return SkillResult.fail(
+                    "Ошибка: Канал приватный, либо у агента нет к нему доступа."
+                )
+            return SkillResult.fail(f"Ошибка при установке личного канала: {e}")

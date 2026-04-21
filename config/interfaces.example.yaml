@@ -56,3 +56,4 @@ multimodality:
 calendar:
   enabled: true
   polling_interval_sec: 60
+  upcoming_events_limit: 10
