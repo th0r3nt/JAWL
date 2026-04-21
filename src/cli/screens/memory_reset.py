@@ -112,19 +112,19 @@ def memory_reset_screen() -> None:
 
         # Формируем список. Separator не реагирует на стрелочки.
         choices = [
-            questionary.Separator("Vector DB (Семантическая память)"),
-            questionary.Separator(f"  Knowledge: {vec_stats['knowledge']} записей"),
-            questionary.Separator(f"  Thoughts:  {vec_stats['thoughts']} записей"),
+            questionary.Separator("Vector DB"),
+            questionary.Separator(f"    Knowledge: {vec_stats['knowledge']} записей"),
+            questionary.Separator(f"    Thoughts:  {vec_stats['thoughts']} записей"),
             questionary.Choice("🔥 Сжечь Vector DB", "clean_vector"),
             questionary.Separator(" "),  # Пустая строка для воздуха
             questionary.Separator("SQL DB"),
-            questionary.Separator(f"  Mental States: {sql_stats['mental_states']} записей"),
-            questionary.Separator(f"  Tasks:         {sql_stats['tasks']} записей"),
+            questionary.Separator(f"    Mental States: {sql_stats['mental_states']} записей"),
+            questionary.Separator(f"    Tasks:         {sql_stats['tasks']} записей"),
             questionary.Separator(
-                f"  Traits:        {sql_stats['personality_traits']} записей"
+                f"    Traits:        {sql_stats['personality_traits']} записей"
             ),
-            questionary.Separator(f"  Drives:        {sql_stats['drives']} записей"),
-            questionary.Separator(f"  Ticks:         {sql_stats['ticks']} записей"),
+            questionary.Separator(f"    Drives:        {sql_stats['drives']} записей"),
+            questionary.Separator(f"    Ticks:         {sql_stats['ticks']} записей"),
             questionary.Choice("🔥 Сжечь SQL DB", "clean_sql"),
             questionary.Separator(" "),  # Пустая строка для воздуха
             questionary.Choice("❌ Выход в главное меню", "exit"),
@@ -135,7 +135,7 @@ def memory_reset_screen() -> None:
             choices=choices,
             style=style,
             qmark=" ",  # <-- Надежно прячем знак вопроса пробелом
-            instruction="\n  (Стрелочки ↑/↓ для навигации)",
+            instruction="\n  (Стрелочки ↑/↓ для навигации)\n",
         ).ask()
 
         if choice is None or choice == "exit":
@@ -143,7 +143,7 @@ def memory_reset_screen() -> None:
 
         # Защита от дурака
         confirm = questionary.confirm(
-            "⚠️ Вы уверены? Это действие необратимо удалит всю накопленную память.",
+            "⚠️  Вы уверены? Это действие необратимо удалит всю накопленную память.",
             default=False,
             qmark=" ",  # Здесь тоже убираем вопрос
         ).ask()

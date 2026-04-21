@@ -19,7 +19,7 @@ def logs_screen() -> None:
     clear_screen()
     console.print(
         Panel(
-            "[bold green]Стриминг логов в реальном времени[/bold green]\n"
+            "[bold green]Стриминг system.log в реальном времени[/bold green]\n"
             "[dim]Нажмите Ctrl+C для возврата в главное меню[/dim]",
             border_style="green",
         )
