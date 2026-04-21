@@ -91,12 +91,11 @@ class HostOSClient:
         return resolved_path
 
     async def get_context_block(self, **kwargs) -> str:
-        status = "ON" if self.state.is_online else "OFF"
 
         if not self.state.is_online:
             return "### HOST OS [OFF]\nИнтерфейс отключен."
 
-        return f"""### HOST OS [{status}]
+        return f"""### HOST OS [ON]
 * OS: {self.state.os_info}
 * Access Level: {self.access_level.value} ({self.access_level.name}) / 3
 * Datetime: {self.state.datetime}

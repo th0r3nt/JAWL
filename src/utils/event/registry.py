@@ -159,9 +159,9 @@ class Events:
 
     SYSTEM_CALENDAR_ALARM = EventConfig(
         name="SYSTEM_CALENDAR_ALARM",
-        description="Сработал таймер или регулярная задача из календаря.",
-        level=EventLevel.MEDIUM,
-        requires_attention=True,
+        description="Сработал таймер или регулярная задача из календаря.", # TODO: в коде вообще используется поле description?
+        level=EventLevel.HIGH,
+        requires_attention=True, # TODO: это вообще влияет на что-нибудь?
     )
 
     SYSTEM_CONFIG_UPDATED = EventConfig(

@@ -27,6 +27,7 @@ class WebSearchClient:
         Отдает отформатированный блок контекста для агента.
         """
 
-        status = "ON" if self.state.is_online else "OFF"
-        data = self.state.browser_history if self.state.is_online else "Интерфейс отключен."
-        return f"### WEB SEARCH [{status}]\n{data}"
+        if not self.state.is_online:
+            return "### WEB SEARCH [OFF] \nИнтерфейс отключен."            
+
+        return f"### WEB SEARCH [ON] \n{self.state.browser_history}"

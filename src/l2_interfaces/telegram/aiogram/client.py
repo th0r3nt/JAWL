@@ -2,6 +2,7 @@ from aiogram import Bot
 from src.utils.logger import system_logger
 from src.l0_state.interfaces.state import AiogramState
 
+
 class AiogramClient:
     """
     Управляет базовым подключением к Telegram через Bot API (Aiogram v3).
@@ -34,16 +35,20 @@ class AiogramClient:
 
             # Делаем тестовый запрос для проверки токена
             me = await self._bot.get_me()
-            system_logger.info(f"[Telegram Aiogram] Aiogram успешно авторизован как бот: @{me.username}")
+            system_logger.info(
+                f"[Telegram Aiogram] Aiogram успешно авторизован как бот: @{me.username}"
+            )
             self.state.is_online = True
 
         except Exception as e:
-            system_logger.error(f"[Telegram Aiogram] Критическая ошибка при запуске Aiogram: {e}")
+            system_logger.error(
+                f"[Telegram Aiogram] Критическая ошибка при запуске Aiogram: {e}"
+            )
             raise e
 
     async def stop(self) -> None:
         """Корректно закрывает сессию aiohttp."""
-        
+
         if self._bot:
             await self._bot.session.close()
             system_logger.info("[Telegram Aiogram] Aiogram клиент отключен.")
@@ -55,6 +60,7 @@ class AiogramClient:
         Отдает отформатированный блок контекста для агента.
         """
 
-        status = "ON" if self.state.is_online else "OFF"
-        data = self.state.last_chats if self.state.is_online else "Интерфейс отключен."
-        return f"### AIOGRAM [{status}]\n{data}"
+        if not self.state.is_online:
+            return "### AIOGRAM [OFF] \nИнтерфейс отключен."
+
+        return f"### AIOGRAM [ON] \n{self.state.last_chats}"

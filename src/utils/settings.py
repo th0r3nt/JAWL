@@ -64,12 +64,18 @@ class MultimodalityConfig(BaseModel):
     enabled: bool
 
 
+class CalendarConfig(BaseModel):
+    enabled: bool
+    polling_interval_sec: int
+
+
 class InterfacesConfig(BaseModel):
     host: HostConfig
     telegram: TelegramConfig
     web: WebConfig
     meta: MetaConfig
     multimodality: MultimodalityConfig
+    calendar: CalendarConfig
 
 
 # ==========================================

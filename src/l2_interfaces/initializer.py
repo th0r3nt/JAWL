@@ -1,16 +1,19 @@
 from typing import List, Any, Dict, TYPE_CHECKING
 
+if TYPE_CHECKING:
+    from src.main import System
+
+# Импорт интерфейсов
 from src.l2_interfaces.host.os.bootstrap import setup_host_os
 from src.l2_interfaces.meta.bootstrap import setup_meta
 from src.l2_interfaces.telegram.telethon.bootstrap import setup_telethon
 from src.l2_interfaces.telegram.aiogram.bootstrap import setup_aiogram
 from src.l2_interfaces.web.search.bootstrap import setup_web_search
 from src.l2_interfaces.multimodality.bootstrap import setup_multimodality
+from src.l2_interfaces.calendar.bootstrap import setup_calendar
 
-# TODO: from src.l2_interfaces.web.http.bootstrap import setup_web_http
-
-if TYPE_CHECKING:
-    from src.main import System
+# Импортируйте сюда свой кастомный интерфейс
+# from src.l2_interfaces.interface_name.bootstrap import setup_interface
 
 
 def initialize_l2_interfaces(system: "System", env_vars: Dict[str, str | None]) -> List[Any]:
@@ -76,5 +79,12 @@ def initialize_l2_interfaces(system: "System", env_vars: Dict[str, str | None]) 
         components.extend(setup_multimodality(system))
 
     # ================================================================
+    # CALENDAR
+    # ================================================================
 
-    return components  # Возвращает список компонентов, которые нужно запустить в main.py (например, поллинг Telethon, если он включен)
+    if getattr(config, "calendar", None) and config.calendar.enabled:
+        components.extend(setup_calendar(system))
+
+    # ================================================================
+
+    return components  # Возвращает список компонентов, которые нужно запустить в main.py (например, поллинг Telethon или календаря, если они включены)

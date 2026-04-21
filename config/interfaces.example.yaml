@@ -18,6 +18,7 @@ host:
     http_response_max_chars: 5000
     top_processes_limit: 10
 
+
 telegram:
   telethon:
     enabled: false # Перед включением введите TELETHON_API_ID и TELETHON_API_HASH в .env
@@ -25,6 +26,7 @@ telegram:
 
   aiogram:
     enabled: false # Перед включением введите AIOGRAM_BOT_TOKEN в .env
+
 
 web:
   # Поиск через DuckDuckGo и чтение страниц
@@ -45,5 +47,12 @@ web:
 meta:
   enabled: false 
 
+
 multimodality:
   enabled: false # Поставьте true, если модель мультимодальна
+
+
+# Локальный календарь для агента (может ставить себе напоминания, задачи)
+calendar:
+  enabled: true
+  polling_interval_sec: 60

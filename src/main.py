@@ -26,6 +26,7 @@ from src.l0_state.interfaces.state import (
     TelethonState,
     AiogramState,
     WebSearchState,
+    CalendarState,
 )
 
 # ==========================================
@@ -110,6 +111,7 @@ class System:
         self.telethon_state = TelethonState(number_of_last_chats=15)
         self.aiogram_state = AiogramState(number_of_last_chats=15)
         self.web_search_state = WebSearchState(history_limit=10)
+        self.calendar_state = CalendarState()
 
     async def setup_l1_databases(self):
         """Поднимает базы данных и регистрирует их CRUD-скиллы."""
@@ -157,7 +159,9 @@ class System:
         if sys_cfg.sql.personality_traits.enabled:
             register_instance(self.sql.personality_traits)
             self.context_registry.register_provider(
-                "sql_traits", self.sql.personality_traits.get_context_block, section=ContextSection.TRAITS
+                "sql_traits",
+                self.sql.personality_traits.get_context_block,
+                section=ContextSection.TRAITS,
             )
 
         # TASKS
@@ -171,7 +175,9 @@ class System:
         if sys_cfg.sql.mental_states.enabled:
             register_instance(self.sql.mental_states)
             self.context_registry.register_provider(
-                "sql_mental_states", self.sql.mental_states.get_context_block, section=ContextSection.MENTAL_STATES
+                "sql_mental_states",
+                self.sql.mental_states.get_context_block,
+                section=ContextSection.MENTAL_STATES,
             )
 
         # Базовые вещи регистрируются всегда
@@ -179,7 +185,9 @@ class System:
             "sql_ticks", self.sql.ticks.get_context_block, section=ContextSection.RECENT_TICKS
         )
         self.context_registry.register_provider(
-            "agent_state", self.agent_state.get_context_block, section=ContextSection.AGENT_STATE
+            "agent_state",
+            self.agent_state.get_context_block,
+            section=ContextSection.AGENT_STATE,
         )
 
         # Vector DB

@@ -4,6 +4,7 @@ from src.l0_state.interfaces.state import (
     HostOSState,
     HostTerminalState,
     WebSearchState,
+    CalendarState,
 )
 
 
@@ -30,6 +31,13 @@ def test_host_terminal_state_init():
     state = HostTerminalState(number_of_last_messages=10)
     assert state.number_of_last_messages == 10
     assert state.messages == ""
+
+
+def test_calendar_state_init():
+    """Тест: Дефолтная инициализация стейта календаря."""
+    state = CalendarState()
+    assert state.is_online is False
+    assert state.upcoming_events == "Событий нет."
 
 
 def test_web_search_state_mru():
