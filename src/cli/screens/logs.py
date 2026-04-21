@@ -60,7 +60,7 @@ def logs_screen() -> None:
     if not LOG_FILE.exists():
         print_error(f"Файл логов не найден: {LOG_FILE.name}")
         print_info("Возможно, агент еще ни разу не запускался.")
-        console.print("\n[dim]Нажмите Enter для возврата в меню...[/dim]")
+        console.print("\n[dim]Нажмите Enter для возврата в меню.[/dim]")
         input()
         return
 
@@ -74,23 +74,30 @@ def logs_screen() -> None:
     )
 
     try:
-        with open(LOG_FILE, "r", encoding="utf-8") as f:
-            # Прыгаем в конец файла минус 2000 байт, чтобы показать немного предыстории
+        # errors="replace" спасет от краша, если seek() попадет в середину русской буквы (многобайтового символа)
+        with open(LOG_FILE, "r", encoding="utf-8", errors="replace") as f:
             f.seek(0, 2)
             file_size = f.tell()
-            f.seek(max(0, file_size - 2000))
 
-            # Читаем остаток файла до конца, чтобы выровнять курсор чтения
-            f.readlines()
+            # Прыгаем на 2000 байт назад
+            if file_size > 2000:
+                f.seek(file_size - 2000)
+                # Выкидываем первую строку, так как мы почти наверняка приземлились на её середину
+                f.readline()
+            else:
+                f.seek(0)
 
-            # Бесконечный цикл чтения новых строк (tail -f)
+            # 1. Сначала выводим всю накопленную предысторию
+            for line in f:
+                console.print(_colorize_log_line(line))
+
+            # 2. Переходим в режим ожидания новых строк (tail -f)
             while True:
                 line = f.readline()
                 if not line:
                     time.sleep(0.1)
                     continue
 
-                # Выводим раскрашенную строку
                 console.print(_colorize_log_line(line))
 
     except KeyboardInterrupt:
