@@ -1,3 +1,4 @@
+import psutil
 from pathlib import Path
 from typing import Union
 
@@ -60,3 +61,25 @@ def get_project_root() -> Path:
 def get_pid_file_path() -> Path:
     """Единый путь к PID-файлу для всех модулей."""
     return get_project_root() / "src" / "utils" / "local" / "data" / "agent.pid"
+
+
+def is_agent_running() -> bool:
+    """Проверяет, работает ли агент на самом деле (логика перенесена из screens)."""
+    pid_file = get_pid_file_path()
+    if not pid_file.exists():
+        return False
+
+    try:
+        pid = int(pid_file.read_text().strip())
+        if psutil.pid_exists(pid):
+            proc = psutil.Process(pid)
+            # Проверяем, что это не какой-то левый процесс занял этот PID
+            return proc.is_running() and "python" in proc.name().lower()
+        return False
+    except (ValueError, psutil.NoSuchProcess, psutil.AccessDenied):
+        if pid_file.exists():
+            try:
+                pid_file.unlink()
+            except:
+                pass
+        return False

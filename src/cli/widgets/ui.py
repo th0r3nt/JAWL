@@ -4,15 +4,13 @@ import psutil
 import yaml
 from pathlib import Path
 
-from src.utils._tools import get_pid_file_path
+from src.utils._tools import is_agent_running, get_pid_file_path
 
 from rich.console import Console, Group
 from rich.panel import Panel
 from rich.text import Text
 from rich.align import Align
 import questionary
-
-from src.cli.screens.agent_control import _is_agent_running
 
 console = Console()
 
@@ -34,7 +32,7 @@ SETTINGS_FILE = ROOT_DIR / "config" / "settings.yaml"
 def _get_agent_status() -> dict:
     """Легковесно собирает статус агента (без IPC, напрямую из ОС и конфигов)."""
 
-    is_running = _is_agent_running()
+    is_running = is_agent_running()
 
     status = {"is_running": is_running, "uptime": "00:00", "model": "unknown", "interval": 0}
 
