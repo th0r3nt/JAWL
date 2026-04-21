@@ -1,4 +1,5 @@
 import sys
+import os
 import shutil
 import subprocess
 from pathlib import Path
@@ -75,7 +76,6 @@ def _check_and_setup_env() -> bool:
 
     return True
 
-
 def start_agent_screen() -> None:
     """Экран запуска агента."""
 
@@ -90,16 +90,26 @@ def start_agent_screen() -> None:
 
     print_info("Инициализация систем агента.")
     PID_FILE.parent.mkdir(parents=True, exist_ok=True)
+    
+    # Создаем директорию для логов, если её нет
+    logs_dir = ROOT_DIR / "logs"
+    logs_dir.mkdir(parents=True, exist_ok=True)
+    crash_log_path = logs_dir / "crash.log"
+
+    # Прокидываем PYTHONPATH, чтобы импорты 'src...' работали в новом процессе
+    env = os.environ.copy()
+    env["PYTHONPATH"] = str(ROOT_DIR)
 
     try:
-        # sys.executable указывает на Python внутри нашего venv (благодаря jawl.py)
-        # Направляем stdout/stderr в DEVNULL, т.к. агент сам пишет логи в system.log
-        process = subprocess.Popen(
-            [sys.executable, str(MAIN_SCRIPT)],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            cwd=str(ROOT_DIR),
-        )
+        # Перенаправляем stderr в файл crash.log, чтобы не терять фатальные ошибки
+        with open(crash_log_path, "a", encoding="utf-8") as crash_log:
+            process = subprocess.Popen(
+                [sys.executable, str(MAIN_SCRIPT)],
+                stdout=subprocess.DEVNULL,
+                stderr=crash_log,
+                cwd=str(ROOT_DIR),
+                env=env, # <-- Передаем окружение
+            )
 
         PID_FILE.write_text(str(process.pid))
 
