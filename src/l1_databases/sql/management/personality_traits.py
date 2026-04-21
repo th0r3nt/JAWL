@@ -60,11 +60,15 @@ class SQLPersonalityTraits:
 
         lines = []
         for t in traits:
-            reason_str = f" | Причина: {t.reason}" if t.reason else ""
-            ctx_str = f" | Контекст: {t.context}" if t.context else ""
-            lines.append(f"- [ID: `{t.id}`] '{t.name}': {t.description}{reason_str}{ctx_str}")
+            lines.append(f"['{t.name}'] (ID: `{t.id}`)")
+            lines.append(f"* Описание: {t.description}")
+            if t.reason:
+                lines.append(f"* Причина: {t.reason}")
+            if t.context:
+                lines.append(f"* Контекст: {t.context}")
+            lines.append("")  # Пустая строка-разделитель между чертами
 
-        return SkillResult.ok("\n".join(lines))
+        return SkillResult.ok("\n".join(lines).strip())
 
     @skill()
     async def remove_trait(self, trait_id: str) -> SkillResult:

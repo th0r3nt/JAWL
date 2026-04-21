@@ -53,11 +53,15 @@ class SQLTasks:
 
         lines = []
         for t in tasks:
-            term_str = f" | Срок: {t.term}" if t.term else ""
-            ctx_str = f" | Контекст: {t.context}" if t.context else ""
-            lines.append(f"- [ID: `{t.id}`] {t.description}{term_str}{ctx_str}")
+            lines.append(f"[Task ID: `{t.id}`]")
+            lines.append(f"* Описание: {t.description}")
+            if t.term:
+                lines.append(f"* Срок: {t.term}")
+            if t.context:
+                lines.append(f"* Контекст: {t.context}")
+            lines.append("")  # Пустая строка-разделитель
 
-        return SkillResult.ok("\n".join(lines))
+        return SkillResult.ok("\n".join(lines).strip())
 
     @skill()
     async def update_task(
