@@ -111,6 +111,6 @@ def logs_screen() -> None:
 
     except KeyboardInterrupt:
         # Юзер нажал Ctrl+C
-        print_info("Выход из режима просмотра логов.")
-        time.sleep(1.5)
+        print_info(" Выход из режима просмотра логов.")
+        time.sleep(3)
         return

@@ -15,6 +15,17 @@ from src.l2_interfaces.calendar.bootstrap import setup_calendar
 # Импортируйте сюда свой кастомный интерфейс
 # from src.l2_interfaces.interface_name.bootstrap import setup_interface
 
+from src.l3_agent.context.registry import ContextSection
+
+
+def make_off_provider(name: str):
+    """Создает заглушку-провайдер контекста для аппаратно отключенных интерфейсов."""
+
+    async def provider(**kwargs) -> str:
+        return f"### {name} [OFF]\nИнтерфейс отключен."
+
+    return provider
+
 
 def initialize_l2_interfaces(system: "System", env_vars: Dict[str, str | None]) -> List[Any]:
     """
@@ -31,6 +42,10 @@ def initialize_l2_interfaces(system: "System", env_vars: Dict[str, str | None]) 
 
     if config.host.os.enabled:
         components.extend(setup_host_os(system))
+    else:
+        system.context_registry.register_provider(
+            "host os", make_off_provider("HOST OS"), ContextSection.INTERFACES
+        )
 
     # ================================================================
     # TELEGRAM TELETHON
@@ -44,6 +59,10 @@ def initialize_l2_interfaces(system: "System", env_vars: Dict[str, str | None]) 
                 api_hash=env_vars.get("TELETHON_API_HASH"),
             )
         )
+    else:
+        system.context_registry.register_provider(
+            "telethon", make_off_provider("TELETHON"), ContextSection.INTERFACES
+        )
 
     # ================================================================
     # TELEGRAM AIOGRAM
@@ -56,6 +75,10 @@ def initialize_l2_interfaces(system: "System", env_vars: Dict[str, str | None]) 
                 bot_token=env_vars.get("AIOGRAM_BOT_TOKEN"),
             )
         )
+    else:
+        system.context_registry.register_provider(
+            "aiogram", make_off_provider("AIOGRAM"), ContextSection.INTERFACES
+        )
 
     # ================================================================
     # WEB SEARCH
@@ -63,6 +86,10 @@ def initialize_l2_interfaces(system: "System", env_vars: Dict[str, str | None]) 
 
     if config.web.search.enabled:
         components.extend(setup_web_search(system))
+    else:
+        system.context_registry.register_provider(
+            "web search", make_off_provider("WEB SEARCH"), ContextSection.INTERFACES
+        )
 
     # ================================================================
     # META
@@ -70,6 +97,10 @@ def initialize_l2_interfaces(system: "System", env_vars: Dict[str, str | None]) 
 
     if getattr(config, "meta", None) and config.meta.enabled:
         components.extend(setup_meta(system))
+    else:
+        system.context_registry.register_provider(
+            "meta", make_off_provider("META"), ContextSection.INTERFACES
+        )
 
     # ================================================================
     # MULTIMODALITY
@@ -77,6 +108,10 @@ def initialize_l2_interfaces(system: "System", env_vars: Dict[str, str | None]) 
 
     if getattr(config, "multimodality", None) and config.multimodality.enabled:
         components.extend(setup_multimodality(system))
+    else:
+        system.context_registry.register_provider(
+            "multimodality", make_off_provider("MULTIMODALITY"), ContextSection.INTERFACES
+        )
 
     # ================================================================
     # CALENDAR
@@ -84,6 +119,10 @@ def initialize_l2_interfaces(system: "System", env_vars: Dict[str, str | None]) 
 
     if getattr(config, "calendar", None) and config.calendar.enabled:
         components.extend(setup_calendar(system))
+    else:
+        system.context_registry.register_provider(
+            "calendar", make_off_provider("CALENDAR"), ContextSection.INTERFACES
+        )
 
     # ================================================================
 

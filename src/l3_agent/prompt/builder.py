@@ -15,44 +15,38 @@ class PromptBuilder:
         """
         Рекурсивно ищет, читает и склеивает все .md файлы в указанной подпапке.
         Игнорирует примеры (.example.md).
-
-        sub_folder: название папки в l3/agent/prompt/.
         """
-
         target_dir = self.prompt_dir / sub_folder
         if not target_dir.exists() or not target_dir.is_dir():
             return ""
 
-        parts = []
-        # Сортируем для предсказуемого порядка склейки
-        for file_path in sorted(target_dir.rglob("*.md")):
-            if file_path.name.endswith(".example.md"):
-                continue
+        valid_files = [
+            f for f in target_dir.rglob("*.md") if not f.name.endswith(".example.md")
+        ]
 
+        # Вводим весовые приоритеты, чтобы избежать алфавитной мешанины
+        def sort_key(path: Path):
+            name = path.name.upper()
+
+            # 0 - Базовые файлы (фундамент, всегда идут первыми)
+            if name in ("SOUL.md", "INSTRUCTIONS.md"):
+                return 0, name
+
+            # 2 - Примеры и жесткие схемы (всегда идут в самом конце)
+            elif name in ("EXAMPLES_OF_STYLE.md", "FUNCTION_CALL.md"):
+                return 2, name
+
+            else:
+                # 1 - Кастомные файлы пользователя (идут посередине по алфавиту)
+                return 1, name
+
+        valid_files.sort(key=sort_key)
+
+        parts = []
+        for file_path in valid_files:
             try:
                 parts.append(file_path.read_text(encoding="utf-8").strip())
             except Exception as e:
-                # Если файл битый или нет прав - падаем жестко
-                # Без промпта агент сойдет с ума
                 raise RuntimeError(f"Ошибка чтения файла промпта {file_path}: {e}")
 
         return "\n\n".join(parts)
-
-    def build(self) -> str:
-        """
-        Собирает итоговый системный промпт.
-        Порядок важен: Характер -> Инструкции -> Описание доступных функций.
-        """
-
-        # Сначала сканируем папку prompt/personality
-        personality = self._gather_markdown("personality")
-        # Далее - prompt/system
-        system_rules = self._gather_markdown("system")
-
-        return (
-            f"""
-{personality}
-
-{system_rules}
-"""
-        ).strip()

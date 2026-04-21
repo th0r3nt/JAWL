@@ -16,6 +16,7 @@ ENV_FILE = ROOT_DIR / ".env"
 ENV_EXAMPLE = ROOT_DIR / ".env.example"
 MAIN_SCRIPT = ROOT_DIR / "src" / "main.py"
 STOP_FILE = ROOT_DIR / "src" / "utils" / "local" / "data" / "agent.stop"
+PROMPTS_DIR = ROOT_DIR / "src" / "l3_agent" / "prompt" / "personality"
 
 
 def _is_agent_running() -> bool:
@@ -86,6 +87,28 @@ def _check_and_setup_env() -> bool:
         print_success("API ключ успешно сохранен в .env")
 
     return True
+def _check_and_setup_prompts() -> None:
+    """Проверяет наличие файлов промпта личности. Если их нет, создает из .example.md"""
+    if not PROMPTS_DIR.exists():
+        return
+
+    created_any = False
+    
+    for example_file in PROMPTS_DIR.rglob("*.example.md"):
+        # Формируем имя без .example (например: SOUL.example.md -> SOUL.md)
+        target_name = example_file.name.replace(".example.md", ".md")
+        target_file = example_file.with_name(target_name)
+
+        if not target_file.exists():
+            shutil.copy(example_file, target_file)
+            print_info(f"Создан базовый файл личности: {target_name}")
+            created_any = True
+            
+    if created_any:
+        print_info(
+            "Напоминание: вы можете полностью кастомизировать характер агента, редактируя эти файлы "
+            "или добавляя любые новые .md документы в папку src/l3_agent/prompt/personality/"
+        )
 
 
 def start_agent_screen() -> None:
@@ -95,6 +118,9 @@ def start_agent_screen() -> None:
         print_error("Агент уже запущен. Если он завис, сначала остановите его.")
         wait_for_enter()
         return
+
+    # Сначала проверяем промпты
+    _check_and_setup_prompts()
 
     if not _check_and_setup_env():
         wait_for_enter()
