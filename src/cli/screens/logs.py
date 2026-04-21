@@ -2,7 +2,7 @@ import time
 from pathlib import Path
 
 from rich.panel import Panel
-from src.cli.widgets.ui import console, print_error, print_info
+from src.cli.widgets.ui import console, print_error, print_info, clear_screen
 
 LOG_FILE = Path(__file__).resolve().parent.parent.parent.parent / "logs" / "system.log"
 
@@ -16,7 +16,7 @@ def logs_screen() -> None:
         input()
         return
 
-    console.clear()
+    clear_screen()
     console.print(
         Panel(
             "[bold green]Стриминг логов в реальном времени[/bold green]\n"

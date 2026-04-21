@@ -3,6 +3,7 @@ UI-виджеты для CLI.
 Инкапсулирует работу с rich для переиспользования по всему CLI.
 """
 
+import os
 from rich.console import Console
 from rich.panel import Panel
 from rich.text import Text
@@ -15,15 +16,20 @@ LOGO = """
      ██║ ██╔══██╗ ██║    ██║ ██║
      ██║ ███████║ ██║ █╗ ██║ ██║
 ██   ██║ ██╔══██║ ██║███╗██║ ██║
-╚█████╔╝ ██║  ██║ ╚███╔███╔╝ ███████╗
- ╚════╝  ╚═╝  ╚═╝  ╚══╝╚══╝  ╚══════╝
+  ╚█████╔╝ ██║  ██║ ╚███╔███╔╝ ███████╗
+   ╚════╝  ╚═╝  ╚═╝  ╚══╝╚══╝  ╚══════╝
          Just A While Loop
 """
 
 
+def clear_screen() -> None:
+    """Очистка консоли под любую ОС."""
+    os.system("cls" if os.name == "nt" else "clear")
+
+
 def draw_header(version: str = "v0.9.0") -> None:
     """Очищает экран и отрисовывает главный логотип JAWL в рамке."""
-    console.clear()
+    clear_screen()
     text = Text(LOGO, style="bold cyan", justify="center")
     panel = Panel(text, title="SYSTEM", subtitle=version, border_style="cyan")
     console.print(panel)
@@ -46,7 +52,7 @@ def print_info(msg: str) -> None:
 
 def wait_for_enter() -> None:
     """Ставит CLI на паузу, ожидая нажатия Enter от пользователя."""
-    console.print("\n[dim]Нажмите Enter для продолжения...[/dim]")
+    console.print("\n[dim]Нажмите Enter для продолжения.[/dim]")
     input()
 
 

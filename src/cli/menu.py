@@ -26,19 +26,20 @@ def main_menu() -> None:
             "Добро пожаловать в JAWL. Выберите действие:",
             choices=[
                 questionary.Choice("🚀 Запустить агента", "start"),
-                questionary.Choice("⏹️ Остановить агента", "stop"),
+                questionary.Choice("⏹️  Остановить агента", "stop"),
                 questionary.Choice("📋 Открыть логи", "logs"),
-                questionary.Choice("⚙️ Мастер настройки интерфейсов", "setup"),
+                questionary.Choice("⚙️  Мастер настройки интерфейсов", "setup"),
                 questionary.Choice("🧹 Полный сброс памяти", "reset"),
-                questionary.Separator(),
+                questionary.Separator(" "),  # Заменяем дефисы на пустую строку для воздуха
                 questionary.Choice("❌ Выход", "exit"),
             ],
             style=style,
-            instruction="(Используйте стрелочки ↑/↓ и Enter)",
+            qmark="",  # Убираем дефолтный знак вопроса '?' слева
+            instruction="\n(Используйте стрелочки ↑/↓ и Enter)",  # Переносим инструкцию на новую строку с отступом
         ).ask()
 
         if choice is None or choice == "exit":
-            print_info("Отключение пульта JAWL. До встречи!")
+            print_info("Отключение. До встречи.")
             sys.exit(0)
 
         # Маршрутизация
