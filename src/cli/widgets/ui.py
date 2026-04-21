@@ -3,9 +3,11 @@ import time
 import psutil
 import yaml
 from pathlib import Path
-from rich.console import Console
+
+from rich.console import Console, Group
 from rich.panel import Panel
 from rich.text import Text
+from rich.align import Align
 import questionary
 
 console = Console()
@@ -47,7 +49,6 @@ def _get_agent_status() -> dict:
                 process = psutil.Process(pid)
                 status["is_running"] = True
 
-                # Считаем аптайм от времени создания процесса ядром ОС
                 uptime_seconds = time.time() - process.create_time()
                 hours, remainder = divmod(int(uptime_seconds), 3600)
                 minutes, seconds = divmod(remainder, 60)
@@ -73,25 +74,33 @@ def draw_header(version: str = "v0.9.0") -> None:
 
     status = _get_agent_status()
 
-    # Собираем текст логотипа
-    text = Text(LOGO, style="bold cyan", justify="center")
-    text.append(f"Version: {version}\n\n", style="dim cyan")
+    # 1. Логотип (убираем лишние переносы по краям, чтобы не было дыр)
+    logo_text = Text(LOGO.strip("\n"), style="bold cyan")
 
-    # Добавляем плашку статуса
+    # 2. Версия (добавляем \n в конце для отступа перед статусом)
+    version_text = Text(f"Version: {version}\n", style="dim cyan")
+
+    # 3. Плашка статуса
+    status_text = Text()
     if status["is_running"]:
-        text.append("● ONLINE", style="bold green")
-        text.append(
-            f"  |  Uptime: {status['uptime']}  |  LLM Model: {status['model']}  |  Heartbeat: {status['interval']}s",
+        status_text.append("● ONLINE", style="bold green")
+        status_text.append(
+            f"  |  Uptime: {status['uptime']}  |  Model: {status['model']}  |  Heartbeat: {status['interval']}s",
             style="bold white",
         )
     else:
-        text.append("○ OFFLINE", style="bold red")
-        text.append(
+        status_text.append("○ OFFLINE", style="bold red")
+        status_text.append(
             f"  |  Model: {status['model']}  |  Heartbeat: {status['interval']}s",
             style="dim white",
         )
 
-    panel = Panel(text, border_style="cyan")
+    # Группируем и железобетонно выравниваем всё как независимые "коробки"
+    content = Group(
+        Align.center(logo_text), Align.center(version_text), Align.center(status_text)
+    )
+
+    panel = Panel(content, border_style="cyan")
     console.print(panel)
 
 
