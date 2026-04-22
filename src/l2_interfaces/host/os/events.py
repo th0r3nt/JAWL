@@ -396,7 +396,7 @@ class HostOSEvents:
                         )
                     else:
                         lines.append(
-                            f"{prefix}{extension}... [Скрыто для экономии контекста]"
+                            f"{prefix}{extension}... [Скрыто]"
                         )
         except Exception:
             pass

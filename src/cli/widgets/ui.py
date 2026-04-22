@@ -117,7 +117,7 @@ def draw_header(version: str = "v0.9.0") -> None:
 
 def print_success(msg: str) -> None:
     """Выводит сообщение об успехе."""
-    console.print(f"[bold green]✓ {msg}[/bold green]")
+    console.print(f"[bold green] ✓ {msg}[/bold green]")
 
 
 def print_error(msg: str) -> None:
