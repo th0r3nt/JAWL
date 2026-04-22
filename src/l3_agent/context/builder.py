@@ -40,7 +40,7 @@ class ContextBuilder:
 
         # blocks уже отсортированы по приоритетам
         # Просто склеиваем их с мощным отступом для чистоты Markdown
-        return "\n\n\n\n\n".join(blocks.values()).strip()
+        return "\n\n\n".join(blocks.values()).strip()
 
     # =================================================================
     # СЛУЖЕБНЫЕ МЕТОДЫ

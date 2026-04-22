@@ -39,7 +39,7 @@ class SQLTasks:
             await session.commit()
 
         msg = f"Задача создана. ID: {task_id}"
-        system_logger.info(f"[SQL DB] {msg}")
+        system_logger.debug(f"[SQL DB] {msg}")
         return SkillResult.ok(msg)
 
     async def get_tasks(self) -> SkillResult:
@@ -89,7 +89,7 @@ class SQLTasks:
             await session.commit()
 
         msg = f"Задача {task_id} обновлена."
-        system_logger.info(f"[SQL DB] {msg}")
+        system_logger.debug(f"[SQL DB] {msg}")
         return SkillResult.ok(msg)
 
     @skill()
@@ -103,7 +103,7 @@ class SQLTasks:
                 return SkillResult.fail(f"Задача с ID {task_id} не найдена.")
 
         msg = f"Задача {task_id} удалена."
-        system_logger.info(f"[SQL DB] {msg}")
+        system_logger.debug(f"[SQL DB] {msg}")
         return SkillResult.ok(msg)
 
     async def get_context_block(self, **kwargs) -> str:

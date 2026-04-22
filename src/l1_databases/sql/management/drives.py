@@ -115,7 +115,7 @@ class SQLDrives:
 
             await session.commit()
 
-        system_logger.info(f"[SQL DB] Дефицит драйва '{drive.name}' снижен на {amount}%.")
+        system_logger.debug(f"[SQL DB] Дефицит драйва '{drive.name}' снижен на {amount}%.")
         return SkillResult.ok(
             f"Дефицит драйва '{drive.name}' успешно снижен на {amount}%. Текущий остаток: {int(new_deficit)}/100"
         )
@@ -147,7 +147,7 @@ class SQLDrives:
             session.add(new_drive)
             await session.commit()
 
-        system_logger.info(f"[SQL DB] Создан кастомный драйв '{name}'.")
+        system_logger.debug(f"[SQL DB] Создан кастомный драйв '{name}'.")
         return SkillResult.ok(f"Кастомный драйв '{name}' успешно создан.")
 
     @skill()
@@ -171,7 +171,7 @@ class SQLDrives:
             await session.delete(drive)
             await session.commit()
 
-        system_logger.info(f"[SQL DB] Удален кастомный драйв '{drive_name}'.")
+        system_logger.debug(f"[SQL DB] Удален кастомный драйв '{drive_name}'.")
         return SkillResult.ok(f"Драйв '{drive_name}' удален.")
 
     async def get_context_block(self, **kwargs) -> str:

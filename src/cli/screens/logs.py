@@ -28,13 +28,15 @@ PREFIX_COLORS = {
     "[System]": "bright_white",
 }
 
+# Инициализируем глобальную переменную до её использования
+_current_log_color = ""
+
 
 def _colorize_log_line(line: str) -> Text:
     """
     Раскрашивает чистую текстовую строку лога на лету.
     Запоминает последний цвет, чтобы корректно красить многострочные логи.
     """
-
     global _current_log_color
 
     clean_line = line.rstrip("\n")

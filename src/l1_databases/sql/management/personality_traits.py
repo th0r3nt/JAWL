@@ -45,7 +45,6 @@ class SQLPersonalityTraits:
             await session.commit()
 
         msg = f"Черта личности '{name}' успешно добавлена. ID: {trait_id}"
-        system_logger.info(f"[SQL DB] {msg}")
         return SkillResult.ok(msg)
 
     async def get_traits(self) -> SkillResult:

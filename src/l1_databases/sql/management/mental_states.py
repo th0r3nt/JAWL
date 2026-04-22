@@ -67,7 +67,7 @@ class SQLMentalStates:
             await session.commit()
 
         msg = f"MentalState для '{name}' успешно создан. ID: {state_id}"
-        system_logger.info(f"[SQL DB] {msg}")
+        system_logger.debug(f"[SQL DB] {msg}")
         return SkillResult.ok(msg)
 
     async def get_mental_states(self) -> SkillResult:
@@ -157,7 +157,7 @@ class SQLMentalStates:
             await session.commit()
 
         msg = f"MentalState '{state.name}' (ID: {state_id}) обновлен."
-        system_logger.info(f"[SQL DB] {msg}")
+        system_logger.debug(f"[SQL DB] {msg}")
         return SkillResult.ok(msg)
 
     @skill()
@@ -174,7 +174,7 @@ class SQLMentalStates:
                 return SkillResult.fail(f"MentalState с ID {state_id} не найден.")
 
         msg = f"MentalState с ID {state_id} удален."
-        system_logger.info(f"[SQL DB] {msg}")
+        system_logger.debug(f"[SQL DB] {msg}")
         return SkillResult.ok(msg)
 
     async def get_context_block(self, **kwargs) -> str:

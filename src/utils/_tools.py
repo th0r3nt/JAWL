@@ -44,12 +44,14 @@ def parse_int_or_str(value: Union[int, str]) -> Union[int, str]:
 
 
 def truncate_text(
-    text: str, max_chars: int, suffix: str = "... [Вывод обрезан. Превышен лимит символов] ..."
+    text: str,
+    max_chars: int,
+    suffix: str = "\n... [Вывод обрезан. Превышен лимит символов] ...",
 ) -> str:
     """Универсальная защита контекста от переполнения огромными текстами."""
 
     if len(text) > max_chars:
-        return text[:max_chars] + f"\n{suffix}"
+        return text[:max_chars] + suffix
     return text
 
 
