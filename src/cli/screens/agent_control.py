@@ -218,7 +218,7 @@ def stop_agent_screen() -> None:
             time.sleep(1)
 
         if is_dead:
-            print_success("Агент успешно и безопасно остановлен.")
+            print_success("Агент успешно остановлен.")
         else:
             print_error(
                 f"Агент не ответил за {timeout} секунд. Принудительное убийство (SIGKILL)."
