@@ -18,7 +18,6 @@ system:
     similarity_threshold: 0.55 # Косинусное расстояние: 1.0 - абсолютное совпадение, а 0.0 - полное отсутствие связи
 
     # Локальная модель для генерации эмбеддингов (поддерживаются любые модели FastEmbed). 
-    # Можно поставить любую поддерживаемую, например: intfloat/multilingual-e5-small или BAAI/bge-m3
     # Важно: при смене модели обязательно измените vector_size под её размерность и удалите папку базы (src/utils/local/data/vector_db), чтобы она пересоздалась с новым размером векторов
     embedding_model: "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2" # Можно поставить любую
     vector_size: 384

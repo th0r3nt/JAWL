@@ -7,7 +7,7 @@ host:
     # 1 - OBSERVER  (Read для всего кода фреймворка, Write только в sandbox/)
     # 2 - OPERATOR  (Read всей ОС, управление процессами, Write только для файлов фреймворка)
     # 3 - ROOT      (Полный доступ: Read/Write всей системы и управление процессами)
-    access_level: 1
+    access_level: 0
     env_access: false # Если false - запрещает агенту читать и изменять файлы *.env во избежание слива ключей
 
     # Лимиты и таймауты
@@ -23,7 +23,7 @@ telegram:
   telethon:
     enabled: false # Перед включением введите TELETHON_API_ID и TELETHON_API_HASH в .env
     session_name: "agent_telethon" # Находится в src/utils/local/data/telethon/
-    private_chat_history_limit: 0 # В Telethon State будут видны последние n сообщений, если это личный чат (поставить 0, если не нужно)
+    private_chat_history_limit: 0 # В контексте Telethon State всегда будут видны последние n сообщений для последних личных чатов (поставить 0, если не нужно)
 
   aiogram:
     enabled: false # Перед включением введите AIOGRAM_BOT_TOKEN в .env
