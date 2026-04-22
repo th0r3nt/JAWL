@@ -28,7 +28,7 @@ class HostConfig(BaseModel):
 class TelethonConfig(BaseModel):
     enabled: bool
     session_name: str
-    private_chat_history_limit: int = 3 
+    private_chat_history_limit: int = 3
     # TODO: добавить больше параметров для изменения
 
 
@@ -173,13 +173,17 @@ class SettingsConfig(BaseModel):
 
 
 def load_yaml(file_path: Path) -> dict:
-    """Безопасно читает YAML файл и возвращает словарь."""
-
+    """Безопасно читает YAML файл и возвращает словарь с автофикс-кодировкой."""
     if not file_path.exists():
         raise FileNotFoundError(f"Конфигурационный файл не найден: {file_path}")
-    
-    with open(file_path, "r", encoding="utf-8") as f:
-        return yaml.safe_load(f) or {}
+
+    try:
+        with open(file_path, "r", encoding="utf-8") as f:
+            return yaml.safe_load(f) or {}
+    except UnicodeDecodeError:
+        # Лечим сломанную кодировку
+        with open(file_path, "r", encoding="cp1251") as f:
+            return yaml.safe_load(f) or {}
 
 
 def load_config() -> tuple[SettingsConfig, InterfacesConfig]:

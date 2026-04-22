@@ -47,19 +47,36 @@ def _check_and_setup_env() -> bool:
 
     if not ENV_FILE.exists():
         if ENV_EXAMPLE.exists():
-            shutil.copy(ENV_EXAMPLE, ENV_FILE)
+            # Автовосстановление кодировки при копировании
+            try:
+                with open(ENV_EXAMPLE, "r", encoding="utf-8") as f:
+                    content = f.read()
+            except UnicodeDecodeError:
+                with open(ENV_EXAMPLE, "r", encoding="cp1251") as f:
+                    content = f.read()
+
+            with open(ENV_FILE, "w", encoding="utf-8") as f:
+                f.write(content)
             print_info(" Создан базовый файл .env из .env.example")
         else:
             print_error("Не найден ни .env, ни .env.example.")
             return False
 
-    with open(ENV_FILE, "r", encoding="utf-8") as f:
-        env_content = f.readlines()
+    # Магия защиты от блокнота Windows
+    try:
+        with open(ENV_FILE, "r", encoding="utf-8") as f:
+            env_content = f.readlines()
+    except UnicodeDecodeError:
+        # Юзер сохранил файл в ANSI. Читаем и сразу лечим, перезаписывая в UTF-8
+        with open(ENV_FILE, "r", encoding="cp1251") as f:
+            env_content = f.readlines()
+        with open(ENV_FILE, "w", encoding="utf-8") as f:
+            f.writelines(env_content)
 
     # Проверяем, заполнен ли LLM_API_KEY_1
     key_found = False
     for line in env_content:
-        if line.startswith("LLM_API_KEY_1=") and len(line.strip()) > 10:
+        if line.startswith("LLM_API_KEY_1=") and len(line.strip()) > 14:
             key_found = True
             break
 
@@ -73,7 +90,6 @@ def _check_and_setup_env() -> bool:
             print_error("Запуск отменен: API ключ обязателен для работы агента.")
             return False
 
-        # Перезаписываем .env с новым ключом
         new_content = []
         for line in env_content:
             if line.startswith("LLM_API_KEY_1="):
@@ -87,6 +103,8 @@ def _check_and_setup_env() -> bool:
         print_success("API ключ успешно сохранен в .env")
 
     return True
+
+
 def _check_and_setup_prompts() -> None:
     """Проверяет наличие файлов промпта личности. Если их нет, создает из .example.md"""
     if not PROMPTS_DIR.exists():
@@ -103,7 +121,7 @@ def _check_and_setup_prompts() -> None:
             shutil.copy(example_file, target_file)
             print_info(f" Создан базовый файл личности: {target_name}")
             created_any = True
-            
+
     if created_any:
         print_info(
             " Напоминание: вы можете полностью кастомизировать характер агента, редактируя эти файлы "

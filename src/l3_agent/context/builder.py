@@ -117,23 +117,25 @@ class ContextBuilder:
         if event_time and level:
             header = f"[{event_time}] [{level}] {header}"
 
-        # Выделяем важные поля, остальное в список
-        msg = payload.get("message", "No message content")
-        sender = payload.get("sender_name", "Unknown")
-        history = payload.get("recent_history", "")
+        # Если это пустой HEARTBEAT (нет внешних триггеров) - даем пинок к проактивности
+        if event_name == "HEARTBEAT" and not payload:
+            return f"{header}\n(Внешних триггеров нет. Ожидаются проактивные действия)"
 
-        # Собираем доп. поля (chat_id, msg_id и т.д.), исключая уже обработанные
-        other_meta = [
-            f"* {k}: {v}"
-            for k, v in payload.items()
-            if k not in ["message", "sender_name", "recent_history"]
-        ]
-        meta_str = "\n".join(other_meta)
+        lines = [header]
 
-        block = f"{header}\nSender: {sender}\nMessage: {msg}"
-        if meta_str:
-            block += f"\n{meta_str}"
-        if history:
-            block += f"\n\n#### Recent Chat History:\n{history}"
+        # Выводим Sender и Message ТОЛЬКО если они реально переданы в событии
+        if "sender_name" in payload:
+            lines.append(f"Sender: {payload['sender_name']}")
+        if "message" in payload:
+            lines.append(f"Message: {payload['message']}")
 
-        return block
+        # Собираем доп. метаданные (chat_id, msg_id, filepath и т.д.)
+        for k, v in payload.items():
+            if k not in ["message", "sender_name", "recent_history"]:
+                lines.append(f"* {k}: {v}")
+
+        # История чата (если есть) всегда идет в конце блока
+        if "recent_history" in payload and payload["recent_history"]:
+            lines.append(f"\n#### Recent Chat History:\n{payload['recent_history']}")
+
+        return "\n".join(lines)
