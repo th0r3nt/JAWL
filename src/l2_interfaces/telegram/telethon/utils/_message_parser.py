@@ -4,10 +4,6 @@ from telethon import utils
 from src.utils.dtime import format_datetime
 from src.utils._tools import truncate_text
 
-# TODO: может, перенести этот файл в отдельную папку telethon/utils/?
-# Сейчас он в корне telethon/, моя тонкая душевная организация перфекциониста недовольна
-
-
 class TelethonMessageParser:
     """Утилита для глубокого парсинга сообщений Telethon (реакции, реплаи, медиа, кнопки)."""
 
