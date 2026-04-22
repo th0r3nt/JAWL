@@ -109,7 +109,10 @@ class System:
         )
         self.os_state = HostOSState()
         self.terminal_state = HostTerminalState(number_of_last_messages=15)
-        self.telethon_state = TelethonState(number_of_last_chats=15)
+        self.telethon_state = TelethonState(
+            number_of_last_chats=15,
+            private_chat_history_limit=self.interfaces_config.telegram.telethon.private_chat_history_limit,
+        )
         self.aiogram_state = AiogramState(number_of_last_chats=15)
         self.web_search_state = WebSearchState(history_limit=10)
         self.calendar_state = CalendarState()
@@ -266,6 +269,7 @@ class System:
             context_builder=context_builder,
             agent_state=self.agent_state,
             sql_ticks=self.sql.ticks,
+            vector_manager=self.vector,
             token_tracker=token_tracker,
             tools=ACTION_SCHEMA,
         )

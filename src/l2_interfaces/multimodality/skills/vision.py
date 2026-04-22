@@ -28,7 +28,7 @@ class VisionSkills:
             # Возвращаем системный маркер
             marker = f"[IMAGE_REQUEST: {safe_path.resolve()}]"
             return SkillResult.ok(
-                f"{marker} Изображение будет добавлено в контекст на следующем шаге."
+                f"{marker} Изображение добавлено в контекст."
             )
 
         except PermissionError as e:

@@ -13,7 +13,9 @@ from src.utils.logger import system_logger
 from src.utils.token_tracker import TokenTracker
 
 from src.l0_state.agent.state import AgentState, AgentStatus
+
 from src.l1_databases.sql.management.ticks import SQLTicks
+from src.l1_databases.vector.manager import VectorManager
 
 from src.l3_agent.llm.client import LLMClient
 from src.l3_agent.prompt.builder import PromptBuilder
@@ -37,6 +39,7 @@ class ReactLoop:
         context_builder: ContextBuilder,
         agent_state: AgentState,
         sql_ticks: SQLTicks,
+        vector_manager: VectorManager,
         token_tracker: TokenTracker,
         tools: list,
         cooldown_sec: int = 30,
@@ -46,17 +49,12 @@ class ReactLoop:
         self.context_builder = context_builder
         self.agent_state = agent_state
         self.sql_ticks = sql_ticks
+        self.vector_manager = vector_manager
         self.tracker = token_tracker
         self.tools = tools
         self.cooldown_sec = cooldown_sec
 
         self.current_events: list[str] = []  # Хранилище событий для текущего цикла
-
-    def add_realtime_event(self, event_str: str):
-        """
-        Добавляет входящее событие в контекст в том случае, если агент уже думает.
-        """
-        self.current_events.append(event_str)
 
     async def run(self, event_name: str, payload: Dict[str, Any], missed_events: list[str]):
         """
@@ -68,6 +66,8 @@ class ReactLoop:
 
         # Очищаем кэш тиков перед стартом
         self.sql_ticks.clear_session_cache()
+        self.vector_manager.knowledge.clear_session_cache()
+        self.vector_manager.thoughts.clear_session_cache()
 
         try:
             self.agent_state.reset_step()
@@ -194,13 +194,11 @@ class ReactLoop:
                     step += 1
                     continue
 
-                _thoughts = " ".join(parsed_response.thoughts.split())
-                
-                thoughts = _thoughts.replace("\n", " \\n ")
+                thoughts = parsed_response.thoughts.strip()
                 actions = parsed_response.actions
 
                 if thoughts:
-                    system_logger.info(f"[Thoughts]: {thoughts}")
+                    system_logger.info(f"\n[Thoughts]:\n{thoughts}\n")
 
                 if not actions:
                     system_logger.info(
@@ -255,6 +253,11 @@ class ReactLoop:
             # Обязательно сбрасываем кэш при любом исходе
             self.sql_ticks.clear_session_cache()
             self.agent_state.update_state(AgentStatus.IDLE)
+
+    def add_realtime_event(self, event_str: str):
+        """Добавляет входящее событие в контекст в том случае, если агент уже думает."""
+
+        self.current_events.append(event_str)
 
     # ============================================================================
     # СЛУЖЕБНЫЕ МЕТОДЫ

@@ -19,6 +19,23 @@ async def test_admin_create_channel(mock_tg_client):
 
 
 @pytest.mark.asyncio
+async def test_admin_set_channel_username(mock_tg_client):
+    """Тест: изменение юзернейма канала (публичный/приватный)."""
+    skills = TelethonAdmin(mock_tg_client)
+    mock_tg_client.client().side_effect = AsyncMock()
+
+    # Делаем публичным
+    res_public = await skills.set_channel_username(chat_id=-100500, username="lazy_exe")
+    assert res_public.is_success is True
+    assert "t.me/lazy_exe" in res_public.message
+
+    # Делаем приватным
+    res_private = await skills.set_channel_username(chat_id=-100500, username="")
+    assert res_private.is_success is True
+    assert "канал стал приватным" in res_private.message
+
+
+@pytest.mark.asyncio
 async def test_admin_pin_message(mock_tg_client):
     skills = TelethonAdmin(mock_tg_client)
     res = await skills.pin_message(chat_id=12345, message_id=42, notify=True)

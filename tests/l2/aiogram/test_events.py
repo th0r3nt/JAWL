@@ -15,6 +15,7 @@ def create_mock_message(chat_id, chat_type, text, from_user_name="John"):
     msg.from_user.first_name = from_user_name
     msg.from_user.id = 999
 
+    msg.message_id = 42
     msg.text = text
     msg.caption = None
     msg.reply_to_message = None
@@ -50,6 +51,7 @@ async def test_on_private_message(aiogram_events, mock_bus):
         message="Привет",
         sender_name="Alex",
         chat_id=12345,
+        msg_id=42,
     )
 
 
@@ -65,6 +67,7 @@ async def test_on_group_message_mention(aiogram_events, mock_bus):
         message="Эй @test_bot, ответь",
         sender_name="Bob",
         chat_id=200,
+        msg_id=42,
     )
 
 
@@ -80,4 +83,5 @@ async def test_on_group_message_background(aiogram_events, mock_bus):
         message="Обычный текст",
         sender_name="Bob",
         chat_id=200,
+        msg_id=42,
     )

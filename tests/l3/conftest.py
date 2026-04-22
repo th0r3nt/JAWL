@@ -5,8 +5,6 @@ from src.l0_state.agent.state import AgentState
 
 @pytest.fixture
 def mock_openai_response():
-    """Фабрика для создания фейковых ответов от OpenAI API."""
-
     def _create(arguments_json: str, finish_reason: str = "tool_calls"):
         response = MagicMock()
         message = MagicMock()
@@ -29,7 +27,6 @@ def mock_openai_response():
 
 @pytest.fixture
 def mock_dependencies():
-    """Создает безопасные заглушки для всех зависимостей ReactLoop."""
     llm_client = MagicMock()
     llm_client.rotator = MagicMock()
 
@@ -44,11 +41,12 @@ def mock_dependencies():
     sql_ticks = MagicMock()
     sql_ticks.save_tick = AsyncMock()
 
+    vector_manager = MagicMock()
+    vector_manager.knowledge.clear_session_cache = MagicMock()
+    vector_manager.thoughts.clear_session_cache = MagicMock()
+
     token_tracker = MagicMock()
-
-    # Фейковая схема
     tools = [{"type": "function", "function": {"name": "execute_skill"}}]
-
     cooldown_sec = 0.2
 
     return {
@@ -57,6 +55,7 @@ def mock_dependencies():
         "context_builder": context_builder,
         "agent_state": agent_state,
         "sql_ticks": sql_ticks,
+        "vector_manager": vector_manager,
         "token_tracker": token_tracker,
         "tools": tools,
         "cooldown_sec": cooldown_sec,

@@ -1,6 +1,6 @@
 import uuid
 from typing import TYPE_CHECKING
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from sqlalchemy import select, func
 
 from src.l3_agent.skills.registry import skill, SkillResult
@@ -41,11 +41,11 @@ class SQLDrives:
             },
             {
                 "name": "Social",
-                "description": "Потребность в коммуникации. Направлена на обработку входящих запросов, поддержание активного статуса в каналах связи и проактивную инициализацию диалога для получения полезных социальных связей.",
+                "description": "Потребность в коммуникации. Направлена на обработку входящих запросов, поддержание активного статуса в каналах связи и проактивную инициализацию диалога.",
             },
             {
                 "name": "Mastery",
-                "description": "Стремление к эффективности и порядку. Требует продвижения по долгосрочным задачам (TASKS), структурирования накопленных данных и проведения диагностики.",
+                "description": "Стремление к эффективности и порядку. Требует продвижения по долгосрочным задачам (TASKS), структурирования данных и диагностики.",
             },
         ]
 
@@ -68,15 +68,18 @@ class SQLDrives:
             await session.commit()
 
     @skill()
-    async def satisfy_drive(self, drive_name: str, reflection_summary: str) -> SkillResult:
+    async def satisfy_drive(
+        self, drive_name: str, amount: int, reflection_summary: str
+    ) -> SkillResult:
         """
-        Сбрасывает дефицит мотиватора до 0%.
-        Внимание: Вызывать строго вместе с фактическим действием, которое удовлетворяет этот драйв.
+        Снижает показатель дефицита мотиватора на указанную величину.
+        amount: от 1 до 100 (на сколько процентов закрыта потребность).
         reflection_summary: описание того, как именно была удовлетворена мотивация.
         """
 
+        amount = max(1, min(100, amount))
+
         async with self.db.session_factory() as session:
-            # Забираем все драйвы и ищем нужный на стороне Python (обход бага SQLite с кириллицей)
             result = await session.execute(select(DriveTable))
             drives = result.scalars().all()
 
@@ -85,10 +88,26 @@ class SQLDrives:
             if not drive:
                 return SkillResult.fail(f"Драйв '{drive_name}' не найден.")
 
-            drive.last_satisfied_at = datetime.now(timezone.utc)
+            now = datetime.now(timezone.utc)
+            last_sat = (
+                drive.last_satisfied_at.replace(tzinfo=timezone.utc)
+                if drive.last_satisfied_at.tzinfo is None
+                else drive.last_satisfied_at
+            )
 
-            time_str = format_datetime(drive.last_satisfied_at, self.tz_offset, "%m-%d %H:%M")
-            entry = f"[{time_str}] {reflection_summary}"
+            # Высчитываем текущий дефицит
+            intervals_passed = (now - last_sat).total_seconds() / self.decay_interval_sec
+            current_deficit = min(100.0, intervals_passed * drive.decay_rate)
+
+            # Считаем новый дефицит после удовлетворения
+            new_deficit = max(0.0, current_deficit - amount)
+
+            # Высчитываем время, когда дефицит был бы равен new_deficit
+            seconds_ago = (new_deficit / drive.decay_rate) * self.decay_interval_sec
+            drive.last_satisfied_at = now - timedelta(seconds=seconds_ago)
+
+            time_str = format_datetime(now, self.tz_offset, "%m-%d %H:%M")
+            entry = f"[{time_str}] Снижен на {amount}%: {reflection_summary}"
 
             current_refs = list(drive.recent_reflections)
             current_refs.insert(0, entry)
@@ -96,8 +115,10 @@ class SQLDrives:
 
             await session.commit()
 
-        system_logger.info(f"[SQL DB] Дефицит драйва '{drive.name}' сброшен.")
-        return SkillResult.ok(f"Дефицит драйва '{drive.name}' успешно сброшен до 0%.")
+        system_logger.info(f"[SQL DB] Дефицит драйва '{drive.name}' снижен на {amount}%.")
+        return SkillResult.ok(
+            f"Дефицит драйва '{drive.name}' успешно снижен на {amount}%. Текущий остаток: {int(new_deficit)}/100"
+        )
 
     @skill()
     async def create_custom_drive(
@@ -134,7 +155,6 @@ class SQLDrives:
         """Удаляет созданную кастомную потребность."""
 
         async with self.db.session_factory() as session:
-            # Забираем все драйвы и ищем нужный на стороне Python
             result = await session.execute(select(DriveTable))
             drives = result.scalars().all()
 
@@ -155,7 +175,7 @@ class SQLDrives:
         return SkillResult.ok(f"Драйв '{drive_name}' удален.")
 
     async def get_context_block(self, **kwargs) -> str:
-        """Считает дефицит на лету и отдает блок контекста с подробным объяснением механики."""
+        """Считает дефицит на лету и отдает блок контекста."""
 
         async with self.db.session_factory() as session:
             result = await session.execute(select(DriveTable))
@@ -164,7 +184,6 @@ class SQLDrives:
         if not drives:
             return ""
 
-        # Добавляем агенту понимание механики роста дефицита прямо в контекст
         lines = [
             "## DRIVES \nДолгосрочные векторы поведения. Рекомендуется снижать дефицит, когда он высокий.",
             f"Длительность 1 интервала: {self.decay_interval_sec} сек.",
@@ -173,7 +192,6 @@ class SQLDrives:
         now = datetime.now(timezone.utc)
 
         for d in drives:
-            # Считаем дефицит на лету
             last_sat = (
                 d.last_satisfied_at.replace(tzinfo=timezone.utc)
                 if d.last_satisfied_at.tzinfo is None
@@ -184,18 +202,17 @@ class SQLDrives:
             deficit = min(100.0, intervals_passed * d.decay_rate)
             deficit_int = int(deficit)
 
-            # Более детализированный контекст
             if deficit_int >= 90:
-                status = "(Очень высокий: рекомендуется принять меры для удовлетворения потребности)"
+                status = "(Критический дефицит: приоритетная задача)"
 
             elif deficit_int >= 70:
-                status = "(Высокий: требует внимания в ближайшее время)"
+                status = "(Высокий: требует внимания)"
 
             elif deficit_int >= 50:
-                status = "(Растет: рекомендуется запланировать действия по снижению дефицита)"
-                
+                status = "(Растет: рекомендуется запланировать действия)"
+
             elif deficit_int >= 30:
-                status = "(Лёгкий дефицит: не критично, можно отложить)"
+                status = "(Лёгкий дефицит: не критично)"
 
             else:
                 status = "(В норме: потребность удовлетворена)"

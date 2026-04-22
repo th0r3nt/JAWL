@@ -26,10 +26,12 @@ class TelethonState:
     Обновляется слушателями (telethon/events.py) в фоне.
     """
 
-    def __init__(self, number_of_last_chats: int = 15):
+    def __init__(self, number_of_last_chats: int = 15, private_chat_history_limit: int = 3):
         self.is_online = False
 
         self.number_of_last_chats = number_of_last_chats  # Количество хранимых последних чатов
+
+        self.private_chat_history_limit = private_chat_history_limit
 
         # Хранилище последних чатов
         self.last_chats = ""

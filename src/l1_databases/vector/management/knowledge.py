@@ -5,6 +5,7 @@ from qdrant_client import models
 
 from src.utils.dtime import safe_format_timestamp
 from src.utils.logger import system_logger
+from src.utils._tools import truncate_text
 
 from src.l3_agent.skills.registry import skill, SkillResult
 
@@ -14,11 +15,6 @@ if TYPE_CHECKING:
 
 
 class VectorKnowledge:
-    """
-    CRUD-функции для взаимодействия с коллекцией знаний агента.
-    Здесь хранится неструктурированная информация (статьи, документация, факты из интернета).
-    """
-
     def __init__(
         self,
         db: "VectorDB",
@@ -33,6 +29,12 @@ class VectorKnowledge:
         self.similarity_threshold = similarity_threshold
         self.timezone = timezone
 
+        self.session_ignored_ids = set()
+
+    def clear_session_cache(self):
+        """Очищает игнор-лист текущего ReAct-цикла."""
+        self.session_ignored_ids.clear()
+
     @skill()
     async def save_knowledge(self, knowledge_text: str) -> SkillResult:
         """Сохраняет фрагмент знаний."""
@@ -44,7 +46,6 @@ class VectorKnowledge:
             vector = await self.embedding_model.get_embedding(knowledge_text)
             point_id = str(uuid.uuid4())
 
-            # Сохраняем только текст и системное время
             payload = {"text": knowledge_text, "created_at": time.time()}
 
             await self.db.client.upsert(
@@ -52,8 +53,9 @@ class VectorKnowledge:
                 points=[models.PointStruct(id=point_id, vector=vector, payload=payload)],
             )
 
+            self.session_ignored_ids.add(point_id)
+
             msg = f"[Vector DB] Знание успешно сохранено в базе данных (ID: {point_id})."
-            # system_logger.info(msg) # Видно в Agent Action Result
             return SkillResult.ok(msg)
 
         except Exception as e:
@@ -61,19 +63,26 @@ class VectorKnowledge:
             system_logger.error(msg)
             return SkillResult.fail(msg)
 
+
     @skill()
     async def search_knowledge(self, query: str, limit: int = 5) -> SkillResult:
         """Семантический поиск информации из базы данных."""
 
         try:
-            # safe_query = query.replace("\n", " ").replace("\r", "")
             query_vector = await self.embedding_model.get_embedding(query)
+
+            query_filter = None
+            if self.session_ignored_ids:
+                query_filter = models.Filter(
+                    must_not=[models.HasIdCondition(has_id=list(self.session_ignored_ids))]
+                )
 
             search_result = await self.db.client.query_points(
                 collection_name=self.collection.name,
                 query=query_vector,
                 limit=limit,
                 score_threshold=self.similarity_threshold,
+                query_filter=query_filter,
                 with_payload=True,
             )
 
@@ -86,9 +95,11 @@ class VectorKnowledge:
                 system_logger.debug(msg)
                 return SkillResult.ok(msg)
 
-            # system_logger.info(
-            #     f"[Vector DB] База знаний вернула {len(points)} фрагментов по запросу '{safe_query}'."
-            # )
+            # Обрезаем запрос до 200 символов, чтобы не спамить в логи
+            short_query = truncate_text(query.replace("\n", " "), 200, "... [Обрезано]")
+            system_logger.info(
+                f"[Vector DB] Знания: найдено {len(points)} записей по запросу '{short_query}'"
+            )
 
             formatted_results = []
             for point in points:
@@ -102,13 +113,14 @@ class VectorKnowledge:
             return SkillResult.ok("\n\n".join(formatted_results))
 
         except Exception as e:
-            msg = f"[Vector DB] Ошибка при поиске знаний в базе данных: {e}"
+            msg = f"[Vector DB] Ошибка при поиске знаний: {e}"
             system_logger.error(msg)
             return SkillResult.fail(msg)
 
     @skill()
     async def delete_knowledge(self, point_id: str) -> SkillResult:
         """Удаляет фрагмент знаний по ID."""
+
         try:
             await self.db.client.delete(
                 collection_name=self.collection.name,
@@ -118,17 +130,25 @@ class VectorKnowledge:
             system_logger.debug(msg)
             return SkillResult.ok(msg)
         except Exception as e:
-            msg = f"[Vector DB] Ошибка при удалении знания из базы данных: {e}"
+            msg = f"[Vector DB] Ошибка при удалении знания: {e}"
             system_logger.error(msg)
             return SkillResult.fail(msg)
 
     @skill()
     async def get_all_knowledge(self, limit: int = 10) -> SkillResult:
         """Получает последние n записей из базы знаний (без семантического поиска)."""
+
         try:
+            scroll_filter = None
+            if self.session_ignored_ids:
+                scroll_filter = models.Filter(
+                    must_not=[models.HasIdCondition(has_id=list(self.session_ignored_ids))]
+                )
+
             records, _ = await self.db.client.scroll(
                 collection_name=self.collection.name,
                 limit=limit,
+                scroll_filter=scroll_filter,
                 with_payload=True,
                 with_vectors=False,
             )
@@ -138,14 +158,12 @@ class VectorKnowledge:
                 system_logger.debug(msg)
                 return SkillResult.ok(msg)
 
-            system_logger.debug(
-                f"[Vector DB] База данных выгрузила {len(records)} фрагментов знаний (чтение)."
-            )
-
             formatted_results = []
             for point in records:
                 text = point.payload.get("text", "")
-                time_str = safe_format_timestamp(point.payload.get("created_at"), self.timezone)
+                time_str = safe_format_timestamp(
+                    point.payload.get("created_at"), self.timezone
+                )
 
                 md_block = f"[ID: `{point.id}`] [Время: {time_str}]\n{text}"
                 formatted_results.append(md_block)
@@ -153,6 +171,6 @@ class VectorKnowledge:
             return SkillResult.ok("\n\n".join(formatted_results))
 
         except Exception as e:
-            msg = f"[Vector DB] Ошибка при чтении базы знаний из базы данных: {e}"
+            msg = f"[Vector DB] Ошибка при чтении базы знаний: {e}"
             system_logger.error(msg)
             return SkillResult.fail(msg)

@@ -5,6 +5,7 @@ from qdrant_client import models
 
 from src.utils.dtime import safe_format_timestamp
 from src.utils.logger import system_logger
+from src.utils._tools import truncate_text  # <--- Добавили
 
 from src.l3_agent.skills.registry import skill, SkillResult
 
@@ -14,11 +15,6 @@ if TYPE_CHECKING:
 
 
 class VectorThoughts:
-    """
-    CRUD-функции для взаимодействия с коллекцией мыслей агента.
-    Рефлексия, мысли и консолидация.
-    """
-
     def __init__(
         self,
         db: "VectorDB",
@@ -32,6 +28,12 @@ class VectorThoughts:
         self.embedding_model = embedding_model
         self.similarity_threshold = similarity_threshold
         self.timezone = timezone
+
+        self.session_ignored_ids = set()
+
+    def clear_session_cache(self):
+        """Очищает игнор-лист текущего ReAct-цикла."""
+        self.session_ignored_ids.clear()
 
     @skill()
     async def save_thought(self, thought_text: str) -> SkillResult:
@@ -48,27 +50,36 @@ class VectorThoughts:
                 points=[models.PointStruct(id=point_id, vector=vector, payload=payload)],
             )
 
+            self.session_ignored_ids.add(point_id)  # <--- Прячем от самого себя
+
             msg = f"[Vector DB] Мысль успешно сохранена в базу данных (ID: {point_id})."
             system_logger.info(msg)
             return SkillResult.ok(msg)
 
         except Exception as e:
-            msg = f"[Vector DB] Ошибка при сохранении мысли в базу данных: {e}"
+            msg = f"[Vector DB] Ошибка при сохранении мысли: {e}"
             system_logger.error(msg)
             return SkillResult.fail(msg)
 
     @skill()
     async def search_thoughts(self, query: str, limit: int = 5) -> SkillResult:
         """Семантический поиск мыслей из базы данных."""
+
         try:
-            safe_query = query.replace("\n", " ").replace("\r", "")
             query_vector = await self.embedding_model.get_embedding(query)
+
+            query_filter = None
+            if self.session_ignored_ids:
+                query_filter = models.Filter(
+                    must_not=[models.HasIdCondition(has_id=list(self.session_ignored_ids))]
+                )
 
             search_result = await self.db.client.query_points(
                 collection_name=self.collection.name,
                 query=query_vector,
                 limit=limit,
                 score_threshold=self.similarity_threshold,
+                query_filter=query_filter,
                 with_payload=True,
             )
 
@@ -77,12 +88,13 @@ class VectorThoughts:
             )
 
             if not points:
-                msg = f"[Vector DB] Поиск мыслей в базе данных по запросу '{safe_query}' не дал результатов."
+                msg = "[Vector DB] Поиск мыслей не дал результатов."
                 system_logger.debug(msg)
                 return SkillResult.ok(msg)
 
+            short_query = truncate_text(query.replace("\n", " "), 200, "... [Обрезано]")
             system_logger.info(
-                f"[Vector DB] База данных вернула {len(points)} мыслей по запросу '{safe_query}'."
+                f"[Vector DB] Мысли: найдено {len(points)} записей по запросу '{short_query}'"
             )
 
             formatted_results = []
@@ -99,13 +111,14 @@ class VectorThoughts:
             return SkillResult.ok("\n\n".join(formatted_results))
 
         except Exception as e:
-            msg = f"[Vector DB] Ошибка при поиске мыслей в базе данных: {e}"
+            msg = f"[Vector DB] Ошибка при поиске мыслей: {e}"
             system_logger.error(msg)
             return SkillResult.fail(msg)
 
     @skill()
     async def delete_thought(self, point_id: str) -> SkillResult:
         """Удаляет мысль из базы данных по ID."""
+
         try:
             await self.db.client.delete(
                 collection_name=self.collection.name,
@@ -114,9 +127,8 @@ class VectorThoughts:
             msg = f"[Vector DB] Мысль успешно удалена в базе данных (ID: {point_id})."
             system_logger.info(msg)
             return SkillResult.ok(msg)
-
         except Exception as e:
-            msg = f"[Vector DB] Ошибка при удалении мысли в базе данных: {e}"
+            msg = f"[Vector DB] Ошибка при удалении мысли: {e}"
             system_logger.error(msg)
             return SkillResult.fail(msg)
 
@@ -125,9 +137,16 @@ class VectorThoughts:
         """Получает последние n мыслей из базы данных."""
 
         try:
+            scroll_filter = None
+            if self.session_ignored_ids:
+                scroll_filter = models.Filter(
+                    must_not=[models.HasIdCondition(has_id=list(self.session_ignored_ids))]
+                )
+
             records, _ = await self.db.client.scroll(
                 collection_name=self.collection.name,
                 limit=limit,
+                scroll_filter=scroll_filter,
                 with_payload=True,
                 with_vectors=False,
             )
@@ -136,10 +155,6 @@ class VectorThoughts:
                 msg = "[Vector DB] Векторная коллекция мыслей пуста."
                 system_logger.debug(msg)
                 return SkillResult.ok(msg)
-
-            system_logger.debug(
-                f"[Vector DB] База данных выгрузила {len(records)} мыслей (чтение)."
-            )
 
             formatted_results = []
             for point in records:
@@ -154,6 +169,6 @@ class VectorThoughts:
             return SkillResult.ok("\n\n".join(formatted_results))
 
         except Exception as e:
-            msg = f"[Vector DB] Ошибка при получении мыслей из базы данных: {e}"
+            msg = f"[Vector DB] Ошибка при получении мыслей: {e}"
             system_logger.error(msg)
             return SkillResult.fail(msg)

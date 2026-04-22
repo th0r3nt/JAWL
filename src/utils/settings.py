@@ -1,3 +1,4 @@
+import shutil
 import yaml
 from pathlib import Path
 from pydantic import BaseModel
@@ -27,6 +28,8 @@ class HostConfig(BaseModel):
 class TelethonConfig(BaseModel):
     enabled: bool
     session_name: str
+    private_chat_history_limit: int = 3 
+    # TODO: добавить больше параметров для изменения
 
 
 class AiogramConfig(BaseModel):
@@ -174,16 +177,30 @@ def load_yaml(file_path: Path) -> dict:
 
     if not file_path.exists():
         raise FileNotFoundError(f"Конфигурационный файл не найден: {file_path}")
+    
     with open(file_path, "r", encoding="utf-8") as f:
         return yaml.safe_load(f) or {}
 
 
 def load_config() -> tuple[SettingsConfig, InterfacesConfig]:
-    """Загружает и валидирует настройки из YAML файлов."""
+    """Загружает и валидирует настройки из YAML файлов. Автовосстанавливает при отсутствии."""
 
     base_dir = Path.cwd() / "config"
 
-    settings_data = load_yaml(base_dir / "settings.yaml")
-    interfaces_data = load_yaml(base_dir / "interfaces.yaml")
+    settings_file = base_dir / "settings.yaml"
+    settings_example = base_dir / "settings.example.yaml"
+
+    interfaces_file = base_dir / "interfaces.yaml"
+    interfaces_example = base_dir / "interfaces.example.yaml"
+
+    # Автовосстановление файлов конфигурации из .example
+    if not settings_file.exists() and settings_example.exists():
+        shutil.copy(settings_example, settings_file)
+
+    if not interfaces_file.exists() and interfaces_example.exists():
+        shutil.copy(interfaces_example, interfaces_file)
+
+    settings_data = load_yaml(settings_file)
+    interfaces_data = load_yaml(interfaces_file)
 
     return SettingsConfig(**settings_data), InterfacesConfig(**interfaces_data)

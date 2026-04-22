@@ -1,7 +1,11 @@
 from typing import Union
 
 from telethon import utils
-from telethon.tl.functions.channels import CreateChannelRequest, EditTitleRequest
+from telethon.tl.functions.channels import (
+    CreateChannelRequest,
+    EditTitleRequest,
+    UpdateUsernameRequest,
+)
 from telethon.tl.functions.channels import EditPhotoRequest as ChannelEditPhotoRequest
 from telethon.tl.functions.messages import ExportChatInviteRequest, EditChatTitleRequest
 from telethon.tl.functions.messages import EditChatAboutRequest, EditChatPhotoRequest
@@ -26,14 +30,13 @@ class TelethonAdmin:
     def __init__(self, tg_client: TelethonClient):
         self.tg_client = tg_client
 
-
     @skill()
     async def create_channel(
         self, title: str, about: str = "", is_megagroup: bool = False
     ) -> SkillResult:
         """
-        Создает новый публичный или приватный канал (или супергруппу).
-        is_megagroup: Если True, будет создана группа для общения (супергруппа). Если False - канал (только для публикаций).
+        Создает новый приватный канал (или супергруппу).
+        is_megagroup: Если True, будет создана группа для общения. Если False - канал (только для публикаций).
         """
 
         try:
@@ -51,6 +54,39 @@ class TelethonAdmin:
 
         except Exception as e:
             return SkillResult.fail(f"Ошибка при создании чата: {e}")
+
+    @skill()
+    async def set_channel_username(
+        self, chat_id: Union[int, str], username: str
+    ) -> SkillResult:
+        """
+        Устанавливает публичный юзернейм (ссылку) для канала или супергруппы.
+        Чтобы сделать канал снова приватным - передать пустую строку в username ("").
+        """
+
+        try:
+            client = self.tg_client.client()
+            entity = await client.get_input_entity(parse_int_or_str(chat_id))
+
+            clean_username = username.strip().lstrip("@")
+
+            await client(UpdateUsernameRequest(channel=entity, username=clean_username))
+
+            if clean_username:
+                system_logger.info(
+                    f"[Telegram Telethon] Канал {chat_id} стал публичным (@{clean_username})"
+                )
+                return SkillResult.ok(
+                    f"Успешно. Канал теперь публичный: t.me/{clean_username}"
+                )
+            else:
+                system_logger.info(f"[Telegram Telethon] Канал {chat_id} стал приватным")
+                return SkillResult.ok("Успешно. Юзернейм удален, канал стал приватным.")
+
+        except ValueError:
+            return SkillResult.fail("Ошибка: Некорректный ID чата.")
+        except Exception as e:
+            return SkillResult.fail(f"Ошибка при изменении статуса канала: {e}")
 
     @skill()
     async def edit_chat_title(self, chat_id: Union[int, str], new_title: str) -> SkillResult:
@@ -280,7 +316,6 @@ class TelethonAdmin:
 
             result = await client(CreateForumTopicRequest(channel=entity, title=title))
 
-            # Получаем ID созданного топика из Updates
             topic_id = None
             for update in result.updates:
                 if hasattr(update, "message") and hasattr(update.message, "id"):

@@ -37,28 +37,37 @@ class RAGMemories:
     ) -> str:
 
         queries = set()
+
         # ==================================================================
         # RAG поиск для первого шага ReAct-цикла
         # ==================================================================
 
         if self.agent_state.current_step == 1:
 
-            # Из Payload (Имя отправителя/суть сообщения)
+            # Из Payload (Имя отправителя, Название чата, Суть сообщения)
             sender = payload.get("sender_name")
             if sender and sender.lower() != "unknown":
                 queries.add(sender.strip())
+
+            chat_name = payload.get("chat_name")
+            if chat_name and chat_name.lower() != "unknown":
+                queries.add(chat_name.strip())
 
             msg = payload.get("message", "")
             if len(msg) > 10 or len(msg.split()) > 2:
                 queries.add(msg.strip())
 
-            # Из логов пропущенных событий (ИСПРАВЛЕНО)
+            # Из логов пропущенных событий
             for event in missed_events:
                 evt_payload = event.get("payload", {})
 
                 match_sender = evt_payload.get("sender_name")
                 if match_sender and match_sender.lower() != "unknown":
                     queries.add(match_sender.strip())
+
+                match_chat = evt_payload.get("chat_name")
+                if match_chat and match_chat.lower() != "unknown":
+                    queries.add(match_chat.strip())
 
                 match_msg = evt_payload.get("message", "")
                 if len(match_msg) > 15 or len(match_msg.split()) > 3:
@@ -74,7 +83,7 @@ class RAGMemories:
         # ==================================================================
         # Промежуточный RAG поиск между шагами ReAct цикла
         # ==================================================================
-        # По последним мыслям/действиям агента
+        # По последним мыслям и действиям агента
 
         else:
             if self.agent_state.last_thoughts:
@@ -86,7 +95,6 @@ class RAGMemories:
             if self.agent_state.last_action_error:
                 queries.add(self.agent_state.last_action_error)
 
-            # Проверяем свежие события, прилетевшие во время раздумий (ИСПРАВЛЕНО)
             if missed_events:
                 last_evt = missed_events[-1]
                 match_msg = last_evt.get("payload", {}).get("message", "")
@@ -96,7 +104,7 @@ class RAGMemories:
         if not queries:
             return ""
 
-        # Берем максимум 20 запросов
+        # Ограничиваем количество запросов, чтобы не спамить в БД
         queries = list(queries)[:20]
 
         tasks = []
