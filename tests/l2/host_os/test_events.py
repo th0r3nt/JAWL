@@ -35,7 +35,7 @@ def test_os_events_check_sandbox_tree(os_client):
     (os_client.sandbox_dir / "root_file.log").touch()
 
     # Запускаем проверку
-    events._check_sandbox()
+    events._update_file_trees()
 
     # Проверяем наличие ключевых элементов ASCII-дерева в стейте
     assert "sandbox/" in state.sandbox_files

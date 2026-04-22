@@ -127,6 +127,10 @@ class HostOSClient:
         if not self.state.is_online:
             return "### HOST OS [OFF]\nИнтерфейс отключен."
 
+        framework_block = ""
+        if self.access_level >= HostOSAccessLevel.OBSERVER and self.state.framework_files:
+            framework_block = f"\n\n* JAWL Directory:\n{self.state.framework_files}"
+
         return f"""### HOST OS [ON]
 * OS: {self.state.os_info}
 * Access Level: {self.access_level.value} ({self.access_level.name}) / 3
@@ -138,4 +142,4 @@ class HostOSClient:
 {self.state.telemetry}
 
 * Sandbox Directory:
-{self.state.sandbox_files}""".strip()
+{self.state.sandbox_files}{framework_block}""".strip()

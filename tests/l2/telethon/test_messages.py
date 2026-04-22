@@ -71,15 +71,17 @@ async def test_messages_search_messages(mock_build_string, mock_tg_client):
 
 
 @pytest.mark.asyncio
-async def test_messages_edit_draft(mock_tg_client):
+@patch("src.l2_interfaces.telegram.telethon.skills.messages.SaveDraftRequest")
+async def test_messages_edit_draft(mock_save_draft, mock_tg_client):
     from unittest.mock import AsyncMock, MagicMock
     from src.l2_interfaces.telegram.telethon.skills.messages import TelethonMessages
 
     skills = TelethonMessages(mock_tg_client)
 
-    # Имитируем сущность чата
+    # Имитируем сущности
     mock_entity = MagicMock(id=123)
     mock_tg_client.client().get_entity = AsyncMock(return_value=mock_entity)
+    mock_tg_client.client().get_input_entity = AsyncMock(return_value="input_entity")
 
     # Имитируем существующий черновик
     mock_draft = MagicMock()
@@ -87,13 +89,14 @@ async def test_messages_edit_draft(mock_tg_client):
     mock_draft.text = "Первый абзац"
     mock_tg_client.client().get_drafts = AsyncMock(return_value=[mock_draft])
 
-    mock_tg_client.client().edit_draft = AsyncMock()
+    # Имитируем сырой вызов API
+    mock_tg_client.client().side_effect = AsyncMock()
 
     # Вызываем дополнение черновика (append=True)
     res = await skills.edit_draft(chat_id=123, text="Второй абзац", append=True)
 
     assert res.is_success is True
-    # Проверяем, что клиент склеил старый текст с новым
-    mock_tg_client.client().edit_draft.assert_called_once_with(
-        mock_entity, "Первый абзац\n\nВторой абзац"
+    # Проверяем, что агент отправил правильный запрос в Telegram
+    mock_save_draft.assert_called_once_with(
+        peer="input_entity", message="Первый абзац\n\nВторой абзац"
     )

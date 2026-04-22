@@ -1,6 +1,8 @@
 from datetime import timedelta
 from typing import Optional, Union
 
+from telethon.tl.functions.messages import SaveDraftRequest
+
 from src.utils._tools import format_size, validate_sandbox_path, parse_int_or_str
 from src.utils.logger import system_logger
 
@@ -303,7 +305,6 @@ class TelethonMessages:
         except Exception as e:
             return SkillResult.fail(f"Ошибка при поиске сообщений: {e}")
 
-
     @skill()
     async def edit_draft(
         self, chat_id: Union[int, str], text: str, append: bool = True
@@ -328,14 +329,16 @@ class TelethonMessages:
             final_text = f"{current_text}\n\n{text}".strip() if current_text else text
 
             # Сохраняем черновик
-            await client.edit_draft(target_entity, final_text)
+            await client(
+                SaveDraftRequest(
+                    peer=await client.get_input_entity(target_entity), message=final_text
+                )
+            )
 
             action_type = "дополнен" if current_text else "создан"
             system_logger.info(f"[Telegram Telethon] Черновик {action_type} в чате {chat_id}")
-            
-            return SkillResult.ok(
-                f"Черновик успешно {action_type} в чате {chat_id}."
-            )
+
+            return SkillResult.ok(f"Черновик успешно {action_type} в чате {chat_id}.")
 
         except ValueError:
             return SkillResult.fail("Ошибка: Некорректный ID чата или Username.")

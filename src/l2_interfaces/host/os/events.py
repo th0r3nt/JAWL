@@ -236,7 +236,7 @@ class HostOSEvents:
     async def handle_file_system_event(self, sys_event_config, filepath: str):
         """Вызывается мгновенно при любом изменении файла (создание/удаление/изменение)."""
         # Сразу перестраиваем ASCII-дерево в стейте, чтобы агент увидел актуальную картину
-        self._check_sandbox()
+        self._update_file_trees()
 
         try:
             rel_path = str(Path(filepath).relative_to(self.host_os.sandbox_dir))
@@ -256,10 +256,11 @@ class HostOSEvents:
                 self._update_telemetry()
                 await self._update_network()
                 # Мы всё равно периодически чекаем песочницу на случай, если watchdog что-то пропустил
-                self._check_sandbox()
-                
+                self._update_file_trees()
+
             except asyncio.CancelledError:
                 break
+
             except Exception as e:
                 system_logger.error(f"[Host OS] Ошибка в цикле мониторинга: {e}")
 
@@ -347,10 +348,64 @@ class HostOSEvents:
 
         self.state.network = f"Internet: {status} | Соединений: {conns}"
 
-    def _check_sandbox(self):
+    def _build_tree(
+        self,
+        dir_path: Path,
+        use_emojis: bool,
+        max_depth: int,
+        current_depth: int = 0,
+        prefix: str = "",
+    ) -> list:
+        meta = self.host_os.get_file_metadata()
+        lines = []
+
+        try:
+            items = [item for item in dir_path.iterdir() if not self._is_ignored(item)]
+            items = sorted(items, key=lambda x: (not x.is_dir(), x.name.lower()))
+
+            for i, item in enumerate(items):
+                is_last = i == len(items) - 1
+                connector = "└── " if is_last else "├── "
+
+                icon = ""
+                if use_emojis:
+                    icon = "📂 " if item.is_dir() else "📄 "
+
+                desc = ""
+                if item.is_file():
+                    try:
+                        rel_path = item.relative_to(self.host_os.sandbox_dir).as_posix()
+                        if rel_path in meta:
+                            desc = f" — [{meta[rel_path]}]"
+                    except ValueError:
+                        pass  # Файл вне песочницы, метаданных нет
+
+                lines.append(f"{prefix}{connector}{icon}{item.name}{desc}")
+
+                if item.is_dir():
+                    extension = "    " if is_last else "│   "
+                    if current_depth < max_depth:
+                        lines.extend(
+                            self._build_tree(
+                                item,
+                                use_emojis,
+                                max_depth,
+                                current_depth + 1,
+                                prefix + extension,
+                            )
+                        )
+                    else:
+                        lines.append(
+                            f"{prefix}{extension}... [Скрыто для экономии контекста]"
+                        )
+        except Exception:
+            pass
+
+        return lines
+
+    def _update_file_trees(self):
         sandbox = self.host_os.sandbox_dir
 
-        # Собираем только те файлы, которые не попадают под фильтр
         current_paths = set(
             str(p.relative_to(sandbox)) for p in sandbox.rglob("*") if not self._is_ignored(p)
         )
@@ -361,40 +416,36 @@ class HostOSEvents:
                 f"[Host OS] В песочнице появились новые файлы/папки: {', '.join(new_files)}"
             )
 
-        def build_tree(dir_path, prefix=""):
-            meta = self.host_os.get_file_metadata() # Подтягиваем реестр
-            lines = []
-            try:
-                items = [item for item in dir_path.iterdir() if not self._is_ignored(item)]
-                items = sorted(items, key=lambda x: (not x.is_dir(), x.name.lower()))
-                for i, item in enumerate(items):
-                    is_last = i == len(items) - 1
-                    connector = "└── " if is_last else "├── "
-                    
-                    # Формируем строку с метаданными
-                    rel_path = item.relative_to(self.host_os.sandbox_dir).as_posix()
-                    desc = f" — [{meta[rel_path]}]" if item.is_file() and rel_path in meta else ""
-                    
-                    lines.append(f"{prefix}{connector}{item.name}{desc}")
-
-                    if item.is_dir():
-                        extension = "    " if is_last else "│   "
-                        lines.extend(build_tree(item, prefix + extension))
-            except Exception:
-                pass
-            return lines
-
-        tree_lines = build_tree(sandbox)
+        # 1. Строим дерево песочницы (без лимита глубины, без эмодзи)
+        sandbox_lines = self._build_tree(sandbox, use_emojis=False, max_depth=99)
 
         max_tree_lines = 200
-        if len(tree_lines) > max_tree_lines:
-            tree_lines = tree_lines[:max_tree_lines] + [
+        if len(sandbox_lines) > max_tree_lines:
+            sandbox_lines = sandbox_lines[:max_tree_lines] + [
                 f"└── ...[Дерево обрезано: показано {max_tree_lines} элементов]"
             ]
 
-        if tree_lines:
-            self.state.sandbox_files = "sandbox/\n" + "\n".join(tree_lines)
+        if sandbox_lines:
+            self.state.sandbox_files = "sandbox/\n" + "\n".join(sandbox_lines)
         else:
             self.state.sandbox_files = "Пусто"
 
         self._last_sandbox_files = current_paths
+
+        # 2. Строим дерево фреймворка (JAWL Directory), если права позволяют
+        if self.host_os.access_level >= 1:
+            fw_dir = self.host_os.framework_dir
+            fw_depth = self.host_os.config.framework_tree_depth
+            fw_lines = self._build_tree(fw_dir, use_emojis=True, max_depth=fw_depth)
+
+            if len(fw_lines) > max_tree_lines:
+                fw_lines = fw_lines[:max_tree_lines] + [
+                    f"└── ...[Дерево обрезано: показано {max_tree_lines} элементов]"
+                ]
+
+            if fw_lines:
+                self.state.framework_files = f"🏠 {fw_dir.name}/\n" + "\n".join(fw_lines)
+            else:
+                self.state.framework_files = "Пусто"
+        else:
+            self.state.framework_files = ""

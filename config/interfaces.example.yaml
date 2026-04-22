@@ -10,6 +10,9 @@ host:
     access_level: 0
     env_access: false # Если false - запрещает агенту читать и изменять файлы *.env во избежание слива ключей
 
+    # Если access level >= 1 и host os включен - агент будет получать в контекст файловую директорию своего фреймворка
+    framework_tree_depth: 2
+
     # Лимиты и таймауты
     monitoring_interval_sec: 30 # Интервал мониторинга метрик хост-пк: datetime, uptime, telemetry, network, sandbox/
     execution_timeout_sec: 60 # Таймаут на выполнение скриптов агентом

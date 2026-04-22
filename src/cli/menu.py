@@ -12,7 +12,7 @@ from src.cli.widgets.ui import draw_header, print_info, get_custom_style, flush_
 from src.cli.screens.agent_control import start_agent_screen, stop_agent_screen
 from src.cli.screens.logs import logs_screen
 from src.cli.screens.setup_wizard import setup_wizard_screen
-from src.cli.screens.memory_reset import memory_reset_screen
+from src.cli.screens.database_manager import database_manager_screen
 
 
 def main_menu() -> None:
@@ -34,7 +34,7 @@ def main_menu() -> None:
                 questionary.Choice("⏹️ Остановить агента", "stop"),
                 questionary.Choice("📋 Открыть логи", "logs"),
                 questionary.Choice("⚙️ Мастер настройки интерфейсов", "setup"),
-                questionary.Choice("🧹 Полный сброс памяти", "reset"),
+                questionary.Choice("🗄️ Управление базами данных", "db_manager"),
                 questionary.Separator(" "),  # Заменяем дефисы на пустую строку для воздуха
                 questionary.Choice("❌ Выход", "exit"),
             ],
@@ -61,5 +61,5 @@ def main_menu() -> None:
         elif choice == "setup":
             setup_wizard_screen()
 
-        elif choice == "reset":
-            memory_reset_screen()
+        elif choice == "db_manager":
+            database_manager_screen()

@@ -91,6 +91,7 @@ class HostOSState:
         self.uptime = ""  # Аптайм хост-пк
         self.telemetry = ""  # CPU, ОЗУ, процессы
         self.sandbox_files = ""  # Текущие файлы в Sandbox
+        self.framework_files = ""  # Дерево директории JAWL
 
         self.polling_interval = ""
 
