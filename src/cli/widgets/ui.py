@@ -1,11 +1,9 @@
 import os
-import time
-import psutil
 import yaml
 import sys
 from pathlib import Path
 
-from src.utils._tools import is_agent_running, get_pid_file_path
+from src.utils._tools import is_agent_running
 
 from rich.console import Console, Group
 from rich.panel import Panel
@@ -15,15 +13,16 @@ import questionary
 
 console = Console()
 
-LOGO = """
-     ██╗  █████╗  ██╗    ██╗ ██╗
-     ██║ ██╔══██╗ ██║    ██║ ██║
-     ██║ ███████║ ██║ █╗ ██║ ██║
-██   ██║ ██╔══██║ ██║███╗██║ ██║
-╚█████╔╝ ██║  ██║ ╚███╔███╔╝ ███████╗
- ╚════╝  ╚═╝  ╚═╝  ╚══╝╚══╝  ╚══════╝
-         Just A While Loop
-"""
+LOGO = "\n".join(
+    [
+        "     ██╗  █████╗  ██╗    ██╗ ██╗",
+        "     ██║ ██╔══██╗ ██║    ██║ ██║",
+        "     ██║ ███████║ ██║ █╗ ██║ ██║",
+        "██   ██║ ██╔══██║ ██║███╗██║ ██║",
+        "╚█████╔╝ ██║  ██║ ╚███╔███╔╝ ███████╗",
+        " ╚════╝  ╚═╝  ╚═╝  ╚══╝╚══╝  ╚══════╝",
+    ]
+)
 
 ROOT_DIR = Path(__file__).resolve().parent.parent.parent.parent
 PID_FILE = ROOT_DIR / "src" / "utils" / "local" / "data" / "agent.pid"
@@ -80,13 +79,16 @@ def draw_header(version: str = "v0.9.0") -> None:
 
     status = _get_agent_status()
 
-    # 1. Логотип (убираем лишние переносы по краям, чтобы не было дыр)
-    logo_text = Text(LOGO.strip("\n"), style="bold cyan")
+    # 1. Логотип (чистый арт без лишних отступов)
+    logo_text = Text(LOGO, style="bold cyan")
 
-    # 2. Версия (добавляем \n в конце для отступа перед статусом)
+    # 2. Подзаголовок вынесен отдельно для идеального математического центрирования
+    subtitle_text = Text("Just A While Loop", style="bold cyan")
+
+    # 3. Версия (добавляем \n в конце для отступа перед статусом)
     version_text = Text(f"{version}\n", style="dim cyan")
 
-    # 3. Плашка статуса (без Uptime)
+    # 4. Плашка статуса
     status_text = Text()
     if status["is_running"]:
         status_text.append("● ONLINE", style="bold green")
@@ -101,9 +103,12 @@ def draw_header(version: str = "v0.9.0") -> None:
             style="dim white",
         )
 
-    # Группируем и железобетонно выравниваем всё как независимые "коробки"
+    # Группируем и выравниваем каждый элемент НЕЗАВИСИМО друг от друга
     content = Group(
-        Align.center(logo_text), Align.center(version_text), Align.center(status_text)
+        Align.center(logo_text),
+        Align.center(subtitle_text),
+        Align.center(version_text),
+        Align.center(status_text),
     )
 
     panel = Panel(content, border_style="cyan")

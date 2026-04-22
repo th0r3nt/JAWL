@@ -425,7 +425,7 @@ class System:
             while True:
                 if stop_file.exists():
                     system_logger.info(
-                        "[System] Получен сигнал от CLI (agent.stop). Запускаем плавную остановку."
+                        "[System] Получен сигнал от CLI (agent.stop). Запуск плавной остановки."
                     )
                     try:
                         stop_file.unlink()
