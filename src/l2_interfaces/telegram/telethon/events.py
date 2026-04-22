@@ -27,7 +27,7 @@ class TelethonEvents:
 
     async def start(self) -> None:
         client = self.tg_client.client()
-        await self._update_state()
+        await self._update_state(force=True)
 
         client.add_event_handler(
             self._on_private_message,
@@ -54,15 +54,24 @@ class TelethonEvents:
             events.Raw(),
         )
 
+        # Слушаем исходящие сообщения
+        client.add_event_handler(
+            self._on_outgoing_message,
+            events.NewMessage(outgoing=True),
+        )
+
         system_logger.info("[Telegram Telethon] Слушатели событий успешно запущены.")
 
     async def stop(self) -> None:
         system_logger.info("[Telegram Telethon] Слушатели событий успешно остановлены.")
 
-    async def _update_state(self):
+    async def _update_state(self, force: bool = False):
         now = time.time()
-        if now - self._last_state_update < 10:
+
+        # Если не форсируем, ждем хотя бы 3 секунды (защита от FloodWait)
+        if not force and now - self._last_state_update < 3:
             return
+
         self._last_state_update = now
 
         client = self.tg_client.client()
@@ -73,22 +82,16 @@ class TelethonEvents:
                 entity = dialog.entity
 
                 is_public = bool(getattr(entity, "username", None))
-                status_str = "Публичный" if is_public else "Приватный"
+                status_str = "Public" if is_public else "Private"
 
                 participants = getattr(entity, "participants_count", None)
-                part_str = f" | Участников: {participants}" if participants else ""
+                part_str = f" | {participants} чел." if participants else ""
 
-                unread = (
-                    f" [Непрочитанных: {dialog.unread_count}]"
-                    if dialog.unread_count > 0
-                    else ""
-                )
+                unread = f" [{dialog.unread_count} непр.]" if dialog.unread_count > 0 else ""
 
                 if dialog.is_user:
                     bot_tag = " [Bot]" if getattr(entity, "bot", False) else ""
-                    chats.append(
-                        f"User | ID: {dialog.id} | Название: {dialog.name}{bot_tag}{unread}"
-                    )
+                    chats.append(f"[User] {dialog.name}{bot_tag} (ID: {dialog.id}){unread}")
 
                     limit = self.state.private_chat_history_limit
                     if limit > 0:
@@ -113,11 +116,11 @@ class TelethonEvents:
 
                 elif dialog.is_group:
                     chats.append(
-                        f"Group | ID: {dialog.id} | Название: {dialog.name} | Статус: {status_str}{part_str}{unread}"
+                        f"[{status_str} Group] {dialog.name} (ID: {dialog.id}){part_str}{unread}"
                     )
                 elif dialog.is_channel:
                     chats.append(
-                        f"Channel | ID: {dialog.id} | Название: {dialog.name} | Статус: {status_str}{part_str}{unread}"
+                        f"[{status_str} Channel] {dialog.name} (ID: {dialog.id}){part_str}{unread}"
                     )
 
             self.state.last_chats = "\n".join(chats) if chats else "Список диалогов пуст."
@@ -127,36 +130,37 @@ class TelethonEvents:
     # ==========================================================
     # ЭВЕНТЫ
     # ==========================================================
-    
+
+    async def _on_outgoing_message(self, event: events.NewMessage.Event):
+        """Триггер на исходящие сообщения (агент ответил, либо юзер написал с телефона)."""
+        # Форсируем обновление стейта, чтобы агент на следующем шаге ReAct видел свой же ответ
+        await self._update_state(force=True)
+
     async def _on_private_message(self, event: events.NewMessage.Event) -> None:
         try:
             await event.message.mark_read()
         except Exception:
             pass
 
-        await self._update_state()
+        await self._update_state(force=True)
 
         client = self.tg_client.client()
 
-        # Получаем имя отправителя через умный парсер (решает проблему "Unknown" в каналах)
         sender_name = TelethonMessageParser.get_sender_name(event.message)
         chat = await event.get_chat()
         chat_name = utils.get_display_name(chat) if chat else "Unknown"
 
-        # Обогащаем сообщение (реплаи, форварды, медиа)
         msg_obj = event.message
         fwd_info = await TelethonMessageParser.parse_forward(msg_obj)
         is_reply, reply_id = TelethonMessageParser.determine_reply(msg_obj, None)
         reply_info = await TelethonMessageParser.parse_reply(client, chat, is_reply, reply_id)
 
-        # ИСПРАВЛЕНИЕ: Склеиваем тег медиа и текст
         media_tag = TelethonMessageParser.parse_media(msg_obj)
         msg_text = msg_obj.text or ""
         base_text = f"{media_tag} {msg_text}".strip() if media_tag else msg_text
 
         enriched_message = f"{base_text}{fwd_info}{reply_info}".strip()
 
-        # Тянем историю
         history = await self._fetch_recent_history(chat, limit=5)
 
         payload = {
@@ -181,7 +185,7 @@ class TelethonEvents:
         else:
             event_type = Events.TELETHON_GROUP_MESSAGE
 
-        await self._update_state()
+        await self._update_state(force=True)
 
         client = self.tg_client.client()
         sender_name = TelethonMessageParser.get_sender_name(event.message)
@@ -212,7 +216,6 @@ class TelethonEvents:
         is_reply, reply_id = TelethonMessageParser.determine_reply(msg_obj, topic_id)
         reply_info = await TelethonMessageParser.parse_reply(client, chat, is_reply, reply_id)
 
-        # Склеиваем тег медиа и текст
         media_tag = TelethonMessageParser.parse_media(msg_obj)
         msg_text = msg_obj.text or ""
         base_text = f"{media_tag} {msg_text}".strip() if media_tag else msg_text
@@ -232,7 +235,6 @@ class TelethonEvents:
             if topic_name:
                 payload["topic_name"] = topic_name
 
-        # В группах подтягиваем историю ТОЛЬКО если нас упомянули (экономим запросы)
         if event.mentioned:
             history = await self._fetch_recent_history(chat, limit=10)
             if history:
@@ -246,7 +248,6 @@ class TelethonEvents:
 
         await self._update_state()
 
-        # Вытаскиваем ID чата, в котором поставили реакцию
         try:
             chat_id = utils.get_peer_id(event.peer)
         except Exception:
@@ -269,7 +270,6 @@ class TelethonEvents:
             reactions=reactions_str,
         )
 
-    # Отслеживание сообщений в каналах
     async def _on_channel_message(self, event: events.NewMessage.Event):
         await self._update_state()
 
@@ -283,7 +283,6 @@ class TelethonEvents:
         is_reply, reply_id = TelethonMessageParser.determine_reply(msg_obj, None)
         reply_info = await TelethonMessageParser.parse_reply(client, chat, is_reply, reply_id)
 
-        # ИСПРАВЛЕНИЕ: Склеиваем тег медиа и текст
         media_tag = TelethonMessageParser.parse_media(msg_obj)
         msg_text = msg_obj.text or ""
         base_text = f"{media_tag} {msg_text}".strip() if media_tag else msg_text
@@ -300,7 +299,6 @@ class TelethonEvents:
 
         await self.bus.publish(Events.TELETHON_CHANNEL_MESSAGE, **payload)
 
-    # Отслеживание системных сообщений (ChatAction)
     async def _on_chat_action(self, event: events.ChatAction.Event):
         await self._update_state()
 
@@ -347,20 +345,19 @@ class TelethonEvents:
     # ==========================================================
     # СЛУЖЕБНЫЕ МЕТОДЫ
     # ==========================================================
+
     async def _fetch_recent_history(self, target_entity: Any, limit: int = 5) -> str:
         if not target_entity:
             return ""
 
         try:
             client = self.tg_client.client()
-            # Убрали client.get_entity(chat_id), используем готовую сущность
             msgs = await client.get_messages(target_entity, limit=limit + 1)
 
             if len(msgs) <= 1:
                 return ""
 
             lines = []
-            # Переворачиваем, чтобы читать сверху вниз
             for msg in reversed(msgs[1:]):
                 formatted = await TelethonMessageParser.build_string(
                     client=client,
@@ -372,7 +369,7 @@ class TelethonEvents:
                 lines.append(formatted)
 
             return "\n" + "\n\n".join(lines)
-        
+
         except Exception as e:
             system_logger.error(f"[Telegram Telethon] Не удалось подтянуть предысторию: {e}")
             return ""

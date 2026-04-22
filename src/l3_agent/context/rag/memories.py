@@ -44,7 +44,6 @@ class RAGMemories:
 
         if self.agent_state.current_step == 1:
 
-            # Из Payload (Имя отправителя, Название чата, Суть сообщения)
             sender = payload.get("sender_name")
             if sender and sender.lower() != "unknown":
                 queries.add(sender.strip())
@@ -57,7 +56,6 @@ class RAGMemories:
             if len(msg) > 10 or len(msg.split()) > 2:
                 queries.add(msg.strip())
 
-            # Из логов пропущенных событий
             for event in missed_events:
                 evt_payload = event.get("payload", {})
 
@@ -75,15 +73,15 @@ class RAGMemories:
 
             # Из названий чатов с непрочитанными сообщениями
             for line in self.telethon_state.last_chats.split("\n"):
-                if "[Непрочитанных:" in line:
-                    match_name = re.search(r"Название:\s*(.+?)\s*\[", line)
+                if "непр.]" in line:
+                    # Извлекаем имя между типом чата и ID: "[User] Name (ID: 123)"
+                    match_name = re.search(r"\]\s+(.+?)\s*\(ID:", line)
                     if match_name:
                         queries.add(match_name.group(1).strip())
 
         # ==================================================================
         # Промежуточный RAG поиск между шагами ReAct цикла
         # ==================================================================
-        # По последним мыслям и действиям агента
 
         else:
             if self.agent_state.last_thoughts:
@@ -104,7 +102,6 @@ class RAGMemories:
         if not queries:
             return ""
 
-        # Ограничиваем количество запросов, чтобы не спамить в БД
         queries = list(queries)[:20]
 
         tasks = []
@@ -129,8 +126,14 @@ class RAGMemories:
                 and "пуста" not in res.message
             ):
                 q = queries[i // 2]
+
+                # Изящно обрезаем длинный ключ, как ты и просил
+                short_q = q[:100] + "..." if len(q) > 100 else q
+
                 source = "Knowledge" if i % 2 == 0 else "Thoughts"
-                memory_blocks.append(f"### Найдено по ключу '{q}' ({source}):\n{res.message}")
+                memory_blocks.append(
+                    f"### Найдено по ключу '{short_q}' ({source}):\n{res.message}"
+                )
 
         if not memory_blocks:
             return ""

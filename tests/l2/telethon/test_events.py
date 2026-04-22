@@ -23,9 +23,9 @@ async def test_update_state(telethon_events, mock_tg_client, state):
 
     await telethon_events._update_state()
 
-    assert "User | ID: 111" in state.last_chats
-    assert "Group | ID: 222" in state.last_chats
-    assert "Приватный" in state.last_chats or "Публичный" in state.last_chats
+    assert "[User]" in state.last_chats and "ID: 111" in state.last_chats
+    assert "Group]" in state.last_chats and "ID: 222" in state.last_chats
+    assert "Private" in state.last_chats or "Public" in state.last_chats
 
 
 @pytest.mark.asyncio

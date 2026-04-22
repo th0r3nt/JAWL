@@ -127,6 +127,7 @@ def start_agent_screen() -> None:
         return
 
     print_info(" Инициализация систем агента.")
+    time.sleep(1.5)
     PID_FILE.parent.mkdir(parents=True, exist_ok=True)
 
     logs_dir = ROOT_DIR / "logs"
@@ -159,6 +160,7 @@ def start_agent_screen() -> None:
         PID_FILE.write_text(str(process.pid))
 
         print_success("Агент успешно запущен в фоновом режиме.")
+        time.sleep(1)
         print_info(
             " Для просмотра того, что он делает, выберите 'Открыть логи' в главном меню."
         )
