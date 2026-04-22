@@ -94,7 +94,7 @@ class SQLTicks:
 
             # ПАРСИНГ МЫСЛЕЙ
             thoughts_str = t.thoughts
-            limit = 500
+            limit = 1500
             if not is_detailed and len(thoughts_str) > limit:
                 thoughts_str = thoughts_str[:limit] + " ... [Мысли обрезаны системой]"
 

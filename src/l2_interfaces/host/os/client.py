@@ -1,4 +1,5 @@
 import sys
+import json
 from enum import IntEnum
 from pathlib import Path
 
@@ -21,7 +22,6 @@ class HostOSClient:
         self.config = config
         self.state = state
         self.timezone = timezone
-        
 
         try:
             self.access_level = HostOSAccessLevel(self.config.access_level)
@@ -42,6 +42,20 @@ class HostOSClient:
             f"[Host OS] Клиент инициализирован (ОС: {self.os_platform}, Access Level: {self.access_level.name})."
         )
         self.state.is_online = True
+
+        # Файл для реестра описаний файлов
+        self.metadata_file = (
+            self.framework_dir
+            / "src"
+            / "utils"
+            / "local"
+            / "data"
+            / "host os"
+            / "file_meta.json"
+        )
+        self.metadata_file.parent.mkdir(parents=True, exist_ok=True)
+        if not self.metadata_file.exists():
+            self.metadata_file.write_text("{}", encoding="utf-8")
 
     def validate_path(self, target_path: str | Path, is_write: bool = False) -> Path:
         """
@@ -72,16 +86,16 @@ class HostOSClient:
         if self.access_level == HostOSAccessLevel.OPERATOR:
             if is_write and not resolved_path.is_relative_to(self.framework_dir):
                 raise PermissionError("OPERATOR: Запись разрешена только в директории JAWL.")
-            
+
             return resolved_path
 
         if self.access_level == HostOSAccessLevel.OBSERVER:
             if is_write and not resolved_path.is_relative_to(self.sandbox_dir):
                 raise PermissionError("OBSERVER: Запись разрешена строго в папке sandbox/.")
-            
+
             if not is_write and not resolved_path.is_relative_to(self.framework_dir):
                 raise PermissionError("OBSERVER: Чтение разрешено только в пределах JAWL.")
-            
+
             return resolved_path
 
         if not resolved_path.is_relative_to(self.sandbox_dir):
@@ -90,6 +104,23 @@ class HostOSClient:
             )
 
         return resolved_path
+
+    def get_file_metadata(self) -> dict:
+        """Читает реестр описаний файлов."""
+
+        try:
+            with open(self.metadata_file, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            return {}
+
+    def set_file_metadata(self, rel_path: str, description: str) -> None:
+        """Сохраняет описание для конкретного файла."""
+
+        data = self.get_file_metadata()
+        data[rel_path] = description
+        with open(self.metadata_file, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=4)
 
     async def get_context_block(self, **kwargs) -> str:
 

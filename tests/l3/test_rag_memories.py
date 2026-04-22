@@ -9,13 +9,14 @@ from src.l0_state.agent.state import AgentState
 async def test_rag_memories_context_extraction():
     # Мокаем БД
     mock_knowledge = AsyncMock()
+    mock_thoughts = AsyncMock()
+
     mock_knowledge.search_knowledge.return_value = SkillResult.ok(
-        "Факт: Сервер находится в шкафу."
+        "[ID: `111`] Факт: Сервер находится в шкафу."
     )
 
-    mock_thoughts = AsyncMock()
     mock_thoughts.search_thoughts.return_value = SkillResult.ok(
-        "Мысль: Шкаф надо проветривать."
+        "[ID: `222`] Мысль: Шкаф надо проветривать."
     )
 
     # Мокаем стейт Телеграма

@@ -219,3 +219,32 @@ def test_react_inject_images_success(mock_dependencies, tmp_path):
     assert last_msg_content[1]["type"] == "image_url"
     assert "image/jpeg" in last_msg_content[1]["image_url"]["url"]
     assert "aGVsbG8=" in last_msg_content[1]["image_url"]["url"]  # Проверка кодировки
+
+
+@pytest.mark.asyncio
+async def test_react_timeout_retry(mock_dependencies, mock_openai_response):
+    """
+    Тест: Ошибка таймаута (240 сек). Цикл должен повторить запрос, не увеличивая шаг.
+    """
+    deps = mock_dependencies
+    loop = ReactLoop(**deps)
+
+    mock_session = AsyncMock()
+    mock_session.api_key = "key_1"
+
+    # Первая попытка - Timeout, вторая - успешный выход
+    timeout_err = openai.APITimeoutError(request=MagicMock())
+    mock_session.chat.completions.create.side_effect = [
+        timeout_err,
+        mock_openai_response('{"thoughts": "ok", "actions": []}'),
+    ]
+
+    deps["llm_client"].get_session = MagicMock(return_value=mock_session)
+
+    await loop.run("TEST", {}, missed_events=[])
+
+    # Проверяем, что LLM вызывалась 2 раза
+    assert mock_session.chat.completions.create.call_count == 2
+    # Шаг должен остаться 1, потому что первая попытка упала с таймаутом (шаг не "сгорел")
+    assert deps["agent_state"].current_step == 1
+    assert deps["agent_state"].state == AgentStatus.IDLE

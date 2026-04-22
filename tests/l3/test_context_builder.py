@@ -1,7 +1,7 @@
 import pytest
 from src.l3_agent.context.builder import ContextBuilder
 from src.l0_state.agent.state import AgentState
-from src.l3_agent.context.registry import ContextRegistry, ContextSection 
+from src.l3_agent.context.registry import ContextRegistry, ContextSection
 
 
 @pytest.mark.asyncio
@@ -26,7 +26,8 @@ async def test_context_builder_build():
     # Проверяем, что в итоговом тексте есть куски от всех систем
     assert "## SKILLS" in context
     assert "### TELETHON [ON]" in context
-    assert "## HEARTBEAT" in context
+    assert "## EVENT LOG" in context
+    assert "## CURRENT TRIGGER" in context
     assert "TEST_EVENT" in context
     assert "text: Hello Agent" in context
 

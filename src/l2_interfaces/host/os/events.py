@@ -362,15 +362,20 @@ class HostOSEvents:
             )
 
         def build_tree(dir_path, prefix=""):
+            meta = self.host_os.get_file_metadata() # Подтягиваем реестр
             lines = []
             try:
-                # Фильтруем папки и файлы перед построением дерева
                 items = [item for item in dir_path.iterdir() if not self._is_ignored(item)]
                 items = sorted(items, key=lambda x: (not x.is_dir(), x.name.lower()))
                 for i, item in enumerate(items):
                     is_last = i == len(items) - 1
                     connector = "└── " if is_last else "├── "
-                    lines.append(f"{prefix}{connector}{item.name}")
+                    
+                    # Формируем строку с метаданными
+                    rel_path = item.relative_to(self.host_os.sandbox_dir).as_posix()
+                    desc = f" — [{meta[rel_path]}]" if item.is_file() and rel_path in meta else ""
+                    
+                    lines.append(f"{prefix}{connector}{item.name}{desc}")
 
                     if item.is_dir():
                         extension = "    " if is_last else "│   "

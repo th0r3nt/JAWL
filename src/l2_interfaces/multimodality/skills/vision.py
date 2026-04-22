@@ -29,6 +29,8 @@ class VisionSkills:
             marker = f"[IMAGE_REQUEST: {safe_path.resolve()}]"
             return SkillResult.ok(
                 f"{marker} Изображение добавлено в контекст."
+                f"[System]: Рекомендуется проанализировать медиа и сохранить краткое описание в метаданные с помощью сооветствующего навыка. "
+                f"Это привяжет описание к файлу."
             )
 
         except PermissionError as e:

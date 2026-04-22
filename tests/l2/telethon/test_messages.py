@@ -68,3 +68,32 @@ async def test_messages_search_messages(mock_build_string, mock_tg_client):
     mock_build_string.side_effect = ["Formatted 1"]
     res = await skills.search_messages(chat_id=123, query="test")
     assert res.is_success is True
+
+
+@pytest.mark.asyncio
+async def test_messages_edit_draft(mock_tg_client):
+    from unittest.mock import AsyncMock, MagicMock
+    from src.l2_interfaces.telegram.telethon.skills.messages import TelethonMessages
+
+    skills = TelethonMessages(mock_tg_client)
+
+    # Имитируем сущность чата
+    mock_entity = MagicMock(id=123)
+    mock_tg_client.client().get_entity = AsyncMock(return_value=mock_entity)
+
+    # Имитируем существующий черновик
+    mock_draft = MagicMock()
+    mock_draft.entity.id = 123
+    mock_draft.text = "Первый абзац"
+    mock_tg_client.client().get_drafts = AsyncMock(return_value=[mock_draft])
+
+    mock_tg_client.client().edit_draft = AsyncMock()
+
+    # Вызываем дополнение черновика (append=True)
+    res = await skills.edit_draft(chat_id=123, text="Второй абзац", append=True)
+
+    assert res.is_success is True
+    # Проверяем, что клиент склеил старый текст с новым
+    mock_tg_client.client().edit_draft.assert_called_once_with(
+        mock_entity, "Первый абзац\n\nВторой абзац"
+    )

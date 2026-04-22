@@ -111,7 +111,7 @@ class HostOSFiles:
 
     @skill()
     async def list_directory(self, path: str = ".") -> SkillResult:
-        """Аналог команды ls. Показывает содержимое папки и размеры файлов."""
+        """Показывает содержимое папки и размеры файлов."""
         limit = self.host_os.config.file_list_limit
 
         try:
@@ -119,6 +119,8 @@ class HostOSFiles:
 
             if not safe_path.is_dir():
                 return SkillResult.fail(f"Ошибка: Путь не является директорией ({path}).")
+
+            meta = self.host_os.get_file_metadata()
 
             items = []
             for i, item in enumerate(safe_path.iterdir()):
@@ -132,7 +134,12 @@ class HostOSFiles:
                     size_str = "???"
 
                 prefix = "📁" if item.is_dir() else "📄"
-                items.append(f"{prefix} {item.name} ({size_str})")
+
+                # Достаем описание, если оно есть
+                rel_path = item.relative_to(self.host_os.sandbox_dir).as_posix()
+                desc = f" [Description: {meta[rel_path]}]" if rel_path in meta else ""
+
+                items.append(f"{prefix} {item.name} ({size_str}){desc}")
 
             if not items:
                 return SkillResult.ok(f"Директория '{safe_path.name}' пуста.")
@@ -160,6 +167,8 @@ class HostOSFiles:
                     "Ошибка: Базовый путь для поиска должен быть директорией."
                 )
 
+            meta = self.host_os.get_file_metadata()
+
             found = []
             for i, file_path in enumerate(safe_path.rglob(pattern)):
                 if i >= limit:
@@ -167,6 +176,7 @@ class HostOSFiles:
                     break
 
                 rel_path = file_path.relative_to(safe_path)
+                full_rel_path = file_path.relative_to(self.host_os.sandbox_dir).as_posix()
 
                 try:
                     size_str = (
@@ -175,7 +185,8 @@ class HostOSFiles:
                 except Exception:
                     size_str = "???"
 
-                found.append(f"- {rel_path} ({size_str})")
+                desc = f" [Description: {meta[full_rel_path]}]" if full_rel_path in meta else ""
+                found.append(f"- {rel_path} ({size_str}){desc}")
 
             if not found:
                 return SkillResult.ok(f"По маске '{pattern}' ничего не найдено.")
@@ -198,7 +209,7 @@ class HostOSFiles:
 
             if not safe_path.exists():
                 return SkillResult.fail(f"Ошибка: Файл не существует ({filepath}).")
-            
+
             if not safe_path.is_file():
                 return SkillResult.fail(
                     "Ошибка: Это не файл, удаление директорий через этот инструмент запрещено."
@@ -281,3 +292,31 @@ class HostOSFiles:
         system_logger.info(f"[Host OS] Созданы директории: {', '.join(created)}")
 
         return SkillResult.ok(msg)
+
+    @skill()
+    async def set_file_description(self, filepath: str, description: str) -> SkillResult:
+        """
+        Привязывает текстовое описание к медиа-файлу.
+        Полезно для сохранения информации о содержимом картинок, видео или сложных архивов,
+        чтобы в будущем понимать их суть без повторного чтения/просмотра.
+        """
+        try:
+            safe_path = self.host_os.validate_path(filepath, is_write=False)
+            if not safe_path.exists():
+                return SkillResult.fail(f"Ошибка: Файл не найден ({filepath}).")
+
+            # Получаем путь относительно sandbox/ в формате posix (со слэшами '/')
+            rel_path = safe_path.relative_to(self.host_os.sandbox_dir).as_posix()
+
+            # Убираем переносы строк для красоты вывода в ls
+            clean_desc = description.replace("\n", " ").strip()
+
+            await asyncio.to_thread(self.host_os.set_file_metadata, rel_path, clean_desc)
+
+            system_logger.info(f"[Host OS] Добавлено описание для файла: {safe_path.name}")
+            return SkillResult.ok(f"Описание успешно привязано к файлу {safe_path.name}.")
+
+        except PermissionError as e:
+            return SkillResult.fail(str(e))
+        except Exception as e:
+            return SkillResult.fail(f"Ошибка при сохранении описания: {e}")

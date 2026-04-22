@@ -83,6 +83,9 @@ class ReactLoop:
                 {"role": "user", "content": ""},  # Будет перезаписываться на каждом шаге
             ]
 
+            timeout_retries = 0
+            max_timeout_retries = 3
+
             step = 1
             while step <= self.agent_state.max_react_steps:
                 self.agent_state.current_step = step
@@ -118,7 +121,10 @@ class ReactLoop:
                         },
                         temperature=self.agent_state.temperature,
                         max_tokens=4096,
+                        timeout=240.0,
                     )
+
+                    timeout_retries = 0
 
                     message_obj = response.choices[0].message
                     raw_answer = message_obj.content or ""
@@ -127,6 +133,20 @@ class ReactLoop:
                         raw_answer += str(message_obj.tool_calls[0].function.arguments)
 
                     self.tracker.add_output_record(raw_answer)
+
+                except (openai.APITimeoutError, asyncio.TimeoutError):
+                    timeout_retries += 1
+                    if timeout_retries >= max_timeout_retries:
+                        system_logger.error(
+                            f"[LLM] API недоступно после {max_timeout_retries} таймаутов. Прерывание цикла."
+                        )
+                        self.agent_state.update_state(AgentStatus.ERROR)
+                        break
+
+                    system_logger.warning(
+                        f"[LLM] Таймаут ответа API (240 сек). Повторный запрос ({timeout_retries}/{max_timeout_retries})."
+                    )
+                    continue  # continue запустит новую попытку на ТОМ ЖЕ шаге
 
                 except openai.RateLimitError as e:
                     err_code = getattr(e.body, "get", lambda x: None)("code")

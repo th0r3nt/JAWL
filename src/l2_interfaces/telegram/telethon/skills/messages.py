@@ -302,3 +302,42 @@ class TelethonMessages:
 
         except Exception as e:
             return SkillResult.fail(f"Ошибка при поиске сообщений: {e}")
+
+
+    @skill()
+    async def edit_draft(
+        self, chat_id: Union[int, str], text: str, append: bool = True
+    ) -> SkillResult:
+        """
+        Сохраняет или обновляет черновик (неотправленное сообщение) в указанном чате.
+        Если append=True, добавляет текст к уже существующему черновику (удобно для неспешного сбора лонгридов).
+        """
+        try:
+            client = self.tg_client.client()
+            target_entity = await client.get_entity(parse_int_or_str(chat_id))
+
+            current_text = ""
+            if append:
+                # Пытаемся вытянуть текущий текст черновика для конкретного чата
+                drafts = await client.get_drafts()
+                for d in drafts:
+                    if getattr(d.entity, "id", None) == target_entity.id:
+                        current_text = d.text
+                        break
+
+            final_text = f"{current_text}\n\n{text}".strip() if current_text else text
+
+            # Сохраняем черновик
+            await client.edit_draft(target_entity, final_text)
+
+            action_type = "дополнен" if current_text else "создан"
+            system_logger.info(f"[Telegram Telethon] Черновик {action_type} в чате {chat_id}")
+            
+            return SkillResult.ok(
+                f"Черновик успешно {action_type} в чате {chat_id}."
+            )
+
+        except ValueError:
+            return SkillResult.fail("Ошибка: Некорректный ID чата или Username.")
+        except Exception as e:
+            return SkillResult.fail(f"Ошибка при работе с черновиком: {e}")
