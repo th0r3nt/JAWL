@@ -27,7 +27,12 @@ class RAGMemories:
         self.vector_thoughts = vector_thoughts
         self.telethon_state = telethon_state
         self.agent_state = agent_state
+
+        # Лимит для БД (сколько искать по 1 ключу)
         self.auto_rag_top_k = auto_rag_top_k
+
+        # Глобальный лимит: сколько МАКСИМУМ воспоминаний суммарно отдать в контекст
+        self.global_limit = 10
 
     async def get_context_block(
         self,
@@ -56,25 +61,16 @@ class RAGMemories:
             if len(msg) > 10 or len(msg.split()) > 2:
                 queries.add(msg.strip())
 
-            for event in missed_events:
-                evt_payload = event.get("payload", {})
-
-                match_sender = evt_payload.get("sender_name")
-                if match_sender and match_sender.lower() != "unknown":
-                    queries.add(match_sender.strip())
-
-                match_chat = evt_payload.get("chat_name")
-                if match_chat and match_chat.lower() != "unknown":
-                    queries.add(match_chat.strip())
-
-                match_msg = evt_payload.get("message", "")
+            # Берем только ПОСЛЕДНИЙ пропущенный ивент, чтобы не собирать мусор со всех логов
+            if missed_events:
+                last_evt = missed_events[-1].get("payload", {})
+                match_msg = last_evt.get("message", "")
                 if len(match_msg) > 15 or len(match_msg.split()) > 3:
                     queries.add(match_msg.strip())
 
             # Из названий чатов с непрочитанными сообщениями
             for line in self.telethon_state.last_chats.split("\n"):
                 if "непр.]" in line:
-                    # Извлекаем имя между типом чата и ID: "[User] Name (ID: 123)"
                     match_name = re.search(r"\]\s+(.+?)\s*\(ID:", line)
                     if match_name:
                         queries.add(match_name.group(1).strip())
@@ -93,16 +89,11 @@ class RAGMemories:
             if self.agent_state.last_action_error:
                 queries.add(self.agent_state.last_action_error)
 
-            if missed_events:
-                last_evt = missed_events[-1]
-                match_msg = last_evt.get("payload", {}).get("message", "")
-                if match_msg:
-                    queries.add(match_msg.strip())
-
         if not queries:
             return ""
 
-        queries = list(queries)[:20]
+        # ЖЕСТКИЙ ЛИМИТ ЗАПРОСОВ
+        queries = list(queries)[:3]
 
         tasks = []
         for q in queries:
@@ -115,30 +106,39 @@ class RAGMemories:
 
         results = await asyncio.gather(*tasks, return_exceptions=True)
 
-        memory_blocks = []
-        for i, res in enumerate(results):
-            if isinstance(res, Exception):
+        # ==================================================================
+        # ОЧИСТКА ОТ ДУБЛЕЙ И ФОРМАТИРОВАНИЕ
+        # ==================================================================
+
+        unique_memories = {}
+
+        for res in results:
+            if isinstance(res, Exception) or not res.is_success:
                 continue
 
-            if (
-                res.is_success
-                and "не дал результатов" not in res.message
-                and "пуста" not in res.message
-            ):
-                q = queries[i // 2]
+            if "не дал результатов" in res.message or "пуста" in res.message:
+                continue
 
-                # Изящно обрезаем длинный ключ, как ты и просил
-                short_q = q[:100] + "..." if len(q) > 100 else q
+            # Разбиваем ответ скилла на отдельные блоки памяти (каждая память отделена \n\n)
+            blocks = res.message.split("\n\n")
 
-                source = "Knowledge" if i % 2 == 0 else "Thoughts"
-                memory_blocks.append(
-                    f"### Найдено по ключу '{short_q}' ({source}):\n{res.message}"
-                )
+            for block in blocks:
+                block = block.strip()
+                if not block:
+                    continue
 
-        if not memory_blocks:
+                # Вытаскиваем ID для дедупликации
+                match = re.search(r"\[ID: `([^`]+)`\]", block)
+                if match:
+                    point_id = match.group(1)
+                    # Если такой ID еще не добавляли - сохраняем
+                    if point_id not in unique_memories:
+                        unique_memories[point_id] = block
+
+        # Обрезаем суммарное количество воспоминаний под глобальный лимит
+        final_blocks = list(unique_memories.values())[: self.global_limit]
+
+        if not final_blocks:
             return ""
 
-        return (
-            "## RELEVANT INFORMATION (автоматический поиск по базам данных)\n"
-            + "\n\n".join(memory_blocks)
-        )
+        return "## RELEVANT INFORMATION (Семантическая память)\n" + "\n\n".join(final_blocks)

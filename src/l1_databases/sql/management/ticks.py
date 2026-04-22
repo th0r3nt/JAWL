@@ -77,8 +77,7 @@ class SQLTicks:
 
             ticks = result.scalars().all()
             return list(reversed(ticks))
-
-    async def get_context_block(self, **kwargs) -> str:
+async def get_context_block(self, **kwargs) -> str:
         # ВАЖНО: передаем ignore_session=True
         ticks = await self.get_ticks(limit=self.ticks_limit, ignore_session=True)
 
@@ -92,8 +91,14 @@ class SQLTicks:
             # Проверяем, попадает ли тик в последние N детализированных
             is_detailed = i >= total_ticks - self.detailed_ticks
 
+            # ПАРСИНГ МЫСЛЕЙ
+            thoughts_str = t.thoughts
+            limit = 500
+            if not is_detailed and len(thoughts_str) > limit:
+                thoughts_str = thoughts_str[:limit] + " ... [Мысли обрезаны системой]"
+
             # ПАРСИНГ ДЕЙСТВИЙ
-            action_limit = self.action_max_chars if is_detailed else 150
+            action_limit = self.action_max_chars if is_detailed else 200
             actions_list = []
 
             # Унифицируем к списку (защита от галлюцинаций LLM)
@@ -111,7 +116,6 @@ class SQLTicks:
                 else:
                     act_str = str(a)
 
-                # Обрезаем каждое действие индивидуально
                 if len(act_str) > action_limit:
                     act_str = act_str[:action_limit] + " ...[Параметры обрезаны]"
 
@@ -132,7 +136,6 @@ class SQLTicks:
                     if not part:
                         continue
 
-                    # Обрезаем каждый результат индивидуально
                     if len(part) > res_limit:
                         formatted_parts.append(
                             part[:res_limit]
@@ -158,7 +161,7 @@ class SQLTicks:
 
             blocks.append(
                 f"#### [Tick ID: {short_id}] ({time_str})\n"
-                f"*Thoughts*: {t.thoughts}\n"
+                f"*Thoughts*: {thoughts_str}\n"
                 f"*Actions*:\n{actions_str}\n"
                 f"*Result*:\n```\n{res_str}\n```"
             )

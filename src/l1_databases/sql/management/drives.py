@@ -225,7 +225,10 @@ class SQLDrives:
             if d.recent_reflections:
                 lines.append("* История удовлетворения:")
                 for ref in d.recent_reflections:
-                    lines.append(f"  - {ref}")
+                    # Жестко режем длинные рефлексии
+                    limit = 500
+                    short_ref = ref if len(ref) <= limit else ref[:limit] + "... [Обрезано системой]"
+                    lines.append(f"  - {short_ref}")
             else:
                 lines.append("* История удовлетворения: Пусто")
 

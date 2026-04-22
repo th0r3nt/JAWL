@@ -60,13 +60,12 @@ class ContextBuilder:
     ) -> str:
         """Возвращает отформатированный блок контекста текущего Heartbeat."""
 
-        # 1. Форматируем текущий триггер (то, почему мы проснулись прямо сейчас)
+        # Форматируем текущий триггер (то, почему мы проснулись прямо сейчас)
         current_trigger = self._format_single_event(event_name, payload)
 
-        # 2. Форматируем список пропущенных событий (Event Log)
+        # Форматируем список пропущенных событий (Event Log)
         log_blocks = []
         for evt in missed_events:
-            # evt теперь словарь из heartbeat.py
             formatted = self._format_single_event(
                 event_name=evt["name"],
                 payload=evt["payload"],
@@ -77,13 +76,15 @@ class ContextBuilder:
 
         event_log = "\n\n---\n\n".join(log_blocks) if log_blocks else "No other events in log"
 
+        # Сначала лог, потом системный триггер (главная директива в самом конце для Recency Bias)
         return f"""
-## HEARTBEAT
-### CURRENT TRIGGER
-{current_trigger}
-
-### EVENT LOG (missed while sleeping or thinking)
+## EVENT LOG (missed while sleeping or thinking)
 {event_log}
+
+---
+
+## CURRENT TRIGGER
+{current_trigger}
 """.strip()
 
     def _build_answer_to_event_reason(
@@ -125,21 +126,21 @@ class ContextBuilder:
 [Плановый системный такт]
 [Статус: внешние прерывания отсутствуют]
 [Рекомендуется: поддержание проактивности, самостоятельное определение вектора полезной нагрузки]
-[События из Event Log носят информационный характер и не являются главной причиной пробуждения]
+[Важно: события из Event Log носят информационный характер и не являются главной причиной пробуждения]
 [Пропуск вычислительного цикла без выполнения действий и реагирование исключительно на Event Log является нежелательным]
 """
 
         # Системная директива при первичном запуске (холодный старт)
         if event_name == "SYSTEM_CORE_START":
-            return (f"""
+            return f"""
 {header}
 [SYSTEM]
 [Инициализация ядра JAWL]
 [Статус: Запуск подсистем завершен]
 [Рекомендуется: выполнить первичную калибровку, оценить уровень дефицита мотиваторов и список открытых задач]
 [Ожидается проактивный старт]
-""")
-        
+"""
+
         if event_name == "SYSTEM_CALENDAR_ALARM":
             alarm_title = payload.get("title", "Неизвестно")
             return f"""
