@@ -77,7 +77,8 @@ class SQLTicks:
 
             ticks = result.scalars().all()
             return list(reversed(ticks))
-async def get_context_block(self, **kwargs) -> str:
+
+    async def get_context_block(self, **kwargs) -> str:
         # ВАЖНО: передаем ignore_session=True
         ticks = await self.get_ticks(limit=self.ticks_limit, ignore_session=True)
 
@@ -157,10 +158,10 @@ async def get_context_block(self, **kwargs) -> str:
                 res_str = "None"
 
             time_str = format_datetime(t.created_at, self.tz_offset)
-            short_id = t.id[:8]
+            # short_id = t.id[:8]
 
             blocks.append(
-                f"#### [Tick ID: {short_id}] ({time_str})\n"
+                f"#### [Tick] ({time_str})\n"
                 f"*Thoughts*: {thoughts_str}\n"
                 f"*Actions*:\n{actions_str}\n"
                 f"*Result*:\n```\n{res_str}\n```"
