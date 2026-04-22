@@ -117,24 +117,29 @@ class ContextBuilder:
         if event_time and level:
             header = f"[{event_time}] [{level}] {header}"
 
-        # Если это пустой HEARTBEAT (нет внешних триггеров) - даем пинок к проактивности
+        # Если это пустой HEARTBEAT (нет внешних триггеров) - даем системную директиву
         if event_name == "HEARTBEAT" and not payload:
-            return f"{header}\n(Внешних триггеров нет. Ожидаются проактивные действия)"
+            return f"""
+{header}
+[SYSTEM]
+[Плановый системный такт]
+[Статус: срочные внешние прерывания отсутствуют]
+[Рекомендуется: поддержание проактивности, самостоятельное определение вектора полезной нагрузки]
+[Пропуск вычислительного цикла без выполнения действий и вызова инструментов нежелателен]
+"""
 
         lines = [header]
 
-        # Выводим Sender и Message ТОЛЬКО если они реально переданы в событии
         if "sender_name" in payload:
             lines.append(f"Sender: {payload['sender_name']}")
+
         if "message" in payload:
             lines.append(f"Message: {payload['message']}")
 
-        # Собираем доп. метаданные (chat_id, msg_id, filepath и т.д.)
         for k, v in payload.items():
             if k not in ["message", "sender_name", "recent_history"]:
                 lines.append(f"* {k}: {v}")
 
-        # История чата (если есть) всегда идет в конце блока
         if "recent_history" in payload and payload["recent_history"]:
             lines.append(f"\n#### Recent Chat History:\n{payload['recent_history']}")
 
