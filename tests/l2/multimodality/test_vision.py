@@ -14,7 +14,7 @@ async def test_look_at_media_success(vision_skills, mock_os_client, tmp_path):
     res = await vision_skills.look_at_media("test.png")
 
     assert res.is_success is True
-    assert "[IMAGE_REQUEST:" in res.message
+    assert "[SYSTEM_MARKER_IMAGE_ATTACHED:" in res.message
     assert str(fake_image.resolve()) in res.message
 
 

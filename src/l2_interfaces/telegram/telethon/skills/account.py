@@ -109,10 +109,13 @@ class TelethonAccount:
         self, user_or_chat_id: Union[int, str], dest_filename: str, avatar_index: int = 0
     ) -> SkillResult:
         """
-        Скачивает аватар (фото профиля) пользователя, канала или группы в папку sandbox/.
+        Скачивает аватар (фото профиля) пользователя, канала или группы. По умолчанию в sandbox/download/.
         avatar_index: 0 - текущий аватар, 1 - предыдущий и т.д. (если доступна история фото).
         """
         try:
+            if "/" not in dest_filename and "\\" not in dest_filename:
+                dest_filename = f"download/{dest_filename}"
+
             safe_path = validate_sandbox_path(dest_filename)
             client = self.tg_client.client()
             entity = await client.get_entity(parse_int_or_str(user_or_chat_id))

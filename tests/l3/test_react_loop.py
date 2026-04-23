@@ -200,7 +200,7 @@ def test_react_inject_images_success(mock_dependencies, tmp_path):
 
     # Имитируем историю, где на прошлом шаге тулза вернула маркер
     messages = [
-        {"role": "tool", "content": f"Result: [IMAGE_REQUEST: {fake_img.resolve()}]"},
+        {"role": "tool", "content": f"Result: [SYSTEM_MARKER_IMAGE_ATTACHED: {fake_img.resolve()}]"},
         {"role": "user", "content": "Анализируй"},
     ]
 

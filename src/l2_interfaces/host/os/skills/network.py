@@ -182,14 +182,15 @@ class HostOSNetwork:
 
     @skill()
     async def download_file(self, url: str, dest_filename: str) -> SkillResult:
-        """Скачивает файл из сети на диск."""
+        """Скачивает файл из сети на диск. По умолчанию сохраняет в sandbox/download/."""
 
         try:
+            # Если агент передал просто имя файла, кидаем его в папку загрузок
+            if "/" not in dest_filename and "\\" not in dest_filename:
+                dest_filename = f"download/{dest_filename}"
+
             # Гейткипер проверит права на запись в этот путь
             safe_path = self.host_os.validate_path(dest_filename, is_write=True)
-
-            # Создаем родительские папки, если их нет
-            safe_path.parent.mkdir(parents=True, exist_ok=True)
 
             def _download():
                 req = urllib.request.Request(url, headers={"User-Agent": "JAWL-Agent/1.0"})

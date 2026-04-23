@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from typing import Optional, Callable, Dict, Any, TypeVar
 
 from src.utils.logger import system_logger
+from src.utils._tools import truncate_text
 from src.l3_agent.skills.schema import ActionCall
 
 
@@ -101,7 +102,6 @@ def register_instance(instance: Any):
 def get_skills_library() -> str:
     return "\n".join(_SKILL_DOCS)
 
-
 async def execute_skill(actions: list[ActionCall]) -> str:
     if not actions:
         return "Цикл завершен: действий не передано."
@@ -111,7 +111,10 @@ async def execute_skill(actions: list[ActionCall]) -> str:
         name = act.tool_name
         params = act.parameters
 
-        system_logger.info(f"[Agent Action] {name}({params})")
+        # Ограничиваем длину параметров для логов
+        params_str = truncate_text(str(params), max_chars=250, suffix="... [Параметры обрезаны]")
+        
+        system_logger.info(f"[Agent Action] {name}({params_str})")
         tasks.append(_run_single_skill(name, params))
 
     results = await asyncio.gather(*tasks)

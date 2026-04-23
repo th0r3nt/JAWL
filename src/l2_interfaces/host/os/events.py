@@ -6,6 +6,7 @@ import subprocess
 from pathlib import Path
 import psutil
 import json
+import difflib
 from typing import Any
 
 from watchdog.observers import Observer
@@ -105,7 +106,7 @@ class HostOSEvents:
         self._is_running: bool = False
         self._monitoring_task: asyncio.Task | None = None
 
-        self._observer: Observer | None = None  # type: ignore
+        self._observer: Observer | None = None # type: ignore
         self._watches: dict[str, Any] = {}
 
         self._persistence_file = (
@@ -120,6 +121,10 @@ class HostOSEvents:
 
         self._last_sandbox_files = set()
         psutil.cpu_percent(interval=None)
+
+        self._debounce_tasks: dict[str, asyncio.Task] = {}
+        self._file_cache: dict[str, str] = {}
+        self._diff_size_limit = 1024 * 100  # Макс 100 КБ для кэша одного текстового файла
 
         # Собираем статику 1 раз при старте
         self.state.os_info = f"{platform.system()} {platform.release()}"
@@ -234,8 +239,25 @@ class HostOSEvents:
     # ==========================================================
 
     async def handle_file_system_event(self, sys_event_config, filepath: str):
-        """Вызывается мгновенно при любом изменении файла (создание/удаление/изменение)."""
-        # Сразу перестраиваем ASCII-дерево в стейте, чтобы агент увидел актуальную картину
+        """Вызывается при изменении файла. Использует Debounce для защиты от спама."""
+        # Отменяем предыдущий таймер для этого файла, если он был (IDE еще пишет файл)
+        if filepath in self._debounce_tasks:
+            self._debounce_tasks[filepath].cancel()
+
+        # Создаем новую задачу с отложенным выполнением
+        task = asyncio.create_task(self._debounced_publish(sys_event_config, filepath))
+        self._debounce_tasks[filepath] = task
+
+    async def _debounced_publish(self, sys_event_config, filepath: str):
+        try:
+            # Ждем 1.5 секунды тишины. Если IDE еще раз дернет файл, эта задача отменится
+            await asyncio.sleep(1.5)
+        except asyncio.CancelledError:
+            return  # Отменено новым событием для этого же файла
+
+        self._debounce_tasks.pop(filepath, None)
+
+        # Перестраиваем ASCII дерево для стейта
         self._update_file_trees()
 
         try:
@@ -243,8 +265,62 @@ class HostOSEvents:
         except ValueError:
             rel_path = str(filepath)
 
-        # Публикуем событие
-        await self.bus.publish(sys_event_config, filepath=rel_path)
+        diff_msg = ""
+        path_obj = Path(filepath)
+
+        # Если файл удален - чистим кэш
+        if sys_event_config == Events.HOST_OS_FILE_DELETED:
+            self._file_cache.pop(filepath, None)
+
+        # Если создан или изменен - считаем символы
+        elif path_obj.exists() and path_obj.is_file():
+            try:
+                size = path_obj.stat().st_size
+                if size < self._diff_size_limit:
+                    with open(path_obj, "r", encoding="utf-8") as f:
+                        new_content = f.read()
+
+                    old_content = self._file_cache.get(filepath)
+
+                    # Считаем разницу, если файл уже был в кэше
+                    if old_content is not None and old_content != new_content:
+                        matcher = difflib.SequenceMatcher(None, old_content, new_content)
+                        added = 0
+                        deleted = 0
+                        for tag, i1, i2, j1, j2 in matcher.get_opcodes():
+                            if tag == "insert":
+                                added += j2 - j1
+                            elif tag == "delete":
+                                deleted += i2 - i1
+                            elif tag == "replace":
+                                deleted += i2 - i1
+                                added += j2 - j1
+
+                        if added > 0 or deleted > 0:
+                            diff_msg = f"(Изменения: +{added} симв. / -{deleted} симв.)"
+                        else:
+                            diff_msg = "(Сохранен без изменений текста)"
+
+                    elif old_content is None:
+                        diff_msg = f"(Зафиксирован: {size} байт)"
+
+                    # Обновляем кэш
+                    self._file_cache[filepath] = new_content
+            except UnicodeDecodeError:
+                pass  # Если бинарник - игнорируем diff
+            except Exception:
+                pass
+
+        action_word = "изменен"
+        if sys_event_config == Events.HOST_OS_FILE_CREATED:
+            action_word = "создан"
+        elif sys_event_config == Events.HOST_OS_FILE_DELETED:
+            action_word = "удален"
+
+        message = f"Файл '{rel_path}' был {action_word}. {diff_msg}".strip()
+
+        # Публикуем ЕДИНСТВЕННОЕ событие агенту
+        await self.bus.publish(sys_event_config, filepath=rel_path, message=message)
 
     async def _loop(self):
         """Бесконечный цикл поллинга для телеметрии (раз в 20-30 сек)."""

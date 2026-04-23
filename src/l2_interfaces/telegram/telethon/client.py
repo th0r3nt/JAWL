@@ -93,11 +93,12 @@ class TelethonClient:
             if personal_channel_id:
                 try:
                     from telethon import utils
+
                     channel = await self._client.get_entity(personal_channel_id)
                     channel_name = utils.get_display_name(channel)
                     channel_username = getattr(channel, "username", None)
                     un_str = f" (@{channel_username})" if channel_username else ""
-                    
+
                     channel_info = (
                         f"\nЛичный канал: {channel_name}{un_str} (ID: {personal_channel_id})"
                     )

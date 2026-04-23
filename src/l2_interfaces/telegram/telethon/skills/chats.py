@@ -188,7 +188,6 @@ class TelethonChats:
                 kwargs["reply_to"] = int(topic_id)
 
             async for msg in client.iter_messages(target_entity, **kwargs):
-                # Вся мощь в одной строчке
                 formatted = await TelethonMessageParser.build_string(
                     client=client,
                     target_entity=target_entity,
@@ -199,15 +198,35 @@ class TelethonChats:
                 )
                 messages.append(formatted)
 
+            draft_text = ""
+            try:
+                drafts = await client.get_drafts()
+                for d in drafts:
+                    if getattr(d.entity, "id", None) == target_entity.id:
+                        # Если читаем топик форума - проверяем совпадение reply_to_msg_id
+                        if topic_id:
+                            d_topic_id = getattr(d, "reply_to_msg_id", None)
+                            if d_topic_id != int(topic_id):
+                                continue
+
+                        if d.text:
+                            draft_text = (
+                                f"\n\n[Черновик (Неотправленное сообщение)]:\n{d.text}"
+                            )
+                        break
+            except Exception as e:
+                system_logger.debug(f"[TelethonChats] Ошибка при получении черновика: {e}")
+
             if not messages:
-                return SkillResult.ok(
+                base_msg = (
                     "В этом топике нет сообщений."
                     if topic_id
                     else "В этом чате нет сообщений."
                 )
+                return SkillResult.ok(base_msg + draft_text)
 
             messages.reverse()
-            return SkillResult.ok("\n\n".join(messages))
+            return SkillResult.ok("\n\n".join(messages) + draft_text)
 
         except ValueError:
             return SkillResult.fail(f"Ошибка: Некорректный ID чата ({chat_id}).")

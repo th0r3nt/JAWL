@@ -2,7 +2,7 @@ import shutil
 import yaml
 from pathlib import Path
 from pydantic import BaseModel
-
+from yaml.constructor import ConstructorError
 
 # ==========================================
 # Модели для interfaces.yaml
@@ -175,6 +175,34 @@ class SettingsConfig(BaseModel):
 # ==========================================
 
 
+class UniqueKeyLoader(yaml.SafeLoader):
+    """Кастомный загрузчик YAML, который падает с ошибкой при дублировании ключей."""
+
+    pass
+
+
+def construct_mapping(loader, node, deep=False):
+    loader.flatten_mapping(node)
+    mapping = {}
+    for key_node, value_node in node.value:
+        key = loader.construct_object(key_node, deep=deep)
+        if key in mapping:
+            raise ConstructorError(
+                None,
+                None,
+                f"Обнаружен дубликат ключа '{key}' в YAML файле. Исправьте конфигурацию.",
+                key_node.start_mark,
+            )
+        value = loader.construct_object(value_node, deep=deep)
+        mapping[key] = value
+    return mapping
+
+
+UniqueKeyLoader.add_constructor(
+    yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG, construct_mapping
+)
+
+
 def load_yaml(file_path: Path) -> dict:
     """Безопасно читает YAML файл и возвращает словарь с автофикс-кодировкой."""
     if not file_path.exists():
@@ -182,11 +210,12 @@ def load_yaml(file_path: Path) -> dict:
 
     try:
         with open(file_path, "r", encoding="utf-8") as f:
-            return yaml.safe_load(f) or {}
+            # Заменяем yaml.safe_load на yaml.load с строгим парсером
+            return yaml.load(f, Loader=UniqueKeyLoader) or {}
     except UnicodeDecodeError:
         # Лечим сломанную кодировку
         with open(file_path, "r", encoding="cp1251") as f:
-            return yaml.safe_load(f) or {}
+            return yaml.load(f, Loader=UniqueKeyLoader) or {}
 
 
 def load_config() -> tuple[SettingsConfig, InterfacesConfig]:

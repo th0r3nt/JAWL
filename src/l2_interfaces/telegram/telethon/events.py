@@ -3,7 +3,12 @@ from typing import Any
 
 from telethon import events, utils
 from telethon.tl.types import UpdateMessageReactions
+from telethon.tl.functions.channels import GetFullChannelRequest
+from telethon.tl.functions.messages import GetFullChatRequest
+from telethon.errors import FloodWaitError
+from telethon.tl.types import Channel, Chat
 
+from src.utils._tools import truncate_text
 from src.utils.logger import system_logger
 from src.utils.event.bus import EventBus
 from src.utils.event.registry import Events
@@ -24,6 +29,9 @@ class TelethonEvents:
         self.state = state
         self.bus = event_bus
         self._last_state_update = 0.0
+
+        # Кэш описаний чатов (чтобы не убить API Telegram'а лимитами)
+        self._chat_desc_cache: dict[int, str] = {}
 
     async def start(self) -> None:
         client = self.tg_client.client()
@@ -66,9 +74,9 @@ class TelethonEvents:
         system_logger.info("[Telegram Telethon] Слушатели событий успешно остановлены.")
 
     async def _update_state(self, force: bool = False):
+        """Обновляет состояние (последние n чатов и профиль агента)."""
         now = time.time()
 
-        # Если не форсируем, ждем хотя бы 3 секунды (защита от FloodWait)
         if not force and now - self._last_state_update < 3:
             return
 
@@ -81,13 +89,47 @@ class TelethonEvents:
             async for dialog in client.iter_dialogs(limit=self.state.number_of_last_chats):
                 entity = dialog.entity
 
+                # =============================================================
+                # ГРУППЫ/КАНАЛЫ
+
+                # Ленивая подгрузка описаний для каналов и групп
+                if (dialog.is_group or dialog.is_channel) and entity.id not in self._chat_desc_cache:
+                    try:
+                        about = ""
+                        if isinstance(entity, Channel):
+                            full = await client(GetFullChannelRequest(channel=entity))
+                            about = full.full_chat.about or ""
+
+                        elif isinstance(entity, Chat):
+                            full = await client(GetFullChatRequest(chat_id=entity.id))
+                            about = full.full_chat.about or ""
+
+                        self._chat_desc_cache[entity.id] = about.strip()
+
+                    except FloodWaitError:
+                        # Если Telegram ругается на частоту запросов - просто пропускаем,
+                        # чтобы не крашнуть весь цикл. Попробуем догрузить описание позже.
+                        pass
+                    except Exception:
+                        self._chat_desc_cache[entity.id] = ""
+
+                desc = self._chat_desc_cache.get(entity.id, "")
+                desc_str = f" | Описание: {truncate_text(desc.replace('\n', ' '), 250, '...')}" if desc else ""
+
+                # Public/Private
                 is_public = bool(getattr(entity, "username", None))
                 status_str = "Public" if is_public else "Private"
 
+                # Подписчики
                 participants = getattr(entity, "participants_count", None)
                 part_str = f" | {participants} чел." if participants else ""
 
+                # Статус непрочитанных
                 unread = f" [{dialog.unread_count} непр.]" if dialog.unread_count > 0 else ""
+
+
+                # =============================================================
+                # USERS
 
                 if dialog.is_user:
                     bot_tag = " [Bot]" if getattr(entity, "bot", False) else ""
@@ -115,15 +157,18 @@ class TelethonEvents:
                             chats.append("    [Ошибка загрузки истории]")
 
                 elif dialog.is_group:
+                    # Добавляем desc_str перед unread
                     chats.append(
-                        f"[{status_str} Group] {dialog.name} (ID: {dialog.id}){part_str}{unread}"
+                        f"[{status_str} Group] {dialog.name} (ID: {dialog.id}){part_str}{desc_str}{unread}"
                     )
                 elif dialog.is_channel:
+                    # Добавляем desc_str перед unread
                     chats.append(
-                        f"[{status_str} Channel] {dialog.name} (ID: {dialog.id}){part_str}{unread}"
+                        f"[{status_str} Channel] {dialog.name} (ID: {dialog.id}){part_str}{desc_str}{unread}"
                     )
 
             self.state.last_chats = "\n".join(chats) if chats else "Список диалогов пуст."
+            
         except Exception as e:
             system_logger.error(f"[Telethon] Ошибка обновления стейта: {e}")
 

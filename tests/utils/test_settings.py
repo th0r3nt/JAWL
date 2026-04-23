@@ -1,6 +1,7 @@
 import pytest
 import yaml
 from pathlib import Path
+from yaml.constructor import ConstructorError
 
 from src.utils.settings import (
     load_yaml,
@@ -64,3 +65,20 @@ def test_host_os_config_validation():
     }
     with pytest.raises(ValueError):
         HostOSConfig(**data)
+
+
+def test_load_yaml_duplicate_keys(tmp_path: Path):
+    """Тест: парсер должен выбрасывать исключение при дублировании ключей."""
+    test_file = tmp_path / "test_dup.yaml"
+    
+    # Создаем кривой YAML с дублирующимся ключом 'system'
+    test_data = """
+system:
+  timezone: 3
+system:
+  timezone: 5
+    """
+    test_file.write_text(test_data.strip(), encoding="utf-8")
+
+    with pytest.raises(ConstructorError, match="Обнаружен дубликат ключа 'system'"):
+        load_yaml(test_file)

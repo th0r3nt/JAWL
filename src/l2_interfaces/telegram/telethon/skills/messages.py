@@ -108,9 +108,12 @@ class TelethonMessages:
     async def download_file(
         self, chat_id: Union[int, str], message_id: int, dest_filename: str
     ) -> SkillResult:
-        """Скачивает медиа-вложение (картинку, гс, документ) из сообщения в Telegram в локальную папку sandbox/."""
+        """Скачивает медиа-вложение из сообщения в Telegram. По умолчанию сохраняет в sandbox/download/."""
 
         try:
+            if "/" not in dest_filename and "\\" not in dest_filename:
+                dest_filename = f"download/{dest_filename}"
+
             safe_path = validate_sandbox_path(dest_filename)
             client = self.tg_client.client()
             entity = parse_int_or_str(chat_id)
@@ -344,3 +347,25 @@ class TelethonMessages:
             return SkillResult.fail("Ошибка: Некорректный ID чата или Username.")
         except Exception as e:
             return SkillResult.fail(f"Ошибка при работе с черновиком: {e}")
+
+    @skill()
+    async def delete_draft(self, chat_id: Union[int, str]) -> SkillResult:
+        """
+        Удаляет черновик (неотправленное сообщение) в указанном чате.
+        """
+        try:
+            client = self.tg_client.client()
+            target_entity = await client.get_entity(parse_int_or_str(chat_id))
+
+            # Передаем пустую строку в SaveDraftRequest, чтобы Telegram удалил черновик
+            await client(
+                SaveDraftRequest(peer=await client.get_input_entity(target_entity), message="")
+            )
+
+            system_logger.info(f"[Telegram Telethon] Черновик удален в чате {chat_id}")
+            return SkillResult.ok(f"Черновик успешно удален в чате {chat_id}.")
+
+        except ValueError:
+            return SkillResult.fail("Ошибка: Некорректный ID чата или Username.")
+        except Exception as e:
+            return SkillResult.fail(f"Ошибка при удалении черновика: {e}")

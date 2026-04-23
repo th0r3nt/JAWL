@@ -35,8 +35,10 @@ class HostOSClient:
 
         self.framework_dir = Path(base_dir).resolve()
         self.sandbox_dir = self.framework_dir / "sandbox"
+        self.download_dir = self.sandbox_dir / "download"
 
         self.sandbox_dir.mkdir(parents=True, exist_ok=True)
+        self.download_dir.mkdir(parents=True, exist_ok=True)
 
         system_logger.info(
             f"[Host OS] Клиент инициализирован (ОС: {self.os_platform}, Access Level: {self.access_level.name})."
