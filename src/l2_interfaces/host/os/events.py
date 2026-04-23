@@ -366,7 +366,7 @@ class HostOSEvents:
             for i, item in enumerate(items):
                 is_last = i == len(items) - 1
                 connector = "└── " if is_last else "├── "
-
+                
                 icon = ""
                 if use_emojis:
                     icon = "📂 " if item.is_dir() else "📄 "
@@ -380,24 +380,22 @@ class HostOSEvents:
                     except ValueError:
                         pass  # Файл вне песочницы, метаданных нет
 
-                lines.append(f"{prefix}{connector}{icon}{item.name}{desc}")
+                is_truncated_dir = item.is_dir() and current_depth >= max_depth
+                display_name = f"{item.name}/..." if is_truncated_dir else item.name
 
-                if item.is_dir():
+                lines.append(f"{prefix}{connector}{icon}{display_name}{desc}")
+
+                if item.is_dir() and not is_truncated_dir:
                     extension = "    " if is_last else "│   "
-                    if current_depth < max_depth:
-                        lines.extend(
-                            self._build_tree(
-                                item,
-                                use_emojis,
-                                max_depth,
-                                current_depth + 1,
-                                prefix + extension,
-                            )
+                    lines.extend(
+                        self._build_tree(
+                            item,
+                            use_emojis,
+                            max_depth,
+                            current_depth + 1,
+                            prefix + extension,
                         )
-                    else:
-                        lines.append(
-                            f"{prefix}{extension}... [Скрыто]"
-                        )
+                    )
         except Exception:
             pass
 
