@@ -273,15 +273,16 @@ def start_agent_screen() -> None:
 
     # Если это чистый первый старт - тормозим процесс и даем юзеру время
     if configs_created or prompts_created or env_modified:
-        print_info("\n[Первичная инициализация завершена]")
+        print("\n")
+        print_info(" [Первичная инициализация завершена]")
         print_info(
-            "Были созданы базовые файлы конфигурации, файлы личности агента и/или .env."
+            " Были созданы базовые файлы конфигурации, файлы личности агента и/или .env."
         )
         print_info(
-            "Рекомендуется просмотреть и при необходимости отредактировать их перед стартом."
+            " Рекомендуется просмотреть и при необходимости отредактировать их перед стартом."
         )
         print_info(
-            "В том числе файлы в src/l3_agent/prompt/personality/ (личность и характер агента)."
+            " В том числе файлы в src/l3_agent/prompt/personality/ (личность и характер агента)."
         )
         print_success("После проверки выберите 'Запустить агента' в меню еще раз.")
         wait_for_enter()
@@ -304,17 +305,21 @@ def start_agent_screen() -> None:
         kwargs["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP
     else:
         kwargs["start_new_session"] = True
-
+        
     try:
-        # Агент самостоятельно пишет всё нужное в system.log через логгер.
-        process = subprocess.Popen(
-            [sys.executable, str(MAIN_SCRIPT)],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            cwd=str(ROOT_DIR),
-            env=env,
-            **kwargs,
-        )
+        # Создаем файл для перехвата критических ошибок уровня Python (Traceback)
+        crash_log_path = ROOT_DIR / "logs" / "startup_error.log"
+        crash_log_path.parent.mkdir(parents=True, exist_ok=True)
+
+        with open(crash_log_path, "w", encoding="utf-8") as err_file:
+            process = subprocess.Popen(
+                [sys.executable, str(MAIN_SCRIPT)],
+                stdout=subprocess.DEVNULL,
+                stderr=err_file,  # Перенаправляем stderr в файл, а не в DEVNULL
+                cwd=str(ROOT_DIR),
+                env=env,
+                **kwargs,
+            )
 
         PID_FILE.write_text(str(process.pid))
 
@@ -327,7 +332,15 @@ def start_agent_screen() -> None:
                 PID_FILE.unlink()
 
             print_error("Агент завершился с ошибкой сразу после старта.")
-            print_info("Проверьте основной лог (logs/system.log) для получения деталей.")
+            
+            # Читаем и выводим реальную причину падения
+            if crash_log_path.exists():
+                error_output = crash_log_path.read_text(encoding="utf-8").strip()
+                if error_output:
+                    print_info("Детали критической ошибки (Traceback):")
+                    print(f"\n{error_output}\n")
+                else:
+                    print_info(" Проверьте основной лог (logs/system.log) для получения деталей.")
 
             wait_for_enter()
             return

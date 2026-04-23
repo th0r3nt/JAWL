@@ -1,6 +1,8 @@
+import ast 
 from typing import Literal
 import shutil
 import asyncio
+from typing import Union, List 
 
 from src.utils.logger import system_logger
 from src.utils._tools import format_size
@@ -278,11 +280,24 @@ class HostOSFiles:
             return SkillResult.fail(f"Ошибка при удалении директории: {e}")
 
     @skill()
-    async def create_directories(self, paths: list[str]) -> SkillResult:
+    async def create_directories(self, paths: Union[str, List[str]]) -> SkillResult:
         """Создает одну или несколько директорий (папок)."""
 
-        if not paths:
-            return SkillResult.fail("Ошибка: Список путей пуст.")
+        # Защита от галлюцинаций LLM (когда она присылает строку вместо списка)
+        if isinstance(paths, str):
+            try:
+                # Пытаемся безопасно распарсить, если LLM прислала строку "['dir1', 'dir2']"
+                parsed = ast.literal_eval(paths.strip())
+                if isinstance(parsed, list):
+                    paths = parsed
+                else:
+                    paths = [paths]
+            except Exception:
+                # Если это просто обычная строка "sandbox/test"
+                paths = [paths]
+
+        if not paths or not isinstance(paths, list):
+            return SkillResult.fail("Ошибка: Список путей пуст или имеет неверный формат.")
 
         created, errors = [], []
 

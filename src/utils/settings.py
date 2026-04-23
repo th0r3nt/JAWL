@@ -1,7 +1,7 @@
 import shutil
 import yaml
 from pathlib import Path
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from yaml.constructor import ConstructorError
 
 # ==========================================
@@ -95,6 +95,7 @@ class IdentityConfig(BaseModel):
 
 
 class LLMConfig(BaseModel):
+    model_config = ConfigDict(protected_namespaces=())
     model_name: str
     is_multimodal: bool = False
     temperature: float
