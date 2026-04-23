@@ -59,22 +59,46 @@ class HostOSClient:
 
     def validate_path(self, target_path: str | Path, is_write: bool = False) -> Path:
         """
-        Проверяет переданный путь на безопасность
-        + уровни доступа агента к файловой системе.
+        Умный гейткипер. Парсит пути так, как их видит агент в дереве контекста,
+        и проверяет права доступа.
         """
+        path_str = str(target_path).replace("\\", "/").strip()
+        path_obj = Path(path_str)
 
-        path_obj = Path(target_path)
-
-        # Smart Resolve: если путь относительный,
-        # резолвим его относительно песочницы, очищая от дубликатов "sandbox/"
-        if not path_obj.is_absolute():
-            path_str = str(path_obj).replace("\\", "/")
-            if path_str.startswith("sandbox/"):
-                path_str = path_str[8:]  # Отрезаем префикс "sandbox/"
-            resolved_path = (self.sandbox_dir / path_str).resolve()
-        else:
+        # Если путь абсолютный - оставляем как есть
+        if path_obj.is_absolute():
             resolved_path = path_obj.resolve()
 
+        else:
+            # Делегируем сложность скрипту (умный резолв)
+            fw_name = self.framework_dir.name  # Обычно "JAWL"
+
+            if path_str.startswith(f"{fw_name}/"):
+                # Агент пишет "JAWL/docs/TODO.md" -> ищем в корне фреймворка
+                sub_path = path_str[len(fw_name) + 1 :]
+                resolved_path = (self.framework_dir / sub_path).resolve()
+
+            elif path_str == fw_name:
+                resolved_path = self.framework_dir.resolve()
+
+            elif path_str.startswith("sandbox/"):
+                # Агент пишет "sandbox/test.txt" -> ищем в песочнице
+                sub_path = path_str[8:]
+                resolved_path = (self.sandbox_dir / sub_path).resolve()
+
+            elif path_str in [".", "./"]:
+                # Текущая папка по умолчанию - песочница
+                resolved_path = self.sandbox_dir.resolve()
+
+            elif path_str in ["..", "../"]:
+                # Подняться на уровень выше - корень фреймворка
+                resolved_path = self.framework_dir.resolve()
+                
+            else:
+                # По умолчанию все простые имена файлов (например "test.txt") кидаем в песочницу
+                resolved_path = (self.sandbox_dir / path_str).resolve()
+
+        # Проверка прав доступа
         if not self.config.env_access and ".env" in resolved_path.name.lower():
             raise PermissionError(
                 f"SYSTEM DENIED: Доступ к файлам конфигурации ({resolved_path.name}) запрещен."
@@ -86,16 +110,13 @@ class HostOSClient:
         if self.access_level == HostOSAccessLevel.OPERATOR:
             if is_write and not resolved_path.is_relative_to(self.framework_dir):
                 raise PermissionError("OPERATOR: Запись разрешена только в директории JAWL.")
-
             return resolved_path
 
         if self.access_level == HostOSAccessLevel.OBSERVER:
             if is_write and not resolved_path.is_relative_to(self.sandbox_dir):
                 raise PermissionError("OBSERVER: Запись разрешена строго в папке sandbox/.")
-
             if not is_write and not resolved_path.is_relative_to(self.framework_dir):
                 raise PermissionError("OBSERVER: Чтение разрешено только в пределах JAWL.")
-
             return resolved_path
 
         if not resolved_path.is_relative_to(self.sandbox_dir):

@@ -112,7 +112,10 @@ if __name__ == "__main__":
         sys.exit(0)
 
     except Exception as e:
-        print(f"\n[Критическая ошибка]: {e}")
+        import traceback
+
+        print("\n[Критическая ошибка загрузчика]:")
+        traceback.print_exc()
         if os.name == "nt":
-            input("Нажмите Enter для выхода...")
+            input("\nНажмите Enter для выхода...")
         sys.exit(1)

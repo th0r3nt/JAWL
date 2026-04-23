@@ -178,7 +178,7 @@ class TelethonMessageParser:
 
         text = msg.text or ""
         if truncate_text_flag:
-            text = truncate_text(text, 200, "... [Обрезано системой]")
+            text = truncate_text(text, 1000, "... [Обрезано системой]")
 
         parts = [
             cls.parse_media(msg),

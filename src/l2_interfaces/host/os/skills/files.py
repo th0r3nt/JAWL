@@ -135,9 +135,15 @@ class HostOSFiles:
 
                 prefix = "📁" if item.is_dir() else "📄"
 
-                # Достаем описание, если оно есть
-                rel_path = item.relative_to(self.host_os.sandbox_dir).as_posix()
-                desc = f" [Description: {meta[rel_path]}]" if rel_path in meta else ""
+                # Достаем описание, если файл лежит внутри песочницы
+                desc = ""
+                try:
+                    if item.is_relative_to(self.host_os.sandbox_dir):
+                        rel_path = item.relative_to(self.host_os.sandbox_dir).as_posix()
+                        if rel_path in meta:
+                            desc = f" [Description: {meta[rel_path]}]"
+                except Exception:
+                    pass
 
                 items.append(f"{prefix} {item.name} ({size_str}){desc}")
 
@@ -176,7 +182,6 @@ class HostOSFiles:
                     break
 
                 rel_path = file_path.relative_to(safe_path)
-                full_rel_path = file_path.relative_to(self.host_os.sandbox_dir).as_posix()
 
                 try:
                     size_str = (
@@ -185,7 +190,18 @@ class HostOSFiles:
                 except Exception:
                     size_str = "???"
 
-                desc = f" [Description: {meta[full_rel_path]}]" if full_rel_path in meta else ""
+                # Извлекаем метаданные только если файл в песочнице
+                desc = ""
+                try:
+                    if file_path.is_relative_to(self.host_os.sandbox_dir):
+                        full_rel_path = file_path.relative_to(
+                            self.host_os.sandbox_dir
+                        ).as_posix()
+                        if full_rel_path in meta:
+                            desc = f" [Description: {meta[full_rel_path]}]"
+                except Exception:
+                    pass
+
                 found.append(f"- {rel_path} ({size_str}){desc}")
 
             if not found:

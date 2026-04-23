@@ -13,7 +13,7 @@ class HostOSConfig(BaseModel):
     enabled: bool
     access_level: int
     env_access: bool
-    framework_tree_depth: int
+    framework_tree_depth: int = 1
     monitoring_interval_sec: int
     execution_timeout_sec: int
     file_read_max_chars: int

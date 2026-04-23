@@ -67,7 +67,7 @@ class CalendarClient:
         for ev in sorted_events:
             dt_str = format_timestamp(ev["trigger_at"], self.timezone, "%m-%d %H:%M")
             ev_type = ev["type"].upper()
-            lines.append(f"-[{dt_str}] [ID: `{ev['id'][:6]}`] ({ev_type}) {ev['title']}")
+            lines.append(f"-[{dt_str}] [ID: `{ev['id'][:8]}`] ({ev_type}) {ev['title']}")
 
         self.state.upcoming_events = "\n".join(lines)
 
