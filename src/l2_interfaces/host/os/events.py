@@ -366,7 +366,7 @@ class HostOSEvents:
             for i, item in enumerate(items):
                 is_last = i == len(items) - 1
                 connector = "└── " if is_last else "├── "
-                
+
                 icon = ""
                 if use_emojis:
                     icon = "📂 " if item.is_dir() else "📄 "
@@ -380,12 +380,24 @@ class HostOSEvents:
                     except ValueError:
                         pass  # Файл вне песочницы, метаданных нет
 
+                # Папка sandbox/ выводится отдельным блоком - проверяем, чтобы не дублировать
+
+                is_sandbox = item == self.host_os.sandbox_dir
                 is_truncated_dir = item.is_dir() and current_depth >= max_depth
-                display_name = f"{item.name}/..." if is_truncated_dir else item.name
+
+                if is_sandbox:
+                    display_name = f"{item.name}/ [См. блок Sandbox Directory выше]"
+                    should_traverse = False
+                elif is_truncated_dir:
+                    display_name = f"{item.name}/..."
+                    should_traverse = False
+                else:
+                    display_name = item.name
+                    should_traverse = item.is_dir()
 
                 lines.append(f"{prefix}{connector}{icon}{display_name}{desc}")
 
-                if item.is_dir() and not is_truncated_dir:
+                if should_traverse:
                     extension = "    " if is_last else "│   "
                     lines.extend(
                         self._build_tree(

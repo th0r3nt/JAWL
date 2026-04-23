@@ -5,6 +5,7 @@ from telethon.tl.functions.channels import (
     CreateChannelRequest,
     EditTitleRequest,
     UpdateUsernameRequest,
+    SetDiscussionGroupRequest,
 )
 from telethon.tl.functions.channels import EditPhotoRequest as ChannelEditPhotoRequest
 from telethon.tl.functions.messages import ExportChatInviteRequest, EditChatTitleRequest
@@ -87,6 +88,41 @@ class TelethonAdmin:
             return SkillResult.fail("Ошибка: Некорректный ID чата.")
         except Exception as e:
             return SkillResult.fail(f"Ошибка при изменении статуса канала: {e}")
+
+    @skill()
+    async def set_discussion_group(
+        self, channel_id: Union[int, str], group_id: Union[int, str]
+    ) -> SkillResult:
+        """
+        Привязывает супергруппу (is_megagroup=True) к каналу в качестве группы для обсуждений (комментариев).
+        Нужны права администратора для обоих групп. Чтобы отвязать группу - передать пустую строку "" в group_id.
+        """
+        try:
+            client = self.tg_client.client()
+            channel_entity = await client.get_input_entity(parse_int_or_str(channel_id))
+
+            if not group_id or str(group_id).strip() == "":
+                # Отвязываем группу (передаем пустой InputChannel)
+                from telethon.tl.types import InputChannelEmpty
+
+                group_entity = InputChannelEmpty()
+            else:
+                group_entity = await client.get_input_entity(parse_int_or_str(group_id))
+
+            await client(
+                SetDiscussionGroupRequest(broadcast=channel_entity, group=group_entity)
+            )
+
+            action_str = "привязана к каналу" if group_id else "отвязана от канала"
+            msg = f"Супергруппа успешно {action_str} {channel_id}."
+            system_logger.info(f"[Telegram Telethon] {msg}")
+
+            return SkillResult.ok(msg)
+
+        except ValueError:
+            return SkillResult.fail("Ошибка: Некорректный ID канала или группы.")
+        except Exception as e:
+            return SkillResult.fail(f"Ошибка при привязке группы обсуждений: {e}")
 
     @skill()
     async def edit_chat_title(self, chat_id: Union[int, str], new_title: str) -> SkillResult:
