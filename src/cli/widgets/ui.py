@@ -122,7 +122,7 @@ def print_success(msg: str) -> None:
 
 def print_error(msg: str) -> None:
     """Выводит сообщение об ошибке."""
-    console.print(f"[bold red]✗ {msg}[/bold red]")
+    console.print(f"[bold red] ✗ {msg}[/bold red]")
 
 
 def print_info(msg: str) -> None:

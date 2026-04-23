@@ -20,10 +20,13 @@ from src.cli.widgets.ui import (
 from src.cli.screens.agent_control import _is_agent_running
 
 ROOT_DIR = Path(__file__).resolve().parent.parent.parent.parent
+
 DB_DIR = ROOT_DIR / "src" / "utils" / "local" / "data"
 SQL_DB_FILE = DB_DIR / "sql_db" / "agent.db"
 VECTOR_DB_DIR = DB_DIR / "vector_db"
+
 SETTINGS_FILE = ROOT_DIR / "config" / "settings.yaml"
+SETTINGS_EXAMPLE = ROOT_DIR / "config" / "settings.example.yaml"
 
 yaml = YAML()
 yaml.preserve_quotes = True
@@ -45,6 +48,19 @@ def _get_settings() -> dict:
 def _save_settings(settings: dict):
     with open(SETTINGS_FILE, "w", encoding="utf-8") as f:
         yaml.dump(settings, f)
+
+
+def _ensure_settings_exists() -> bool:
+    """Проверяет наличие файла settings.yaml, если нет - копирует example."""
+
+    if not SETTINGS_FILE.exists():
+        if SETTINGS_EXAMPLE.exists():
+            shutil.copy(SETTINGS_EXAMPLE, SETTINGS_FILE)
+            print_info(" Создан базовый файл конфигурации settings.yaml из .example")
+        else:
+            print_error("Не найден базовый файл конфигурации (settings.example.yaml).")
+            return False
+    return True
 
 
 def _run_sql(query: str, params: tuple = (), fetchall: bool = False, fetchone: bool = False):
@@ -542,6 +558,10 @@ def database_manager_screen() -> None:
     if _is_agent_running():
         print_error("Ошибка: Нельзя управлять базами данных во время работы агента.")
         print_info("Остановите агента в главном меню (чтобы избежать SQLite Locks).")
+        wait_for_enter()
+        return
+
+    if not _ensure_settings_exists():
         wait_for_enter()
         return
 

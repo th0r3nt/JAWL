@@ -44,11 +44,12 @@ def _is_agent_running() -> bool:
         return False
 
 
-def _check_and_setup_env() -> bool:
+def _check_and_setup_env() -> tuple[bool, bool]:
     """
     Проверяет наличие файла .env и базовых ключей.
-    Если ключей нет - просит пользователя ввести их прямо в CLI.
+    Возвращает: (Успех_проверки, Были_ли_созданы_или_изменены_файлы)
     """
+    was_modified = False
 
     if not ENV_FILE.exists():
         if ENV_EXAMPLE.exists():
@@ -56,6 +57,7 @@ def _check_and_setup_env() -> bool:
             try:
                 with open(ENV_EXAMPLE, "r", encoding="utf-8") as f:
                     content = f.read()
+
             except UnicodeDecodeError:
                 with open(ENV_EXAMPLE, "r", encoding="cp1251") as f:
                     content = f.read()
@@ -63,16 +65,17 @@ def _check_and_setup_env() -> bool:
             with open(ENV_FILE, "w", encoding="utf-8") as f:
                 f.write(content)
             print_info(" Создан базовый файл .env из .env.example")
+            was_modified = True
+
         else:
             print_error("Не найден ни .env, ни .env.example.")
-            return False
+            return False, False
 
     # Магия защиты от блокнота Windows
     try:
         with open(ENV_FILE, "r", encoding="utf-8") as f:
             env_content = f.readlines()
     except UnicodeDecodeError:
-        # Юзер сохранил файл в ANSI. Читаем и сразу лечим, перезаписывая в UTF-8
         with open(ENV_FILE, "r", encoding="cp1251") as f:
             env_content = f.readlines()
         with open(ENV_FILE, "w", encoding="utf-8") as f:
@@ -81,39 +84,58 @@ def _check_and_setup_env() -> bool:
     # Проверяем, заполнен ли LLM_API_KEY_1
     key_found = False
     for line in env_content:
-        if line.startswith("LLM_API_KEY_1=") and len(line.strip()) > 14:
-            key_found = True
-            break
+        line_stripped = line.strip()
+        if line_stripped.startswith("LLM_API_KEY_1="):
+            # Проверяем, что после равно есть хоть что-то кроме кавычек
+            val = line_stripped.split("=", 1)[1].strip("\"' ")
+            if len(val) > 0:
+                key_found = True
+                break
 
     if not key_found:
-        print_info("Похоже, вы еще не добавили API-ключ для LLM.")
-        api_key = questionary.text(
-            "Введите ваш LLM API Key (или нажмите Enter для отмены):"
+        print_info("Похоже, вы еще не настроили подключение к LLM.")
+
+        api_url = questionary.text(
+            "Введите Base URL для LLM (например, ссылку для Gemini или локальной модели).\nОставьте пустым для стандартного OpenAI API:"
         ).ask()
+
+        if api_url is None:  # Юзер нажал Ctrl+C
+            return False, False
+
+        api_key = questionary.text("Введите ваш LLM API Key (Обязательно):").ask()
 
         if not api_key:
             print_error("Запуск отменен: API ключ обязателен для работы агента.")
-            return False
+            return False, False
 
         new_content = []
         for line in env_content:
             if line.startswith("LLM_API_KEY_1="):
-                new_content.append(f'LLM_API_KEY_1="{api_key}"\n')
+                new_content.append(f'LLM_API_KEY_1="{api_key.strip()}"\n')
+
+            elif line.startswith("LLM_API_URL="):
+                new_content.append(f'LLM_API_URL="{api_url.strip()}"\n')
+
             else:
                 new_content.append(line)
 
         with open(ENV_FILE, "w", encoding="utf-8") as f:
             f.writelines(new_content)
 
-        print_success("API ключ успешно сохранен в .env")
+        print_success("Настройки LLM успешно сохранены в .env")
+        was_modified = True
 
-    return True
+    return True, was_modified
 
 
-def _check_and_setup_prompts() -> None:
-    """Проверяет наличие файлов промпта личности. Если их нет, создает из .example.md"""
+def _check_and_setup_prompts() -> bool:
+    """
+    Проверяет наличие файлов промпта личности.
+    Если их нет, создает из .example.md. Возвращает True, если файлы были созданы.
+    """
+
     if not PROMPTS_DIR.exists():
-        return
+        PROMPTS_DIR.mkdir(parents=True, exist_ok=True)
 
     created_any = False
 
@@ -127,11 +149,7 @@ def _check_and_setup_prompts() -> None:
             print_info(f" Создан базовый файл личности: {target_name}")
             created_any = True
 
-    if created_any:
-        print_info(
-            " Напоминание: вы можете полностью кастомизировать характер агента, редактируя эти файлы "
-            "или добавляя любые новые .md документы в папку src/l3_agent/prompt/personality/"
-        )
+    return created_any
 
 
 def _validate_configs() -> bool:
@@ -235,14 +253,37 @@ def start_agent_screen() -> None:
         wait_for_enter()
         return
 
+    # Запоминаем, существовали ли конфиги до их проверки (т.к. валидация их копирует)
+    settings_existed = (ROOT_DIR / "config" / "settings.yaml").exists()
+    interfaces_existed = (ROOT_DIR / "config" / "interfaces.yaml").exists()
+
     # Предполетная проверка
     if not _validate_configs():
         wait_for_enter()
         return
 
-    _check_and_setup_prompts()
+    configs_created = not (settings_existed and interfaces_existed)
 
-    if not _check_and_setup_env():
+    prompts_created = _check_and_setup_prompts()
+
+    env_success, env_modified = _check_and_setup_env()
+    if not env_success:
+        wait_for_enter()
+        return
+
+    # Если это чистый первый старт - тормозим процесс и даем юзеру время
+    if configs_created or prompts_created or env_modified:
+        print_info("\n[Первичная инициализация завершена]")
+        print_info(
+            "Были созданы базовые файлы конфигурации, файлы личности агента и/или .env."
+        )
+        print_info(
+            "Рекомендуется просмотреть и при необходимости отредактировать их перед стартом."
+        )
+        print_info(
+            "В том числе файлы в src/l3_agent/prompt/personality/ (личность и характер агента)."
+        )
+        print_success("После проверки выберите 'Запустить агента' в меню еще раз.")
         wait_for_enter()
         return
 
@@ -250,6 +291,7 @@ def start_agent_screen() -> None:
     if not _telethon_auth_flow():
         wait_for_enter()
         return
+
     print_info(" Инициализация систем агента.")
     PID_FILE.parent.mkdir(parents=True, exist_ok=True)
 
@@ -265,7 +307,6 @@ def start_agent_screen() -> None:
 
     try:
         # Агент самостоятельно пишет всё нужное в system.log через логгер.
-        # Сырые stdout/stderr уводим в DEVNULL, чтобы не плодить мусор.
         process = subprocess.Popen(
             [sys.executable, str(MAIN_SCRIPT)],
             stdout=subprocess.DEVNULL,
@@ -277,8 +318,8 @@ def start_agent_screen() -> None:
 
         PID_FILE.write_text(str(process.pid))
 
-        # Health Check (проверка пульса)
-        time.sleep(3)  # Даем время на краш (ошибки импорта или синтаксиса)
+        # Увеличиваем Health Check, чтобы дать время на запуск тяжелых БД при старте
+        time.sleep(5)
 
         if process.poll() is not None:
             # Процесс умер
@@ -293,9 +334,7 @@ def start_agent_screen() -> None:
 
         print_success("Агент успешно запущен в фоновом режиме.")
         time.sleep(1)
-        print_info(
-            " Для просмотра того, что он делает, выберите 'Открыть логи' в главном меню."
-        )
+        print_info(" Для просмотра логов выберите 'Открыть логи' в главном меню.")
 
     except Exception as e:
         print_error(f"Не удалось запустить агента: {e}")

@@ -70,7 +70,7 @@ def logs_screen() -> None:
     """Экран потокового вывода логов в реальном времени."""
     if not LOG_FILE.exists():
         print_error(f"Файл логов не найден: {LOG_FILE.name}")
-        print_info("Возможно, агент еще ни разу не запускался.")
+        print_info(" Возможно, агент еще ни разу не запускался.")
         console.print("\n[dim]Нажмите Enter для возврата в меню.[/dim]")
         input()
         return
