@@ -328,7 +328,7 @@ class ReactLoop:
                 content = getattr(msg, "content", "")
 
             if role == "tool" and content and isinstance(content, str):
-                matches = re.findall(r"\[IMAGE_REQUEST:\s*(.+?)\]", content)
+                matches = re.findall(r"\[SYSTEM_MARKER_IMAGE_ATTACHED:\s*(.+?)\]", content)
                 image_paths.extend(matches)
 
         if not image_paths:

@@ -26,9 +26,9 @@ class VisionSkills:
                 )
 
             # Возвращаем системный маркер
-            marker = f"[IMAGE_REQUEST: {safe_path.resolve()}]"
+            marker = f"[SYSTEM_MARKER_IMAGE_ATTACHED: {safe_path.resolve()}]"
             return SkillResult.ok(
-                f"{marker} Изображение добавлено в контекст. "
+                f"{marker}: True. Изображено успешно доставлено и уже находится в контексте."
                 f"[System]: Рекомендуется проанализировать медиа и сохранить краткое описание в метаданные с помощью сооветствующего навыка. "
                 f"Это привяжет описание к файлу."
             )
