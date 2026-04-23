@@ -40,6 +40,7 @@ class Heartbeat:
         self._next_tick_time: int = 0.0
         self._wake_reason: str = "HEARTBEAT"
         self._wake_payload: Dict[str, Any] = {}
+        self._wake_level: int = 0  # Приоритет текущего триггера
 
         self._sleep_memory: deque[str] = deque(maxlen=20)
 
@@ -98,6 +99,7 @@ class Heartbeat:
                 )
                 self._wake_reason = event_name
                 self._wake_payload = payload
+                self._wake_level = level.value
                 self._is_interrupted = True
                 self._active_react_task.cancel()
 
@@ -125,11 +127,18 @@ class Heartbeat:
 
             # Если сон срезан в ноль - это экстренное пробуждение
             if new_remaining <= 0.01:
-                system_logger.info(
-                    f"[Heartbeat] Входящее событие: '{event_name}' ({level.name}). Инициализация вызова LLM."
-                )
-                self._wake_reason = event_name
-                self._wake_payload = payload
+                # Перезаписываем главную причину, только если новое событие важнее или такое же
+                if level.value >= self._wake_level:
+                    system_logger.info(
+                        f"[Heartbeat] Входящее событие: '{event_name}' ({level.name}). Инициализация вызова LLM."
+                    )
+                    self._wake_reason = event_name
+                    self._wake_payload = payload
+                    self._wake_level = level.value
+                else:
+                    system_logger.info(
+                        f"[Heartbeat] Входящее событие: '{event_name}' ({level.name}). Сон уже прерван более приоритетным событием."
+                    )
             else:
                 if safe_remaining > 0:
                     system_logger.info(

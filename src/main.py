@@ -110,10 +110,12 @@ class System:
         self.os_state = HostOSState()
         self.terminal_state = HostTerminalState(number_of_last_messages=15)
         self.telethon_state = TelethonState(
-            number_of_last_chats=15,
+            number_of_last_chats=self.interfaces_config.telegram.telethon.recent_chats_limit,
             private_chat_history_limit=self.interfaces_config.telegram.telethon.private_chat_history_limit,
         )
-        self.aiogram_state = AiogramState(number_of_last_chats=15)
+        self.aiogram_state = AiogramState(
+            number_of_last_chats=self.interfaces_config.telegram.aiogram.recent_chats_limit
+        )
         self.web_search_state = WebSearchState(history_limit=10)
         self.calendar_state = CalendarState()
 

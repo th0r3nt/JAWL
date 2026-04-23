@@ -29,12 +29,14 @@ class HostConfig(BaseModel):
 class TelethonConfig(BaseModel):
     enabled: bool
     session_name: str
+    recent_chats_limit: int = 15
     private_chat_history_limit: int = 3
     # TODO: добавить больше параметров для изменения
 
 
 class AiogramConfig(BaseModel):
     enabled: bool
+    recent_chats_limit: int = 15
 
 
 class TelegramConfig(BaseModel):

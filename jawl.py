@@ -111,11 +111,11 @@ if __name__ == "__main__":
         print("\nОстановка загрузчика.")
         sys.exit(0)
 
-    except Exception as e:
+    except Exception:
         import traceback
 
         print("\n[Критическая ошибка загрузчика]:")
         traceback.print_exc()
         if os.name == "nt":
-            input("\nНажмите Enter для выхода...")
+            input("\nНажмите Enter для выхода.")
         sys.exit(1)

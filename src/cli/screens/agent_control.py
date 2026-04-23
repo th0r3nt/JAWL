@@ -250,13 +250,8 @@ def start_agent_screen() -> None:
     if not _telethon_auth_flow():
         wait_for_enter()
         return
-
     print_info(" Инициализация систем агента.")
     PID_FILE.parent.mkdir(parents=True, exist_ok=True)
-
-    logs_dir = ROOT_DIR / "logs"
-    logs_dir.mkdir(parents=True, exist_ok=True)
-    agent_log_path = logs_dir / "agent.log"
 
     env = os.environ.copy()
     env["PYTHONPATH"] = str(ROOT_DIR)
@@ -269,16 +264,16 @@ def start_agent_screen() -> None:
         kwargs["start_new_session"] = True
 
     try:
-        # Открываем лог-файл для перехвата крашей (stderr=subprocess.STDOUT)
-        with open(agent_log_path, "a", encoding="utf-8") as agent_log:
-            process = subprocess.Popen(
-                [sys.executable, str(MAIN_SCRIPT)],
-                stdout=agent_log,
-                stderr=subprocess.STDOUT,
-                cwd=str(ROOT_DIR),
-                env=env,
-                **kwargs,
-            )
+        # Агент самостоятельно пишет всё нужное в system.log через логгер.
+        # Сырые stdout/stderr уводим в DEVNULL, чтобы не плодить мусор.
+        process = subprocess.Popen(
+            [sys.executable, str(MAIN_SCRIPT)],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            cwd=str(ROOT_DIR),
+            env=env,
+            **kwargs,
+        )
 
         PID_FILE.write_text(str(process.pid))
 
@@ -291,13 +286,7 @@ def start_agent_screen() -> None:
                 PID_FILE.unlink()
 
             print_error("Агент завершился с ошибкой сразу после старта.")
-            try:
-                with open(agent_log_path, "r", encoding="utf-8") as f:
-                    tail = "".join(f.readlines()[-15:]).strip()
-                    if tail:
-                        print_info(f"Последние логи (logs/agent.log):\n{tail}")
-            except Exception:
-                pass
+            print_info("Проверьте основной лог (logs/system.log) для получения деталей.")
 
             wait_for_enter()
             return
