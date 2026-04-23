@@ -93,10 +93,21 @@ class HostOSClient:
             elif path_str in ["..", "../"]:
                 # Подняться на уровень выше - корень фреймворка
                 resolved_path = self.framework_dir.resolve()
-                
+
             else:
-                # По умолчанию все простые имена файлов (например "test.txt") кидаем в песочницу
-                resolved_path = (self.sandbox_dir / path_str).resolve()
+                # Умный fallback: "Do What I Mean"
+                sandbox_target = (self.sandbox_dir / path_str).resolve()
+                fw_target = (self.framework_dir / path_str).resolve()
+                
+                # Если в песочнице запрошенного пути нет, но он физически существует во фреймворке
+                if not sandbox_target.exists() and fw_target.exists() and self.access_level >= HostOSAccessLevel.OBSERVER:
+                    if is_write and self.access_level == HostOSAccessLevel.OBSERVER:
+                        resolved_path = sandbox_target
+                    else:
+                        resolved_path = fw_target
+                else:
+                    # Во всех остальных случаях считаем, что агент работает в песочнице
+                    resolved_path = sandbox_target
 
         # Проверка прав доступа
         if not self.config.env_access and ".env" in resolved_path.name.lower():
