@@ -114,7 +114,11 @@ class TelethonEvents:
                         self._chat_desc_cache[entity.id] = ""
 
                 desc = self._chat_desc_cache.get(entity.id, "")
-                desc_str = f" | Описание: {truncate_text(desc.replace('\n', ' '), 250, '...')}" if desc else ""
+                if desc:
+                    clean_desc = desc.replace("\n", " ")
+                    desc_str = f" | Описание: {truncate_text(clean_desc, 60, '...')}"
+                else:
+                    desc_str = ""
 
                 # Public/Private
                 is_public = bool(getattr(entity, "username", None))
@@ -168,7 +172,7 @@ class TelethonEvents:
                     )
 
             self.state.last_chats = "\n".join(chats) if chats else "Список диалогов пуст."
-            
+
         except Exception as e:
             system_logger.error(f"[Telethon] Ошибка обновления стейта: {e}")
 
