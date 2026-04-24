@@ -114,6 +114,9 @@ class ContextDepthConfig(BaseModel):
     detailed_ticks: int
     tick_action_max_chars: int
     tick_result_max_chars: int
+    tick_thoughts_short_max_chars: int
+    tick_action_short_max_chars: int
+    tick_result_short_max_chars: int
 
 
 class EventAccelerationConfig(BaseModel):

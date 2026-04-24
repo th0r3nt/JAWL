@@ -24,13 +24,22 @@ class SQLTicks:
         detailed_ticks: int = 2,
         action_max_chars: int = 2000,
         result_max_chars: int = 5000,
+        thoughts_short_max_chars: int = 2000,
+        action_short_max_chars: int = 300,
+        result_short_max_chars: int = 300,
         tz_offset: int = 0,
     ):
         self.db = db
         self.ticks_limit = limit
         self.detailed_ticks = detailed_ticks
+
         self.action_max_chars = action_max_chars
         self.result_max_chars = result_max_chars
+
+        self.thoughts_short_max_chars = thoughts_short_max_chars
+        self.action_short_max_chars = action_short_max_chars
+        self.result_short_max_chars = result_short_max_chars
+
         self.tz_offset = tz_offset
 
     async def save_tick(
@@ -63,7 +72,6 @@ class SQLTicks:
         Отдает отформатированный блок контекста для агента.
         """
 
-        # Берем чистую историю
         ticks = await self.get_ticks(limit=self.ticks_limit)
 
         if not ticks:
@@ -75,19 +83,30 @@ class SQLTicks:
         for i, t in enumerate(ticks):
             is_detailed = i >= total_ticks - self.detailed_ticks
 
+            # ===============================================================================
             # ПАРСИНГ МЫСЛЕЙ
-            thoughts_str = t.thoughts
-            limit = 2000
-            if not is_detailed and len(thoughts_str) > limit:
-                thoughts_str = thoughts_str[:limit] + " ... [Мысли обрезаны системой]"
+            # ===============================================================================
 
+            thoughts_str = t.thoughts
+            if not is_detailed and len(thoughts_str) > self.thoughts_short_max_chars:
+                thoughts_str = (
+                    thoughts_str[: self.thoughts_short_max_chars]
+                    + " ... [Мысли обрезаны системой]"
+                )
+
+            # ===============================================================================
             # ПАРСИНГ ДЕЙСТВИЙ
-            action_limit = self.action_max_chars if is_detailed else 300
+            # ===============================================================================
+
+            action_limit = (
+                self.action_max_chars if is_detailed else self.action_short_max_chars
+            )
             actions_list = []
 
             actions_raw = t.actions
             if isinstance(actions_raw, dict):
                 actions_raw = [actions_raw]
+
             elif not isinstance(actions_raw, list):
                 actions_raw = [actions_raw]
 
@@ -106,8 +125,11 @@ class SQLTicks:
 
             actions_str = "\n".join(actions_list) if actions_list else "None"
 
-            # ПАРСИНГ РЕЗУЛЬТАТОВ
-            res_limit = self.result_max_chars if is_detailed else 1000
+            # ===============================================================================
+            # ПАРСИНГ РЕЗУЛЬТАТОВ ДЕЙСТВИЙ
+            # ===============================================================================
+
+            res_limit = self.result_max_chars if is_detailed else self.result_short_max_chars
 
             if t.results and isinstance(t.results, dict) and "execution_report" in t.results:
                 raw_report = str(t.results["execution_report"])

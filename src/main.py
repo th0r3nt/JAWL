@@ -130,9 +130,14 @@ class System:
             db_path=self.local_data_dir / "sql_db" / "agent.db",
             # Ticks
             ticks_limit=sys_cfg.context_depth.ticks,
+            # Детальные тики
             detailed_ticks=sys_cfg.context_depth.detailed_ticks,
             tick_action_max_chars=sys_cfg.context_depth.tick_action_max_chars,
             tick_result_max_chars=sys_cfg.context_depth.tick_result_max_chars,
+            # Старые тики
+            tick_thoughts_short_max_chars=sys_cfg.context_depth.tick_thoughts_short_max_chars,
+            tick_action_short_max_chars=sys_cfg.context_depth.tick_action_short_max_chars,
+            tick_result_short_max_chars=sys_cfg.context_depth.tick_result_short_max_chars,
             # Tasks
             max_tasks=sys_cfg.sql.tasks.max_tasks,
             # Mental State
