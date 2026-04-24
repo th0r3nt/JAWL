@@ -80,7 +80,7 @@ class VectorKnowledge:
                 system_logger.debug(msg)
                 return SkillResult.ok(msg)
 
-            short_query = truncate_text(query.replace("\n", " "), 200, "... [Обрезано]")
+            short_query = truncate_text(query.replace("\n", " "), 50, "... [Обрезано]")
             system_logger.info(
                 f"[Vector DB] Знания: найдено {len(points)} записей по запросу '{short_query}'"
             )
