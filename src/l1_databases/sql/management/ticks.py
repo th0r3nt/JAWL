@@ -164,8 +164,8 @@ class SQLTicks:
             time_str = format_datetime(t.created_at, self.tz_offset)
 
             blocks.append(
-                f"#### [Tick] ({time_str})\n"
-                f"*Thoughts*: {thoughts_str}\n"
+                f"#### [Tick] {time_str}\n"
+                f"*Thoughts*: '{thoughts_str}'\n\n"
                 f"*Actions*:\n{actions_str}\n"
                 f"*Result*:\n```\n{res_str}\n```"
             )

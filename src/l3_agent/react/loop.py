@@ -240,9 +240,6 @@ class ReactLoop:
                 step += 1
 
         finally:
-            system_logger.warning(
-                f"LLM превысила максимальный лимит шагов в ReAct цикле ({self.agent_state.max_react_steps}/{self.agent_state.max_react_steps})."
-            )
             self.agent_state.update_state(AgentStatus.IDLE)
 
     def add_realtime_event(self, event_str: str):

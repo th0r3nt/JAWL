@@ -62,7 +62,7 @@ class TelethonChats:
                     "User" if dialog.is_user else "Group" if dialog.is_group else "Channel"
                 )
                 unread = (
-                    f"[Непрочитанных: {dialog.unread_count}]"
+                    f" [Непрочитанных: {dialog.unread_count}]"
                     if dialog.unread_count > 0
                     else ""
                 )
@@ -76,7 +76,7 @@ class TelethonChats:
                         topics_data = await self._get_topics(client, dialog.entity, limit=10)
                         for topic in topics_data:
                             t_unread = (
-                                f" ({topic.unread_count} непр.)"
+                                f" ({topic.unread_count} непрочитанных)"
                                 if getattr(topic, "unread_count", 0) > 0
                                 else ""
                             )
@@ -91,7 +91,7 @@ class TelethonChats:
                     # Если топиков нет, но сообщения висят - значит они в дефолтном General
                     if not topics_list and dialog.unread_count > 0:
                         topics_list.append(
-                            f"      ↳ General / Общий топик ({dialog.unread_count} непр.)"
+                            f"      ↳ General / Общий топик ({dialog.unread_count} непрочитанных)"
                         )
 
                     if topics_list:
@@ -136,7 +136,7 @@ class TelethonChats:
                                 unread = getattr(topic, "unread_count", 0)
                                 if unread > 0:
                                     topics_list.append(
-                                        f"      ↳ Топик '{getattr(topic, 'title', 'Unknown')}' (ID: {topic.id}) [{unread} непр.]"
+                                        f"      ↳ Топик '{getattr(topic, 'title', 'Unknown')}' (ID: {topic.id}) [{unread} непрочитанных]"
                                     )
                         except Exception as e:
                             system_logger.error(
@@ -146,7 +146,7 @@ class TelethonChats:
                         # Fallback для General топика
                         if not topics_list:
                             topics_list.append(
-                                f"      ↳ General / Другие топики [{dialog.unread_count} непр.]"
+                                f"      ↳ General / Другие топики [{dialog.unread_count} непрочитанных]"
                             )
 
                         forum_str = "\n" + "\n".join(topics_list)

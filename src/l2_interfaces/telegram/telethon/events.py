@@ -116,7 +116,7 @@ class TelethonEvents:
                 desc = self._chat_desc_cache.get(entity.id, "")
                 if desc:
                     clean_desc = desc.replace("\n", " ")
-                    desc_str = f" | Описание: {truncate_text(clean_desc, 200, '... [Обрезано]')}"
+                    desc_str = f" | Описание: {truncate_text(clean_desc, 100, '... [Обрезано]')}"
                 else:
                     desc_str = ""
 
@@ -129,7 +129,7 @@ class TelethonEvents:
                 part_str = f" | {participants} чел." if participants else ""
 
                 # Статус непрочитанных
-                unread = f" [{dialog.unread_count} непр.]" if dialog.unread_count > 0 else ""
+                unread = f" [{dialog.unread_count} непрочитанных]" if dialog.unread_count > 0 else ""
 
 
                 # =============================================================

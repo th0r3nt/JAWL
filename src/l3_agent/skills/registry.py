@@ -125,7 +125,6 @@ async def execute_skill(actions: list[ActionCall]) -> str:
 
     return "\n".join(report)
 
-
 async def _run_single_skill(name: str, params: dict) -> SkillResult:
     """
     Выполняет одну функцию, которую вызвал агент.
@@ -142,7 +141,11 @@ async def _run_single_skill(name: str, params: dict) -> SkillResult:
         }
 
         result = await func(**valid_params)
-        system_logger.info(f"[Agent Action Result] {name}: {result}")
+        
+        # Обрезаем результат ТОЛЬКО для логов, чтобы не засорять system.log и экран CLI
+        res_msg = truncate_text(str(result.message), max_chars=800, suffix="... [Результат обрезан для логов]")
+        status = "Success" if result.is_success else "Fail"
+        system_logger.info(f"[Agent Action Result] {name} ({status}): {res_msg}")
 
         return result
     except Exception as e:

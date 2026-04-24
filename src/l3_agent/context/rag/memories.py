@@ -74,7 +74,7 @@ class RAGMemories:
 
             # Из названий чатов с непрочитанными сообщениями
             for line in self.telethon_state.last_chats.split("\n"):
-                if "непр.]" in line:
+                if "непрочитанных]" in line:
                     match_name = re.search(r"\]\s+(.+?)\s*\(ID:", line)
                     if match_name:
                         queries.add(match_name.group(1).strip())

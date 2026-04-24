@@ -27,7 +27,7 @@ telegram:
     enabled: false # Перед включением введите TELETHON_API_ID и TELETHON_API_HASH в .env
 
     session_name: "agent_telethon" # Находится в src/utils/local/data/telethon/
-    recent_chats_limit: 20 # Сколько последних диалогов отображать в контексте агента
+    recent_chats_limit: 15 # Сколько последних диалогов отображать в контексте агента
     private_chat_history_limit: 0 # В контексте всегда будут видны последние n сообщений для последних личных чатов (поставить 0, если не нужно)
 
   aiogram:
