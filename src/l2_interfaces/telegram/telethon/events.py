@@ -116,7 +116,7 @@ class TelethonEvents:
                 desc = self._chat_desc_cache.get(entity.id, "")
                 if desc:
                     clean_desc = desc.replace("\n", " ")
-                    desc_str = f" | Описание: {truncate_text(clean_desc, 60, '...')}"
+                    desc_str = f" | Описание: {truncate_text(clean_desc, 200, '... [Обрезано]')}"
                 else:
                     desc_str = ""
 
@@ -186,10 +186,6 @@ class TelethonEvents:
         await self._update_state(force=True)
 
     async def _on_private_message(self, event: events.NewMessage.Event) -> None:
-        try:
-            await event.message.mark_read()
-        except Exception:
-            pass
 
         await self._update_state(force=True)
 
@@ -227,10 +223,6 @@ class TelethonEvents:
     async def _on_group_message(self, event: events.NewMessage.Event):
         if event.mentioned:
             event_type = Events.TELETHON_GROUP_MENTION
-            try:
-                await event.message.mark_read()
-            except Exception:
-                pass
         else:
             event_type = Events.TELETHON_GROUP_MESSAGE
 

@@ -49,13 +49,15 @@ class ContextRegistry:
         missed_events: List[Dict[str, Any]],
         agent_state,
     ) -> Dict[str, str]:
+        """
+        Проходится по всем провайдерам контекста и дергает их функции, 
+        которые возвращают отформатированные Markdown-блоки для контекста.
+        """
 
         if not self._providers:
             return {}
 
         # Сортируем по Enum значению (по возрастанию)
-        # Python использует стабильную сортировку, поэтому элементы с одинаковым
-        # приоритетом (например, разные интерфейсы) сохранят порядок регистрации
         sorted_names = sorted(
             self._providers.keys(), key=lambda k: self._providers[k]["section"].value
         )

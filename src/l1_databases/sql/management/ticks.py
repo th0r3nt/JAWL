@@ -33,17 +33,9 @@ class SQLTicks:
         self.result_max_chars = result_max_chars
         self.tz_offset = tz_offset
 
-        # Кэш ID тиков, созданных в рамках текущего просыпания агента
-        self.session_ignored_ids = set()
-
-    def clear_session_cache(self):
-        """Очищает игнор-лист (вызывается в начале и в конце ReAct-цикла)."""
-        self.session_ignored_ids.clear()
-
     async def save_tick(
         self, thoughts: str, actions: list[dict[str, Any]], results: dict[str, Any]
     ) -> str:
-        """Сохраняет один полный цикл (тик) работы агента."""
         tick_id = str(uuid.uuid4())
 
         async with self.db.session_factory() as session:
@@ -53,34 +45,26 @@ class SQLTicks:
             session.add(new_tick)
             await session.commit()
 
-        # Добавляем в игнор-лист, чтобы агент не ловил "дежавю" на следующем шаге
-        self.session_ignored_ids.add(tick_id)
-
         system_logger.debug(f"[SQL DB] Тик сохранен (ID: {tick_id[:8]}).")
         return tick_id
 
-    async def get_ticks(self, limit: int = 5, ignore_session: bool = False) -> list[TickTable]:
-        """
-        Возвращает последние N тиков.
-        Если ignore_session=True, скрывает тики текущего ReAct-цикла (нужно для ReAct цикла, чтобы LLM не видела дубли своих недавних действий).
-        """
+    async def get_ticks(self, limit: int = 5) -> list[TickTable]:
+        """Возвращает последние N тиков из базы данных."""
 
         async with self.db.session_factory() as session:
-            stmt = select(TickTable)
-
-            # Исключаем свежие логи из выдачи
-            if ignore_session and self.session_ignored_ids:
-                stmt = stmt.where(TickTable.id.notin_(self.session_ignored_ids))
-
-            stmt = stmt.order_by(desc(TickTable.created_at)).limit(limit)
+            stmt = select(TickTable).order_by(desc(TickTable.created_at)).limit(limit)
             result = await session.execute(stmt)
 
             ticks = result.scalars().all()
             return list(reversed(ticks))
 
     async def get_context_block(self, **kwargs) -> str:
-        # ВАЖНО: передаем ignore_session=True
-        ticks = await self.get_ticks(limit=self.ticks_limit, ignore_session=True)
+        """
+        Отдает отформатированный блок контекста для агента.
+        """
+
+        # Берем чистую историю
+        ticks = await self.get_ticks(limit=self.ticks_limit)
 
         if not ticks:
             return "## RECENT TICKS\nНет предыдущих тиков."
@@ -89,20 +73,18 @@ class SQLTicks:
         total_ticks = len(ticks)
 
         for i, t in enumerate(ticks):
-            # Проверяем, попадает ли тик в последние N детализированных
             is_detailed = i >= total_ticks - self.detailed_ticks
 
             # ПАРСИНГ МЫСЛЕЙ
             thoughts_str = t.thoughts
-            limit = 1500
+            limit = 2000
             if not is_detailed and len(thoughts_str) > limit:
                 thoughts_str = thoughts_str[:limit] + " ... [Мысли обрезаны системой]"
 
             # ПАРСИНГ ДЕЙСТВИЙ
-            action_limit = self.action_max_chars if is_detailed else 200
+            action_limit = self.action_max_chars if is_detailed else 300
             actions_list = []
 
-            # Унифицируем к списку (защита от галлюцинаций LLM)
             actions_raw = t.actions
             if isinstance(actions_raw, dict):
                 actions_raw = [actions_raw]
@@ -125,7 +107,7 @@ class SQLTicks:
             actions_str = "\n".join(actions_list) if actions_list else "None"
 
             # ПАРСИНГ РЕЗУЛЬТАТОВ
-            res_limit = self.result_max_chars if is_detailed else 150
+            res_limit = self.result_max_chars if is_detailed else 1000
 
             if t.results and isinstance(t.results, dict) and "execution_report" in t.results:
                 raw_report = str(t.results["execution_report"])
@@ -158,7 +140,6 @@ class SQLTicks:
                 res_str = "None"
 
             time_str = format_datetime(t.created_at, self.tz_offset)
-            # short_id = t.id[:8]
 
             blocks.append(
                 f"#### [Tick] ({time_str})\n"

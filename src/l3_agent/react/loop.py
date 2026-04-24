@@ -3,7 +3,6 @@ import asyncio
 from typing import Dict, Any
 from pydantic import ValidationError
 
-# Для анализа медиа
 import base64
 import re
 import copy
@@ -21,7 +20,6 @@ from src.l3_agent.llm.client import LLMClient
 from src.l3_agent.prompt.builder import PromptBuilder
 from src.l3_agent.context.builder import ContextBuilder
 
-# Импортируем готовый роутер скиллов
 from src.l3_agent.skills.registry import execute_skill
 from src.l3_agent.skills.schema import AgentResponse
 
@@ -29,7 +27,7 @@ from src.l3_agent.skills.schema import AgentResponse
 class ReactLoop:
     """
     Ядро автономного агента.
-    Реализует паттерн ReAct (Reasoning and Acting).
+    Реализует паттерн ReAct (Reasoning and Acting) в Stateless режиме.
     """
 
     def __init__(
@@ -54,34 +52,23 @@ class ReactLoop:
         self.tools = tools
         self.cooldown_sec = cooldown_sec
 
-        self.current_events: list[str] = []  # Хранилище событий для текущего цикла
+        self.current_events: list[str] = []
 
     async def run(self, event_name: str, payload: Dict[str, Any], missed_events: list[str]):
         """
         Запускает ReAct цикл вызова к LLM.
         """
 
-        # Переносим пропущенные события в память текущего цикла
         self.current_events = missed_events.copy()
 
-        # Очищаем кэш тиков перед стартом
-        self.sql_ticks.clear_session_cache()
-        self.vector_manager.knowledge.clear_session_cache()
-        self.vector_manager.thoughts.clear_session_cache()
-
         try:
+            # Создаем новый ReAct цикл в стейте
             self.agent_state.reset_step()
             system_logger.info(
                 f"[ReAct] Цикл инициирован. Причина: {event_name} (LLM Model: {self.agent_state.llm_model})."
             )
 
-            # Системный промпт статический, собираем один раз
             prompt = self.prompt_builder.build()
-
-            messages = [
-                {"role": "system", "content": prompt},  # Статичный промпт
-                {"role": "user", "content": ""},  # Будет перезаписываться на каждом шаге
-            ]
 
             timeout_retries = 0
             max_timeout_retries = 3
@@ -91,18 +78,18 @@ class ReactLoop:
                 self.agent_state.current_step = step
                 self.agent_state.update_state(AgentStatus.THINKING)
 
-                # Передаем обновляемый список self.current_events
                 context = await self.context_builder.build(
                     event_name, payload, self.current_events
                 )
 
-                # Обновляем блок контекста в истории сообщений
-                messages[1]["content"] = context
+                # Stateless сборка промпта: каждый шаг мы отправляем чистую историю
+                messages = [
+                    {"role": "system", "content": prompt},
+                    {"role": "user", "content": context},
+                ]
 
-                # Трекаем токены на каждом из шагов, которые реально улетают в API (включая историю шагов)
                 self.tracker.add_input_record(messages=messages)
 
-                # Делаем глубокое копирование, чтобы Base64 не попал в БД тиков и логи
                 api_messages = copy.deepcopy(messages)
                 api_messages = self._inject_images_to_payload(api_messages)
 
@@ -125,7 +112,6 @@ class ReactLoop:
                     )
 
                     timeout_retries = 0
-
                     message_obj = response.choices[0].message
                     raw_answer = message_obj.content or ""
 
@@ -136,6 +122,7 @@ class ReactLoop:
 
                 except (openai.APITimeoutError, asyncio.TimeoutError):
                     timeout_retries += 1
+
                     if timeout_retries >= max_timeout_retries:
                         system_logger.error(
                             f"[LLM] API недоступно после {max_timeout_retries} таймаутов. Прерывание цикла."
@@ -144,33 +131,26 @@ class ReactLoop:
                         break
 
                     system_logger.warning(
-                        f"[LLM] Таймаут ответа API (240 сек). Повторный запрос ({timeout_retries}/{max_timeout_retries})."
+                        f"[LLM] Таймаут ответа API. Повтор ({timeout_retries}/{max_timeout_retries})."
                     )
-                    continue  # continue запустит новую попытку на ТОМ ЖЕ шаге
+                    continue
 
                 except openai.RateLimitError as e:
                     err_code = getattr(e.body, "get", lambda x: None)("code")
-                    err_msg = str(e).lower()
 
-                    if (
-                        err_code == "insufficient_quota"
-                        or "billing" in err_msg
-                        or "check your plan" in err_msg
-                    ):
+                    if err_code == "insufficient_quota" or "billing" in str(e).lower():
                         system_logger.error(
-                            f"[LLM] Квота исчерпана или нет денег. Бан ключа {session.api_key[:8]} на 24ч"
+                            f"[LLM] Квота исчерпана. Бан ключа {session.api_key[:8]} на 24ч"
                         )
                         self.llm.rotator.cooldown_key(session.api_key, 86400)
+
                     else:
                         system_logger.info(
-                            f"[LLM] Рейт-лимит (RPM/TPM). Пауза 60с для {session.api_key[:8]}"
+                            f"[LLM] Рейт-лимит. Пауза 60с для {session.api_key[:8]}"
                         )
                         self.llm.rotator.cooldown_key(session.api_key, 60)
 
                     await asyncio.sleep(self.cooldown_sec)
-                    system_logger.info(
-                        f"[LLM] Пауза на {self.cooldown_sec} сек. перед следующим API вызовом."
-                    )
                     continue
 
                 except openai.AuthenticationError:
@@ -183,36 +163,40 @@ class ReactLoop:
                     self.agent_state.update_state(AgentStatus.ERROR)
                     break
 
-                response_message = response.choices[0].message
-                messages.append(response_message)
-
-                if not response_message.tool_calls:
-                    system_logger.info(
-                        "[ReAct] Остановка цикла: модель не вызвала ни одного инструмента."
+                if not message_obj.tool_calls:
+                    system_logger.info("[ReAct] Агент не вызвал инструменты. Цикл завершен.")
+                    await self.sql_ticks.save_tick(
+                        thoughts=raw_answer, actions=[], results={"status": "completed"}
                     )
                     break
 
-                tool_call = response_message.tool_calls[0]
+                # =====================================================================
+                # Разбор ответа LLM
+                # =====================================================================
+
+                tool_call = message_obj.tool_calls[0]
                 args_str = tool_call.function.arguments
 
-                # Валидация ответа LLM через Pydantic
                 try:
                     parsed_response = AgentResponse.model_validate_json(args_str)
 
                 except ValidationError as e:
-                    system_logger.warning(
-                        f"[ReAct] Ошибка структуры от LLM. Запрашиваем исправление. Детали: {e}"
+                    system_logger.warning("[ReAct] Ошибка структуры JSON.")
+                    err_msg = f"Format Error: {e}"
+
+                    # Пишем ошибку в БД. На следующем шаге агент прочитает её в ## RECENT TICKS и исправится
+                    await self.sql_ticks.save_tick(
+                        thoughts="[System: LLM provided invalid JSON format]",
+                        actions=[{"tool_name": "unknown", "parameters": {"raw": args_str}}],
+                        results={"execution_report": err_msg},
                     )
-                    messages.append(
-                        {
-                            "role": "tool",
-                            "tool_call_id": tool_call.id,
-                            "name": tool_call.function.name,
-                            "content": f"Format Error: {e}",
-                        }
-                    )
+                    self.agent_state.last_actions_result = err_msg
                     step += 1
                     continue
+
+                # =====================================================================
+                # Мысли/действия
+                # =====================================================================
 
                 thoughts = parsed_response.thoughts.strip()
                 actions = parsed_response.actions
@@ -221,9 +205,7 @@ class ReactLoop:
                     system_logger.info(f"\n[Thoughts]:\n{thoughts}\n")
 
                 if not actions:
-                    system_logger.info(
-                        "[ReAct] Агент передал пустой массив действий. ReAct-цикл завершен."
-                    )
+                    system_logger.info("[ReAct] Передан пустой массив действий. Завершение.")
                     await self.sql_ticks.save_tick(
                         thoughts=thoughts, actions=[], results={"status": "completed"}
                     )
@@ -232,25 +214,22 @@ class ReactLoop:
                 self.agent_state.update_state(AgentStatus.ACTING)
                 results_str = await execute_skill(actions=actions)
 
-                # Сохраняем данные для RAG на следующем шаге
-                self.agent_state.last_thoughts = thoughts
+                # Сохраняем стейт для RAG на каждом шаге и инжекта картинок
+                self.agent_state.last_thoughts = (
+                    thoughts  # RAG ищет похожую инфу в базе по мыслям агента в текущем тике
+                )
+                self.agent_state.last_actions_result = (
+                    results_str  # RAG ищет похожую инфу в базе по результатам действий
+                )
 
-                # Вытаскиваем только строковые аргументы из функций (длиннее 3 символов)
+                # Вызываем функции
                 args_to_rag = []
                 for act in actions:
                     for val in act.parameters.values():
                         if isinstance(val, str) and len(val) > 3:
                             args_to_rag.append(val)
-                self.agent_state.last_action_args = args_to_rag
 
-                # Если в ответе есть слово "Ошибка" или "Error" и ответ короткий - сохраняем
-                self.agent_state.last_action_error = ""
-                if len(results_str) < 500 and (
-                    "ошибка" in results_str.lower()
-                    or "error" in results_str.lower()
-                    or "fail" in results_str.lower()
-                ):
-                    self.agent_state.last_action_error = results_str
+                self.agent_state.last_action_args = args_to_rag
 
                 await self.sql_ticks.save_tick(
                     thoughts=thoughts,
@@ -258,36 +237,21 @@ class ReactLoop:
                     results={"execution_report": results_str},
                 )
 
-                messages.append(
-                    {
-                        "role": "tool",
-                        "tool_call_id": tool_call.id,
-                        "name": tool_call.function.name,
-                        "content": results_str,
-                    }
-                )
-
                 step += 1
 
         finally:
-            # Обязательно сбрасываем кэш при любом исходе
-            self.sql_ticks.clear_session_cache()
+            system_logger.warning(
+                f"LLM превысила максимальный лимит шагов в ReAct цикле ({self.agent_state.max_react_steps}/{self.agent_state.max_react_steps})."
+            )
             self.agent_state.update_state(AgentStatus.IDLE)
 
     def add_realtime_event(self, event_str: str):
-        """Добавляет входящее событие в контекст в том случае, если агент уже думает."""
+        """Добавляет входящее событие в контекст агента."""
 
         self.current_events.append(event_str)
 
-    # ============================================================================
-    # СЛУЖЕБНЫЕ МЕТОДЫ
-    # ============================================================================
-
     def _dump_context_to_file(self, messages: list):
-        """
-        Сохраняет финальный промпт в Markdown-файл для отладки.
-        Безопасно парсит как обычные dict, так и объекты OpenAI.
-        """
+        """Создает дамп контекста, который отправляется к LLM."""
 
         try:
             with open("logs/last_prompt.md", "w", encoding="utf-8") as f:
@@ -311,37 +275,26 @@ class ReactLoop:
 
     def _inject_images_to_payload(self, messages: list) -> list:
         """
-        Сканирует историю сообщений на наличие маркера [IMAGE_REQUEST: /path/...].
-        Если находит, добавляет Base64 картинку в текущий user-контекст.
+        Сканирует результат последнего выполненного действия на наличие маркера изображения.
+        Если находит - инжектит Base64 в User-промпт.
         """
-        image_paths = []
 
-        # Ищем маркеры ТОЛЬКО в ответах инструментов (role == "tool")
-        # внутри текущего ReAct-цикла. Строго игнорируем role == "user",
-        # чтобы не вытянуть старый маркер из контекста прошлых тиков (баг залипания картинок)
-        for msg in messages:
-            if isinstance(msg, dict):
-                role = msg.get("role")
-                content = msg.get("content", "")
-            else:
-                role = getattr(msg, "role", "")
-                content = getattr(msg, "content", "")
+        last_result = self.agent_state.last_actions_result
+        if not last_result:
+            return messages
 
-            if role == "tool" and content and isinstance(content, str):
-                matches = re.findall(r"\[SYSTEM_MARKER_IMAGE_ATTACHED:\s*(.+?)\]", content)
-                image_paths.extend(matches)
+        image_paths = re.findall(r"\[SYSTEM_MARKER_IMAGE_ATTACHED:\s*(.+?)\]", last_result)
 
         if not image_paths:
             return messages
 
-        # Инжектим картинку строго в messages[1] (блок контекста пользователя)
         user_msg = messages[1]
 
         if isinstance(user_msg, dict) and user_msg.get("role") == "user":
             original_text = user_msg["content"]
             new_content = [{"type": "text", "text": original_text}]
 
-            for img_path in set(image_paths):  # set, чтобы не дублировать
+            for img_path in set(image_paths):
                 try:
                     path_obj = Path(img_path)
                     if path_obj.exists():
@@ -356,7 +309,7 @@ class ReactLoop:
                             }
                         )
                         system_logger.info(
-                            f"[ReAct] Изображение {path_obj.name} успешно инжектировано в промпт."
+                            f"[ReAct] Изображение {path_obj.name} успешно инжектировано."
                         )
                 except Exception as e:
                     system_logger.error(f"[ReAct] Ошибка инжектирования Base64: {e}")

@@ -20,9 +20,6 @@ async def test_knowledge_save_and_search(knowledge_manager):
     assert res1.is_success
     assert res2.is_success
 
-    # Очищаем кэш игнора текущей сессии (иначе Qdrant скроет свежие записи)
-    knowledge_manager.clear_session_cache()
-
     search_result = await knowledge_manager.search_knowledge("Расскажи про яблоки")
 
     assert search_result.is_success
@@ -38,9 +35,6 @@ async def test_knowledge_delete(knowledge_manager):
     assert save_result.is_success
 
     point_id = extract_id(save_result.message)
-
-    # Очищаем кэш игнора, чтобы get_all_knowledge увидел свежую запись
-    knowledge_manager.clear_session_cache()
 
     all_k = await knowledge_manager.get_all_knowledge()
     assert "Временный факт" in all_k.message
@@ -59,9 +53,6 @@ async def test_knowledge_get_all(knowledge_manager):
     await knowledge_manager.save_knowledge("Факт 1")
     await knowledge_manager.save_knowledge("Факт 2")
     await knowledge_manager.save_knowledge("Факт 3")
-
-    # Сбрасываем сессию, чтобы записи стали видимыми
-    knowledge_manager.clear_session_cache()
 
     result = await knowledge_manager.get_all_knowledge(limit=2)
     assert result.is_success

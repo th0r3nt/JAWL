@@ -167,12 +167,14 @@ class TelethonChats:
     async def read_chat(
         self, chat_id: Union[int, str], limit: int = 10, topic_id: Optional[int] = None
     ) -> SkillResult:
-        """Читает историю указанного чата..."""
+        """
+        Читает историю указанного чата (не помечая сообщения прочитанными). 
+        """
         try:
             client = self.tg_client.client()
             target_entity = await client.get_entity(parse_int_or_str(chat_id))
 
-            await self._mark_chat_read(client, target_entity, topic_id)
+            # ВЫРЕЗАНО: await self._mark_chat_read(client, target_entity, topic_id)
 
             read_outbox_max_id = 0
             try:
@@ -203,7 +205,6 @@ class TelethonChats:
                 drafts = await client.get_drafts()
                 for d in drafts:
                     if getattr(d.entity, "id", None) == target_entity.id:
-                        # Если читаем топик форума - проверяем совпадение reply_to_msg_id
                         if topic_id:
                             d_topic_id = getattr(d, "reply_to_msg_id", None)
                             if d_topic_id != int(topic_id):

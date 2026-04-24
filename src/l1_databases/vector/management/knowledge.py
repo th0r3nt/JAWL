@@ -29,12 +29,6 @@ class VectorKnowledge:
         self.similarity_threshold = similarity_threshold
         self.timezone = timezone
 
-        self.session_ignored_ids = set()
-
-    def clear_session_cache(self):
-        """Очищает игнор-лист текущего ReAct-цикла."""
-        self.session_ignored_ids.clear()
-
     @skill()
     async def save_knowledge(self, knowledge_text: str) -> SkillResult:
         """Сохраняет фрагмент знаний."""
@@ -51,9 +45,8 @@ class VectorKnowledge:
             await self.db.client.upsert(
                 collection_name=self.collection.name,
                 points=[models.PointStruct(id=point_id, vector=vector, payload=payload)],
+                wait=True,
             )
-
-            self.session_ignored_ids.add(point_id)
 
             msg = f"[Vector DB] Знание успешно сохранено в базе данных (ID: {point_id})."
             return SkillResult.ok(msg)
@@ -63,7 +56,6 @@ class VectorKnowledge:
             system_logger.error(msg)
             return SkillResult.fail(msg)
 
-
     @skill()
     async def search_knowledge(self, query: str, limit: int = 5) -> SkillResult:
         """Семантический поиск информации из базы данных."""
@@ -71,18 +63,11 @@ class VectorKnowledge:
         try:
             query_vector = await self.embedding_model.get_embedding(query)
 
-            query_filter = None
-            if self.session_ignored_ids:
-                query_filter = models.Filter(
-                    must_not=[models.HasIdCondition(has_id=list(self.session_ignored_ids))]
-                )
-
             search_result = await self.db.client.query_points(
                 collection_name=self.collection.name,
                 query=query_vector,
                 limit=limit,
                 score_threshold=self.similarity_threshold,
-                query_filter=query_filter,
                 with_payload=True,
             )
 
@@ -95,7 +80,6 @@ class VectorKnowledge:
                 system_logger.debug(msg)
                 return SkillResult.ok(msg)
 
-            # Обрезаем запрос до 200 символов, чтобы не спамить в логи
             short_query = truncate_text(query.replace("\n", " "), 200, "... [Обрезано]")
             system_logger.info(
                 f"[Vector DB] Знания: найдено {len(points)} записей по запросу '{short_query}'"
@@ -105,7 +89,9 @@ class VectorKnowledge:
             for point in points:
                 score = round(point.score, 2)
                 text = point.payload.get("text", "")
-                time_str = safe_format_timestamp(point.payload.get("created_at"), self.timezone)
+                time_str = safe_format_timestamp(
+                    point.payload.get("created_at"), self.timezone
+                )
 
                 md_block = f"[ID: `{point.id}`] [Время: {time_str}] Релевантность: {score}/{self.similarity_threshold}\n{text}"
                 formatted_results.append(md_block)
@@ -125,6 +111,7 @@ class VectorKnowledge:
             await self.db.client.delete(
                 collection_name=self.collection.name,
                 points_selector=models.PointIdsList(points=[point_id]),
+                wait=True,
             )
             msg = f"[Vector DB] Знание успешно удалено из базы данных (ID: {point_id})."
             system_logger.debug(msg)
@@ -139,16 +126,9 @@ class VectorKnowledge:
         """Получает последние n записей из базы знаний (без семантического поиска)."""
 
         try:
-            scroll_filter = None
-            if self.session_ignored_ids:
-                scroll_filter = models.Filter(
-                    must_not=[models.HasIdCondition(has_id=list(self.session_ignored_ids))]
-                )
-
             records, _ = await self.db.client.scroll(
                 collection_name=self.collection.name,
                 limit=limit,
-                scroll_filter=scroll_filter,
                 with_payload=True,
                 with_vectors=False,
             )

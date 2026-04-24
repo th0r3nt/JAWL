@@ -8,9 +8,6 @@ async def test_thoughts_save_and_search(thoughts_manager):
     save_result = await thoughts_manager.save_thought("Я подумал про яблоко")
     assert save_result.is_success
 
-    # Очищаем кэш игнора перед поиском
-    thoughts_manager.clear_session_cache()
-
     search_result = await thoughts_manager.search_thoughts("Что я думал про фрукт?")
 
     assert search_result.is_success

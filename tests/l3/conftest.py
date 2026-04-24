@@ -42,8 +42,6 @@ def mock_dependencies():
     sql_ticks.save_tick = AsyncMock()
 
     vector_manager = MagicMock()
-    vector_manager.knowledge.clear_session_cache = MagicMock()
-    vector_manager.thoughts.clear_session_cache = MagicMock()
 
     token_tracker = MagicMock()
     tools = [{"type": "function", "function": {"name": "execute_skill"}}]

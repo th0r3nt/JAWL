@@ -5,7 +5,7 @@ from qdrant_client import models
 
 from src.utils.dtime import safe_format_timestamp
 from src.utils.logger import system_logger
-from src.utils._tools import truncate_text  # <--- Добавили
+from src.utils._tools import truncate_text
 
 from src.l3_agent.skills.registry import skill, SkillResult
 
@@ -29,12 +29,6 @@ class VectorThoughts:
         self.similarity_threshold = similarity_threshold
         self.timezone = timezone
 
-        self.session_ignored_ids = set()
-
-    def clear_session_cache(self):
-        """Очищает игнор-лист текущего ReAct-цикла."""
-        self.session_ignored_ids.clear()
-
     @skill()
     async def save_thought(self, thought_text: str) -> SkillResult:
         """Сохраняет мысль в базу данных."""
@@ -48,9 +42,8 @@ class VectorThoughts:
             await self.db.client.upsert(
                 collection_name=self.collection.name,
                 points=[models.PointStruct(id=point_id, vector=vector, payload=payload)],
+                wait=True,
             )
-
-            self.session_ignored_ids.add(point_id)  # <--- Прячем от самого себя
 
             msg = f"[Vector DB] Мысль успешно сохранена в базу данных (ID: {point_id})."
             system_logger.info(msg)
@@ -68,18 +61,11 @@ class VectorThoughts:
         try:
             query_vector = await self.embedding_model.get_embedding(query)
 
-            query_filter = None
-            if self.session_ignored_ids:
-                query_filter = models.Filter(
-                    must_not=[models.HasIdCondition(has_id=list(self.session_ignored_ids))]
-                )
-
             search_result = await self.db.client.query_points(
                 collection_name=self.collection.name,
                 query=query_vector,
                 limit=limit,
                 score_threshold=self.similarity_threshold,
-                query_filter=query_filter,
                 with_payload=True,
             )
 
@@ -92,7 +78,7 @@ class VectorThoughts:
                 system_logger.debug(msg)
                 return SkillResult.ok(msg)
 
-            short_query = truncate_text(query.replace("\n", " "), 200, "... [Обрезано]") # 
+            short_query = truncate_text(query.replace("\n", " "), 200, "... [Обрезано]")
             system_logger.info(
                 f"[Vector DB] Мысли: найдено {len(points)} записей по запросу '{short_query}'"
             )
@@ -123,6 +109,7 @@ class VectorThoughts:
             await self.db.client.delete(
                 collection_name=self.collection.name,
                 points_selector=models.PointIdsList(points=[point_id]),
+                wait=True,
             )
             msg = f"[Vector DB] Мысль успешно удалена в базе данных (ID: {point_id})."
             system_logger.info(msg)
@@ -137,16 +124,9 @@ class VectorThoughts:
         """Получает последние n мыслей из базы данных."""
 
         try:
-            scroll_filter = None
-            if self.session_ignored_ids:
-                scroll_filter = models.Filter(
-                    must_not=[models.HasIdCondition(has_id=list(self.session_ignored_ids))]
-                )
-
             records, _ = await self.db.client.scroll(
                 collection_name=self.collection.name,
                 limit=limit,
-                scroll_filter=scroll_filter,
                 with_payload=True,
                 with_vectors=False,
             )

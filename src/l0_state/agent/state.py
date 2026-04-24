@@ -18,7 +18,7 @@ class AgentState(BaseModel):
 
     state: AgentStatus = AgentStatus.IDLE
 
-    # Настройки LLM (заполняются при старте из settings.yaml)
+    # Настройки LLM
     llm_model: str = "unknown"
     temperature: float = 0.7
 
@@ -27,40 +27,31 @@ class AgentState(BaseModel):
     max_react_steps: int = 15
     heartbeat_interval: int = 180
 
-    # Аптайм, время первого запуска (записывается автоматически при создании объекта)
     start_time: float = Field(default_factory=time.time)
 
-    # Краткосрочная память для ассоциативного RAG (когда шаг ReAct цикла > 1)
+    # Краткосрочная память для ассоциативного RAG и инжекта мультимодальности
     last_thoughts: str = ""
     last_action_args: list[str] = Field(default_factory=list)
     last_action_error: str = ""
-    # По ним будет осуществляться RAG-поиск по базам данных каждый шаг в текущем ReAct-цикле,
-    # чтобы у агента автоматически всплывали воспоминания по своим мыслям/действиям
+    last_actions_result: str = ""  # Результат последних выполненных действий
 
     def reset_step(self):
         self.current_step = 1
         self.last_thoughts = ""
         self.last_action_args.clear()
         self.last_action_error = ""
+        self.last_actions_result = ""
 
     def update_state(self, new_state: AgentStatus):
         self.state = new_state
 
     def next_step(self):
-        """Увеличивает счетчик шагов в рамках текущего тика."""
         self.current_step += 1
 
     def get_uptime(self) -> str:
-        """Считает, сколько времени жив сам агент (не ОС хоста)."""
         return seconds_to_duration_str(time.time() - self.start_time)
 
-    # P.S. Функцию сборки контекста засунул сюда, ибо это самое подходящее место
     async def get_context_block(self, **kwargs) -> str:
-        """
-        Провайдер контекста для ContextRegistry.
-        Возвращает отформатированный блок для контекста агента.
-        """
-
         return f"""
 ### AGENT STATE
 * Heartbeat Interval: {self.heartbeat_interval}s

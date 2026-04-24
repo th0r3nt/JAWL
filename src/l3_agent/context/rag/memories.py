@@ -40,6 +40,10 @@ class RAGMemories:
         missed_events: List[Dict[str, Any]],
         **kwargs,
     ) -> str:
+        """
+        Мощный RAG поиск по текущим мыслям, действиям и результатам действий агента.
+        Возвращает отформатированный блок RELEVANT INFORMATION, если нашел связанные данные.
+        """
 
         queries = set()
 
@@ -85,9 +89,6 @@ class RAGMemories:
 
             for arg in self.agent_state.last_action_args:
                 queries.add(arg)
-
-            if self.agent_state.last_action_error:
-                queries.add(self.agent_state.last_action_error)
 
         if not queries:
             return ""
