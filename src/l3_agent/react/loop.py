@@ -211,7 +211,7 @@ class ReactLoop:
                     temperature=self.agent_state.temperature,
                     reasoning_effort="xhigh",
                     max_tokens=128000,
-                    timeout=180.0,
+                    timeout=120.0,
                 )
 
                 message_obj = response.choices[0].message
