@@ -107,6 +107,7 @@ class VectorDBConfig(BaseModel):
     embedding_model: str
     vector_size: int
     auto_rag_top_k: int
+    auto_rag_max_query_chars: int
 
 
 class ContextDepthConfig(BaseModel):
