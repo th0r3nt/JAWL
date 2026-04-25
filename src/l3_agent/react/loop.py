@@ -209,9 +209,9 @@ class ReactLoop:
                         "function": {"name": "execute_skill"},
                     },
                     temperature=self.agent_state.temperature,
-                    effort="max",
+                    reasoning_effort="xhigh",
                     max_tokens=128000,
-                    timeout=240.0,
+                    timeout=180.0,
                 )
 
                 message_obj = response.choices[0].message
