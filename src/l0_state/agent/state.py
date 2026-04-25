@@ -28,6 +28,7 @@ class AgentState(BaseModel):
     heartbeat_interval: int = 180
 
     start_time: float = Field(default_factory=time.time)
+    last_input_tokens: int = 0
 
     # Краткосрочная память для ассоциативного RAG и инжекта мультимодальности
     last_thoughts: str = ""
@@ -59,4 +60,5 @@ class AgentState(BaseModel):
 * Temperature: {self.temperature}
 * Uptime: {self.get_uptime()}
 * ReAct Step: {self.current_step}/{self.max_react_steps}
+* Input Tokens (last step): {self.last_input_tokens}
         """.strip()

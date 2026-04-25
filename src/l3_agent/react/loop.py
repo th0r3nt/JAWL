@@ -175,7 +175,11 @@ class ReactLoop:
         await self.sql_ticks.save_tick(
             thoughts=thoughts,
             actions=[a.model_dump() for a in actions],
-            results={"execution_report": results_str},
+            results={
+                "execution_report": results_str,
+                "step": self.agent_state.current_step,
+                "max_steps": self.agent_state.max_react_steps,
+            },
         )
 
     async def _handle_completion(self, thoughts: str) -> None:
@@ -185,7 +189,13 @@ class ReactLoop:
 
         system_logger.info("[ReAct] Передан пустой массив действий. Завершение.")
         await self.sql_ticks.save_tick(
-            thoughts=thoughts, actions=[], results={"status": "completed"}
+            thoughts=thoughts,
+            actions=[],
+            results={
+                "status": "completed",
+                "step": self.agent_state.current_step,
+                "max_steps": self.agent_state.max_react_steps,
+            },
         )
 
     async def _call_llm_with_retries(self, messages: list) -> str | None:
@@ -294,7 +304,11 @@ class ReactLoop:
             await self.sql_ticks.save_tick(
                 thoughts="[System: LLM provided invalid JSON format]",
                 actions=[{"tool_name": "unknown", "parameters": {"raw": clean_answer}}],
-                results={"execution_report": err_msg},
+                results={
+                    "execution_report": err_msg,
+                    "step": self.agent_state.current_step,
+                    "max_steps": self.agent_state.max_react_steps,
+                },
             )
             self.agent_state.last_actions_result = err_msg
             return None

@@ -66,6 +66,8 @@ class TokenTracker:
         self._current_tick_in += total_tokens
         system_logger.info(f"[LLM] Input tokens: {total_tokens}.")
 
+        return total_tokens
+
     def add_output_record(self, output_text: str) -> None:
         output_tokens = self._approximate_tokens(output_text)
         self.output_history.append({"total": output_tokens})

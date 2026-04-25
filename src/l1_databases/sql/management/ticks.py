@@ -163,8 +163,13 @@ class SQLTicks:
 
             time_str = format_datetime(t.created_at, self.tz_offset)
 
+            step_str = ""
+            if t.results and "step" in t.results and "max_steps" in t.results:
+                step_str = f"ReAct Step: {t.results['step']}/{t.results['max_steps']}\n"
+
             blocks.append(
-                f"#### [Tick] {time_str}\n\n"
+                f"#### [Tick] {time_str}\n"
+                f"{step_str}"
                 f"*Thoughts*: '{thoughts_str}'\n\n"
                 f"*Actions*:\n{actions_str}\n"
                 f"*Result*:\n```\n{res_str}\n```"
