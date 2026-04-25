@@ -4,16 +4,42 @@ from telethon import utils
 from src.utils.dtime import format_datetime
 from src.utils._tools import truncate_text
 
+
 class TelethonMessageParser:
     """Утилита для глубокого парсинга сообщений Telethon (реакции, реплаи, медиа, кнопки)."""
 
     @staticmethod
-    def get_sender_name(msg: Any) -> str:
-        if msg.sender:
-            name = utils.get_display_name(msg.sender)
+    async def get_sender_name(msg: Any) -> str:
+        sender = msg.sender
+        if not sender:
+            try:
+                # Пытаемся подтянуть отправителя, если его нет в локальном кэше
+                sender = await msg.get_sender()
+            except Exception:
+                pass
+
+        # Если отправитель всё еще None, проверяем: возможно это анонимный админ (отправитель = сам чат)
+        if not sender and msg.sender_id:
+            chat = msg.chat
+            if not chat:
+                try:
+                    chat = await msg.get_chat()
+                except Exception:
+                    pass
+
+            # Telethon хранит raw ID без префикса -100, поэтому сверка корректна
+            if chat and getattr(chat, "id", None) == msg.sender_id:
+                sender = chat
+
+        if sender:
+            name = utils.get_display_name(sender)
+            if not name:
+                name = "Deleted Account" if getattr(sender, "deleted", False) else "Anonymous"
             return f"{name} (ID: {msg.sender_id})" if msg.sender_id else name
+
         elif msg.sender_id:
             return f"Unknown (ID: {msg.sender_id})"
+
         return "Unknown"
 
     @staticmethod
@@ -173,7 +199,7 @@ class TelethonMessageParser:
         if msg.out:
             read_status = " [Прочитано]" if msg.id <= read_outbox_max_id else " [Не прочитано]"
 
-        sender_name = cls.get_sender_name(msg)
+        sender_name = await cls.get_sender_name(msg)
         is_reply, reply_id = cls.determine_reply(msg, topic_id)
 
         text = msg.text or ""

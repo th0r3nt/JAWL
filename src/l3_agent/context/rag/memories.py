@@ -185,4 +185,4 @@ class RAGMemories:
         if not final_blocks:
             return ""
 
-        return "## RELEVANT INFORMATION\n" + "\n\n".join(final_blocks)
+        return "## RELEVANT INFORMATION (автоматический RAG-поиск: информация из векторной базы данных) \n" + "\n\n".join(final_blocks)

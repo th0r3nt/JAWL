@@ -102,7 +102,9 @@ class TelethonEvents:
                 # ГРУППЫ/КАНАЛЫ
 
                 # Ленивая подгрузка описаний для каналов и групп
-                if (dialog.is_group or dialog.is_channel) and entity.id not in self._chat_desc_cache:
+                if (
+                    dialog.is_group or dialog.is_channel
+                ) and entity.id not in self._chat_desc_cache:
                     try:
                         about = ""
                         if isinstance(entity, Channel):
@@ -123,7 +125,9 @@ class TelethonEvents:
                 desc = self._chat_desc_cache.get(entity.id, "")
                 if desc:
                     clean_desc = desc.replace("\n", " ")
-                    desc_str = f" | Описание: {truncate_text(clean_desc, 100, '... [Обрезано]')}"
+                    desc_str = (
+                        f" | Описание: {truncate_text(clean_desc, 100, '... [Обрезано]')}"
+                    )
                 else:
                     desc_str = ""
 
@@ -179,12 +183,12 @@ class TelethonEvents:
                 self.state.last_chats = "Список диалогов пуст."
             else:
                 res_str = "\n".join(chats)
-                
+
                 # Считаем, сколько чатов осталось скрыто за лимитом
                 if total_dialogs > len(chats):
                     hidden = total_dialogs - len(chats)
                     res_str += f"\n\n...и еще {hidden} чатов скрыто для экономии контекста. Для просмотра - сооветствующая функция с увеличенным лимитом."
-                
+
                 self.state.last_chats = res_str
 
         except Exception as e:
@@ -205,7 +209,7 @@ class TelethonEvents:
 
         client = self.tg_client.client()
 
-        sender_name = TelethonMessageParser.get_sender_name(event.message)
+        sender_name = await TelethonMessageParser.get_sender_name(event.message)
         chat = await event.get_chat()
         chat_name = utils.get_display_name(chat) if chat else "Unknown"
 
@@ -243,7 +247,7 @@ class TelethonEvents:
         await self._update_state(force=True)
 
         client = self.tg_client.client()
-        sender_name = TelethonMessageParser.get_sender_name(event.message)
+        sender_name = await TelethonMessageParser.get_sender_name(event.message)
         chat = await event.get_chat()
         chat_name = utils.get_display_name(chat) if chat else "Unknown"
 
@@ -329,7 +333,7 @@ class TelethonEvents:
         await self._update_state()
 
         client = self.tg_client.client()
-        sender_name = TelethonMessageParser.get_sender_name(event.message)
+        sender_name = await TelethonMessageParser.get_sender_name(event.message)
         chat = await event.get_chat()
         chat_name = utils.get_display_name(chat) if chat else "Unknown"
 
