@@ -202,14 +202,32 @@ def _manage_sql_module(
             record_id = str(uuid.uuid4())[:8]
 
             if table_name == "tasks":
-                desc = questionary.text("Описание задачи (обязательно):").ask()
+                title = questionary.text("Короткое название задачи:").ask()
+                if not title:
+                    continue
+                desc = questionary.text("Полное описание:").ask()
                 if not desc:
                     continue
-                term = questionary.text("Срок (опционально, Enter пропустить):").ask()
+
+                # JSON-пустышки
+                empty_list_json = "[]"
 
                 _run_sql(
-                    "INSERT INTO tasks (id, description, term, context) VALUES (?, ?, ?, ?)",
-                    (record_id, desc, term if term else None, None),
+                    """INSERT INTO tasks 
+                    (id, title, description, status, progress, tags, dependencies, subtasks, due_date, context) 
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    (
+                        record_id,
+                        title,
+                        desc,
+                        "todo",
+                        0,
+                        empty_list_json,
+                        empty_list_json,
+                        empty_list_json,
+                        None,
+                        None,
+                    ),
                 )
                 print_success("Задача успешно добавлена.")
 
@@ -629,6 +647,7 @@ def database_manager_screen() -> None:
         # SQL
         if choice == "drives":
             _manage_drives_screen()
+
         elif choice == "ms":
             _manage_sql_module(
                 "Mental States",
@@ -637,8 +656,12 @@ def database_manager_screen() -> None:
                 "max_entities",
                 ["name", "status"],
             )
+
         elif choice == "tasks":
-            _manage_sql_module("Tasks", "tasks", "tasks", "max_tasks", ["description", "term"])
+            _manage_sql_module(
+                "Tasks", "tasks", "tasks", "max_tasks", ["title", "status", "progress"]
+            )
+
         elif choice == "traits":
             _manage_sql_module(
                 "Traits",
@@ -651,6 +674,7 @@ def database_manager_screen() -> None:
         # Vector
         elif choice == "knowledge":
             _manage_vector_collection("knowledge")
+
         elif choice == "thoughts":
             _manage_vector_collection("thoughts")
 

@@ -11,14 +11,28 @@ class Base(DeclarativeBase):
 
 
 class TaskTable(Base):
-    """Таблица долгосрочных задач."""
+    """Таблица долгосрочных задач (Tasks v2)."""
 
     __tablename__ = "tasks"
 
     id: Mapped[str] = mapped_column(primary_key=True)
-    description: Mapped[str]  # Описание задачи
-    term: Mapped[Optional[str]]  # Длительность
-    context: Mapped[Optional[str]]  # Рабочие заметки агента
+    title: Mapped[str]  # Короткое название
+    description: Mapped[str]  # Полное описание задачи
+    status: Mapped[str] = mapped_column(
+        default="todo"
+    )  # todo, in_progress, blocked, done, cancelled
+    progress: Mapped[int] = mapped_column(default=0)  # 0-100%
+
+    tags: Mapped[list[str]] = mapped_column(JSON, default=list)
+    dependencies: Mapped[list[str]] = mapped_column(
+        JSON, default=list
+    )  # Массив ID других задач
+    subtasks: Mapped[list[dict[str, Any]]] = mapped_column(
+        JSON, default=list
+    )  # [{"title": "...", "is_done": false}]
+
+    due_date: Mapped[Optional[float]] = mapped_column(default=None)  # UNIX timestamp
+    context: Mapped[Optional[str]] = mapped_column(default=None)  # Рабочие заметки агента
 
 
 class TickTable(Base):
