@@ -297,7 +297,30 @@ class HostOSEvents:
                                 added += j2 - j1
 
                         if added > 0 or deleted > 0:
-                            diff_msg = f"(Изменения: +{added} симв. / -{deleted} симв.)"
+                            limit = self.host_os.config.file_diff_max_chars
+                            
+                            # Генерируем построчный diff (unified_diff)
+                            diff_gen = difflib.unified_diff(
+                                old_content.splitlines(), 
+                                new_content.splitlines(),
+                                n=1, # Показывать только 1 строчку контекста вокруг изменений
+                                lineterm=""
+                            )
+                            
+                            # Убираем системные заголовки diff'а (--- и +++) для экономии контекста
+                            diff_lines = [
+                                line for line in diff_gen 
+                                if not line.startswith('---') and not line.startswith('+++')
+                            ]
+                            
+                            diff_str = "\n".join(diff_lines)
+                            
+                            # Обрезаем, если diff слишком огромный
+                            if len(diff_str) > limit:
+                                diff_str = diff_str[:limit] + "\n... [Diff обрезан]"
+                                
+                            diff_block = f"\n\nDiff preview:\n```diff\n{diff_str}\n```" if diff_str else ""
+                            diff_msg = f"(Изменения: +{added} симв. / -{deleted} симв.){diff_block}"
                         else:
                             diff_msg = "(Сохранен без изменений текста)"
 

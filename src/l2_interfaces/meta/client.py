@@ -5,7 +5,6 @@ from src.l0_state.agent.state import AgentState
 from src.utils.event.bus import EventBus
 from src.utils.logger import system_logger
 
-
 class MetaClient:
     def __init__(self, agent_state: AgentState, event_bus: EventBus, settings_path: Path):
         self.agent_state = agent_state

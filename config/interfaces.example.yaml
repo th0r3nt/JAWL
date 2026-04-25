@@ -20,6 +20,7 @@ host:
     file_list_limit: 100
     http_response_max_chars: 10000
     top_processes_limit: 10
+    file_diff_max_chars: 300 # При появлении события OS_FILE_MODIFIED (отслеживание изменений в файлах sandbox/) - будут показываться последние n измененных символов 
 
 
 telegram:
@@ -27,7 +28,7 @@ telegram:
     enabled: false # Перед включением введите TELETHON_API_ID и TELETHON_API_HASH в .env
 
     session_name: "agent_telethon" # Находится в src/utils/local/data/telethon/
-    recent_chats_limit: 25 # Сколько последних диалогов отображать в контексте агента
+    recent_chats_limit: 15 # Сколько последних диалогов отображать в контексте агента
     private_chat_history_limit: 0 # В контексте всегда будут видны последние n сообщений для последних личных чатов (поставить 0, если не нужно)
 
   aiogram:

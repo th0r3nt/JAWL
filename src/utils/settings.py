@@ -20,6 +20,7 @@ class HostOSConfig(BaseModel):
     file_list_limit: int
     http_response_max_chars: int
     top_processes_limit: int
+    file_diff_max_chars: int = 300
 
 
 class HostConfig(BaseModel):

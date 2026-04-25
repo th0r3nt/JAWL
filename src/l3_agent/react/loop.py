@@ -214,10 +214,13 @@ class ReactLoop:
                 )
 
                 message_obj = response.choices[0].message
-                raw_answer = message_obj.content or ""
-
+                
                 if message_obj.tool_calls:
-                    raw_answer += str(message_obj.tool_calls[0].function.arguments)
+                    # Если модель вызвала функцию, берем СТРОГО её JSON-аргументы
+                    raw_answer = str(message_obj.tool_calls[0].function.arguments)
+                else:
+                    # Иначе это просто текстовый ответ (или галлюцинация)
+                    raw_answer = message_obj.content or ""
 
                 self.tracker.add_output_record(raw_answer)
                 return raw_answer
@@ -267,13 +270,21 @@ class ReactLoop:
         В случае ошибки возвращает None
         и записывает ошибку в БД.
         """
+        
+        clean_answer = raw_answer.strip()
 
-        if not raw_answer.strip().startswith("{"):
-            # Имитация пустого действия, если модель просто написала текст без вызова функций
-            return AgentResponse(thoughts=raw_answer, actions=[])
+        # Срезаем Markdown-обертку, если LLM всё-таки решила прислать json как текст
+        if clean_answer.startswith("```"):
+            match = re.search(r"\{.*\}", clean_answer, re.DOTALL)
+            if match:
+                clean_answer = match.group(0)
+
+        if not clean_answer.startswith("{"):
+            # Имитация пустого действия
+            return AgentResponse(thoughts=clean_answer, actions=[])
 
         try:
-            parsed_response = AgentResponse.model_validate_json(raw_answer)
+            parsed_response = AgentResponse.model_validate_json(clean_answer)
             return parsed_response
         except ValidationError as e:
             system_logger.warning("[ReAct] Ошибка структуры JSON.")
@@ -281,7 +292,7 @@ class ReactLoop:
 
             await self.sql_ticks.save_tick(
                 thoughts="[System: LLM provided invalid JSON format]",
-                actions=[{"tool_name": "unknown", "parameters": {"raw": raw_answer}}],
+                actions=[{"tool_name": "unknown", "parameters": {"raw": clean_answer}}],
                 results={"execution_report": err_msg},
             )
             self.agent_state.last_actions_result = err_msg
