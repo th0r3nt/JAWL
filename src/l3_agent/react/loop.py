@@ -21,7 +21,7 @@ from src.l3_agent.prompt.builder import PromptBuilder
 from src.l3_agent.context.builder import ContextBuilder
 
 from src.l3_agent.skills.registry import execute_skill
-from src.l3_agent.skills.schema import AgentResponse
+from src.l3_agent.skills.schema import AgentResponse, ActionCall
 
 
 class ReactLoop:
@@ -57,8 +57,8 @@ class ReactLoop:
 
     async def run(
         self, event_name: str, payload: Dict[str, Any], missed_events: list[Dict[str, Any]]
-    ):
-        """Запускает ReAct цикл вызова к LLM."""
+    ) -> None:
+        """Запускает ReAct цикл вызова к LLM (Оркестратор)."""
 
         self.current_events = missed_events.copy()
 
@@ -69,52 +69,29 @@ class ReactLoop:
             )
 
             prompt = self.prompt_builder.build()
-            step = 1
 
-            while step <= self.agent_state.max_react_steps:
-                self.agent_state.current_step = step
+            # ======================================================================
+            # ГЛАВНЫЙ ЦИКЛ
+            # ======================================================================
+
+            while self.agent_state.current_step <= self.agent_state.max_react_steps:
                 self.agent_state.update_state(AgentStatus.THINKING)
 
-                # ==================================================================================
-                # СБОРКА КОНТЕКСТА
-                # ==================================================================================
+                # =======================================================
+                # Сборка контекста и промпта
+                messages = await self._prepare_messages(prompt, event_name, payload)
 
-                context = await self.context_builder.build(
-                    event_name, payload, self.current_events
-                )
-
-                # Очищаем события, чтобы на следующих шагах цикла LLM не видела их повторно
-                # Любые новые события, прилетевшие в процессе работы, будут добавлены через add_realtime_event.
-                self.current_events.clear()
-
-                messages = [
-                    {"role": "system", "content": prompt},
-                    {"role": "user", "content": context},
-                ]
-
-                self.tracker.add_input_record(messages=messages)
-
-                api_messages = copy.deepcopy(messages)
-                api_messages = self._inject_images_to_payload(api_messages)
-                self._dump_context_to_file(api_messages)
-
-                system_logger.info(f"[ReAct] Шаг {step}/{self.agent_state.max_react_steps}.")
-
-                # ==================================================================================
-                # ВЫЗОВ LLM
-                # ==================================================================================
-
-                raw_answer = await self._call_llm_with_retries(api_messages)
+                # =======================================================
+                # Вызов LLM
+                raw_answer = await self._call_llm_with_retries(messages)
                 if raw_answer is None:
                     break  # Критическая ошибка или таймауты
 
-                # ==================================================================================
-                # ПАРСИНГ ОТВЕТА
-                # ==================================================================================
-
-                parsed_response = await self._parse_response(raw_answer, step)
+                # =======================================================
+                # Парсинг ответа
+                parsed_response = await self._parse_response(raw_answer)
                 if parsed_response is None:
-                    step += 1
+                    self.agent_state.next_step()
                     continue  # Ошибка парсинга (агент исправится на следующем шаге)
 
                 thoughts = parsed_response.thoughts.strip()
@@ -123,45 +100,99 @@ class ReactLoop:
                 if thoughts:
                     system_logger.info(f"[Thoughts]:\n{thoughts}\n")
 
+                # =======================================================
+                # Проверка на завершение цикла
                 if not actions:
-                    system_logger.info("[ReAct] Передан пустой массив действий. Завершение.")
-                    await self.sql_ticks.save_tick(
-                        thoughts=thoughts, actions=[], results={"status": "completed"}
-                    )
+                    await self._handle_completion(thoughts)
                     break
 
-                # ==================================================================================
-                # ВЫПОЛНЕНИЕ ДЕЙСТВИЙ
-                # ==================================================================================
+                # =======================================================
+                # Выполнение действий
+                await self._execute_actions(thoughts, actions)
 
-                self.agent_state.update_state(AgentStatus.ACTING)
-                results_str = await execute_skill(actions=actions)
-
-                # Обновляем стейт для RAG
-                self.agent_state.last_thoughts = thoughts
-                self.agent_state.last_actions_result = results_str
-
-                args_to_rag = []
-                for act in actions:
-                    for val in act.parameters.values():
-                        if isinstance(val, str) and len(val) > 3:
-                            args_to_rag.append(val)
-                self.agent_state.last_action_args = args_to_rag
-
-                # Сохраняем результаты в БД
-                await self.sql_ticks.save_tick(
-                    thoughts=thoughts,
-                    actions=[a.model_dump() for a in actions],
-                    results={"execution_report": results_str},
-                )
-
-                step += 1
+                self.agent_state.next_step()
 
         finally:
             self.agent_state.update_state(AgentStatus.IDLE)
 
+    # ==================================================================================
+    # ПРИВАТНЫЕ МЕТОДЫ
+    # ==================================================================================
+
+    async def _prepare_messages(
+        self, prompt: str, event_name: str, payload: Dict[str, Any]
+    ) -> list[Dict[str, Any]]:
+        """
+        Собирает контекст,
+        формирует сообщения для LLM
+        и инжектит мультимодальность.
+        """
+
+        context = await self.context_builder.build(event_name, payload, self.current_events)
+
+        # Очищаем события, чтобы на следующих шагах цикла LLM не видела их повторно
+        if self.agent_state.current_step >= 4:
+            self.current_events.clear()
+
+        messages = [
+            {"role": "system", "content": prompt},
+            {"role": "user", "content": context},
+        ]
+
+        self.tracker.add_input_record(messages=messages)
+
+        messages = copy.deepcopy(messages)
+        messages = self._inject_images_to_payload(messages)
+        self._dump_context_to_file(messages)
+
+        system_logger.info(
+            f"[ReAct] Шаг {self.agent_state.current_step}/{self.agent_state.max_react_steps}."
+        )
+
+        return messages
+
+    async def _execute_actions(self, thoughts: str, actions: list[ActionCall]) -> None:
+        """
+        Выполняет запрошенные инструменты,
+        обновляет стейт и сохраняет результат в БД.
+        """
+
+        self.agent_state.update_state(AgentStatus.ACTING)
+        results_str = await execute_skill(actions=actions)
+
+        # Обновляем стейт для RAG
+        self.agent_state.last_thoughts = thoughts
+        self.agent_state.last_actions_result = results_str
+
+        args_to_rag = []
+        for act in actions:
+            for val in act.parameters.values():
+                if isinstance(val, str) and len(val) > 3:
+                    args_to_rag.append(val)
+        self.agent_state.last_action_args = args_to_rag
+
+        # Сохраняем логи (Tick) в БД
+        await self.sql_ticks.save_tick(
+            thoughts=thoughts,
+            actions=[a.model_dump() for a in actions],
+            results={"execution_report": results_str},
+        )
+
+    async def _handle_completion(self, thoughts: str) -> None:
+        """
+        Логика корректного завершения (отсутствие actions=).
+        """
+
+        system_logger.info("[ReAct] Передан пустой массив действий. Завершение.")
+        await self.sql_ticks.save_tick(
+            thoughts=thoughts, actions=[], results={"status": "completed"}
+        )
+
     async def _call_llm_with_retries(self, messages: list) -> str | None:
-        """Обрабатывает запросы к LLM, ротацию ключей и Rate Limits."""
+        """
+        Обрабатывает запросы к LLM,
+        ротацию ключей и Rate Limits.
+        """
 
         timeout_retries = 0
         max_timeout_retries = 3
@@ -190,9 +221,6 @@ class ReactLoop:
 
                 self.tracker.add_output_record(raw_answer)
                 return raw_answer
-
-            # ====================================================
-            # Обработка ошибок 
 
             except (openai.APITimeoutError, asyncio.TimeoutError):
                 timeout_retries += 1
@@ -233,10 +261,11 @@ class ReactLoop:
                 self.agent_state.update_state(AgentStatus.ERROR)
                 return None
 
-    async def _parse_response(self, raw_answer: str, step: int) -> AgentResponse | None:
+    async def _parse_response(self, raw_answer: str) -> AgentResponse | None:
         """
-        Парсит JSON-ответ агента. 
-        В случае ошибки возвращает None и записывает ошибку в БД.
+        Парсит JSON-ответ агента.
+        В случае ошибки возвращает None
+        и записывает ошибку в БД.
         """
 
         if not raw_answer.strip().startswith("{"):
@@ -258,17 +287,17 @@ class ReactLoop:
             self.agent_state.last_actions_result = err_msg
             return None
 
-    def add_realtime_event(self, event_data: Dict[str, Any]):
+    def add_realtime_event(self, event_data: Dict[str, Any]) -> None:
         """
-        Добавляет входящее событие в контекст агента.
+        Добавляет входящее событие в контекст агента
+        (вызывается извне).
         """
 
         self.current_events.append(event_data)
 
-    def _dump_context_to_file(self, messages: list):
+    def _dump_context_to_file(self, messages: list) -> None:
         """
-        Создает дамп контекста в .md файл, который отправляется к LLM.
-        Для отладки.
+        Создает дамп контекста в .md файл для отладки.
         """
 
         try:
@@ -292,8 +321,8 @@ class ReactLoop:
 
     def _inject_images_to_payload(self, messages: list) -> list:
         """
-        Сканирует результат последних выполненных действий (массив actions=) на наличие маркера изображения.
-        Если находит - инжектит Base64 в User-промпт.
+        Инжектит Base64 изображения в User-промпт,
+        если находит маркер.
         """
 
         last_result = self.agent_state.last_actions_result

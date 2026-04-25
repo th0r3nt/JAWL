@@ -23,7 +23,7 @@ class AgentState(BaseModel):
     temperature: float = 0.7
 
     # ReAct цикл
-    current_step: int = 1
+    current_step: int = 1 # Хранит текущий шаг раздумий агента
     max_react_steps: int = 15
     heartbeat_interval: int = 180
 
