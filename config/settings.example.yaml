@@ -22,7 +22,7 @@ system:
     auto_rag_max_query_chars: 200 # Макс. длина запроса, после которой он будет разбит на несколько частей
 
     # Рекомендуемые эмбеддинг модели:
-    # intfloat/multilingual-e5-large (vector_size: 1024, ~2.2 ГБ) - самая мощная, но работает медленнее
+    # intfloat/multilingual-e5-large (vector_size: 1024, ~2.2 ГБ, рекомендуется similarity_threshold: 0.85) - самая мощная, но работает медленнее
     # sentence-transformers/paraphrase-multilingual-mpnet-base-v2 (vector_size: 768, ~1.0 ГБ) - баланс
     # sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2 (vector_size: 384, ~300 МБ) - оптимизированный вариант
     

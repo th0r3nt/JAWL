@@ -19,7 +19,7 @@ class TelethonMessageParser:
                 pass
 
         # Если отправитель всё еще None, проверяем: возможно это анонимный админ (отправитель = сам чат)
-        if not sender and msg.sender_id:
+        if not sender and (msg.is_group or msg.is_channel):
             chat = msg.chat
             if not chat:
                 try:
@@ -27,9 +27,9 @@ class TelethonMessageParser:
                 except Exception:
                     pass
 
-            # Telethon хранит raw ID без префикса -100, поэтому сверка корректна
-            if chat and getattr(chat, "id", None) == msg.sender_id:
-                sender = chat
+            if chat:
+                name = utils.get_display_name(chat)
+                return f"{name} [Анонимный Админ]"
 
         if sender:
             name = utils.get_display_name(sender)

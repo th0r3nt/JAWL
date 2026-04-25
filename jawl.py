@@ -42,7 +42,15 @@ def setup_and_run() -> None:
                 print(
                     "[*] Установка зависимостей из requirements.txt. Пожалуйста, подождите несколько минут."
                 )
-                subprocess.run([str(venv_python), "-m", "pip", "install", "-r", str(req_file)])
+                # Проверяем успешность установки
+                result = subprocess.run([str(venv_python), "-m", "pip", "install", "-r", str(req_file)])
+                if result.returncode != 0:
+                    print("\n[!] Ошибка при первичной установке зависимостей.")
+                    print("[!] Внимательно изучите ошибки pip выше (возможно, версия Python не поддерживается).")
+                    if os.name == "nt":
+                        input("Нажмите Enter для выхода...")
+                    sys.exit(1)
+                
                 print("[*] Установка завершена.\n")
 
         # Определяем путь к python внутри venv
@@ -73,7 +81,6 @@ def setup_and_run() -> None:
     try:
         from src.cli.menu import main_menu
     except ModuleNotFoundError as e:
-        # Защита от бесконечного цикла, если pip так и не смог поставить модуль
         if os.environ.get("JAWL_RECOVERY_ATTEMPTED") == "1":
             print(
                 f"\n[!] Критический сбой: модуль {e.name} так и не найден после переустановки."
@@ -84,9 +91,17 @@ def setup_and_run() -> None:
 
         print(f"\n[*] Сбой: отсутствует модуль {e.name}. Похоже, зависимости были повреждены.")
         print("[*] Запуск автоматического восстановления.")
-        time.sleep(2)  # Даем юзеру время на чтение
+        time.sleep(2)
 
-        subprocess.run([sys.executable, "-m", "pip", "install", "-r", str(req_file)])
+        # Проверяем код возврата при восстановлении
+        result = subprocess.run([sys.executable, "-m", "pip", "install", "-r", str(req_file)])
+        
+        if result.returncode != 0:
+            print("\n[!] Критическая ошибка: pip не смог восстановить зависимости.")
+            print("[!] Изучите логи выше. Возможно, версия Python несовместима с библиотеками.")
+            if os.name == "nt":
+                input("Нажмите Enter для выхода...")
+            sys.exit(1)
 
         print("\n[*] Зависимости успешно восстановлены. Запускаем интерфейс.")
         time.sleep(1)
