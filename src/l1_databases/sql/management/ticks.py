@@ -166,7 +166,7 @@ class SQLTicks:
             blocks.append(
                 f"#### [Tick] {time_str}\n\n"
                 f"*Thoughts*: '{thoughts_str}'\n\n"
-                f"*Actions*:\n{actions_str}\n\n"
+                f"*Actions*:\n{actions_str}\n"
                 f"*Result*:\n```\n{res_str}\n```"
             )
 

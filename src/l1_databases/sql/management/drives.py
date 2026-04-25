@@ -187,6 +187,7 @@ class SQLDrives:
         lines = [
             "## DRIVES \nДолгосрочные векторы поведения. Рекомендуется снижать дефицит, когда он высокий.",
             f"Длительность 1 интервала: {self.decay_interval_sec} сек.",
+            f"Лимит кастомных мотиваций: {self.max_custom}",
         ]
 
         now = datetime.now(timezone.utc)

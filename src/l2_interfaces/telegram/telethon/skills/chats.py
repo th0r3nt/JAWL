@@ -12,6 +12,7 @@ from telethon.tl.functions.messages import (
     ImportChatInviteRequest,
     GetPeerDialogsRequest,
     ReadMentionsRequest,
+    GetFullChatRequest,
 )
 
 from src.utils.logger import system_logger
@@ -57,15 +58,19 @@ class TelethonChats:
             client = self.tg_client.client()
             chats = []
 
+            # Получаем общее количество диалогов
+            total_dialogs = 0
+            try:
+                d_info = await client.get_dialogs(limit=0)
+                total_dialogs = getattr(d_info, "total", 0)
+            except Exception:
+                pass
+
             async for dialog in client.iter_dialogs(limit=limit):
                 chat_type = (
                     "User" if dialog.is_user else "Group" if dialog.is_group else "Channel"
                 )
-                unread = (
-                    f" [Непрочитанных: {dialog.unread_count}]"
-                    if dialog.unread_count > 0
-                    else ""
-                )
+                unread = f" [UNREAD: {dialog.unread_count}]" if dialog.unread_count > 0 else ""
 
                 forum_str = ""
                 if getattr(dialog.entity, "forum", False):
@@ -76,7 +81,7 @@ class TelethonChats:
                         topics_data = await self._get_topics(client, dialog.entity, limit=10)
                         for topic in topics_data:
                             t_unread = (
-                                f" ({topic.unread_count} непрочитанных)"
+                                f" (UNREAD: {topic.unread_count})"
                                 if getattr(topic, "unread_count", 0) > 0
                                 else ""
                             )
@@ -91,7 +96,7 @@ class TelethonChats:
                     # Если топиков нет, но сообщения висят - значит они в дефолтном General
                     if not topics_list and dialog.unread_count > 0:
                         topics_list.append(
-                            f"      ↳ General / Общий топик ({dialog.unread_count} непрочитанных)"
+                            f"      ↳ General / Общий топик (UNREAD: {dialog.unread_count})"
                         )
 
                     if topics_list:
@@ -104,7 +109,14 @@ class TelethonChats:
             if not chats:
                 return SkillResult.ok("Список чатов пуст.")
 
-            return SkillResult.ok("\n".join(chats))
+            res_str = "\n".join(chats)
+
+            # Добавляем плашку о скрытых диалогах, если они есть
+            if total_dialogs > len(chats):
+                hidden = total_dialogs - len(chats)
+                res_str += f"\n\n...и еще {hidden} чатов скрыто. Для просмотра - увеличить параметр limit, чтобы загрузить больше."
+
+            return SkillResult.ok(res_str)
 
         except Exception as e:
             return SkillResult.fail(f"Ошибка при получении списка чатов: {e}")
@@ -136,7 +148,7 @@ class TelethonChats:
                                 unread = getattr(topic, "unread_count", 0)
                                 if unread > 0:
                                     topics_list.append(
-                                        f"      ↳ Топик '{getattr(topic, 'title', 'Unknown')}' (ID: {topic.id}) [{unread} непрочитанных]"
+                                        f"      ↳ Топик '{getattr(topic, 'title', 'Unknown')}' (ID: {topic.id}) [UNREAD: {unread}]"
                                     )
                         except Exception as e:
                             system_logger.error(
@@ -146,13 +158,13 @@ class TelethonChats:
                         # Fallback для General топика
                         if not topics_list:
                             topics_list.append(
-                                f"      ↳ General / Другие топики [{dialog.unread_count} непрочитанных]"
+                                f"      ↳ General / Другие топики [UNREAD: {dialog.unread_count}]"
                             )
 
                         forum_str = "\n" + "\n".join(topics_list)
 
                     chats.append(
-                        f"- {chat_type} | ID: `{dialog.id}` | Название: **{dialog.name}** | Непрочитанных: {dialog.unread_count}{forum_str}"
+                        f"- {chat_type} | ID: `{dialog.id}` | Название: **{dialog.name}** | UNREAD: {dialog.unread_count}{forum_str}"
                     )
 
             if not chats:
@@ -168,7 +180,7 @@ class TelethonChats:
         self, chat_id: Union[int, str], limit: int = 10, topic_id: Optional[int] = None
     ) -> SkillResult:
         """
-        Читает историю указанного чата (не помечая сообщения прочитанными). 
+        Читает историю указанного чата (не помечая сообщения прочитанными).
         """
         try:
             client = self.tg_client.client()
@@ -268,6 +280,7 @@ class TelethonChats:
     @skill()
     async def search_public_chats(self, query: str, limit: int = 5) -> SkillResult:
         """Ищет публичные группы и каналы в глобальном поиске Telegram по запросу."""
+
         try:
             client = self.tg_client.client()
             result = await client(SearchRequest(q=query, limit=limit))
@@ -276,8 +289,15 @@ class TelethonChats:
             for chat in result.chats:
                 chat_type = "Channel" if getattr(chat, "broadcast", False) else "Group"
                 username = f"@{chat.username}" if getattr(chat, "username", None) else "Нет"
+
+                # Пытаемся достать количество подписчиков
+                participants = getattr(chat, "participants_count", None)
+                part_str = (
+                    f" | Подписчиков: {participants}" if participants is not None else ""
+                )
+
                 chats.append(
-                    f"- {chat_type} | ID: `{chat.id}` | Название: {chat.title} | Юзернейм: {username}"
+                    f"- {chat_type} | ID: `{chat.id}` | Название: {chat.title} | Юзернейм: {username}{part_str}"
                 )
 
             if not chats:
@@ -287,6 +307,63 @@ class TelethonChats:
 
         except Exception as e:
             return SkillResult.fail(f"Ошибка при поиске чатов: {e}")
+
+    @skill()
+    async def get_chat_info(self, chat_id: Union[int, str]) -> SkillResult:
+        """
+        Получает информацию о конкретном чате (описание, кол-во участников/подписчиков).
+        Можно передавать ID чата или юзернейм (@username).
+        """
+
+        try:
+            client = self.tg_client.client()
+            entity = await client.get_entity(parse_int_or_str(chat_id))
+
+            lines = [f"Информация о чате {chat_id}:"]
+            lines.append(f"Название: {getattr(entity, 'title', 'Unknown')}")
+
+            if getattr(entity, "username", None):
+                lines.append(f"Юзернейм: @{entity.username}")
+
+            # Пытаемся получить полные данные (описание и точное количество участников)
+            try:
+                if getattr(entity, "broadcast", False) or getattr(entity, "megagroup", False):
+                    full = await client(GetFullChannelRequest(channel=entity))
+                    lines.append(
+                        f"Тип: {'Канал' if getattr(entity, 'broadcast', False) else 'Супергруппа'}"
+                    )
+                    if full.full_chat.about:
+                        lines.append(f"Описание: {full.full_chat.about}")
+                    lines.append(
+                        f"Участников (подписчиков): {full.full_chat.participants_count}"
+                    )
+
+                elif hasattr(entity, "participants_count"):
+                    # Для обычных старых групп
+                    full = await client(GetFullChatRequest(chat_id=entity.id))
+                    lines.append("Тип: Группа")
+                    if full.full_chat.about:
+                        lines.append(f"Описание: {full.full_chat.about}")
+                    lines.append(f"Участников: {full.full_chat.participants_count}")
+
+            except Exception as e:
+                system_logger.debug(
+                    f"[TelethonChats] Не удалось получить full_chat для {chat_id}: {e}"
+                )
+                # Fallback: выводим то, что есть в базовом объекте
+                if (
+                    hasattr(entity, "participants_count")
+                    and entity.participants_count is not None
+                ):
+                    lines.append(f"Участников: {entity.participants_count}")
+
+            return SkillResult.ok("\n".join(lines))
+
+        except ValueError:
+            return SkillResult.fail("Ошибка: Некорректный ID чата или юзернейм.")
+
+        except Exception as e:
+            return SkillResult.fail(f"Ошибка при получении информации о чате: {e}")
 
     @skill()
     async def join_chat(self, link_or_username: str) -> SkillResult:

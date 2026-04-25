@@ -75,6 +75,7 @@ class TelethonEvents:
 
     async def _update_state(self, force: bool = False):
         """Обновляет состояние (последние n чатов и профиль агента)."""
+        """Обновляет состояние (последние n чатов и профиль агента)."""
         now = time.time()
 
         if not force and now - self._last_state_update < 3:
@@ -86,6 +87,14 @@ class TelethonEvents:
         chats = []
 
         try:
+            # Быстро получаем общее количество диалогов для статистики
+            total_dialogs = 0
+            try:
+                d_info = await client.get_dialogs(limit=0)
+                total_dialogs = getattr(d_info, "total", 0)
+            except Exception:
+                pass
+
             async for dialog in client.iter_dialogs(limit=self.state.number_of_last_chats):
                 entity = dialog.entity
 
@@ -107,8 +116,6 @@ class TelethonEvents:
                         self._chat_desc_cache[entity.id] = about.strip()
 
                     except FloodWaitError:
-                        # Если Telegram ругается на частоту запросов - просто пропускаем,
-                        # чтобы не крашнуть весь цикл. Попробуем догрузить описание позже.
                         pass
                     except Exception:
                         self._chat_desc_cache[entity.id] = ""
@@ -129,8 +136,7 @@ class TelethonEvents:
                 part_str = f" | {participants} чел." if participants else ""
 
                 # Статус непрочитанных
-                unread = f" [{dialog.unread_count} непрочитанных]" if dialog.unread_count > 0 else ""
-
+                unread = f" [UNREAD: {dialog.unread_count}]" if dialog.unread_count > 0 else ""
 
                 # =============================================================
                 # USERS
@@ -161,17 +167,25 @@ class TelethonEvents:
                             chats.append("    [Ошибка загрузки истории]")
 
                 elif dialog.is_group:
-                    # Добавляем desc_str перед unread
                     chats.append(
                         f"[{status_str} Group] {dialog.name} (ID: {dialog.id}){part_str}{desc_str}{unread}"
                     )
                 elif dialog.is_channel:
-                    # Добавляем desc_str перед unread
                     chats.append(
                         f"[{status_str} Channel] {dialog.name} (ID: {dialog.id}){part_str}{desc_str}{unread}"
                     )
 
-            self.state.last_chats = "\n".join(chats) if chats else "Список диалогов пуст."
+            if not chats:
+                self.state.last_chats = "Список диалогов пуст."
+            else:
+                res_str = "\n".join(chats)
+                
+                # Считаем, сколько чатов осталось скрыто за лимитом
+                if total_dialogs > len(chats):
+                    hidden = total_dialogs - len(chats)
+                    res_str += f"\n\n...и еще {hidden} чатов скрыто для экономии контекста. Для просмотра - сооветствующая функция с увеличенным лимитом."
+                
+                self.state.last_chats = res_str
 
         except Exception as e:
             system_logger.error(f"[Telethon] Ошибка обновления стейта: {e}")

@@ -76,7 +76,7 @@ class ContextBuilder:
 
         event_log = "\n\n---\n\n".join(log_blocks) if log_blocks else "No other events in log"
 
-        # Сначала лог, потом системный триггер (главная директива в самом конце для Recency Bias)
+        # Сначала лог, потом системный триггер
         return f"""
 ## EVENT LOG (missed while sleeping or thinking)
 {event_log}

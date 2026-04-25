@@ -90,5 +90,6 @@ class SQLPersonalityTraits:
         Провайдер контекста для ContextRegistry.
         Отдает отформатированный блок для контекста агента.
         """
+        
         res = await self.get_traits()
-        return f"## PERSONALITY TRAITS\n{res.message}"
+        return f"## PERSONALITY TRAITS\nMax traits allowed: {self.max_traits}\n\n{res.message}"

@@ -258,6 +258,7 @@ class System:
             telethon_state=self.telethon_state,
             agent_state=self.agent_state,
             auto_rag_top_k=self.settings.system.vector_db.auto_rag_top_k,
+            auto_rag_max_query_chars=self.settings.system.vector_db.auto_rag_max_query_chars,
         )
         self.context_registry.register_provider(
             "rag memories", rag_memories.get_context_block, section=ContextSection.RAG_MEMORIES

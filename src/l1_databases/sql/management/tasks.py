@@ -113,4 +113,4 @@ class SQLTasks:
         """
 
         res = await self.get_tasks()
-        return f"## TASKS\n{res.message}"
+        return f"## TASKS\nMax tasks allowed: {self.max_tasks}\n\n{res.message}"

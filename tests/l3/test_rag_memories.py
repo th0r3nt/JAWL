@@ -21,7 +21,7 @@ async def test_rag_memories_context_extraction():
 
     # Мокаем стейт Телеграма
     mock_telethon_state = MagicMock()
-    mock_telethon_state.last_chats = "User | ID: 123 | Название: John_Admin [Непрочитанных: 1]"
+    mock_telethon_state.last_chats = "User | ID: 123 | Название: John_Admin [UNREAD: 1]"
 
     # Имитируем стейт агента
     mock_agent_state = AgentState()

@@ -24,10 +24,12 @@ class ContextSection(IntEnum):
     MENTAL_STATES = 110
     TASKS = 120
     RAG_MEMORIES = 130
+
+    # Последние действия
     RECENT_TICKS = 140
 
-    # Причина пробуждения (всегда в самом низу)
-    HEARTBEAT = 999
+    # Причина пробуждения и фоновые логи
+    HEARTBEAT = 150
 
 
 class ContextRegistry:
@@ -50,7 +52,7 @@ class ContextRegistry:
         agent_state,
     ) -> Dict[str, str]:
         """
-        Проходится по всем провайдерам контекста и дергает их функции, 
+        Проходится по всем провайдерам контекста и дергает их функции,
         которые возвращают отформатированные Markdown-блоки для контекста.
         """
 
