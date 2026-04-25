@@ -1,8 +1,8 @@
-import ast 
+import ast
 from typing import Literal
 import shutil
 import asyncio
-from typing import Union, List 
+from typing import Union, List
 
 from src.utils.logger import system_logger
 from src.utils._tools import format_size
@@ -81,39 +81,241 @@ class HostOSFiles:
         except Exception as e:
             return SkillResult.fail(f"Ошибка при чтении файла: {e}")
 
-    @skill()
-    async def write_file(
-        self, filepath: str, content: str, mode: Literal["w", "a"]
-    ) -> SkillResult:
-        """Создает или перезаписывает файл. mode: 'w' - перезапись, 'a' - добавление."""
+    # =================================================================================
+    # ХИНСТРУМЕНТЫ РЕДАКТИРОВАНИЯ ФАЙЛОВ
+    # =================================================================================
 
-        if mode not in ("w", "a"):
-            return SkillResult.fail("Ошибка: Допустимые режимы 'w' или 'a'.")
+    @skill()
+    async def write_file(self, filepath: str, content: str) -> SkillResult:
+        """
+        Создает новый файл или полностью перезаписывает существующий.
+        """
+        try:
+            safe_path = self.host_os.validate_path(filepath, is_write=True)
+            safe_path.parent.mkdir(parents=True, exist_ok=True)
+
+            def _write():
+                with open(safe_path, "w", encoding="utf-8") as f:
+                    f.write(content)
+
+            await asyncio.to_thread(_write)
+
+            size_str = format_size(safe_path.stat().st_size)
+            system_logger.info(f"[Host OS] Перезаписан файл: {safe_path.name} ({size_str})")
+            return SkillResult.ok(
+                f"Файл {safe_path.name} успешно перезаписан. Записано: {len(content)} симв. Размер: {size_str}."
+            )
+
+        except PermissionError as e:
+            return SkillResult.fail(str(e))
+        except Exception as e:
+            return SkillResult.fail(f"Ошибка при перезаписи файла: {e}")
+
+    @skill()
+    async def append_to_file(self, filepath: str, content: str) -> SkillResult:
+        """
+        Безопасно добавляет текст в конец существующего файла.
+        Автоматически ставит перенос строки, если его нет.
+        """
 
         try:
             safe_path = self.host_os.validate_path(filepath, is_write=True)
             safe_path.parent.mkdir(parents=True, exist_ok=True)
 
-            with open(safe_path, mode, encoding="utf-8") as f:
-                f.write(content)
+            def _append():
+                prefix = "\n"
+                if safe_path.exists():
+                    with open(safe_path, "r", encoding="utf-8") as f:
+                        f.seek(0, 2)
+                        if f.tell() > 0:
+                            f.seek(f.tell() - 1, 0)
+                            if f.read(1) == "\n":
+                                prefix = ""
+                else:
+                    prefix = ""
+
+                with open(safe_path, "a", encoding="utf-8") as f:
+                    f.write(prefix + content)
+
+            await asyncio.to_thread(_append)
 
             size_str = format_size(safe_path.stat().st_size)
-            action_type = "Перезаписан" if mode == "w" else "Обновлен"
-
-            system_logger.info(f"[Host OS] {action_type} файл: {safe_path.name} ({size_str})")
+            system_logger.info(f"[Host OS] Дополнен файл (append): {safe_path.name}")
             return SkillResult.ok(
-                f"Файл {safe_path.name} успешно {action_type.lower()}. Записано: {len(content)} симв. Итоговый размер: {size_str}."
+                f"Текст успешно добавлен в конец файла {safe_path.name}. Размер: {size_str}."
             )
 
         except PermissionError as e:
             return SkillResult.fail(str(e))
-
+        
         except Exception as e:
-            return SkillResult.fail(f"Ошибка при записи в файл: {e}")
+            return SkillResult.fail(f"Ошибка при добавлении в файл: {e}")
+
+    @skill()
+    async def replace_in_file(
+        self, filepath: str, search_block: str, replace_block: str
+    ) -> SkillResult:
+        """
+        Умный поиск и замена в файле.
+        Находит точное совпадение 'search_block' и меняет его на 'replace_block'.
+        Чтобы удалить кусок текста - передать пустую строку "" в replace_block.
+        Внимание: следить за точностью отступов в search_block.
+        """
+
+        try:
+            safe_path = self.host_os.validate_path(filepath, is_write=True)
+            if not safe_path.is_file():
+                return SkillResult.fail(f"Ошибка: Файл не найден ({filepath}).")
+
+            def _replace():
+                with open(safe_path, "r", encoding="utf-8") as f:
+                    text = f.read()
+
+                if search_block not in text:
+                    return (
+                        False,
+                        "Блок текста не найден. Проверьте точность совпадения и отступов.",
+                    )
+
+                count = text.count(search_block)
+                new_text = text.replace(search_block, replace_block)
+
+                with open(safe_path, "w", encoding="utf-8") as f:
+                    f.write(new_text)
+
+                return True, f"Успешно. Заменено вхождений: {count}."
+
+            is_success, msg = await asyncio.to_thread(_replace)
+
+            if is_success:
+                system_logger.info(
+                    f"[Host OS] Выполнена замена текста в файле: {safe_path.name}"
+                )
+                return SkillResult.ok(msg)
+            else:
+                return SkillResult.fail(msg)
+
+        except PermissionError as e:
+            return SkillResult.fail(str(e))
+        except Exception as e:
+            return SkillResult.fail(f"Ошибка при замене текста: {e}")
+
+    @skill()
+    async def insert_in_file(
+        self,
+        filepath: str,
+        anchor_string: str,
+        new_content: str,
+        position: Literal["before", "after"] = "after",
+    ) -> SkillResult:
+        """
+        Находит первую строку, содержащую 'anchor_string' (например, 'class Bot:'),
+        и вставляет 'new_content' перед (before) или после (after) этой строки.
+        """
+
+        try:
+            safe_path = self.host_os.validate_path(filepath, is_write=True)
+            if not safe_path.is_file():
+                return SkillResult.fail(f"Ошибка: Файл не найден ({filepath}).")
+
+            def _insert():
+                with open(safe_path, "r", encoding="utf-8") as f:
+                    lines = f.readlines()
+
+                target_idx = -1
+                for i, line in enumerate(lines):
+                    if anchor_string in line:
+                        target_idx = i
+                        break
+
+                if target_idx == -1:
+                    return False, f"Строка, содержащая '{anchor_string}', не найдена."
+
+                insert_idx = target_idx if position == "before" else target_idx + 1
+                insert_text = new_content if new_content.endswith("\n") else new_content + "\n"
+
+                lines.insert(insert_idx, insert_text)
+
+                with open(safe_path, "w", encoding="utf-8") as f:
+                    f.writelines(lines)
+
+                return True, f"Текст успешно вставлен {position} строки {target_idx + 1}."
+
+            is_success, msg = await asyncio.to_thread(_insert)
+
+            if is_success:
+                system_logger.info(f"[Host OS] Выставлена якорная вставка в: {safe_path.name}")
+                return SkillResult.ok(msg)
+            else:
+                return SkillResult.fail(msg)
+
+        except PermissionError as e:
+            return SkillResult.fail(str(e))
+        
+        except Exception as e:
+            return SkillResult.fail(f"Ошибка при вставке текста: {e}")
+
+    @skill()
+    async def delete_lines_matching(
+        self, filepath: str, match_string: str, exact_match: bool = False
+    ) -> SkillResult:
+        """
+        Удаляет из файла все строки, которые содержат подстроку 'match_string'.
+        Если exact_match=True, строка должна совпадать полностью (без учета пробелов по краям).
+        """
+
+        try:
+            safe_path = self.host_os.validate_path(filepath, is_write=True)
+            if not safe_path.is_file():
+                return SkillResult.fail(f"Ошибка: Файл не найден ({filepath}).")
+
+            def _delete():
+                with open(safe_path, "r", encoding="utf-8") as f:
+                    lines = f.readlines()
+
+                new_lines = []
+                deleted_count = 0
+
+                for line in lines:
+                    if exact_match:
+                        if line.strip() == match_string.strip():
+                            deleted_count += 1
+                            continue
+                    else:
+                        if match_string in line:
+                            deleted_count += 1
+                            continue
+                    new_lines.append(line)
+
+                if deleted_count == 0:
+                    return False, "Совпадений не найдено. Ни одна строка не удалена."
+
+                with open(safe_path, "w", encoding="utf-8") as f:
+                    f.writelines(new_lines)
+
+                return True, f"Успешно удалено строк: {deleted_count}."
+
+            is_success, msg = await asyncio.to_thread(_delete)
+
+            if is_success:
+                system_logger.info(f"[Host OS] Удалены строки в файле: {safe_path.name}")
+                return SkillResult.ok(msg)
+            else:
+                return SkillResult.fail(msg)
+
+        except PermissionError as e:
+            return SkillResult.fail(str(e))
+        except Exception as e:
+            return SkillResult.fail(f"Ошибка при удалении строк: {e}")
+
+    # =================================================================================
+    # ОСТАЛЬНЫЕ НАВЫКИ ФАЙЛОВОЙ СИСТЕМЫ
+    # =================================================================================
 
     @skill()
     async def list_directory(self, path: str = ".") -> SkillResult:
         """Показывает содержимое папки и размеры файлов."""
+
         limit = self.host_os.config.file_list_limit
 
         try:
@@ -137,7 +339,6 @@ class HostOSFiles:
 
                 prefix = "📁" if item.is_dir() else "📄"
 
-                # Достаем описание, если файл лежит внутри песочницы
                 desc = ""
                 try:
                     if item.is_relative_to(self.host_os.sandbox_dir):
@@ -192,7 +393,6 @@ class HostOSFiles:
                 except Exception:
                     size_str = "???"
 
-                # Извлекаем метаданные только если файл в песочнице
                 desc = ""
                 try:
                     if file_path.is_relative_to(self.host_os.sandbox_dir):
@@ -283,17 +483,14 @@ class HostOSFiles:
     async def create_directories(self, paths: Union[str, List[str]]) -> SkillResult:
         """Создает одну или несколько директорий (папок)."""
 
-        # Защита от галлюцинаций LLM (когда она присылает строку вместо списка)
         if isinstance(paths, str):
             try:
-                # Пытаемся безопасно распарсить, если LLM прислала строку "['dir1', 'dir2']"
                 parsed = ast.literal_eval(paths.strip())
                 if isinstance(parsed, list):
                     paths = parsed
                 else:
                     paths = [paths]
             except Exception:
-                # Если это просто обычная строка "sandbox/test"
                 paths = [paths]
 
         if not paths or not isinstance(paths, list):
@@ -331,15 +528,13 @@ class HostOSFiles:
         Полезно для сохранения информации о содержимом картинок, видео, сложных архивов, скриптов или логов,
         чтобы в будущем понимать их суть без повторного чтения/просмотра.
         """
+
         try:
             safe_path = self.host_os.validate_path(filepath, is_write=False)
             if not safe_path.exists():
                 return SkillResult.fail(f"Ошибка: Файл не найден ({filepath}).")
 
-            # Получаем путь относительно sandbox/ в формате posix (со слэшами '/')
             rel_path = safe_path.relative_to(self.host_os.sandbox_dir).as_posix()
-
-            # Убираем переносы строк для красоты вывода в ls
             clean_desc = description.replace("\n", " ").strip()
 
             await asyncio.to_thread(self.host_os.set_file_metadata, rel_path, clean_desc)

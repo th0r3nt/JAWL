@@ -100,9 +100,13 @@ class HostOSClient:
                 # Умный fallback: "Do What I Mean"
                 sandbox_target = (self.sandbox_dir / path_str).resolve()
                 fw_target = (self.framework_dir / path_str).resolve()
-                
+
                 # Если в песочнице запрошенного пути нет, но он физически существует во фреймворке
-                if not sandbox_target.exists() and fw_target.exists() and self.access_level >= HostOSAccessLevel.OBSERVER:
+                if (
+                    not sandbox_target.exists()
+                    and fw_target.exists()
+                    and self.access_level >= HostOSAccessLevel.OBSERVER
+                ):
                     if is_write and self.access_level == HostOSAccessLevel.OBSERVER:
                         resolved_path = sandbox_target
                     else:
@@ -165,9 +169,17 @@ class HostOSClient:
         if self.access_level >= HostOSAccessLevel.OBSERVER and self.state.framework_files:
             framework_block = f"\n\n* JAWL Directory:\n{self.state.framework_files}"
 
+        access_levels_desc = (
+            "  - 0/SANDBOX: Read/Write только внутри папки sandbox/.\n"
+            "  - 1/OBSERVER: Read для всего кода фреймворка, Write только в sandbox/.\n"
+            "  - 2/OPERATOR: Read всей ОС, управление процессами, Write только для файлов фреймворка.\n"
+            "  - 3/ROOT: Полный доступ. Read/Write всей системы и управление процессами."
+        )
+
         return f"""### HOST OS [ON]
 * OS: {self.state.os_info}
 * Access Level: {self.access_level.value} ({self.access_level.name}) / 3
+{access_levels_desc}
 * Polling interval: {self.state.polling_interval}
 * Datetime: {self.state.datetime}
 * Uptime: {self.state.uptime}

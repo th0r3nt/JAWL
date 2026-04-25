@@ -209,12 +209,13 @@ class ReactLoop:
                         "function": {"name": "execute_skill"},
                     },
                     temperature=self.agent_state.temperature,
-                    max_tokens=4096,
+                    effort="max",
+                    max_tokens=128000,
                     timeout=240.0,
                 )
 
                 message_obj = response.choices[0].message
-                
+
                 if message_obj.tool_calls:
                     # Если модель вызвала функцию, берем СТРОГО её JSON-аргументы
                     raw_answer = str(message_obj.tool_calls[0].function.arguments)
@@ -270,7 +271,7 @@ class ReactLoop:
         В случае ошибки возвращает None
         и записывает ошибку в БД.
         """
-        
+
         clean_answer = raw_answer.strip()
 
         # Срезаем Markdown-обертку, если LLM всё-таки решила прислать json как текст
