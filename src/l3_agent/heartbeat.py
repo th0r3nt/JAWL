@@ -179,6 +179,16 @@ class Heartbeat:
                 missed_events = list(self._sleep_memory)
                 self._sleep_memory.clear()
 
+                # Убираем дублирование: если событие стало главным триггером, удаляем его из лога (missed_events)
+                if self._wake_reason != "HEARTBEAT":
+                    for i in range(len(missed_events) - 1, -1, -1):
+                        if (
+                            missed_events[i]["name"] == self._wake_reason
+                            and missed_events[i]["payload"] == self._wake_payload
+                        ):
+                            missed_events.pop(i)
+                            break
+
                 # Устанавливаем таймер ДО начала работы агента
                 # Фоновые события, приходящие во время бодрствования,
                 # будут корректно сокращать будущий сон и высвечиваться в логах
