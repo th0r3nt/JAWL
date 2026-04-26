@@ -34,18 +34,32 @@ def safe_format_timestamp(
 ) -> str:
     """Безопасно форматирует UNIX-timestamp, возвращая заглушку, если времени нет."""
 
-    if not timestamp:
+    if timestamp is None:
         return "Неизвестно"
     return format_timestamp(timestamp, offset_hours, fmt)
 
 
+def _pluralize_days(n: int) -> str:
+    """Возвращает корректную форму слова "день" для числа n."""
+    mod100 = abs(n) % 100
+    if 11 <= mod100 <= 14:
+        return "дней"
+    mod10 = mod100 % 10
+    if mod10 == 1:
+        return "день"
+    if 2 <= mod10 <= 4:
+        return "дня"
+    return "дней"
+
+
 def seconds_to_duration_str(seconds: int | float) -> str:
-    """Переводит секунды в формат (DD дней,) HH:MM:SS."""
-    
-    hours, remainder = divmod(int(seconds), 3600)
+    """Переводит секунды в формат (DD день/дня/дней,) HH:MM:SS."""
+
+    total = max(int(seconds), 0)
+    hours, remainder = divmod(total, 3600)
     minutes, secs = divmod(remainder, 60)
     days, hours = divmod(hours, 24)
 
     if days > 0:
-        return f"{days} дней, {hours:02d}:{minutes:02d}:{secs:02d}"
+        return f"{days} {_pluralize_days(days)}, {hours:02d}:{minutes:02d}:{secs:02d}"
     return f"{hours:02d}:{minutes:02d}:{secs:02d}"

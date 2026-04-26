@@ -4,14 +4,21 @@ from typing import Union
 
 
 def format_size(size_bytes: int) -> str:
-    """Переводит байты в человекочитаемый формат (B, KB, MB)."""
+    """Переводит байты в человекочитаемый формат (B, KB, MB, GB, TB, PB)."""
 
-    if size_bytes < 1024:
-        return f"{size_bytes} B"
-    elif size_bytes < 1024 * 1024:
-        return f"{size_bytes / 1024:.1f} KB"
-    else:
-        return f"{size_bytes / (1024 * 1024):.1f} MB"
+    if size_bytes < 0:
+        return f"-{format_size(-size_bytes)}"
+
+    units = ("B", "KB", "MB", "GB", "TB", "PB")
+    size = float(size_bytes)
+    for unit in units[:-1]:
+        if size < 1024:
+            if unit == "B":
+                return f"{int(size)} {unit}"
+            return f"{size:.1f} {unit}"
+        size /= 1024
+    return f"{size:.1f} {units[-1]}"
+
 
 
 def validate_sandbox_path(filepath: str | Path) -> Path:
