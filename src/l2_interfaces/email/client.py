@@ -132,6 +132,8 @@ class EmailClient:
                     return
 
                 uids = messages[0].split()
+                total_emails = len(uids)  # Считаем общее количество писем
+                
                 if not uids:
                     self.state.mailbox_preview = "Ящик пуст."
                     return
@@ -156,7 +158,14 @@ class EmailClient:
                             f"- [UID: {uid.decode()}] От: {sender} | Тема: {subject} | {date}"
                         )
 
-                self.state.mailbox_preview = "\n".join(lines)
+                # Собираем итоговый текст
+                preview_text = "\n".join(lines)
+                
+                if total_emails > self.state.recent_limit:
+                    hidden = total_emails - self.state.recent_limit
+                    preview_text += f"\n\n...и еще {hidden} писем скрыто для экономии контекста."
+                
+                self.state.mailbox_preview = preview_text
 
         except Exception as e:
             system_logger.error(f"[Email] Ошибка обновления дашборда: {e}")

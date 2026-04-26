@@ -115,7 +115,9 @@ class ContextBuilder:
         """Вспомогательный метод для красивого Markdown-оформления события."""
 
         proactive_prompt = """
-Режим простоя нежелателен. Рекомендуется проактивное выполнение действий.
+
+[SYSTEM]
+Рекомендуется проактивное выполнение действий.
 
 Векторы активности могут включать: 
 - Анализ и снижение дефицита системных мотиваторов.
@@ -127,26 +129,26 @@ class ContextBuilder:
 - Составление/создание новых задач для выполнения.
 
 Пропуск шага без действий нецелесообразен.
-В случае, если текущих задач нет - система должна проактивно поставить их себе (Tasks).
+В случае, если текущих задач нет - система должна проактивно поставить их (Tasks).
 """
 
         header = f"**{event_name}**"
         if event_time and level:
             header = f"[{event_time}] [{level}] {header}"
 
-        # Если это пустой HEARTBEAT (нет внешних триггеров) - даем системную директиву
-        if event_name == "HEARTBEAT" and not payload:
-            return f"{header}\n[SYSTEM]\n[Статус: Heartbeat такт]\n{proactive_prompt}"
+        if event_name == "HEARTBEAT":
+            return f"{header}\n[Статус: Heartbeat тик]"
 
-        # Системная директива при первичном запуске
         if event_name == "SYSTEM_CORE_START":
-            return f"{header}\n[SYSTEM]\n[Статус: Инициализация ядра JAWL. Запуск подсистем завершен]\n{proactive_prompt}"
+            return f"{header}\n[Статус: Инициализация ядра JAWL. Запуск подсистем завершен]"
 
         if event_name == "SYSTEM_CALENDAR_ALARM":
             alarm_title = payload.get("title", "Неизвестно")
-            return f"{header}\n[SYSTEM]\n[Статус: Срабатывание системного таймера]\n\nЗадача: {alarm_title}\n{proactive_prompt}"
+            return f"{header}\n[Статус: Срабатывание системного таймера]\n\nЗадача: {alarm_title}."
 
         lines = [header]
+
+        lines.append(proactive_prompt)
 
         if "sender_name" in payload:
             lines.append(f"Sender: {payload['sender_name']}")

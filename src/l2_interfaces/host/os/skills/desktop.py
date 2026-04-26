@@ -110,7 +110,7 @@ class HostOSDesktop:
             return SkillResult.fail(
                 "Служба уведомлений недоступна в данной ОС (вероятно, сервер без GUI)."
             )
-        
+
         except Exception as e:
             return SkillResult.fail(f"Ошибка отправки уведомления: {e}")
 
@@ -129,7 +129,7 @@ class HostOSDesktop:
             safe_path.parent.mkdir(parents=True, exist_ok=True)
 
             def _grab():
-                img = ImageGrab.grab()
+                img = ImageGrab.grab(all_screens=True)
                 img.save(safe_path)
 
             await asyncio.to_thread(_grab)

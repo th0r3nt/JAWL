@@ -8,16 +8,19 @@ env/
 .DS_Store
 Thumbs.db
 .vscode/
+.pytest_cache/
+.mypy_cache/
+.coverage
+htmlcov/
 
 # Конфиги/настройки/ключи
 .env
 SOUL.md
 EXAMPLES_OF_STYLE.md
+prompt/personality/
+prompt/custom/
 settings.yaml
 interfaces.yaml
-
-# Базы данных и сессии
-# ...
 
 # Локальные модели
 src/utils/local/
@@ -29,7 +32,7 @@ logs/
 sandbox/*
 
 # Утилиты
-docs/
+_docs/
 scripts/
 TODO.md
 copy_all_code.py
