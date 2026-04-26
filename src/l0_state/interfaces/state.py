@@ -74,7 +74,8 @@ class AiogramState:
 class GithubState:
     """
     Хранит состояние Github-клиента.
-    Флаг is_online, информация об аккаунте агента и короткая история запросов.
+    Флаг is_online, информация об аккаунте агента, его репозиториях,
+    уведомлениях и короткая история запросов.
     """
 
     def __init__(self, history_limit: int = 10):
@@ -83,6 +84,8 @@ class GithubState:
         self.history: list[str] = []
 
         self.account_info = "Ожидание инициализации..."
+        self.own_repos = "Репозитории неизвестны."
+        self.unread_notifications = "Уведомлений нет."
 
     def add_history(self, entry: str) -> None:
         """Добавляет запись в начало истории (самые свежие сверху)."""

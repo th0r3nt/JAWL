@@ -52,6 +52,7 @@ class GithubConfig(BaseModel):
     agent_account: bool
     request_timeout_sec: int
     history_limit: int
+    polling_interval_sec: int = 300
 
 
 class EmailConfig(BaseModel):
