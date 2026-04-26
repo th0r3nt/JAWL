@@ -48,6 +48,7 @@ class GithubLocalGit:
             )
         except asyncio.TimeoutError:
             process.kill()
+            await process.wait()
             raise TimeoutError("Таймаут выполнения команды git (> 60 сек).")
 
     @skill()
