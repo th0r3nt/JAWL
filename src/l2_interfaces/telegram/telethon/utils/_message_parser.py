@@ -109,10 +109,17 @@ class TelethonMessageParser:
         try:
             fwd_sender = await msg.get_forward_sender()
             if fwd_sender:
-                return f"\n  ↳[Переслано от: {utils.get_display_name(fwd_sender)}]"
+                name = utils.get_display_name(fwd_sender)
+                fwd_id = getattr(fwd_sender, "id", "")
+                id_str = f" (ID: {fwd_id})" if fwd_id else ""
+                return f"\n  ↳[Переслано от: {name}{id_str}]"
 
             elif msg.fwd_from.from_name:
-                return f"\n  ↳[Переслано от: {msg.fwd_from.from_name}]"
+                return f"\n  ↳[Переслано от: {msg.fwd_from.from_name} (Скрытый аккаунт)]"
+
+            elif msg.fwd_from.from_id:
+                peer_id = utils.get_peer_id(msg.fwd_from.from_id)
+                return f"\n  ↳[Переслано от: ID {peer_id}]"
 
         except Exception:
             pass

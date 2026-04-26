@@ -34,6 +34,7 @@ class TelethonConfig(BaseModel):
     session_name: str
     recent_chats_limit: int = 15
     private_chat_history_limit: int = 3
+    incoming_history_limit: int = 5
     # TODO: добавить больше параметров для изменения
 
 

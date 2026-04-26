@@ -1,5 +1,5 @@
 import time
-from typing import Any
+from typing import Any, TYPE_CHECKING
 
 from telethon import events, utils
 from telethon.tl.types import UpdateMessageReactions
@@ -7,11 +7,15 @@ from telethon.tl.functions.channels import GetFullChannelRequest
 from telethon.tl.functions.messages import GetFullChatRequest
 from telethon.errors import FloodWaitError
 from telethon.tl.types import Channel, Chat
+from telethon.tl.functions.messages import GetPeerDialogsRequest
 
 from src.utils._tools import truncate_text
 from src.utils.logger import system_logger
 from src.utils.event.bus import EventBus
 from src.utils.event.registry import Events
+
+if TYPE_CHECKING:
+    from src.utils.settings import TelethonConfig
 
 from src.l0_state.interfaces.state import TelethonState
 from src.l2_interfaces.telegram.telethon.client import TelethonClient
@@ -24,10 +28,12 @@ class TelethonEvents:
         tg_client: TelethonClient,
         state: TelethonState,
         event_bus: EventBus,
+        config: "TelethonConfig",
     ):
         self.tg_client = tg_client
         self.state = state
         self.bus = event_bus
+        self.config = config
         self._last_state_update = 0.0
 
         # Кэш описаний чатов (чтобы не убить API Telegram'а лимитами)
@@ -74,7 +80,6 @@ class TelethonEvents:
         system_logger.info("[Telegram Telethon] Слушатели событий успешно остановлены.")
 
     async def _update_state(self, force: bool = False):
-        """Обновляет состояние (последние n чатов и профиль агента)."""
         """Обновляет состояние (последние n чатов и профиль агента)."""
         now = time.time()
 
@@ -224,7 +229,10 @@ class TelethonEvents:
 
         enriched_message = f"{base_text}{fwd_info}{reply_info}".strip()
 
-        history = await self._fetch_recent_history(chat, limit=5)
+        # Динамический расчет истории сообщений
+        unread_count = await self._get_unread_count(chat)
+        limit = min(50, max(self.config.incoming_history_limit, unread_count))
+        history = await self._fetch_recent_history(chat, limit=limit)
 
         payload = {
             "message": enriched_message,
@@ -295,7 +303,10 @@ class TelethonEvents:
                 payload["topic_name"] = topic_name
 
         if event.mentioned:
-            history = await self._fetch_recent_history(chat, limit=10)
+            # Динамический расчет истории сообщений
+            unread_count = await self._get_unread_count(chat)
+            limit = min(50, max(self.config.incoming_history_limit, unread_count))
+            history = await self._fetch_recent_history(chat, limit=limit)
             if history:
                 payload["recent_history"] = history
 
@@ -432,3 +443,15 @@ class TelethonEvents:
         except Exception as e:
             system_logger.error(f"[Telegram Telethon] Не удалось подтянуть предысторию: {e}")
             return ""
+
+    async def _get_unread_count(self, peer: Any) -> int:
+        """Хелпер: получает количество непрочитанных сообщений в конкретном чате."""
+
+        try:
+            client = self.tg_client.client()
+            peer_dialogs = await client(GetPeerDialogsRequest(peers=[peer]))
+            if peer_dialogs and peer_dialogs.dialogs:
+                return peer_dialogs.dialogs[0].unread_count
+        except Exception as e:
+            system_logger.debug(f"[TelethonEvents] Ошибка получения unread_count: {e}")
+        return 0

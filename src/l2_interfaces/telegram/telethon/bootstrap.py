@@ -43,7 +43,10 @@ def setup_telethon(system: "System", api_id: str | None, api_hash: str | None) -
         timezone=system.settings.system.timezone,
     )
     events = TelethonEvents(
-        tg_client=client, state=system.telethon_state, event_bus=system.event_bus
+        tg_client=client, 
+        state=system.telethon_state, 
+        event_bus=system.event_bus,
+        config=config,
     )
 
     # Регистрация навыков для агента
