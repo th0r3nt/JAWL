@@ -46,3 +46,47 @@ async def test_network_http_request_truncation(mock_urlopen, os_client):
     # Проверяем, что сработал лимит в 100 символов
     assert "Превышен лимит символов" in res.message
     assert len(res.message) < 200
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "url",
+    [
+        "file:///etc/passwd",
+        "FILE:///etc/shadow",
+        "ftp://internal.example/secret",
+        "data:text/plain,leak",
+        "javascript:alert(1)",
+        "/etc/passwd",
+        "",
+    ],
+)
+@patch("src.l2_interfaces.host.os.skills.network.urllib.request.urlopen")
+async def test_http_request_blocks_non_http_schemes(mock_urlopen, os_client, url):
+    """Гард: http_request не должен открывать ничего кроме http(s)."""
+    network = HostOSNetwork(os_client)
+    res = await network.http_request(url)
+
+    assert res.is_success is False
+    assert "Запрещённая схема" in res.message
+    mock_urlopen.assert_not_called()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "url",
+    [
+        "file:///etc/shadow",
+        "ftp://internal.example/secret",
+        "data:text/plain,leak",
+    ],
+)
+@patch("src.l2_interfaces.host.os.skills.network.urllib.request.urlopen")
+async def test_download_file_blocks_non_http_schemes(mock_urlopen, os_client, url):
+    """Гард: download_file не должен скачивать через file:// и прочие нестандартные схемы."""
+    network = HostOSNetwork(os_client)
+    res = await network.download_file(url, "leak.txt")
+
+    assert res.is_success is False
+    assert "Запрещённая схема" in res.message
+    mock_urlopen.assert_not_called()
