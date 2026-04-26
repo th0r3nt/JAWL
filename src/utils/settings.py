@@ -11,6 +11,8 @@ from yaml.constructor import ConstructorError
 
 class HostOSConfig(BaseModel):
     enabled: bool
+    desktop_interactions: bool = False
+    
     access_level: int
     env_access: bool
     framework_tree_depth: int = 1

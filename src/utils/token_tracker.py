@@ -18,7 +18,6 @@ class TokenTracker:
         # Накопители для текущего (активного) тика
         self._current_tick_in = 0
         self._current_tick_out = 0
-        self.total_ticks = 0
 
         try:
             self.encoding = tiktoken.get_encoding("o200k_base")

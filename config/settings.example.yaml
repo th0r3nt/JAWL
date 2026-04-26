@@ -18,8 +18,8 @@ system:
     # Важно: при смене модели обязательно измените vector_size под её размерность и удалите папку базы (src/utils/local/data/vector_db), чтобы она пересоздалась с новым размером векторов
     embedding_model: "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2" # Можно поставить любую
     vector_size: 384
-    auto_rag_top_k: 3
-    auto_rag_max_query_chars: 200 # Макс. длина запроса, после которой он будет разбит на несколько частей
+    auto_rag_top_k: 2
+    auto_rag_max_query_chars: 200 # Макс. длина запроса к базе, после которой он будет разбит на несколько частей
 
     # Рекомендуемые эмбеддинг модели:
     # intfloat/multilingual-e5-large (vector_size: 1024, ~2.2 ГБ, рекомендуется similarity_threshold: 0.85) - самая мощная, но работает медленнее

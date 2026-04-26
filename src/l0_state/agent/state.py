@@ -60,5 +60,5 @@ class AgentState(BaseModel):
 * Temperature: {self.temperature}
 * Uptime: {self.get_uptime()}
 * ReAct Step: {self.current_step}/{self.max_react_steps}
-* Input Tokens (last step): {self.last_input_tokens}
+* Input Tokens (current step): {self.last_input_tokens}
         """.strip()

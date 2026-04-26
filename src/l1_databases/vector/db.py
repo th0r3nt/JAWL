@@ -20,13 +20,11 @@ class VectorDB:
             self.client = AsyncQdrantClient(path=str(self.db_path))
 
         except Exception as e:
-            # Отлавливаем ошибку валидации Pydantic или повреждение JSON
             if "ValidationError" in str(type(e)) or "CreateCollection" in str(e):
                 system_logger.warning(
                     "[Vector DB] Обнаружена несовместимость версий или повреждение локальной БД. "
                     "Инициировано автоматическое восстановление."
                 )
-                # Сносим сломанную директорию и создаем чистый клиент
                 shutil.rmtree(self.db_path, ignore_errors=True)
                 self.db_path.mkdir(parents=True, exist_ok=True)
                 self.client = AsyncQdrantClient(path=str(self.db_path))
@@ -45,6 +43,20 @@ class VectorDB:
                         size=self.vector_size,
                         distance=models.Distance.COSINE,
                     ),
+                )
+                system_logger.info(f"[Vector DB] Создана коллекция: {coll}")
+
+            # Создаем KEYWORD индекс для тегов (Qdrant игнорирует вызов, если индекс уже существует)
+            # Это гарантирует, что поиск по tags_filter будет работать за O(1), а не O(N)
+            try:
+                await self.client.create_payload_index(
+                    collection_name=coll,
+                    field_name="tags",
+                    field_schema=models.PayloadSchemaType.KEYWORD,
+                )
+            except Exception as idx_err:
+                system_logger.debug(
+                    f"[Vector DB] Индекс для 'tags' в '{coll}' уже существует или произошла ошибка: {idx_err}"
                 )
 
         system_logger.info(f"[Vector DB] База данных инициализирована по пути: {self.db_path}")

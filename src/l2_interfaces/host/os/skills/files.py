@@ -220,6 +220,12 @@ class HostOSFiles:
             if not safe_path.is_dir():
                 return SkillResult.fail(f"Ошибка: Путь не является директорией ({path}).")
 
+            # Вычисляем понятный агенту путь от корня проекта
+            try:
+                dir_display = safe_path.relative_to(self.host_os.framework_dir).as_posix()
+            except ValueError:
+                dir_display = safe_path.name
+
             meta = self.host_os.get_file_metadata()
 
             items = []
@@ -247,10 +253,11 @@ class HostOSFiles:
                 items.append(f"{prefix} {item.name} ({size_str}){desc}")
 
             if not items:
-                return SkillResult.ok(f"Директория '{safe_path.name}' пуста.")
+                return SkillResult.ok(f"Директория '{dir_display}/' пуста.")
 
             system_logger.info(f"[Host OS] Просмотр директории: {safe_path.name}")
-            return SkillResult.ok("\n".join(items))
+            # Возвращаем с понятным заголовком
+            return SkillResult.ok(f"Содержимое '{dir_display}/':\n" + "\n".join(items))
 
         except PermissionError as e:
             return SkillResult.fail(str(e))
@@ -280,7 +287,11 @@ class HostOSFiles:
                     found.append(f"...[Лимит поиска: найдено более {limit} совпадений] ...")
                     break
 
-                rel_path = file_path.relative_to(safe_path)
+                # ПОКАЗЫВАЕМ ПУТЬ ОТ КОРНЯ ПРОЕКТА, ЧТОБЫ АГЕНТ НЕ ПУТАЛСЯ
+                try:
+                    rel_path = file_path.relative_to(self.host_os.framework_dir).as_posix()
+                except ValueError:
+                    rel_path = str(file_path)
 
                 try:
                     size_str = (

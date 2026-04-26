@@ -139,7 +139,8 @@ class ReactLoop:
             {"role": "user", "content": context},
         ]
 
-        self.tracker.add_input_record(messages=messages)
+        input_tokens = self.tracker.add_input_record(messages=messages)
+        self.agent_state.last_input_tokens = input_tokens
 
         messages = copy.deepcopy(messages)
         messages = self._inject_images_to_payload(messages)
