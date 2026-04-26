@@ -1,11 +1,13 @@
 import asyncio
 import json
+from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
 from src.utils.logger import system_logger
 from src.utils.event.bus import EventBus
 from src.utils.event.registry import Events
+from src.utils.dtime import format_datetime
 
 from src.l0_state.interfaces.state import GithubState
 from src.l2_interfaces.github.client import GithubClient
@@ -17,12 +19,18 @@ class GithubEvents:
     """
 
     def __init__(
-        self, client: GithubClient, state: GithubState, event_bus: EventBus, data_dir: Path
+        self,
+        client: GithubClient,
+        state: GithubState,
+        event_bus: EventBus,
+        data_dir: Path,
+        timezone: int = 0,
     ):
         self.client = client
         self.state = state
         self.bus = event_bus
         self.data_dir = data_dir
+        self.timezone = timezone
 
         self._is_running = False
         self._polling_task: Optional[asyncio.Task] = None
@@ -67,6 +75,17 @@ class GithubEvents:
                 json.dump(self.state.tracked_repos, f, indent=4)
         except Exception as e:
             system_logger.error(f"[Github] Ошибка сохранения tracked_repos.json: {e}")
+
+    def _format_gh_time(self, iso_str: str) -> str:
+        """Хелпер: переводит время из формата GitHub (ISO 8601 UTC) в локальное время агента."""
+        if not iso_str:
+            return ""
+        try:
+            # Парсим строку вида "2026-04-27T10:30:00Z"
+            dt = datetime.strptime(iso_str.replace("Z", "+0000"), "%Y-%m-%dT%H:%M:%S%z")
+            return f"[{format_datetime(dt, self.timezone, '%m-%d %H:%M')}] "
+        except Exception:
+            return ""
 
     # ==========================================================
     # POLLING LOOP
@@ -127,7 +146,8 @@ class GithubEvents:
                         title = n.get("subject", {}).get("title", "No title")
                         repo = (n.get("repository") or {}).get("full_name", "Unknown")
                         n_type = n.get("subject", {}).get("type", "Unknown")
-                        notif_lines.append(f"- [{repo}] {n_type}: {title}")
+                        time_prefix = self._format_gh_time(n.get("updated_at", ""))
+                        notif_lines.append(f"- {time_prefix}[{repo}] {n_type}: {title}")
                     self.state.unread_notifications = "\n".join(notif_lines)
 
         except Exception as e:
@@ -214,24 +234,23 @@ class GithubEvents:
 
     def _parse_github_event(self, event: dict) -> Optional[str]:
         """
-        Превращает JSON Github Event в читаемую строку. Игнорирует мусорные события.
+        Превращает JSON Github Event в читаемую строку с учетом локального времени.
         """
-
         event_type = event.get("type")
         actor = event.get("actor", {}).get("login", "Unknown")
         repo = event.get("repo", {}).get("name", "Unknown")
         payload = event.get("payload", {})
+        time_prefix = self._format_gh_time(event.get("created_at", ""))
 
         if event_type == "PushEvent":
             commits = payload.get("commits", [])
-            # Надежный подсчет коммитов
             count = payload.get("size", len(commits))
 
             if count == 0:
                 return None
 
             msg = commits[0].get("message", "").split("\n")[0] if commits else "Без описания"
-            return f"[{repo}] 🔨 @{actor} запушил {count} коммит(ов). Последний: '{msg}'"
+            return f"{time_prefix}[{repo}] 🔨 @{actor} запушил {count} коммит(ов). Последний: '{msg}'"
 
         elif event_type == "IssuesEvent":
             action = payload.get("action")
@@ -239,27 +258,26 @@ class GithubEvents:
                 return None
             issue_num = payload.get("issue", {}).get("number", "?")
             title = payload.get("issue", {}).get("title", "")
-            return f"[{repo}] 📝 @{actor} {action} issue #{issue_num}: '{title}'"
+            return f"{time_prefix}[{repo}] 📝 @{actor} {action} issue #{issue_num}: '{title}'"
 
         elif event_type == "PullRequestEvent":
             action = payload.get("action")
             pr_num = payload.get("pull_request", {}).get("number", "?")
             title = payload.get("pull_request", {}).get("title", "")
-            return f"[{repo}] 🔀 @{actor} {action} Pull Request #{pr_num}: '{title}'"
+            return (
+                f"{time_prefix}[{repo}] 🔀 @{actor} {action} Pull Request #{pr_num}: '{title}'"
+            )
 
         elif event_type == "IssueCommentEvent":
             action = payload.get("action")
             if action != "created":
                 return None
             issue_num = payload.get("issue", {}).get("number", "?")
-            return f"[{repo}] 💬 @{actor} {action} комментарий в Issue/PR #{issue_num}"
+            return f"{time_prefix}[{repo}] 💬 @{actor} {action} комментарий в Issue/PR #{issue_num}"
 
         elif event_type == "ReleaseEvent":
             action = payload.get("action")
             tag = payload.get("release", {}).get("tag_name", "?")
-            return f"[{repo}] 🚀 @{actor} {action} релиз {tag}"
-
-        elif event_type == "ForkEvent":
-            return f"[{repo}] 🍴 @{actor} сделал форк репозитория."
+            return f"{time_prefix}[{repo}] 🚀 @{actor} {action} релиз {tag}"
 
         return None

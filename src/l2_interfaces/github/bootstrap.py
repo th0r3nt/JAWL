@@ -27,13 +27,13 @@ def setup_github(system: "System", token: str | None) -> List[Any]:
         config=config,
         token=token,
     )
-    
-    # Создаем обработчик событий
+
     events = GithubEvents(
-        client=client, 
-        state=system.github_state, 
-        event_bus=system.event_bus, 
-        data_dir=system.local_data_dir
+        client=client,
+        state=system.github_state,
+        event_bus=system.event_bus,
+        data_dir=system.local_data_dir,
+        timezone=system.settings.system.timezone,
     )
 
     # Регистрация навыков
