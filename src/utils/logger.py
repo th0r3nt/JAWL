@@ -46,7 +46,10 @@ class ColorFormatter(logging.Formatter):
         "[Telegram Telethon]": LogColors.CYAN,
         "[Telegram Aiogram]": LogColors.BLUE,
         "[Meta]": LogColors.WHITE,
-        "[Multimodality]": LogColors.BRIGHT_YELLOW,
+        "[Multimodality]": LogColors.GREEN,
+        "[Github]": LogColors.BLUE,
+        "[Email]": LogColors.MAGENTA,
+        "[Calendar]": LogColors.CYAN,
         # Базы данных
         "[SQL DB]": LogColors.YELLOW,
         "[Vector DB]": LogColors.YELLOW,

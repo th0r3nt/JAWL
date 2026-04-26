@@ -73,3 +73,30 @@ class AiogramMessages:
                     "Сообщение не изменено (новый текст совпадает со старым)."
                 )
             return SkillResult.fail(f"Ошибка при редактировании сообщения (Aiogram): {e}")
+
+    @skill()
+    async def pin_message(self, chat_id: int, message_id: int) -> SkillResult:
+        """Закрепляет сообщение (бот должен иметь права администратора)."""
+        try:
+            bot = self.client.bot()
+            await bot.pin_chat_message(chat_id=int(chat_id), message_id=int(message_id), disable_notification=False)
+
+            system_logger.info(f"[Telegram Aiogram] Сообщение {message_id} закреплено в {chat_id}")
+            return SkillResult.ok(f"Сообщение {message_id} успешно закреплено.")
+        except Exception as e:
+            return SkillResult.fail(f"Ошибка при закреплении сообщения (Aiogram): {e}")
+
+    @skill()
+    async def unpin_message(self, chat_id: int, message_id: int) -> SkillResult:
+        """Открепляет закрепленное сообщение."""
+        try:
+            bot = self.client.bot()
+            await bot.unpin_chat_message(chat_id=int(chat_id), message_id=int(message_id))
+
+            system_logger.info(f"[Telegram Aiogram] Сообщение {message_id} откреплено в {chat_id}")
+            return SkillResult.ok(f"Сообщение {message_id} успешно откреплено.")
+        except Exception as e:
+            return SkillResult.fail(f"Ошибка при откреплении сообщения (Aiogram): {e}")
+        
+
+    # TODO: forward_message

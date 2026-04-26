@@ -662,6 +662,36 @@ class HostOSFiles:
         system_logger.info(f"[Host OS] Созданы директории: {', '.join(created)}")
 
         return SkillResult.ok(msg)
+    
+    @skill()
+    async def move_or_rename(self, source_path: str, destination_path: str) -> SkillResult:
+        """
+        Перемещает/переименовывает файл/директорию.
+        Если destination_path указывает на существующую папку, объект будет перемещен внутрь неё.
+        """
+        try:
+            # Проверяем оба пути через гейткипер ОС (и источник, и назначение)
+            safe_src = self.host_os.validate_path(source_path, is_write=True)
+            safe_dst = self.host_os.validate_path(destination_path, is_write=True)
+
+            if not safe_src.exists():
+                return SkillResult.fail(f"Ошибка: Исходный объект не найден ({source_path}).")
+
+            # Создаем родительские папки для назначения, если их нет
+            safe_dst.parent.mkdir(parents=True, exist_ok=True)
+
+            def _move():
+                shutil.move(str(safe_src), str(safe_dst))
+
+            await asyncio.to_thread(_move)
+
+            system_logger.info(f"[Host OS] Перемещен/переименован объект: {safe_src.name} -> {safe_dst.name}")
+            return SkillResult.ok(f"Успешно. Объект перемещен по пути: {safe_dst.as_posix()}")
+
+        except PermissionError as e:
+            return SkillResult.fail(str(e))
+        except Exception as e:
+            return SkillResult.fail(f"Ошибка при перемещении/переименовании: {e}")
 
     @skill()
     async def set_file_description(self, filepath: str, description: str) -> SkillResult:
