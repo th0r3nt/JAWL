@@ -1,6 +1,7 @@
 from src.l2_interfaces.github.client import GithubClient
 from src.l3_agent.skills.registry import SkillResult, skill
 from src.utils._tools import truncate_text
+from src.utils.logger import system_logger
 
 
 class GithubPullRequests:
@@ -16,7 +17,7 @@ class GithubPullRequests:
         """
         Возвращает список Pull Requests репозитория (state: open/closed/all).
         """
-
+        
         try:
             params = {"state": state, "per_page": per_page}
             data = await self.client.request(
@@ -49,7 +50,6 @@ class GithubPullRequests:
         """
 
         try:
-            # Для получения diff отправляем специальный Accept header
             headers = {"Accept": "application/vnd.github.v3.diff"}
             diff_text = await self.client.request(
                 "GET",
@@ -63,7 +63,6 @@ class GithubPullRequests:
             if not diff_text:
                 return SkillResult.ok("В этом PR нет изменений в коде.")
 
-            # Diff может быть огромным, обязательно обрезаем для защиты контекста
             diff_text = truncate_text(
                 diff_text,
                 20000,
@@ -74,3 +73,36 @@ class GithubPullRequests:
 
         except Exception as e:
             return SkillResult.fail(f"Ошибка при чтении Diff PR: {e}")
+
+    @skill()
+    async def create_pull_request(
+        self, owner: str, repo: str, title: str, head: str, base: str = "main", body: str = ""
+    ) -> SkillResult:
+        """
+        [Требует Agent Account] Создает новый Pull Request.
+        - head: ветка, из которой переносим изменения.
+        - base: ветка, куда вливаем изменения.
+        """
+
+        if not self.client.config.agent_account:
+            return SkillResult.fail(
+                "Ошибка: Для создания PR нужно включить 'agent_account: true' в настройках и добавить токен."
+            )
+
+        try:
+            payload = {"title": title, "head": head, "base": base, "body": body}
+
+            data = await self.client.request(
+                "POST",
+                f"/repos/{owner}/{repo}/pulls",
+                body=payload,
+            )
+
+            pr_num = data.get("number")
+            self.client.state.add_history(f"create_pr: {owner}/{repo} #{pr_num}")
+            system_logger.info(f"[Github] Создан Pull Request #{pr_num} в {owner}/{repo}")
+
+            return SkillResult.ok(f"Pull Request успешно создан. URL: {data.get('html_url')}")
+
+        except Exception as e:
+            return SkillResult.fail(f"Ошибка при создании Pull Request: {e}")

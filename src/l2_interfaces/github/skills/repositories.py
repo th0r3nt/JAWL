@@ -70,7 +70,9 @@ class GithubRepositories:
     async def read_file_content(
         self, owner: str, repo: str, path: str, ref: Optional[str] = None
     ) -> SkillResult:
-        """Читает содержимое файла из репозитория GitHub."""
+        """
+        Читает содержимое файла из репозитория GitHub.
+        """
 
         try:
             params = {"ref": ref} if ref else None
@@ -129,7 +131,7 @@ class GithubRepositories:
         self, owner: str, repo: str, dest_filename: str, ref: Optional[str] = None
     ) -> SkillResult:
         """
-        Скачивает репозиторий в виде ZIP-архива. По умолчанию сохраняет в sandbox/download/.
+        Скачивает репозиторий в виде ZIP-архива. Без .git файла. По умолчанию сохраняет в sandbox/download/.
         ref: Опционально (имя ветки, тег или коммит).
         """
         try:
