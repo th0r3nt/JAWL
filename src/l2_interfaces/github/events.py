@@ -140,9 +140,9 @@ class GithubEvents:
 
         for repo_name, last_event_id in list(self.state.tracked_repos.items()):
             try:
-                # Берем только последние 5 событий, чтобы не грузить сеть
+                # Берем больше событий (15), чтобы гарантированно захватить последние
                 events_data = await self.client.request(
-                    "GET", f"/repos/{repo_name}/events", params={"per_page": 5}
+                    "GET", f"/repos/{repo_name}/events", params={"per_page": 15}
                 )
 
                 if not isinstance(events_data, list) or not events_data:
@@ -154,11 +154,25 @@ class GithubEvents:
                 # Флаг: если last_event_id пустой, значит мы только начали отслеживать
                 is_initial_load = not bool(last_event_id)
 
+                # Флаг: если дашборд агента пуст (после рестарта), тихо подгружаем контекст
+                needs_dashboard_fill = len(self.state.recent_watcher_events) == 0
+
                 for event in events_data:
                     event_id = event.get("id")
+                    if not event_id:
+                        continue
+
+                    # Строгое приведение к int для защиты от ошибки лексического сравнения строк разной длины
+                    try:
+                        ev_id_int = int(event_id)
+                        last_ev_id_int = int(last_event_id) if last_event_id else 0
+                    except (ValueError, TypeError):
+                        ev_id_int = str(event_id)
+                        last_ev_id_int = str(last_event_id)
+
+                    is_new = ev_id_int > last_ev_id_int
 
                     if is_initial_load:
-                        # При первой загрузке добавляем историю в дашборд тихо (без EventBus)
                         parsed_msg = self._parse_github_event(event)
                         if parsed_msg:
                             self.state.add_watcher_event(parsed_msg)
@@ -167,10 +181,19 @@ class GithubEvents:
                         modified = True
                         continue
 
-                    # Нормальный флоу для новых событий (когда репа уже отслеживается)
-                    if event_id <= last_event_id:
+                    # Если это старое событие (агент его уже видел)
+                    if not is_new:
+                        # Но дашборд пустой (перезапуск) - тихо восстанавливаем контекст
+                        if needs_dashboard_fill:
+                            parsed_msg = self._parse_github_event(event)
+                            if (
+                                parsed_msg
+                                and parsed_msg not in self.state.recent_watcher_events
+                            ):
+                                self.state.add_watcher_event(parsed_msg)
                         continue
 
+                    # === НОВОЕ СОБЫТИЕ ===
                     parsed_msg = self._parse_github_event(event)
                     if parsed_msg:
                         # Отправляем в контекст
@@ -232,7 +255,7 @@ class GithubEvents:
         elif event_type == "IssueCommentEvent":
             action = payload.get("action")
 
-            if action != "created": # Игнорируем редактирование и удаление комментов
+            if action != "created":  # Игнорируем редактирование и удаление комментов
                 return None
 
             issue_num = payload.get("issue", {}).get("number", "?")
