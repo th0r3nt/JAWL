@@ -106,7 +106,7 @@ class Events:
         level=EventLevel.LOW,
         requires_attention=False,
     )
-    
+
     AIOGRAM_GROUP_MESSAGE = EventConfig(
         name="AIOGRAM_GROUP_MESSAGE",
         description="Обычное сообщение в группе, где есть бот.",
@@ -115,7 +115,7 @@ class Events:
     )
 
     # ============================================
-    # Host OS (Файловая система)
+    # Host OS
     # ============================================
 
     HOST_OS_FILE_CREATED = EventConfig(
@@ -140,6 +140,17 @@ class Events:
     )
 
     # ============================================
+    # Email
+    # ============================================
+
+    EMAIL_INCOMING = EventConfig(
+        name="EMAIL_INCOMING",
+        description="Входящее электронное письмо.",
+        level=EventLevel.HIGH,
+        requires_attention=True,
+    )
+
+    # ============================================
     # Общие системные события
     # ============================================
 
@@ -159,9 +170,9 @@ class Events:
 
     SYSTEM_CALENDAR_ALARM = EventConfig(
         name="SYSTEM_CALENDAR_ALARM",
-        description="Сработал таймер или регулярная задача из календаря.", # TODO: в коде вообще используется поле description?
+        description="Сработал таймер или регулярная задача из календаря.",  # TODO: в коде вообще используется поле description?
         level=EventLevel.HIGH,
-        requires_attention=True, # TODO: это вообще влияет на что-нибудь?
+        requires_attention=True,  # TODO: это вообще влияет на что-нибудь?
     )
 
     SYSTEM_CONFIG_UPDATED = EventConfig(

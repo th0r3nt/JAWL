@@ -54,6 +54,12 @@ class GithubConfig(BaseModel):
     history_limit: int
 
 
+class EmailConfig(BaseModel):
+    enabled: bool
+    polling_interval_sec: int = 60
+    recent_limit: int = 10
+
+
 class DeepResearchConfig(BaseModel):
     max_queries: int
     max_results_per_query: int
@@ -95,6 +101,7 @@ class InterfacesConfig(BaseModel):
     meta: MetaConfig
     multimodality: MultimodalityConfig
     calendar: CalendarConfig
+    email: EmailConfig
 
 
 # ==========================================

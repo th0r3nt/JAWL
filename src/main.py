@@ -29,6 +29,7 @@ from src.l0_state.interfaces.state import (
     WebSearchState,
     CalendarState,
     GithubState,
+    EmailState,
 )
 
 # ==========================================
@@ -130,6 +131,9 @@ class System:
         self.github_state = GithubState(
             history_limit=self.interfaces_config.github.history_limit
         )
+
+        # EMAIL
+        self.email_state = EmailState(recent_limit=self.interfaces_config.email.recent_limit)
 
         # WEB
         self.web_search_state = WebSearchState(history_limit=10)
@@ -241,6 +245,11 @@ class System:
         telethon_api_hash: Optional[str] = None,
         # Aiogram
         aiogram_bot_token: Optional[str] = None,
+        # GitHub
+        github_token: Optional[str] = None,
+        # Email
+        email_account: Optional[str] = None,
+        email_password: Optional[str] = None,
     ):
         """Читает конфиг, поднимает нужные интерфейсы и регистрирует их скиллы."""
 
@@ -253,7 +262,10 @@ class System:
             # Aiogram
             "AIOGRAM_BOT_TOKEN": aiogram_bot_token,
             # GitHub
-            "GITHUB_TOKEN": os.getenv("GITHUB_TOKEN", None),
+            "GITHUB_TOKEN": github_token,
+            # Email
+            "EMAIL_ACCOUNT": email_account,
+            "EMAIL_PASSWORD": email_password,
         }
 
         # Вся магия сборки интерфейсов скрыта здесь
@@ -341,12 +353,12 @@ class System:
         # Специфичные подписки
         def handle_config_update(**kwargs):
             key = kwargs.get("key")
-            
+
             # Настройки Heartbeat
             if key in ("heartbeat_interval", "continuous_cycle"):
                 if self.heartbeat:
                     self.heartbeat.update_config(key, kwargs.get("value"))
-            
+
             # Лимиты SQL баз данных
             elif key == "db_limit":
                 module = kwargs.get("module")
@@ -371,8 +383,10 @@ class System:
                 if self.sql:
                     self.sql.ticks.ticks_limit = kwargs.get("total_ticks")
                     self.sql.ticks.detailed_ticks = kwargs.get("detailed_ticks")
-                    
-                system_logger.info(f"[System] Рантайм-обновление контекста: {kwargs.get('total_ticks')} тиков")
+
+                system_logger.info(
+                    f"[System] Рантайм-обновление контекста: {kwargs.get('total_ticks')} тиков"
+                )
 
         # Если агент решил совершить сэппуку
         def handle_shutdown(**kwargs):
@@ -399,9 +413,16 @@ class System:
         self,
         llm_api_url: str,
         llm_api_keys: list[str],
+        # Telethon
         telethon_api_id: Optional[str] = None,
         telethon_api_hash: Optional[str] = None,
+        # Aiogram
         aiogram_bot_token: Optional[str] = None,
+        # GitHub
+        github_token: Optional[str] = None,
+        # Email
+        email_account: Optional[str] = None,
+        email_password: Optional[str] = None,
     ) -> int:
         """Запуск системы."""
 
@@ -422,9 +443,16 @@ class System:
 
             # L2 INTERFACES
             self.setup_l2_interfaces(
+                # Telethon
                 telethon_api_id=telethon_api_id,
                 telethon_api_hash=telethon_api_hash,
+                # Aiogram
                 aiogram_bot_token=aiogram_bot_token,
+                # GitHub
+                github_token=github_token,
+                # Email
+                email_account=email_account,
+                email_password=email_password,
             )
 
             # L3 AGENT
@@ -559,6 +587,11 @@ async def main() -> int:
         TELETHON_API_HASH = os.getenv("TELETHON_API_HASH", None)
         # Aiogram
         AIOGRAM_BOT_TOKEN = os.getenv("AIOGRAM_BOT_TOKEN", None)
+        # GitHub 
+        GITHUB_TOKEN = os.getenv("GITHUB_TOKEN", None)
+        # Email
+        EMAIL_ACCOUNT = os.getenv("EMAIL_ACCOUNT", None)
+        EMAIL_PASSWORD = os.getenv("EMAIL_PASSWORD", None)
 
         # Динамически собираем все ключи, которые начинаются с LLM_API_KEY_
         LLM_API_URL = os.getenv("LLM_API_URL", None)
@@ -576,6 +609,11 @@ async def main() -> int:
             telethon_api_hash=TELETHON_API_HASH,
             # Aiogram
             aiogram_bot_token=AIOGRAM_BOT_TOKEN,
+            # GitHub
+            github_token=GITHUB_TOKEN,
+            # Email
+            email_account=EMAIL_ACCOUNT,
+            email_password=EMAIL_PASSWORD,
         )
         return exit_code
 

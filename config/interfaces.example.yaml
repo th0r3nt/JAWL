@@ -49,6 +49,14 @@ github:
   history_limit: 10 # История запросов к API GitHub в контексте агента
 
 
+# Отдельная почта для агента
+email:
+  enabled: false # Перед включением добавьте EMAIL_ACCOUNT и EMAIL_PASSWORD в .env
+  polling_interval_sec: 60
+  recent_limit: 5
+  # Сервера и порты система подберет сама на основе @gmail.com
+
+
 web:
   # Поиск через DuckDuckGo и чтение страниц
   search:

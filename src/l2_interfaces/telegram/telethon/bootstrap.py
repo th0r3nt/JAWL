@@ -25,7 +25,7 @@ def setup_telethon(system: "System", api_id: str | None, api_hash: str | None) -
 
     if not api_id or not api_hash:
         system_logger.error(
-            "[System] TELETHON_API_ID или TELETHON_API_HASH не найдены в .env. Telethon отключен."
+            "[Telegram Telethon] TELETHON_API_ID или TELETHON_API_HASH не найдены в .env. Интерфейс отключен."
         )
         return []
 

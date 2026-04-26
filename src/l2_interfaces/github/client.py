@@ -52,7 +52,7 @@ class GithubClient:
 
             except GithubHTTPError as e:
                 self.state.account_info = (
-                    f"Auth Failed (HTTP {e.status}). Переход в Read-Only режим."
+                    f"Auth Failed (HTTP {e.status}). Read-Only режим."
                 )
                 system_logger.error(f"[Github] Ошибка авторизации: {e}. Проверьте токен.")
                 self.config.agent_account = False  # Фоллбэк

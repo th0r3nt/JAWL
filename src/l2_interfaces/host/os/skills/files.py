@@ -450,6 +450,117 @@ class HostOSFiles:
             return SkillResult.fail(f"Ошибка при поиске файлов: {e}")
 
     @skill()
+    async def search_content_in_files(
+        self,
+        search_string: str,
+        path: str = ".",
+        case_sensitive: bool = False,
+        recursive: bool = True,
+    ) -> SkillResult:
+        """
+        Ищет указанный текст (строку) внутри всех файлов в директории (аналог глобального поиска/grep).
+        Возвращает пути к файлам, номера строк и сами строки, где найдено совпадение.
+        """
+
+        if not search_string:
+            return SkillResult.fail("Строка поиска не может быть пустой.")
+
+        try:
+            safe_path = self.host_os.validate_path(path, is_write=False)
+
+            if not safe_path.is_dir():
+                return SkillResult.fail(f"Ошибка: Путь не является директорией ({path}).")
+
+            # Лимит на количество найденных строк, чтобы не убить контекст агента огромной выдачей
+            max_matches = 150
+
+            def _search():
+                matches = []
+                ignore_dirs = {
+                    ".git",
+                    "venv",
+                    ".venv",
+                    "env",
+                    "__pycache__",
+                    "node_modules",
+                    ".pytest_cache",
+                }
+
+                iterator = safe_path.rglob("*") if recursive else safe_path.iterdir()
+                search_query = search_string if case_sensitive else search_string.lower()
+
+                for item in iterator:
+                    if not item.is_file():
+                        continue
+
+                    rel_path = item.relative_to(safe_path)
+
+                    # Пропускаем мусорные папки
+                    if any(part in ignore_dirs for part in rel_path.parts):
+                        continue
+
+                    # Пропускаем бинарники тихо, ловя UnicodeDecodeError
+                    try:
+                        with open(item, "r", encoding="utf-8") as f:
+                            for line_num, line in enumerate(f, 1):
+                                check_line = line if case_sensitive else line.lower()
+
+                                if search_query in check_line:
+                                    # Форматируем путь: от корня фреймворка (для понятности) или просто имя
+                                    try:
+                                        display_path = item.relative_to(
+                                            self.host_os.framework_dir
+                                        ).as_posix()
+                                    except ValueError:
+                                        display_path = item.name
+
+                                    clean_line = line.strip()
+                                    limit = 300
+                                    # Ограничим длину выводимой строки (на случай сжатых/минифицированных файлов)
+                                    if len(clean_line) > limit:
+                                        clean_line = (
+                                            clean_line[:limit] + " ... [строка обрезана]"
+                                        )
+
+                                    matches.append(
+                                        f"- {display_path}:{line_num}: {clean_line}"
+                                    )
+
+                                    if len(matches) >= max_matches:
+                                        matches.append(
+                                            f"\n... [Достигнут лимит в {max_matches} совпадений. Поиск остановлен]"
+                                        )
+                                        return matches
+
+                    except UnicodeDecodeError:
+                        continue  # Бинарный файл - просто идем дальше
+
+                    except Exception:
+                        continue  # Проблемы с правами доступа или лок файла
+
+                return matches
+
+            results = await asyncio.to_thread(_search)
+
+            if not results:
+                return SkillResult.ok(
+                    f"Совпадений по строке '{search_string}' в '{safe_path.name}' не найдено."
+                )
+
+            system_logger.info(
+                f"[Host OS] Выполнен глобальный поиск текста '{search_string}' в {safe_path.name}"
+            )
+            return SkillResult.ok(
+                f"Результаты поиска '{search_string}':\n" + "\n".join(results)
+            )
+
+        except PermissionError as e:
+            return SkillResult.fail(str(e))
+        
+        except Exception as e:
+            return SkillResult.fail(f"Ошибка при поиске текста: {e}")
+
+    @skill()
     async def delete_file(self, filepath: str) -> SkillResult:
         """Удаляет указанный файл (не папки)."""
 

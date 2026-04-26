@@ -98,6 +98,25 @@ def initialize_l2_interfaces(system: "System", env_vars: Dict[str, str | None]) 
         )
 
     # ================================================================
+    # EMAIL
+    # ================================================================
+
+    if getattr(config, "email", None) and config.email.enabled:
+        from src.l2_interfaces.email.bootstrap import setup_email
+
+        components.extend(
+            setup_email(
+                system=system,
+                account=env_vars.get("EMAIL_ACCOUNT"),
+                password=env_vars.get("EMAIL_PASSWORD"),
+            )
+        )
+    else:
+        system.context_registry.register_provider(
+            "email", make_off_provider("EMAIL"), ContextSection.INTERFACES
+        )
+
+    # ================================================================
     # WEB SEARCH
     # ================================================================
 
