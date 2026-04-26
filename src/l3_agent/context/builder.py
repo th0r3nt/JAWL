@@ -137,7 +137,7 @@ class ContextBuilder:
             header = f"[{event_time}] [{level}] {header}"
 
         if event_name == "HEARTBEAT":
-            return f"{header}\n[Статус: Heartbeat тик]"
+            return f"{header}\n[Статус: Heartbeat тик] \n{proactive_prompt}"
 
         if event_name == "SYSTEM_CORE_START":
             return f"{header}\n[Статус: Инициализация ядра JAWL. Запуск подсистем завершен]"
@@ -147,8 +147,6 @@ class ContextBuilder:
             return f"{header}\n[Статус: Срабатывание системного таймера]\n\nЗадача: {alarm_title}."
 
         lines = [header]
-
-        lines.append(proactive_prompt)
 
         if "sender_name" in payload:
             lines.append(f"Sender: {payload['sender_name']}")
