@@ -134,9 +134,7 @@ class GithubEvents:
             system_logger.debug(f"[Github] Ошибка фонового обновления профиля: {e}")
 
     async def _poll_watched_repos(self):
-        """
-        Опрашивает /events для каждого отслеживаемого репозитория.
-        """
+        """Опрашивает /events для каждого отслеживаемого репозитория."""
 
         modified = False
 
@@ -153,22 +151,26 @@ class GithubEvents:
                 # Идем от старых к новым (reverse)
                 events_data.reverse()
 
+                # Флаг: если last_event_id пустой, значит мы только начали отслеживать
+                is_initial_load = not bool(last_event_id)
+
                 for event in events_data:
                     event_id = event.get("id")
 
-                    # Если мы только начали трекать (last_event_id пуст) - просто сохраняем ID и пропускаем,
-                    # чтобы не спамить агенту старыми ивентами при инициализации
-                    if not last_event_id:
+                    if is_initial_load:
+                        # При первой загрузке добавляем историю в дашборд тихо (без EventBus)
+                        parsed_msg = self._parse_github_event(event)
+                        if parsed_msg:
+                            self.state.add_watcher_event(parsed_msg)
+
                         self.state.tracked_repos[repo_name] = event_id
                         modified = True
-                        last_event_id = event_id
                         continue
 
-                    # Пропускаем уже виденные события
+                    # Нормальный флоу для новых событий (когда репа уже отслеживается)
                     if event_id <= last_event_id:
                         continue
 
-                    # Парсим ивент
                     parsed_msg = self._parse_github_event(event)
                     if parsed_msg:
                         # Отправляем в контекст
@@ -193,7 +195,7 @@ class GithubEvents:
         """
         Превращает JSON Github Event в читаемую строку. Игнорирует мусорные события.
         """
-        
+
         event_type = event.get("type")
         actor = event.get("actor", {}).get("login", "Unknown")
         repo = event.get("repo", {}).get("name", "Unknown")
@@ -202,11 +204,21 @@ class GithubEvents:
         if event_type == "PushEvent":
             commits = payload.get("commits", [])
             count = len(commits)
+
+            # Если коммитов нет (шум GitHub) - игнорируем событие
+            if count == 0:
+                return None
+
             msg = commits[0].get("message", "").split("\n")[0] if count > 0 else ""
             return f"[{repo}] 🔨 @{actor} запушил {count} коммит(ов). Последний: '{msg}'"
 
         elif event_type == "IssuesEvent":
             action = payload.get("action")
+
+            # Игнорируем неинтересные действия (типа изменения лейблов), чтобы не спамить
+            if action not in ("opened", "closed", "reopened", "commented"):
+                return None
+
             issue_num = payload.get("issue", {}).get("number", "?")
             title = payload.get("issue", {}).get("title", "")
             return f"[{repo}] 📝 @{actor} {action} issue #{issue_num}: '{title}'"
@@ -219,6 +231,10 @@ class GithubEvents:
 
         elif event_type == "IssueCommentEvent":
             action = payload.get("action")
+
+            if action != "created": # Игнорируем редактирование и удаление комментов
+                return None
+
             issue_num = payload.get("issue", {}).get("number", "?")
             return f"[{repo}] 💬 @{actor} {action} комментарий в Issue/PR #{issue_num}"
 

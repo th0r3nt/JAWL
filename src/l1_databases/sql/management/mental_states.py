@@ -34,7 +34,7 @@ class SQLMentalStates:
     ) -> SkillResult:
         """
         Создает новую запись в MentalState (отслеживание сущности).
-        related_information: связанная информация. Например: аккаунты/email/ субъекта в разных соц. сетях и подобное.
+        related_information: связанная информация. Например: аккаунты/email/репозитории субъекта в разных сетях и подобное.
         """
 
         if tier not in ("high", "medium", "low", "background"):

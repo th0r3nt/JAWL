@@ -150,14 +150,14 @@ class GithubClient:
         if self.config.agent_account and self.token:
             agent_dashboard = (
                 f"\n* Текущие репозитории аккаунта (Топ-5 по активности):\n  {self.state.own_repos.replace(chr(10), chr(10)+'  ')}\n"
-                f"* Уведомления:\n  {self.state.unread_notifications.replace(chr(10), chr(10)+'  ')}"
+                f"\n* Уведомления:\n  {self.state.unread_notifications.replace(chr(10), chr(10)+'  ')}"
             )
 
         watchers_block = ""
         if self.state.tracked_repos:
             repos_list = ", ".join(self.state.tracked_repos.keys())
-            events_str = "\n".join(self.state.recent_watcher_events) if self.state.recent_watcher_events else "Нет недавних событий."
-            watchers_block = f"\n* Отслеживаемые репозитории: {repos_list}\n* Последние события в репозиториях:\n{events_str}\n"
+            events_str = "\n".join(self.state.recent_watcher_events) if self.state.recent_watcher_events else "  Нет недавних событий."
+            watchers_block = f"\n\n* Отслеживаемые репозитории: {repos_list}\n* Последние события в репозиториях:\n{events_str}\n"
 
         return (
             f"### GITHUB [ON]\n"
