@@ -1,35 +1,34 @@
+from inspect import Parameter, signature
 from typing import Union
-
-from telethon import utils
-from telethon.tl.functions.channels import (
-    CreateChannelRequest,
-    EditTitleRequest,
-    UpdateUsernameRequest,
-    SetDiscussionGroupRequest,
-)
-from telethon.tl.functions.channels import EditPhotoRequest as ChannelEditPhotoRequest
-from telethon.tl.functions.messages import ExportChatInviteRequest, EditChatTitleRequest
-from telethon.tl.functions.messages import EditChatAboutRequest, EditChatPhotoRequest
-from telethon.tl.types import InputChatUploadedPhoto, InputPeerChannel, InputPeerChat
 
 from src.utils._tools import validate_sandbox_path, parse_int_or_str
 from src.utils.logger import system_logger
-from src.l2_interfaces.telegram.telethon.client import TelethonClient
+from src.l2_interfaces.telegram.kurigram.client import KurigramClient
 from src.l3_agent.skills.registry import SkillResult, skill
 
-try:
-    from telethon.tl.functions.channels import CreateForumTopicRequest
-except ImportError:
-    CreateForumTopicRequest = None
 
-
-class TelethonAdmin:
+class KurigramAdmin:
     """
     Навыки администратора: создание каналов, управление участниками, закрепление сообщений и выдача прав.
     """
 
-    def __init__(self, tg_client: TelethonClient):
+    def __init__(self, tg_client: KurigramClient):
         self.tg_client = tg_client
+
+    @staticmethod
+    def _chat_administrator_rights(**kwargs):
+        try:
+            from pyrogram.types import ChatAdministratorRights
+        except ImportError:
+            from pyrogram.types import ChatPrivileges as ChatAdministratorRights
+
+        parameters = signature(ChatAdministratorRights).parameters.values()
+        if not any(param.kind == Parameter.VAR_KEYWORD for param in parameters):
+            allowed_kwargs = {param.name for param in parameters}
+            kwargs = {key: value for key, value in kwargs.items() if key in allowed_kwargs}
+
+        return ChatAdministratorRights(**kwargs)
+
 
     @skill()
     async def create_channel(
@@ -42,15 +41,17 @@ class TelethonAdmin:
 
         try:
             client = self.tg_client.client()
-            result = await client(
-                CreateChannelRequest(title=title, about=about, megagroup=is_megagroup)
+            result = (
+                await client.create_supergroup(title=title, description=about)
+                if is_megagroup
+                else await client.create_channel(title=title, description=about)
             )
 
-            chat_id = f"-100{result.chats[0].id}"
+            chat_id = getattr(result, "id", "Unknown")
             chat_type = "Супергруппа" if is_megagroup else "Канал"
 
             msg = f"{chat_type} '{title}' успешно создан. ID: {chat_id}"
-            system_logger.info(f"[Telegram Telethon] {msg}")
+            system_logger.info(f"[Telegram Kurigram] {msg}")
             return SkillResult.ok(msg)
 
         except Exception as e:
@@ -67,21 +68,19 @@ class TelethonAdmin:
 
         try:
             client = self.tg_client.client()
-            entity = await client.get_input_entity(parse_int_or_str(chat_id))
-
             clean_username = username.strip().lstrip("@")
 
-            await client(UpdateUsernameRequest(channel=entity, username=clean_username))
+            await client.set_chat_username(parse_int_or_str(chat_id), clean_username)
 
             if clean_username:
                 system_logger.info(
-                    f"[Telegram Telethon] Канал {chat_id} стал публичным (@{clean_username})"
+                    f"[Telegram Kurigram] Канал {chat_id} стал публичным (@{clean_username})"
                 )
                 return SkillResult.ok(
                     f"Успешно. Канал теперь публичный: t.me/{clean_username}"
                 )
             else:
-                system_logger.info(f"[Telegram Telethon] Канал {chat_id} стал приватным")
+                system_logger.info(f"[Telegram Kurigram] Канал {chat_id} стал приватным")
                 return SkillResult.ok("Успешно. Юзернейм удален, канал стал приватным.")
 
         except ValueError:
@@ -99,23 +98,23 @@ class TelethonAdmin:
         """
         try:
             client = self.tg_client.client()
-            channel_entity = await client.get_input_entity(parse_int_or_str(channel_id))
+            channel_entity = parse_int_or_str(channel_id)
 
-            if not group_id or str(group_id).strip() == "":
-                # Отвязываем группу (передаем пустой InputChannel)
-                from telethon.tl.types import InputChannelEmpty
+            unlink_group = not group_id or str(group_id).strip() == ""
 
-                group_entity = InputChannelEmpty()
+            if unlink_group:
+                group_entity = None
             else:
-                group_entity = await client.get_input_entity(parse_int_or_str(group_id))
+                group_entity = parse_int_or_str(group_id)
 
-            await client(
-                SetDiscussionGroupRequest(broadcast=channel_entity, group=group_entity)
+            await client.set_chat_discussion_group(
+                chat_id=channel_entity,
+                discussion_chat_id=group_entity,
             )
 
-            action_str = "привязана к каналу" if group_id else "отвязана от канала"
+            action_str = "отвязана от канала" if unlink_group else "привязана к каналу"
             msg = f"Супергруппа успешно {action_str} {channel_id}."
-            system_logger.info(f"[Telegram Telethon] {msg}")
+            system_logger.info(f"[Telegram Kurigram] {msg}")
 
             return SkillResult.ok(msg)
 
@@ -130,15 +129,10 @@ class TelethonAdmin:
 
         try:
             client = self.tg_client.client()
-            entity = await client.get_entity(parse_int_or_str(chat_id))
-
-            try:
-                await client(EditTitleRequest(channel=entity, title=new_title))
-            except Exception:
-                await client(EditChatTitleRequest(chat_id=entity.id, title=new_title))
+            await client.set_chat_title(parse_int_or_str(chat_id), new_title)
 
             system_logger.info(
-                f"[Telegram Telethon] Название чата {chat_id} изменено на '{new_title}'"
+                f"[Telegram Kurigram] Название чата {chat_id} изменено на '{new_title}'"
             )
             return SkillResult.ok(f"Название чата успешно изменено на '{new_title}'.")
 
@@ -154,12 +148,10 @@ class TelethonAdmin:
         """Изменяет описание (about/bio) группы или канала. Требуются права администратора."""
         try:
             client = self.tg_client.client()
-            entity = await client.get_input_entity(parse_int_or_str(chat_id))
-
-            await client(EditChatAboutRequest(peer=entity, about=new_description))
+            await client.set_chat_description(parse_int_or_str(chat_id), new_description)
 
             system_logger.info(
-                f"[Telegram Telethon] Описание чата {chat_id} успешно изменено."
+                f"[Telegram Kurigram] Описание чата {chat_id} успешно изменено."
             )
             return SkillResult.ok("Описание чата успешно изменено.")
         except ValueError:
@@ -176,23 +168,10 @@ class TelethonAdmin:
                 return SkillResult.fail(f"Ошибка: Файл {safe_path.name} не найден.")
 
             client = self.tg_client.client()
-            entity = await client.get_input_entity(parse_int_or_str(chat_id))
-
-            uploaded_file = await client.upload_file(str(safe_path))
-            photo = InputChatUploadedPhoto(file=uploaded_file)
-
-            # Telethon использует разные функции для обычных чатов и каналов/супергрупп
-            if isinstance(entity, InputPeerChannel):
-                await client(ChannelEditPhotoRequest(channel=entity, photo=photo))
-            elif isinstance(entity, InputPeerChat):
-                await client(EditChatPhotoRequest(chat_id=entity.chat_id, photo=photo))
-            else:
-                return SkillResult.fail(
-                    "Ошибка: Этот тип чата не поддерживает смену аватара (возможно это ЛС)."
-                )
+            await client.set_chat_photo(parse_int_or_str(chat_id), photo=str(safe_path))
 
             system_logger.info(
-                f"[Telegram Telethon] Аватар чата {chat_id} изменен на {safe_path.name}"
+                f"[Telegram Kurigram] Аватар чата {chat_id} изменен на {safe_path.name}"
             )
             return SkillResult.ok("Аватар чата успешно изменен.")
 
@@ -211,11 +190,10 @@ class TelethonAdmin:
 
         try:
             client = self.tg_client.client()
-            entity = await client.get_input_entity(parse_int_or_str(chat_id))
+            result = await client.export_chat_invite_link(parse_int_or_str(chat_id))
 
-            result = await client(ExportChatInviteRequest(peer=entity))
-
-            return SkillResult.ok(f"Пригласительная ссылка сгенерирована: {result.link}")
+            link = getattr(result, "invite_link", result)
+            return SkillResult.ok(f"Пригласительная ссылка сгенерирована: {link}")
 
         except Exception as e:
             return SkillResult.fail(f"Ошибка при генерации ссылки: {e}")
@@ -228,12 +206,18 @@ class TelethonAdmin:
 
         try:
             client = self.tg_client.client()
-            entity = await client.get_entity(parse_int_or_str(chat_id))
 
             participants = []
-            async for user in client.iter_participants(entity, limit=limit):
-                name = utils.get_display_name(user) or "Unknown"
-                bot_tag = " [Bot]" if user.bot else ""
+            async for member in client.get_chat_members(parse_int_or_str(chat_id), limit=limit):
+                user = member.user
+                if not user:
+                    continue
+                name = " ".join(
+                    part
+                    for part in (getattr(user, "first_name", ""), getattr(user, "last_name", ""))
+                    if part
+                ) or getattr(user, "username", None) or "Unknown"
+                bot_tag = " [Bot]" if getattr(user, "is_bot", False) else ""
                 participants.append(f"- ID: `{user.id}` | Имя: {name}{bot_tag}")
 
             if not participants:
@@ -258,18 +242,21 @@ class TelethonAdmin:
         try:
             client = self.tg_client.client()
 
-            await client.edit_admin(
-                entity=parse_int_or_str(chat_id),
-                user=parse_int_or_str(user_id),
-                is_admin=True,
-                change_info=True,
-                post_messages=True,
-                edit_messages=True,
-                delete_messages=True,
-                ban_users=True,
-                invite_users=True,
-                pin_messages=True,
-                add_admins=add_admins,
+            await client.promote_chat_member(
+                chat_id=parse_int_or_str(chat_id),
+                user_id=parse_int_or_str(user_id),
+                privileges=self._chat_administrator_rights(
+                    can_manage_chat=True,
+                    can_change_info=True,
+                    can_post_messages=True,
+                    can_edit_messages=True,
+                    can_delete_messages=True,
+                    can_restrict_members=True,
+                    can_invite_users=True,
+                    can_pin_messages=True,
+                    can_promote_members=add_admins,
+                    can_manage_topics=True,
+                ),
             )
 
             return SkillResult.ok(f"Пользователь {user_id} успешно повышен до администратора.")
@@ -286,10 +273,21 @@ class TelethonAdmin:
         try:
             client = self.tg_client.client()
 
-            await client.edit_admin(
-                entity=parse_int_or_str(chat_id),
-                user=parse_int_or_str(user_id),
-                is_admin=False,
+            await client.promote_chat_member(
+                chat_id=parse_int_or_str(chat_id),
+                user_id=parse_int_or_str(user_id),
+                privileges=self._chat_administrator_rights(
+                    can_manage_chat=False,
+                    can_change_info=False,
+                    can_post_messages=False,
+                    can_edit_messages=False,
+                    can_delete_messages=False,
+                    can_restrict_members=False,
+                    can_invite_users=False,
+                    can_pin_messages=False,
+                    can_promote_members=False,
+                    can_manage_topics=False,
+                ),
             )
 
             return SkillResult.ok(f"Пользователь {user_id} понижен до обычного участника.")
@@ -305,12 +303,14 @@ class TelethonAdmin:
 
         try:
             client = self.tg_client.client()
-            await client.pin_message(
-                entity=parse_int_or_str(chat_id), message=int(message_id), notify=notify
+            await client.pin_chat_message(
+                parse_int_or_str(chat_id),
+                int(message_id),
+                disable_notification=not notify,
             )
 
             system_logger.info(
-                f"[Telegram Telethon] Сообщение {message_id} закреплено в {chat_id}"
+                f"[Telegram Kurigram] Сообщение {message_id} закреплено в {chat_id}"
             )
             return SkillResult.ok(f"Сообщение {message_id} успешно закреплено.")
 
@@ -323,12 +323,10 @@ class TelethonAdmin:
 
         try:
             client = self.tg_client.client()
-            await client.unpin_message(
-                entity=parse_int_or_str(chat_id), message=int(message_id)
-            )
+            await client.unpin_chat_message(parse_int_or_str(chat_id), int(message_id))
 
             system_logger.info(
-                f"[Telegram Telethon] Сообщение {message_id} откреплено в {chat_id}"
+                f"[Telegram Kurigram] Сообщение {message_id} откреплено в {chat_id}"
             )
             return SkillResult.ok(f"Сообщение {message_id} успешно откреплено.")
 
@@ -341,28 +339,16 @@ class TelethonAdmin:
         Создает новый топик (раздел) в группе с включенными темами (Форуме).
         Возвращает ID созданного топика (его нужно использовать как topic_id для отправки сообщений туда).
         """
-        if not CreateForumTopicRequest:
-            return SkillResult.fail(
-                "Ошибка: Установленная версия библиотеки Telethon не поддерживает создание топиков."
-            )
-
         try:
             client = self.tg_client.client()
-            entity = await client.get_input_entity(parse_int_or_str(chat_id))
+            result = await client.create_forum_topic(parse_int_or_str(chat_id), title)
 
-            result = await client(CreateForumTopicRequest(channel=entity, title=title))
-
-            topic_id = None
-            for update in result.updates:
-                if hasattr(update, "message") and hasattr(update.message, "id"):
-                    topic_id = update.message.id
-                    break
-
+            topic_id = getattr(result, "id", None) or getattr(result, "message_thread_id", None)
             if not topic_id:
                 return SkillResult.fail("Топик создан, но не удалось извлечь его ID.")
 
             msg = f"Топик '{title}' успешно создан. ID топика: {topic_id}"
-            system_logger.info(f"[Telegram Telethon] {msg} (чат {chat_id})")
+            system_logger.info(f"[Telegram Kurigram] {msg} (чат {chat_id})")
             return SkillResult.ok(msg)
 
         except ValueError:

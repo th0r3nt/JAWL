@@ -35,7 +35,7 @@ def _ensure_config_exists() -> bool:
 def _check_api_keys() -> tuple[bool, bool]:
     """
     Проверяет наличие ключей в .env файле.
-    Возвращает (telethon_ok, aiogram_ok).
+    Возвращает (user_api_ok, aiogram_ok).
     """
 
     if not ENV_FILE.exists():
@@ -43,12 +43,12 @@ def _check_api_keys() -> tuple[bool, bool]:
 
     env_dict = dotenv_values(ENV_FILE)
 
-    telethon_ok = bool(env_dict.get("TELETHON_API_ID")) and bool(
+    user_api_ok = bool(env_dict.get("TELETHON_API_ID")) and bool(
         env_dict.get("TELETHON_API_HASH")
     )
     aiogram_ok = bool(env_dict.get("AIOGRAM_BOT_TOKEN"))
 
-    return telethon_ok, aiogram_ok
+    return user_api_ok, aiogram_ok
 
 
 def _load_yaml() -> dict:
@@ -86,7 +86,7 @@ def setup_wizard_screen() -> None:
     # Это позволяет легко расширять меню, не переписывая логику
     interface_map = {
         "Host OS": ["host", "os", "enabled"],
-        "Telegram Telethon": ["telegram", "telethon", "enabled"],
+        "Telegram User API / Kurigram": ["telegram", "kurigram", "enabled"],
         "Telegram Aiogram": ["telegram", "aiogram", "enabled"],
         "GitHub": ["github", "enabled"],
         "Web Search": ["web", "search", "enabled"],
@@ -98,6 +98,7 @@ def setup_wizard_screen() -> None:
     while True:
         draw_header()
         data = _load_yaml()
+        name_column_width = max(len(name) for name in interface_map)
 
         # Формируем динамический список кнопок
         choices = []
@@ -110,8 +111,8 @@ def setup_wizard_screen() -> None:
             is_enabled = bool(target)
             status_str = "[ON] " if is_enabled else "[OFF]"
 
-            # Выравниваем название интерфейса (до 18 символов), чтобы статусы шли в ровную колонку
-            formatted_name = f"{name:<18} {status_str}"
+            # Выравниваем название интерфейса, чтобы статусы шли в ровную колонку
+            formatted_name = f"{name:<{name_column_width}} {status_str}"
             choices.append(questionary.Choice(formatted_name, name))
 
         choices.append(questionary.Separator())

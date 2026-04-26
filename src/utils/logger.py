@@ -43,7 +43,7 @@ class ColorFormatter(logging.Formatter):
         "[LLM]": LogColors.BRIGHT_BLUE,
         "[Host OS]": LogColors.GREEN,
         "[Web]": LogColors.MAGENTA,
-        "[Telegram Telethon]": LogColors.CYAN,
+        "[Telegram User API / Kurigram]": LogColors.CYAN,
         "[Telegram Aiogram]": LogColors.BLUE,
         "[Meta]": LogColors.WHITE,
         "[Multimodality]": LogColors.GREEN,
@@ -116,6 +116,7 @@ def setup_specific_logger(name: str, log_file: str, level: Union[int, str]) -> l
     console_handler.setFormatter(color_formatter)
 
     if "pytest" in sys.modules:
+        file_handler.setLevel(logging.CRITICAL)
         console_handler.setLevel(logging.CRITICAL)
 
     specific_logger = logging.getLogger(name)
@@ -140,7 +141,8 @@ def update_log_level(level_str: str) -> None:
     system_logger.setLevel(numeric_level)
 
     for handler in system_logger.handlers:
-        # Защищаем нашу тишину в консоли от сброса во время тестов
-        if "pytest" in sys.modules and isinstance(handler, logging.StreamHandler):
+        # Защищаем живые логи проекта от тестовых мок-сценариев.
+        if "pytest" in sys.modules:
+            handler.setLevel(logging.CRITICAL)
             continue
         handler.setLevel(numeric_level)

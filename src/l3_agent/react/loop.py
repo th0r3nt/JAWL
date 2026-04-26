@@ -1,5 +1,6 @@
 import openai
 import asyncio
+import json
 from typing import Dict, Any
 from pydantic import ValidationError
 
@@ -291,6 +292,10 @@ class ReactLoop:
             if match:
                 clean_answer = match.group(0)
 
+        xml_actions_response = self._parse_xmlish_actions_response(clean_answer)
+        if xml_actions_response is not None:
+            return xml_actions_response
+
         if not clean_answer.startswith("{"):
             # Имитация пустого действия
             return AgentResponse(thoughts=clean_answer, actions=[])
@@ -313,6 +318,55 @@ class ReactLoop:
             )
             self.agent_state.last_actions_result = err_msg
             return None
+
+    def _parse_xmlish_actions_response(self, raw_answer: str) -> AgentResponse | None:
+        """
+        Claude-compatible fallback: sometimes a forced tool call is returned as
+        text with `<parameter name="actions">[...]` instead of JSON arguments.
+        """
+
+        parameter_match = re.search(
+            r"<parameter\s+name=[\"']actions[\"']\s*>", raw_answer, re.IGNORECASE
+        )
+        if not parameter_match:
+            return None
+
+        actions_tail = raw_answer[parameter_match.end() :].strip()
+        if actions_tail.startswith("```"):
+            actions_tail = re.sub(r"^```(?:json)?\s*", "", actions_tail, flags=re.I)
+
+        array_start = actions_tail.find("[")
+        if array_start < 0:
+            return AgentResponse(
+                thoughts=self._extract_xmlish_thoughts(raw_answer, parameter_match.start()),
+                actions=[],
+            )
+
+        decoder = json.JSONDecoder()
+        try:
+            actions_payload, _ = decoder.raw_decode(actions_tail[array_start:])
+            return AgentResponse.model_validate(
+                {
+                    "thoughts": self._extract_xmlish_thoughts(
+                        raw_answer, parameter_match.start()
+                    ),
+                    "actions": actions_payload,
+                }
+            )
+        except (json.JSONDecodeError, ValidationError) as e:
+            system_logger.warning(f"[ReAct] Ошибка парсинга XML-ish actions: {e}")
+            return None
+
+    def _extract_xmlish_thoughts(self, raw_answer: str, parameter_start: int) -> str:
+        thoughts_prefix = raw_answer[:parameter_start].strip()
+        thoughts_match = re.search(
+            r"<thoughts>(?P<thoughts>.*)</thoughts>",
+            thoughts_prefix,
+            re.DOTALL | re.IGNORECASE,
+        )
+        if thoughts_match:
+            return thoughts_match.group("thoughts").strip()
+        return re.sub(r"</thoughts>\s*$", "", thoughts_prefix, flags=re.IGNORECASE).strip()
 
     def add_realtime_event(self, event_data: Dict[str, Any]) -> None:
         """

@@ -39,6 +39,6 @@ def setup_aiogram(system: "System", bot_token: str | None) -> List[Any]:
             name="aiogram", provider_func=client.get_context_block, section=ContextSection.INTERFACES
         )
 
-    system_logger.info("[Telethon Aiogram] Интерфейс загружен.")
+    system_logger.info("[Telegram Aiogram] Интерфейс загружен.")
 
     return [client, events]

@@ -17,7 +17,7 @@
 
 ### 2. Ключи и авторизация (.env)
 Некоторым интерфейсам для работы нужны ключи API или пароли. Их нужно прописать в файле `.env` (создайте его из `.env.example`, если его еще нет).
-- **Telegram (Telethon)**: Нужны `TELETHON_API_ID` и `TELETHON_API_HASH` (берутся на my.telegram.org).
+- **Telegram User API (Kurigram)**: Включается через `telegram.kurigram` в `config/interfaces.yaml`. Нужны `TELETHON_API_ID` и `TELETHON_API_HASH` (берутся на my.telegram.org); это legacy env-имена, сохраненные для совместимости со старыми установками. Новая сессия хранится в `src/utils/local/data/kurigram/`; существующие Kurigram/Pyrogram-сессии из прежнего `src/utils/local/data/telethon/` подхватываются, если новой сессии еще нет. Старые `.session` от Telethon нельзя безопасно переиспользовать, поэтому при переходе их нужно переименовать или удалить и пройти авторизацию заново. Legacy config key `telegram.telethon` все еще читается, но для новых конфигов используйте `telegram.kurigram`.
 - **Telegram (Aiogram)**: Нужен `AIOGRAM_BOT_TOKEN` от @BotFather.
 - **GitHub**: Нужен классический `GITHUB_TOKEN` (PAT) с правами `repo` и `read:user`.
 - **Email**: Нужен логин и **специальный Пароль приложения (App Password)**. Обычный пароль от почты не подойдет - Google/Yandex заблокируют вход.

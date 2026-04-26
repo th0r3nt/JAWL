@@ -1,32 +1,82 @@
 from typing import Union
 
-from telethon.tl.functions.account import UpdateProfileRequest, UpdatePersonalChannelRequest
-from telethon.tl.functions.photos import UploadProfilePhotoRequest
-from telethon.tl.functions.contacts import AddContactRequest
-from telethon.tl.functions.users import GetFullUserRequest
-from telethon.tl.types import (
-    UserStatusOnline,
-    UserStatusOffline,
-    UserStatusRecently,
-    UserStatusLastWeek,
-    UserStatusLastMonth,
-)
+from pyrogram import raw
 
-from src.utils.dtime import format_datetime
+from src.utils.dtime import format_datetime, format_timestamp
 from src.utils.logger import system_logger
 from src.utils._tools import format_size, validate_sandbox_path, parse_int_or_str
 
-from src.l2_interfaces.telegram.telethon.client import TelethonClient
+from src.l2_interfaces.telegram.kurigram.client import KurigramClient
 from src.l3_agent.skills.registry import SkillResult, skill
 
 
-class TelethonAccount:
+class KurigramAccount:
     """
     Навыки для управления профилем (имя, био, аватар) и списком контактов.
     """
 
-    def __init__(self, tg_client: TelethonClient):
+    def __init__(self, tg_client: KurigramClient):
         self.tg_client = tg_client
+
+    @staticmethod
+    def _normalize_peer_id(peer_id: Union[int, str]) -> Union[int, str]:
+        parsed = parse_int_or_str(peer_id)
+        if isinstance(parsed, str):
+            return parsed.strip().lstrip("@")
+        return parsed
+
+    @staticmethod
+    async def _resolve_input_user(client, user_id: Union[int, str]):
+        peer = await client.resolve_peer(KurigramAccount._normalize_peer_id(user_id))
+
+        if isinstance(peer, raw.types.InputPeerSelf):
+            return raw.types.InputUserSelf()
+
+        if isinstance(peer, raw.types.InputPeerUser):
+            return raw.types.InputUser(
+                user_id=peer.user_id,
+                access_hash=peer.access_hash,
+            )
+
+        raise ValueError("Target peer is not a user.")
+
+    @staticmethod
+    async def _resolve_input_channel(client, channel_id: Union[int, str]):
+        peer = await client.resolve_peer(KurigramAccount._normalize_peer_id(channel_id))
+
+        if isinstance(peer, raw.types.InputPeerChannel):
+            return raw.types.InputChannel(
+                channel_id=peer.channel_id,
+                access_hash=peer.access_hash,
+            )
+
+        raise ValueError("Target peer is not a channel.")
+
+    @staticmethod
+    def _format_raw_user_status(status, timezone: int) -> str:
+        status_str = "Неизвестно (или скрыто настройками приватности)"
+
+        if isinstance(status, raw.types.UserStatusOnline):
+            return "В сети (Online)"
+
+        if isinstance(status, raw.types.UserStatusOffline):
+            was_online = status.was_online
+            if isinstance(was_online, (int, float)):
+                dt_str = format_timestamp(was_online, timezone)
+            else:
+                dt_str = format_datetime(was_online, timezone)
+            return f"Был(а) в сети: {dt_str}"
+
+        if isinstance(status, raw.types.UserStatusRecently):
+            return "Был(а) недавно"
+
+        if isinstance(status, raw.types.UserStatusLastWeek):
+            return "Был(а) на этой неделе"
+
+        if isinstance(status, raw.types.UserStatusLastMonth):
+            return "Был(а) в этом месяце"
+
+        return status_str
 
     @skill()
     async def change_username(self, name: str, surname: str = "") -> SkillResult:
@@ -35,7 +85,7 @@ class TelethonAccount:
             client = self.tg_client.client()
 
             # В Telegram "name" - это first_name, а "surname" - last_name
-            await client(UpdateProfileRequest(first_name=name, last_name=surname))
+            await client.update_profile(first_name=name, last_name=surname)
 
             # Обновляем стейт, чтобы контекст агента сразу актуализировался
             await self.tg_client.update_profile_state()
@@ -50,10 +100,10 @@ class TelethonAccount:
         """Изменяет описание (био) профиля агента. Макс. длина - 70 символов."""
         try:
             client = self.tg_client.client()
-            await client(UpdateProfileRequest(about=text))
+            await client.update_profile(bio=text)
             await self.tg_client.update_profile_state()
 
-            return SkillResult.ok("[Telegram Telethon] Биография успешно изменена.")
+            return SkillResult.ok("[Telegram Kurigram] Биография успешно изменена.")
 
         except Exception as e:
             return SkillResult.fail(f"Ошибка при изменении био: {e}")
@@ -70,8 +120,7 @@ class TelethonAccount:
                 )
 
             client = self.tg_client.client()
-            uploaded_file = await client.upload_file(str(safe_path))
-            await client(UploadProfilePhotoRequest(file=uploaded_file))
+            await client.set_profile_photo(photo=str(safe_path))
 
             return SkillResult.ok("Аватар профиля успешно изменен.")
 
@@ -88,16 +137,12 @@ class TelethonAccount:
         """Добавляет пользователя в контакты Telegram."""
         try:
             client = self.tg_client.client()
-            target_entity = await client.get_input_entity(parse_int_or_str(user_id))
-
-            await client(
-                AddContactRequest(
-                    id=target_entity,
-                    first_name=first_name,
-                    last_name=last_name,
-                    phone="",
-                    add_phone_privacy_exception=False,
-                )
+            await client.add_contact(
+                user_id=self._normalize_peer_id(user_id),
+                first_name=first_name,
+                last_name=last_name,
+                phone_number="",
+                share_phone_number=False,
             )
 
             name_str = f"{first_name} {last_name}".strip()
@@ -126,10 +171,14 @@ class TelethonAccount:
 
             safe_path = validate_sandbox_path(dest_filename)
             client = self.tg_client.client()
-            entity = await client.get_entity(parse_int_or_str(user_or_chat_id))
 
             # Запрашиваем историю фотографий (до нужного нам индекса)
-            photos = await client.get_profile_photos(entity, limit=avatar_index + 1)
+            photos = []
+            async for photo in client.get_chat_photos(
+                self._normalize_peer_id(user_or_chat_id),
+                limit=avatar_index + 1,
+            ):
+                photos.append(photo)
 
             if not photos or avatar_index >= len(photos):
                 count = len(photos) if photos else 0
@@ -140,16 +189,19 @@ class TelethonAccount:
             target_photo = photos[avatar_index]
 
             system_logger.info(
-                f"[Telegram Telethon] Скачивание аватара (индекс {avatar_index})..."
+                f"[Telegram Kurigram] Скачивание аватара (индекс {avatar_index})..."
             )
-            downloaded_path = await client.download_media(target_photo, file=str(safe_path))
+            downloaded_path = await client.download_media(
+                target_photo,
+                file_name=str(safe_path),
+            )
 
             if not downloaded_path:
                 return SkillResult.fail("Не удалось скачать аватар (возможно нет доступа).")
 
             size_str = format_size(safe_path.stat().st_size)
             system_logger.info(
-                f"[Telegram Telethon] Аватар скачан: {safe_path.name} ({size_str})"
+                f"[Telegram Kurigram] Аватар скачан: {safe_path.name} ({size_str})"
             )
 
             return SkillResult.ok(
@@ -170,10 +222,18 @@ class TelethonAccount:
         """Получает подробную информацию о конкретном пользователе (имя, био, статус в сети)."""
         try:
             client = self.tg_client.client()
-            target_entity = await client.get_input_entity(parse_int_or_str(user_id))
+            target_user = self._normalize_peer_id(user_id)
+            target_input_user = await self._resolve_input_user(client, target_user)
 
-            full_user = await client(GetFullUserRequest(target_entity))
-            user = full_user.users[0]
+            full_user = await client.invoke(
+                raw.functions.users.GetFullUser(id=target_input_user)
+            )
+            user = full_user.users[0] if full_user.users else None
+
+            if not user:
+                return SkillResult.fail(
+                    "Ошибка: Пользователь не найден. Рекомендуется проверить ID или юзернейм."
+                )
 
             lines = [f"Информация о пользователе {user_id}:"]
             lines.append(f"Имя: {user.first_name or ''} {user.last_name or ''}".strip())
@@ -184,23 +244,10 @@ class TelethonAccount:
             if full_user.full_user.about:
                 lines.append(f"О себе (Bio): {full_user.full_user.about}")
 
-            # Парсинг сетевого статуса
-            status_str = "Неизвестно (или скрыто настройками приватности)"
-            if isinstance(user.status, UserStatusOnline):
-                status_str = "В сети (Online)"
-
-            elif isinstance(user.status, UserStatusOffline):
-                dt_str = format_datetime(user.status.was_online, self.tg_client.timezone)
-                status_str = f"Был(а) в сети: {dt_str}"
-
-            elif isinstance(user.status, UserStatusRecently):
-                status_str = "Был(а) недавно"
-
-            elif isinstance(user.status, UserStatusLastWeek):
-                status_str = "Был(а) на этой неделе"
-
-            elif isinstance(user.status, UserStatusLastMonth):
-                status_str = "Был(а) в этом месяце"
+            status_str = self._format_raw_user_status(
+                getattr(user, "status", None),
+                self.tg_client.timezone,
+            )
 
             lines.append(f"Сетевой статус: {status_str}")
 
@@ -235,17 +282,19 @@ class TelethonAccount:
 
             # Обрабатываем удаление канала
             if not channel_id or str(channel_id).strip() == "":
-                target_entity = None
+                target_channel = raw.types.InputChannelEmpty()
             else:
-                target_entity = await client.get_input_entity(parse_int_or_str(channel_id))
+                target_channel = await self._resolve_input_channel(client, channel_id)
 
             # Отправляем запрос на обновление профиля
-            await client(UpdatePersonalChannelRequest(channel=target_entity))
+            await client.invoke(
+                raw.functions.account.UpdatePersonalChannel(channel=target_channel)
+            )
 
             # Актуализируем стейт агента, чтобы он сразу "осознал", что профиль обновился
             await self.tg_client.update_profile_state()
 
-            if target_entity:
+            if not isinstance(target_channel, raw.types.InputChannelEmpty):
                 return SkillResult.ok(f"Успешно. Канал '{channel_id}' установлен как личный.")
             else:
                 return SkillResult.ok("Успешно. Личный канал убран из профиля.")

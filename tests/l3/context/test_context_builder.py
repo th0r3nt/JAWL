@@ -13,10 +13,12 @@ async def test_context_builder_build():
     registry = ContextRegistry()
 
     # Добавляем фейковый провайдер, как это делают интерфейсы
-    async def fake_telethon(**kwargs):
-        return "### TELETHON [ON]\nAccount info..."
+    async def fake_telegram_user_api(**kwargs):
+        return "### TELEGRAM USER API [ON]\nAccount info..."
 
-    registry.register_provider("telethon", fake_telethon, section=ContextSection.INTERFACES)
+    registry.register_provider(
+        "telegram_user_api", fake_telegram_user_api, section=ContextSection.INTERFACES
+    )
 
     builder = ContextBuilder(agent_state=agent_state, registry=registry)
 
@@ -25,7 +27,7 @@ async def test_context_builder_build():
 
     # Проверяем, что в итоговом тексте есть куски от всех систем
     assert "## SKILLS" in context
-    assert "### TELETHON [ON]" in context
+    assert "### TELEGRAM USER API [ON]" in context
     assert "## EVENT LOG" in context
     assert "## CURRENT TRIGGER" in context
     assert "TEST_EVENT" in context

@@ -8,22 +8,21 @@ from typing import Literal
 # Он должен просто кинуть взгляд на приборную панель (L0).
 
 # ==================================================================
-# TELETHON
+# TELEGRAM USER API
 # ==================================================================
 
 
-class TelethonChat:
+class TelegramUserChat:
     id: int  # ID чата
     chat_type: Literal["private", "group", "channel"]  # Тип чата
     name: str  # Название чата
     is_unread: bool  # Есть ли непрочитанные?
 
 
-class TelethonState:
+class TelegramUserState:
     """
-    Хранит состояние Telethon-клиента.
+    Хранит состояние Telegram User API клиента.
     Последние n диалогов, статус непрочитанных.
-    Обновляется слушателями (telethon/events.py) в фоне.
     """
 
     def __init__(self, number_of_last_chats: int = 15, private_chat_history_limit: int = 3):
@@ -41,6 +40,9 @@ class TelethonState:
         # Channel | ID: -10011223344 | Название: Хабр: IT Новости
 
         self.account_info = "Данные профиля загружаются..."
+
+
+KurigramState = TelegramUserState
 
 
 # ==================================================================

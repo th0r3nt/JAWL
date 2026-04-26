@@ -6,7 +6,7 @@ if TYPE_CHECKING:
 # Импорт интерфейсов
 from src.l2_interfaces.host.os.bootstrap import setup_host_os
 from src.l2_interfaces.meta.bootstrap import setup_meta
-from src.l2_interfaces.telegram.telethon.bootstrap import setup_telethon
+from src.l2_interfaces.telegram.kurigram.bootstrap import setup_kurigram
 from src.l2_interfaces.telegram.aiogram.bootstrap import setup_aiogram
 from src.l2_interfaces.web.search.bootstrap import setup_web_search
 from src.l2_interfaces.multimodality.bootstrap import setup_multimodality
@@ -49,12 +49,12 @@ def initialize_l2_interfaces(system: "System", env_vars: Dict[str, str | None]) 
         )
 
     # ================================================================
-    # TELEGRAM TELETHON
+    # TELEGRAM USER API (Kurigram)
     # ================================================================
 
-    if config.telegram.telethon.enabled:
+    if config.telegram.kurigram.enabled:
         components.extend(
-            setup_telethon(
+            setup_kurigram(
                 system=system,
                 api_id=env_vars.get("TELETHON_API_ID"),
                 api_hash=env_vars.get("TELETHON_API_HASH"),
@@ -62,7 +62,9 @@ def initialize_l2_interfaces(system: "System", env_vars: Dict[str, str | None]) 
         )
     else:
         system.context_registry.register_provider(
-            "telethon", make_off_provider("TELETHON"), ContextSection.INTERFACES
+            "telegram_kurigram",
+            make_off_provider("TELEGRAM USER API"),
+            ContextSection.INTERFACES,
         )
 
     # ================================================================
@@ -162,4 +164,4 @@ def initialize_l2_interfaces(system: "System", env_vars: Dict[str, str | None]) 
 
     # ================================================================
 
-    return components  # Возвращает список компонентов, которые нужно запустить в main.py (например, поллинг Telethon или календаря, если они включены)
+    return components  # Возвращает список компонентов, которые нужно запустить в main.py (например, Telegram User API или календарь, если они включены)

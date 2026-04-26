@@ -14,7 +14,7 @@ def mock_configs():
     settings, interfaces = load_config()
 
     # Отключаем тяжелые/опасные интерфейсы для теста
-    interfaces.telegram.telethon.enabled = False
+    interfaces.telegram.kurigram.enabled = False
     interfaces.telegram.aiogram.enabled = False
     interfaces.email.enabled = False
 

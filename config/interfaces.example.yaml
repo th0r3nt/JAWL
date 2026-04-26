@@ -28,10 +28,10 @@ host:
 
 
 telegram:
-  telethon:
-    enabled: false # Перед включением введите TELETHON_API_ID и TELETHON_API_HASH в .env
+  kurigram:
+    enabled: false # Telegram User API через Kurigram. Перед включением введите TELETHON_API_ID и TELETHON_API_HASH в .env (legacy env-имена сохранены для совместимости)
 
-    session_name: "agent_telethon" # Находится в src/utils/local/data/telethon/
+    session_name: "agent_kurigram" # Kurigram создаст agent_kurigram.session в src/utils/local/data/kurigram/. Старые Telethon .session не переиспользуются
     recent_chats_limit: 20 # Сколько последних диалогов отображать в контексте агента
     private_chat_history_limit: 0 # В контексте всегда будут видны последние n сообщений для последних личных чатов (поставить 0, если не нужно)
 
