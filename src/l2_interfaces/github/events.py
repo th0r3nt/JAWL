@@ -140,72 +140,70 @@ class GithubEvents:
 
         for repo_name, last_event_id in list(self.state.tracked_repos.items()):
             try:
-                # Берем больше событий (15), чтобы гарантированно захватить последние
+                # Увеличили лимит до 30, чтобы мусорные ивенты не вытеснили пуши
                 events_data = await self.client.request(
-                    "GET", f"/repos/{repo_name}/events", params={"per_page": 15}
+                    "GET", f"/repos/{repo_name}/events", params={"per_page": 30}
                 )
 
                 if not isinstance(events_data, list) or not events_data:
                     continue
 
-                # Идем от старых к новым (reverse)
                 events_data.reverse()
 
-                # Флаг: если last_event_id пустой, значит мы только начали отслеживать
                 is_initial_load = not bool(last_event_id)
-
-                # Флаг: если дашборд агента пуст (после рестарта), тихо подгружаем контекст
                 needs_dashboard_fill = len(self.state.recent_watcher_events) == 0
 
+                highest_parsed_id = last_event_id
+
                 for event in events_data:
-                    event_id = event.get("id")
+                    event_id = str(event.get("id"))
                     if not event_id:
                         continue
 
-                    # Строгое приведение к int для защиты от ошибки лексического сравнения строк разной длины
                     try:
-                        ev_id_int = int(event_id)
-                        last_ev_id_int = int(last_event_id) if last_event_id else 0
+                        is_new = int(event_id) > int(last_event_id) if last_event_id else True
                     except (ValueError, TypeError):
-                        ev_id_int = str(event_id)
-                        last_ev_id_int = str(last_event_id)
+                        is_new = event_id > str(last_event_id)
 
-                    is_new = ev_id_int > last_ev_id_int
+                    parsed_msg = self._parse_github_event(event)
+
+                    # Если событие неинтересное (звезда, форк) - мы не обновляем ватермарку ID
+                    # Это решает проблему GitHub Eventual Consistency
+                    if not parsed_msg:
+                        continue
 
                     if is_initial_load:
-                        parsed_msg = self._parse_github_event(event)
-                        if parsed_msg:
-                            self.state.add_watcher_event(parsed_msg)
-
-                        self.state.tracked_repos[repo_name] = event_id
-                        modified = True
-                        continue
-
-                    # Если это старое событие (агент его уже видел)
-                    if not is_new:
-                        # Но дашборд пустой (перезапуск) - тихо восстанавливаем контекст
-                        if needs_dashboard_fill:
-                            parsed_msg = self._parse_github_event(event)
-                            if (
-                                parsed_msg
-                                and parsed_msg not in self.state.recent_watcher_events
-                            ):
-                                self.state.add_watcher_event(parsed_msg)
-                        continue
-
-                    # === НОВОЕ СОБЫТИЕ ===
-                    parsed_msg = self._parse_github_event(event)
-                    if parsed_msg:
-                        # Отправляем в контекст
                         self.state.add_watcher_event(parsed_msg)
+                        highest_parsed_id = event_id
+                        continue
 
-                        # Будим агента
-                        await self.bus.publish(
-                            Events.GITHUB_REPO_ACTIVITY, repo=repo_name, message=parsed_msg
-                        )
+                    if not is_new:
+                        if (
+                            needs_dashboard_fill
+                            and parsed_msg not in self.state.recent_watcher_events
+                        ):
+                            self.state.add_watcher_event(parsed_msg)
+                        continue
 
-                    # Обновляем ID
-                    self.state.tracked_repos[repo_name] = event_id
+                    # НОВОЕ ЗНАЧИМОЕ СОБЫТИЕ
+                    self.state.add_watcher_event(parsed_msg)
+                    await self.bus.publish(
+                        Events.GITHUB_REPO_ACTIVITY, repo=repo_name, message=parsed_msg
+                    )
+
+                    # Обновляем ID только по значимым событиям
+                    try:
+                        if (
+                            int(event_id) > int(highest_parsed_id)
+                            if highest_parsed_id
+                            else True
+                        ):
+                            highest_parsed_id = event_id
+                    except (ValueError, TypeError):
+                        highest_parsed_id = event_id
+
+                if highest_parsed_id != last_event_id:
+                    self.state.tracked_repos[repo_name] = highest_parsed_id
                     modified = True
 
             except Exception as e:
@@ -226,22 +224,19 @@ class GithubEvents:
 
         if event_type == "PushEvent":
             commits = payload.get("commits", [])
-            count = len(commits)
+            # Надежный подсчет коммитов
+            count = payload.get("size", len(commits))
 
-            # Если коммитов нет (шум GitHub) - игнорируем событие
             if count == 0:
                 return None
 
-            msg = commits[0].get("message", "").split("\n")[0] if count > 0 else ""
+            msg = commits[0].get("message", "").split("\n")[0] if commits else "Без описания"
             return f"[{repo}] 🔨 @{actor} запушил {count} коммит(ов). Последний: '{msg}'"
 
         elif event_type == "IssuesEvent":
             action = payload.get("action")
-
-            # Игнорируем неинтересные действия (типа изменения лейблов), чтобы не спамить
             if action not in ("opened", "closed", "reopened", "commented"):
                 return None
-
             issue_num = payload.get("issue", {}).get("number", "?")
             title = payload.get("issue", {}).get("title", "")
             return f"[{repo}] 📝 @{actor} {action} issue #{issue_num}: '{title}'"
@@ -254,10 +249,8 @@ class GithubEvents:
 
         elif event_type == "IssueCommentEvent":
             action = payload.get("action")
-
-            if action != "created":  # Игнорируем редактирование и удаление комментов
+            if action != "created":
                 return None
-
             issue_num = payload.get("issue", {}).get("number", "?")
             return f"[{repo}] 💬 @{actor} {action} комментарий в Issue/PR #{issue_num}"
 
@@ -269,5 +262,4 @@ class GithubEvents:
         elif event_type == "ForkEvent":
             return f"[{repo}] 🍴 @{actor} сделал форк репозитория."
 
-        # Игнорируем WatchEvent (звездочки) и прочий шум
         return None

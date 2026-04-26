@@ -23,10 +23,20 @@ class GithubWatchers:
             return SkillResult.ok(f"Репозиторий {repo_name} уже отслеживается.")
 
         try:
-            # Делаем тестовый запрос, чтобы проверить существование репозитория
+            # Делаем тестовый запрос
             await self.client.request("GET", f"/repos/{owner}/{repo}")
 
-            # Добавляем в отслеживаемые (с пустым ID, чтобы не вываливать старые события)
+            # Подписка на Гитхабе (чтобы появиться в списке Watchers на сайте)
+            if self.client.config.agent_account and self.client.token:
+                try:
+                    await self.client.request(
+                        "PUT", f"/repos/{owner}/{repo}/subscription", body={"subscribed": True}
+                    )
+                except Exception as sub_err:
+                    system_logger.debug(
+                        f"[Github] Не удалось физически подписаться на {repo_name}: {sub_err}"
+                    )
+
             self.client.state.tracked_repos[repo_name] = ""
             self.events.save_persisted_repos()
 
@@ -52,6 +62,13 @@ class GithubWatchers:
         del self.client.state.tracked_repos[repo_name]
         self.events.save_persisted_repos()
 
+        # Отписываемся на самом сайте
+        if self.client.config.agent_account and self.client.token:
+            try:
+                await self.client.request("DELETE", f"/repos/{owner}/{repo}/subscription")
+            except Exception:
+                pass
+
         system_logger.info(f"[Github] Прекращено отслеживание репозитория: {repo_name}")
         return SkillResult.ok(f"Успешно. Репозиторий {repo_name} удален из Watchers.")
 
@@ -60,7 +77,7 @@ class GithubWatchers:
         """
         Возвращает список отслеживаемых репозиториев.
         """
-        
+
         tracked = list(self.client.state.tracked_repos.keys())
 
         if not tracked:
