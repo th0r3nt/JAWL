@@ -67,6 +67,37 @@ class AiogramState:
 
 
 # ==================================================================
+# Github
+# ==================================================================
+
+
+class GithubState:
+    """
+    Хранит состояние Github-клиента.
+    Флаг is_online, информация об аккаунте агента и короткая история запросов.
+    """
+
+    def __init__(self, history_limit: int = 10):
+        self.is_online = False
+        self.history_limit = history_limit
+        self.history: list[str] = []
+
+        self.account_info = "Ожидание инициализации..."
+
+    def add_history(self, entry: str) -> None:
+        """Добавляет запись в начало истории (самые свежие сверху)."""
+        self.history.insert(0, entry)
+        if len(self.history) > self.history_limit:
+            self.history.pop()
+
+    @property
+    def github_history(self) -> str:
+        if not self.history:
+            return "История пуста."
+        return "\n".join(f"- {item}" for item in self.history)
+
+
+# ==================================================================
 # Host OS
 # ==================================================================
 

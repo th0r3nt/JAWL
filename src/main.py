@@ -28,6 +28,7 @@ from src.l0_state.interfaces.state import (
     AiogramState,
     WebSearchState,
     CalendarState,
+    GithubState,
 )
 
 # ==========================================
@@ -101,14 +102,19 @@ class System:
 
         system_logger.info("[System] Инициализация L0 State.")
 
+        # AGENT STATE
         self.agent_state = AgentState(
             llm_model=self.settings.llm.model_name,
             temperature=self.settings.llm.temperature,
             max_react_steps=self.settings.llm.max_react_steps,
             heartbeat_interval=self.settings.system.heartbeat_interval,
         )
+
+        # HOST
         self.os_state = HostOSState()
         self.terminal_state = HostTerminalState(number_of_last_messages=15)
+
+        # TELEGRAM
         self.telethon_state = TelethonState(
             number_of_last_chats=self.interfaces_config.telegram.telethon.recent_chats_limit,
             private_chat_history_limit=self.interfaces_config.telegram.telethon.private_chat_history_limit,
@@ -116,7 +122,16 @@ class System:
         self.aiogram_state = AiogramState(
             number_of_last_chats=self.interfaces_config.telegram.aiogram.recent_chats_limit
         )
+
+        # GITHUB
+        self.github_state = GithubState(
+            history_limit=self.interfaces_config.github.history_limit
+        )
+
+        # WEB
         self.web_search_state = WebSearchState(history_limit=10)
+
+        # CALENDAR
         self.calendar_state = CalendarState()
 
     async def setup_l1_databases(self):
@@ -234,6 +249,8 @@ class System:
             "TELETHON_API_HASH": telethon_api_hash,
             # Aiogram
             "AIOGRAM_BOT_TOKEN": aiogram_bot_token,
+            # GitHub
+            "GITHUB_TOKEN": os.getenv("GITHUB_TOKEN", None),
         }
 
         # Вся магия сборки интерфейсов скрыта здесь

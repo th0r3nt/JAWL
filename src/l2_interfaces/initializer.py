@@ -11,6 +11,7 @@ from src.l2_interfaces.telegram.aiogram.bootstrap import setup_aiogram
 from src.l2_interfaces.web.search.bootstrap import setup_web_search
 from src.l2_interfaces.multimodality.bootstrap import setup_multimodality
 from src.l2_interfaces.calendar.bootstrap import setup_calendar
+from src.l2_interfaces.github.bootstrap import setup_github
 
 # Импортируйте сюда свой кастомный интерфейс
 # from src.l2_interfaces.interface_name.bootstrap import setup_interface
@@ -78,6 +79,22 @@ def initialize_l2_interfaces(system: "System", env_vars: Dict[str, str | None]) 
     else:
         system.context_registry.register_provider(
             "aiogram", make_off_provider("AIOGRAM"), ContextSection.INTERFACES
+        )
+
+    # ================================================================
+    # GITHUB
+    # ================================================================
+
+    if getattr(config, "github", None) and config.github.enabled:
+        components.extend(
+            setup_github(
+                system=system,
+                token=env_vars.get("GITHUB_TOKEN"),
+            )
+        )
+    else:
+        system.context_registry.register_provider(
+            "github", make_off_provider("GITHUB"), ContextSection.INTERFACES
         )
 
     # ================================================================

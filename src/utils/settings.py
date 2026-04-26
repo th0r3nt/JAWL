@@ -12,7 +12,7 @@ from yaml.constructor import ConstructorError
 class HostOSConfig(BaseModel):
     enabled: bool
     desktop_interactions: bool = False
-    
+
     access_level: int
     env_access: bool
     framework_tree_depth: int = 1
@@ -45,6 +45,13 @@ class AiogramConfig(BaseModel):
 class TelegramConfig(BaseModel):
     telethon: TelethonConfig
     aiogram: AiogramConfig
+
+
+class GithubConfig(BaseModel):
+    enabled: bool
+    agent_account: bool
+    request_timeout_sec: int
+    history_limit: int
 
 
 class DeepResearchConfig(BaseModel):
@@ -82,6 +89,7 @@ class CalendarConfig(BaseModel):
 class InterfacesConfig(BaseModel):
     host: HostConfig
     telegram: TelegramConfig
+    github: GithubConfig
     web: WebConfig
     meta: MetaConfig
     multimodality: MultimodalityConfig

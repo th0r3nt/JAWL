@@ -88,6 +88,7 @@ def setup_wizard_screen() -> None:
         "Host OS": ["host", "os", "enabled"],
         "Telegram Telethon": ["telegram", "telethon", "enabled"],
         "Telegram Aiogram": ["telegram", "aiogram", "enabled"],
+        "GitHub": ["github", "enabled"],
         "Web Search": ["web", "search", "enabled"],
         "Meta": ["meta", "enabled"],
         "Multimodality": ["multimodality", "enabled"],
@@ -97,7 +98,6 @@ def setup_wizard_screen() -> None:
     while True:
         draw_header()
         data = _load_yaml()
-        telethon_keys, aiogram_keys = _check_api_keys()
 
         # Формируем динамический список кнопок
         choices = []
@@ -110,15 +110,8 @@ def setup_wizard_screen() -> None:
             is_enabled = bool(target)
             status_str = "[ON] " if is_enabled else "[OFF]"
 
-            # Добавляем инфу об API ключах для Telegram
-            api_info = ""
-            if name == "Telegram Telethon":
-                api_info = f"  [Api Keys: {telethon_keys}]"
-            elif name == "Telegram Aiogram":
-                api_info = f"  [Api Keys: {aiogram_keys}]"
-
             # Выравниваем название интерфейса (до 18 символов), чтобы статусы шли в ровную колонку
-            formatted_name = f"{name:<18} {status_str}{api_info}"
+            formatted_name = f"{name:<18} {status_str}"
             choices.append(questionary.Choice(formatted_name, name))
 
         choices.append(questionary.Separator())
