@@ -83,7 +83,11 @@ def is_agent_running() -> bool:
         if psutil.pid_exists(pid):
             proc = psutil.Process(pid)
             # Проверяем, что это не какой-то левый процесс занял этот PID
-            return proc.is_running() and "python" in proc.name().lower()
+            if proc.is_running() and "python" in proc.name().lower():
+                return True
+
+        if pid_file.exists():
+            pid_file.unlink()
         return False
     except (ValueError, psutil.NoSuchProcess, psutil.AccessDenied):
         if pid_file.exists():

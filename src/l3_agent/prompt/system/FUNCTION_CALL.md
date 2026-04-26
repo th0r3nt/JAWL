@@ -22,10 +22,10 @@
       }
     },
     {
-      "tool_name": "TelethonMessages.send_message",
+      "tool_name": "CalendarManagement.add_interval_alarm",
       "parameters": {
-        "to_id": 123456789,
-        "text": "...текст..."
+        "title": "Проверить состояние системы",
+        "interval_minutes": 60
       }
     }
   ]

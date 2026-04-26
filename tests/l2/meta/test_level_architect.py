@@ -23,9 +23,9 @@ async def test_toggle_interface_no_keys_fail(meta_client):
     # Мокаем проверку ключей (типа в .env ничего нет)
     meta_client.has_env_key = lambda k: False
 
-    res = await skills.toggle_interface("telegram_telethon", True)
+    res = await skills.toggle_interface("telegram_kurigram", True)
     assert res.is_success is False
-    assert "отсутствуют TELETHON_API_ID" in res.message
+    assert "TELETHON_API_ID" in res.message
 
 
 @pytest.mark.asyncio

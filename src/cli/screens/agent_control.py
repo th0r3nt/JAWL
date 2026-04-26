@@ -6,12 +6,17 @@ import subprocess
 from pathlib import Path
 import psutil
 import asyncio
-from telethon import TelegramClient
 from dotenv import dotenv_values
 import questionary
 from pydantic import ValidationError
 from src.utils.settings import load_config
 from src.utils._tools import get_pid_file_path
+from src.l2_interfaces.telegram.kurigram.client import (
+    ensure_pyrogram_session_compatible,
+    parse_telegram_api_id,
+    split_pyrogram_session_path,
+    validate_pyrogram_session_name,
+)
 
 from src.cli.widgets.ui import print_success, print_error, print_info, wait_for_enter
 
@@ -35,7 +40,11 @@ def _is_agent_running() -> bool:
         if psutil.pid_exists(pid):
             # Дополнительная проверка: это всё еще Python-процесс?
             proc = psutil.Process(pid)
-            return proc.is_running() and "python" in proc.name().lower()
+            if proc.is_running() and "python" in proc.name().lower():
+                return True
+
+        if pid_file.exists():
+            pid_file.unlink()
         return False
     except (ValueError, psutil.NoSuchProcess, psutil.AccessDenied):
         # Если файл есть, а процесса нет - файл мусорный, удаляем
@@ -172,13 +181,29 @@ def _validate_configs() -> bool:
         return False
 
 
-def _telethon_auth_flow() -> bool:
-    """Предполетная авторизация сессии Telethon, если она включена в конфиге."""
+def _resolve_kurigram_session_dir(session_name: str) -> Path:
+    """Prefer the new Kurigram data dir, but reuse legacy Kurigram sessions if present."""
+    session_file = f"{session_name}.session"
+    session_dir = ROOT_DIR / "src" / "utils" / "local" / "data" / "kurigram"
+    legacy_session_dir = ROOT_DIR / "src" / "utils" / "local" / "data" / "telethon"
 
-    settings, interfaces = load_config()
+    if (
+        not (session_dir / session_file).exists()
+        and (legacy_session_dir / session_file).exists()
+    ):
+        return legacy_session_dir
+
+    return session_dir
+
+
+def _kurigram_auth_flow() -> bool:
+    """Предполетная авторизация Kurigram-сессии, если User API включен в конфиге."""
+
+    _settings, interfaces = load_config()
+    kurigram_config = interfaces.telegram.kurigram
 
     # Если интерфейс отключен, просто идем дальше
-    if not interfaces.telegram.telethon.enabled:
+    if not kurigram_config.enabled:
         return True
 
     env_dict = dotenv_values(ENV_FILE)
@@ -186,17 +211,21 @@ def _telethon_auth_flow() -> bool:
     api_hash = env_dict.get("TELETHON_API_HASH")
 
     # Если ключей нет в .env - просим ввести
-    if not api_id or not api_hash:
+    if not str(api_id or "").strip() or not str(api_hash or "").strip():
         print_info(
-            " Для работы Telethon требуются API_ID и API_HASH (можно получить на my.telegram.org)."
+            " Для Telegram User API требуются API_ID и API_HASH (можно получить на my.telegram.org)."
         )
 
-        api_id_input = questionary.text("Введите TELETHON_API_ID:").ask()
+        api_id_input = questionary.text(
+            "Введите TELETHON_API_ID (legacy env-имя для Kurigram):"
+        ).ask()
         if not api_id_input:
             print_error("Запуск отменен: TELETHON_API_ID обязателен.")
             return False
 
-        api_hash_input = questionary.text("Введите TELETHON_API_HASH:").ask()
+        api_hash_input = questionary.password(
+            "Введите TELETHON_API_HASH (legacy env-имя для Kurigram):"
+        ).ask()
         if not api_hash_input:
             print_error("Запуск отменен: TELETHON_API_HASH обязателен.")
             return False
@@ -209,23 +238,38 @@ def _telethon_auth_flow() -> bool:
         api_id = api_id_input.strip()
         api_hash = api_hash_input.strip()
 
-    # Путь к сессии
-    session_name = interfaces.telegram.telethon.session_name
-    session_dir = ROOT_DIR / "src" / "utils" / "local" / "data" / "telethon"
-    session_dir.mkdir(parents=True, exist_ok=True)
-    session_path = session_dir / session_name
+    try:
+        clean_api_id = parse_telegram_api_id(api_id)
+    except ValueError as e:
+        print_error(f"Некорректный TELETHON_API_ID: {e}")
+        return False
+
+    try:
+        configured_session_name = validate_pyrogram_session_name(kurigram_config.session_name)
+    except ValueError as e:
+        print_error(f"Некорректный session_name Telegram User API: {e}")
+        return False
+
+    session_dir = _resolve_kurigram_session_dir(configured_session_name)
+    session_name, workdir = split_pyrogram_session_path(session_dir / configured_session_name)
+    Path(workdir).mkdir(parents=True, exist_ok=True)
 
     # Асинхронная обертка для мини-клиента
     async def _auth() -> bool:
+        client = None
         try:
-            clean_api_id = int(api_id) if str(api_id).isdigit() else api_id
-            client = TelegramClient(str(session_path), clean_api_id, api_hash)
+            from pyrogram import Client
 
-            await client.connect()
-            if not await client.is_user_authorized():
-                print_info(" Сессия Telegram не найдена. Потребуется авторизация.")
-                # Вызываем встроенный механизм Telethon. Он сам спросит телефон, СМС и 2FA пароль в консоли
-                await client.start()
+            ensure_pyrogram_session_compatible(session_name, workdir)
+            client = Client(
+                session_name,
+                api_id=clean_api_id,
+                api_hash=str(api_hash).strip(),
+                workdir=workdir,
+            )
+
+            print_info(" Если сессия Telegram не найдена, Kurigram запросит авторизацию.")
+            await client.start()
 
             me = await client.get_me()
             name = me.first_name or "Unknown"
@@ -233,15 +277,20 @@ def _telethon_auth_flow() -> bool:
                 name += f" {me.last_name}"
 
             print_success(f"Telegram сессия активна (Пользователь: {name}).")
-            await client.disconnect()
             return True
 
         except Exception as e:
-            print_error(f"Ошибка при авторизации Telethon: {e}")
+            print_error(f"Ошибка при авторизации Kurigram: {e}")
             return False
+        finally:
+            if client is not None:
+                try:
+                    await client.stop()
+                except Exception:
+                    pass
 
     # Запускаем асинхронный флоу авторизации в синхронном CLI
-    print_info(" Проверка сессии Telegram (Telethon)...")
+    print_info(" Проверка сессии Telegram User API (Kurigram)...")
     return asyncio.run(_auth())
 
 
@@ -288,8 +337,8 @@ def start_agent_screen() -> None:
         wait_for_enter()
         return
 
-    # Интерактивная авторизация Telethon (если включен)
-    if not _telethon_auth_flow():
+    # Интерактивная авторизация Telegram User API (если включен)
+    if not _kurigram_auth_flow():
         wait_for_enter()
         return
 

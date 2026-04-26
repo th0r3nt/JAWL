@@ -18,7 +18,7 @@ PREFIX_COLORS = {
     "[LLM]": "bright_blue",
     "[Host OS]": "green",
     "[Web]": "magenta",
-    "[Telegram Telethon]": "cyan",
+    "[Telegram User API / Kurigram]": "cyan",
     "[Telegram Aiogram]": "blue",
     "[Meta]": "white",
     "[Multimodality]": "bright_yellow",

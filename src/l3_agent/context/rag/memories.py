@@ -1,11 +1,11 @@
-import re
 import asyncio
-from typing import Dict, Any, List, TYPE_CHECKING
+import re
+from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from src.l1_databases.vector.management.knowledge import VectorKnowledge
     from src.l1_databases.vector.management.thoughts import VectorThoughts
-    from src.l0_state.interfaces.state import TelethonState
+    from src.l0_state.interfaces.state import TelegramUserState
     from src.l0_state.agent.state import AgentState
 
 
@@ -19,14 +19,33 @@ class RAGMemories:
         self,
         vector_knowledge: "VectorKnowledge",
         vector_thoughts: "VectorThoughts",
-        telethon_state: "TelethonState",
-        agent_state: "AgentState",
+        telegram_user_state: Optional["TelegramUserState"] = None,
+        agent_state: Optional["AgentState"] = None,
         auto_rag_top_k: int = 5,
         auto_rag_max_query_chars: int = 200,
+        **legacy_kwargs: Any,
     ):
+        legacy_telethon_state = legacy_kwargs.pop("telethon_state", None)
+        if legacy_kwargs:
+            unexpected = next(iter(legacy_kwargs))
+            raise TypeError(f"Unexpected RAGMemories argument: {unexpected}")
+        if telegram_user_state is None:
+            telegram_user_state = legacy_telethon_state
+        elif (
+            legacy_telethon_state is not None
+            and legacy_telethon_state is not telegram_user_state
+        ):
+            raise TypeError(
+                "Pass either telegram_user_state or telethon_state, not both."
+            )
+        if telegram_user_state is None:
+            raise TypeError("telegram_user_state is required.")
+        if agent_state is None:
+            raise TypeError("agent_state is required.")
+
         self.vector_knowledge = vector_knowledge
         self.vector_thoughts = vector_thoughts
-        self.telethon_state = telethon_state
+        self.telegram_user_state = telegram_user_state
         self.agent_state = agent_state
 
         self.auto_rag_top_k = auto_rag_top_k
@@ -34,6 +53,14 @@ class RAGMemories:
 
         # Глобальный лимит: сколько МАКСИМУМ воспоминаний суммарно отдать в контекст
         self.global_limit = 10
+
+    @property
+    def telethon_state(self):
+        return self.telegram_user_state
+
+    @telethon_state.setter
+    def telethon_state(self, value):
+        self.telegram_user_state = value
 
     def _split_into_queries(self, raw_text: str) -> list[str]:
         """
@@ -112,7 +139,7 @@ class RAGMemories:
                 if len(match_msg) > 15 or len(match_msg.split()) > 3:
                     raw_queries.add(match_msg.strip())
 
-            for line in self.telethon_state.last_chats.split("\n"):
+            for line in self.telegram_user_state.last_chats.split("\n"):
                 if "UNREAD:" in line:
                     match_name = re.search(r"\]\s+(.+?)\s*\(ID:", line)
                     if match_name:
