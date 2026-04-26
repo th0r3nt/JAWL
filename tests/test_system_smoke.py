@@ -12,7 +12,7 @@ def mock_configs():
     settings = MagicMock()
 
     # LLM
-    settings.llm.model_name = "test-model"
+    settings.llm.model = "test-model"
     settings.llm.temperature = 0.7
     settings.llm.max_react_steps = 15
 

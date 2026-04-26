@@ -6,7 +6,7 @@ async def test_meta_client_update_setting(meta_client, temp_settings_file):
     """Тест: MetaClient должен физически перезаписывать yaml файл."""
 
     success = await meta_client.update_setting(
-        path_keys=["llm", "model_name"], new_value="new-fast-model"
+        path_keys=["llm", "model"], new_value="new-fast-model"
     )
 
     assert success is True

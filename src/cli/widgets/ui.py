@@ -41,7 +41,7 @@ def _get_agent_status() -> dict:
         try:
             with open(SETTINGS_FILE, "r", encoding="utf-8") as f:
                 config = yaml.safe_load(f) or {}
-                status["model"] = config.get("llm", {}).get("model_name", "unknown")
+                status["model"] = config.get("llm", {}).get("model", "unknown")
                 status["interval"] = config.get("system", {}).get("heartbeat_interval", 0)
         except Exception:
             pass

@@ -74,6 +74,7 @@ class WebConfig(BaseModel):
 
 class MetaConfig(BaseModel):
     enabled: bool
+    access_level: int = 0  # 0: SAFE, 1: CONFIGURATOR, 2: ARCHITECT
 
 
 class MultimodalityConfig(BaseModel):
@@ -107,7 +108,8 @@ class IdentityConfig(BaseModel):
 
 class LLMConfig(BaseModel):
     model_config = ConfigDict(protected_namespaces=())
-    model_name: str
+    model: str
+    available_models: list[str] = []
     is_multimodal: bool = False
     temperature: float
     max_react_steps: int

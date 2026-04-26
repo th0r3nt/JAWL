@@ -15,7 +15,7 @@ def temp_settings_file(tmp_path: Path) -> Path:
 identity:
   agent_name: AgentEpta
 llm:
-  model_name: claude-opus-4.7
+  model: claude-opus-4.7
   temperature: 0.7
   max_react_steps: 15
 system:

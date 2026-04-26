@@ -46,11 +46,19 @@ class HostOSFiles:
 
                     if file_size <= max_chars:
                         f.seek(0)
-                        return f.read().decode("utf-8", errors="replace"), False, file_size
+                        return (
+                            f.read().decode("utf-8", errors="replace").replace("\r\n", "\n"),
+                            False,
+                            file_size,
+                        )
 
                     if read_from == "tail":
                         f.seek(file_size - max_chars)
-                        return f.read().decode("utf-8", errors="replace"), True, file_size
+                        return (
+                            f.read().decode("utf-8", errors="replace").replace("\r\n", "\n"),
+                            False,
+                            file_size,
+                        )
                     else:
                         f.seek(0)
                         return (

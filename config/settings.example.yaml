@@ -2,8 +2,16 @@ identity:
   agent_name: AgentName # Имя вашего агента
 
 llm:
-  model_name: unknown # Можно поставить любую
-  is_multimodal: false # Поставьте true, если model_name мультимодальна
+  model: unknown # Можно поставить любую
+  available_models:
+    - claude-opus-4.7
+    - claude-opus-4.6
+    - gemini-3.1-pro-preview
+    - gemini-3-flash-preview
+    - gemma-4-31b-it
+  # ...можно добавить свои
+
+  is_multimodal: false # Поставьте true, если основная модель мультимодальна
   temperature: 1.0
   max_react_steps: 15
 

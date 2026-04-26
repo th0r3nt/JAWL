@@ -104,7 +104,7 @@ class System:
 
         # AGENT STATE
         self.agent_state = AgentState(
-            llm_model=self.settings.llm.model_name,
+            llm_model=self.settings.llm.model,
             temperature=self.settings.llm.temperature,
             max_react_steps=self.settings.llm.max_react_steps,
             heartbeat_interval=self.settings.system.heartbeat_interval,
