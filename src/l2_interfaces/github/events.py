@@ -248,12 +248,14 @@ class GithubEvents:
         if event_type == "PushEvent":
             commits = payload.get("commits", [])
             count = payload.get("size", len(commits))
+            branch = payload.get("ref", "").replace("refs/heads/", "")
 
             if count == 0:
                 return None
 
             msg = commits[0].get("message", "").split("\n")[0] if commits else "Без описания"
-            return f"{time_prefix}[in repo: {repo}] @{actor} запушил {count} коммит(ов). Последний: '{msg}'"
+            branch_str = f" в ветку {branch}" if branch else ""
+            return f"{time_prefix}[in repo: {repo}] @{actor} запушил {count} коммит(ов){branch_str}. Последний: '{msg}'"
 
         elif event_type == "IssuesEvent":
             action = payload.get("action")
@@ -265,8 +267,13 @@ class GithubEvents:
 
         elif event_type == "PullRequestEvent":
             action = payload.get("action")
-            pr_num = payload.get("pull_request", {}).get("number", "?")
-            title = payload.get("pull_request", {}).get("title", "").strip()
+            pr_obj = payload.get("pull_request", {})
+            pr_num = pr_obj.get("number", "?")
+            title = pr_obj.get("title", "").strip()
+
+            # Отличаем успешный merge от простого закрытия PR
+            if action == "closed":
+                action = "merged" if pr_obj.get("merged") else "closed (without merge)"
 
             title_str = f": '{title}'" if title else ""
             return f"{time_prefix}[in repo: {repo}] @{actor} {action} Pull Request #{pr_num}{title_str}"
