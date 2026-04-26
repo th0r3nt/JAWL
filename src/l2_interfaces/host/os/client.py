@@ -183,7 +183,7 @@ class HostOSClient:
 * Polling interval: {self.state.polling_interval}
 * Datetime: {self.state.datetime}
 * Uptime: {self.state.uptime}
-* Network: {getattr(self.state, 'network', 'Неизвестно')}
+* Network: \n{getattr(self.state, 'network', 'Неизвестно')}
 
 {self.state.telemetry}
 

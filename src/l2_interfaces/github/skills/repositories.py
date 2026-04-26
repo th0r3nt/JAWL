@@ -1,6 +1,7 @@
 import base64
 import asyncio
-from typing import Optional
+from datetime import datetime, timedelta
+from typing import Optional, Literal
 
 from src.l2_interfaces.github.client import GithubClient
 from src.l3_agent.skills.registry import SkillResult, skill
@@ -15,9 +16,118 @@ class GithubRepositories:
         self.client = client
 
     @skill()
+    async def search_repositories(
+        self, query: str, sort: Optional[Literal['stars', 'forks', 'updated']], per_page: int = 10
+    ) -> SkillResult:
+        """
+        Ищет репозитории по ключевым словам или темам.
+        """
+
+        try:
+            params = {"q": query, "per_page": per_page}
+            if sort:
+                params["sort"] = sort
+
+            data = await self.client.request("GET", "/search/repositories", params=params)
+            self.client.state.add_history(f"search_repos: '{query}'")
+
+            items = data.get("items", [])
+            if not items:
+                return SkillResult.ok(f"По запросу '{query}' репозитории не найдены.")
+
+            lines = [
+                f"Найдено репозиториев: {data.get('total_count')} (показаны топ {len(items)}):"
+            ]
+            for item in items:
+                repo_name = item.get("full_name")
+                stars = item.get("stargazers_count")
+                lang = item.get("language") or "N/A"
+                desc = item.get("description") or "Без описания"
+                url = item.get("html_url")
+
+                # Защищаем контекст от огромных описаний
+                clean_desc = truncate_text(desc.replace("\n", " "), 150, "...")
+
+                lines.append(
+                    f"- [{repo_name}] ({stars}⭐ | {lang}) - {clean_desc}\n  URL: {url}"
+                )
+
+            system_logger.info(f"[Github] Выполнен поиск репозиториев: '{query}'")
+            return SkillResult.ok("\n".join(lines))
+
+        except Exception as e:
+            return SkillResult.fail(f"Ошибка при поиске репозиториев: {e}")
+
+    @skill()
+    async def get_trending_repositories(
+        self, period: Optional[Literal["daily", "weekly", "monthly"]], language: str = "", limit: int = 10
+    ) -> SkillResult:
+        """
+        Получает трендовые (самые популярные за последнее время) репозитории.
+        language: Опциональный фильтр по языку программирования.
+        """
+
+        try:
+            now = datetime.utcnow()
+            if period == "daily":
+                delta = timedelta(days=1)
+
+            elif period == "weekly":
+                delta = timedelta(days=7)
+
+            elif period == "monthly":
+                delta = timedelta(days=30)
+                
+            else:
+                return SkillResult.fail(
+                    "Ошибка: period должен быть 'daily', 'weekly' или 'monthly'."
+                )
+
+            # Формируем Dork-запрос (репозитории, созданные за указанный период, отсортированные по звездам)
+            target_date = (now - delta).strftime("%Y-%m-%d")
+            query = f"created:>{target_date}"
+            if language:
+                query += f" language:{language}"
+
+            params = {"q": query, "sort": "stars", "order": "desc", "per_page": limit}
+
+            data = await self.client.request("GET", "/search/repositories", params=params)
+            self.client.state.add_history(f"trending_repos: {period} ({language or 'all'})")
+
+            items = data.get("items", [])
+            if not items:
+                return SkillResult.ok(
+                    "Не удалось найти трендовые репозитории по заданным критериям."
+                )
+
+            lang_str = f" для '{language}'" if language else ""
+            lines = [f"Тренды GitHub ({period}){lang_str}:"]
+
+            for item in items:
+                repo_name = item.get("full_name")
+                stars = item.get("stargazers_count")
+                lang_val = item.get("language") or "N/A"
+                desc = item.get("description") or "Без описания"
+                url = item.get("html_url")
+
+                clean_desc = truncate_text(desc.replace("\n", " "), 150, "...")
+
+                lines.append(
+                    f"- [{repo_name}] (+{stars}⭐ | {lang_val}) - {clean_desc}\n  URL: {url}"
+                )
+
+            system_logger.info(
+                f"[Github] Запрошены тренды: {period}, lang: {language or 'all'}"
+            )
+            return SkillResult.ok("\n".join(lines))
+
+        except Exception as e:
+            return SkillResult.fail(f"Ошибка при получении трендов: {e}")
+
+    @skill()
     async def get_repo_info(self, owner: str, repo: str) -> SkillResult:
         """
-        Возвращает метаданные репозитория (stars, forks, описание, язык).
+        Возвращает метаданные репозитория.
         """
 
         try:
@@ -32,7 +142,6 @@ class GithubRepositories:
                 f"Открытых issues: {data.get('open_issues_count')}",
             ]
             return SkillResult.ok("\n".join(lines))
-
         except Exception as e:
             return SkillResult.fail(f"Ошибка при получении репозитория: {e}")
 
@@ -86,7 +195,6 @@ class GithubRepositories:
             content_b64 = data.get("content", "")
             content = base64.b64decode(content_b64).decode("utf-8", errors="replace")
 
-            # Защита контекста
             content = truncate_text(
                 content, 10000, "... [Файл обрезан для экономии контекста]"
             )
@@ -102,7 +210,9 @@ class GithubRepositories:
     async def list_recent_commits(
         self, owner: str, repo: str, per_page: int = 10
     ) -> SkillResult:
-        """Возвращает последние коммиты репозитория."""
+        """
+        Возвращает последние коммиты репозитория.
+        """
 
         try:
             params = {"per_page": per_page}
@@ -131,9 +241,10 @@ class GithubRepositories:
         self, owner: str, repo: str, dest_filename: str, ref: Optional[str] = None
     ) -> SkillResult:
         """
-        Скачивает репозиторий в виде ZIP-архива. Без .git файла. По умолчанию сохраняет в sandbox/download/.
+        Скачивает репозиторий в виде ZIP-архива. Без .git файлов. По умолчанию сохраняет в sandbox/download/.
         ref: Опционально (имя ветки, тег или коммит).
         """
+
         try:
             if "/" not in dest_filename and "\\" not in dest_filename:
                 dest_filename = f"download/{dest_filename}"
@@ -167,13 +278,15 @@ class GithubRepositories:
             )
         except PermissionError as e:
             return SkillResult.fail(str(e))
-        
+
         except Exception as e:
             return SkillResult.fail(f"Ошибка при скачивании репозитория: {e}")
 
     @skill()
     async def star_repository(self, owner: str, repo: str) -> SkillResult:
-        """[Требует Agent Account] Ставит звезду репозиторию."""
+        """
+        [Требует Agent Account] Ставит звезду репозиторию.
+        """
 
         if not self.client.config.agent_account:
             return SkillResult.fail("Ошибка: Для этого действия нужен Agent Account.")
@@ -188,7 +301,9 @@ class GithubRepositories:
 
     @skill()
     async def unstar_repository(self, owner: str, repo: str) -> SkillResult:
-        """[Требует Agent Account] Убирает звезду с репозитория."""
+        """
+        [Требует Agent Account] Убирает звезду с репозитория.
+        """
 
         if not self.client.config.agent_account:
             return SkillResult.fail("Ошибка: Для этого действия нужен Agent Account.")
@@ -203,7 +318,10 @@ class GithubRepositories:
 
     @skill()
     async def list_branches(self, owner: str, repo: str, per_page: int = 30) -> SkillResult:
-        """Возвращает список веток репозитория."""
+        """
+        Возвращает список веток репозитория.
+        """
+
         try:
             params = {"per_page": per_page}
             data = await self.client.request(
@@ -220,6 +338,5 @@ class GithubRepositories:
                 lines.append(f"- {branch.get('name')}{protected}")
 
             return SkillResult.ok("\n".join(lines))
-        
         except Exception as e:
             return SkillResult.fail(f"Ошибка при получении списка веток: {e}")

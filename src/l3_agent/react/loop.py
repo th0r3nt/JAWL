@@ -221,7 +221,7 @@ class ReactLoop:
                     },
                     temperature=self.agent_state.temperature,
                     reasoning_effort="xhigh",
-                    max_tokens=128000,
+                    # max_tokens=60000,
                     timeout=120.0,
                 )
 
