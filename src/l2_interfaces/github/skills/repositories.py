@@ -17,7 +17,10 @@ class GithubRepositories:
 
     @skill()
     async def search_repositories(
-        self, query: str, sort: Optional[Literal['stars', 'forks', 'updated']], per_page: int = 10
+        self,
+        query: str,
+        sort: Optional[Literal["stars", "forks", "updated"]],
+        per_page: int = 10,
     ) -> SkillResult:
         """
         Ищет репозитории по ключевым словам или темам.
@@ -60,7 +63,10 @@ class GithubRepositories:
 
     @skill()
     async def get_trending_repositories(
-        self, period: Optional[Literal["daily", "weekly", "monthly"]], language: str = "", limit: int = 10
+        self,
+        period: Optional[Literal["daily", "weekly", "monthly"]],
+        language: str = "",
+        limit: int = 10,
     ) -> SkillResult:
         """
         Получает трендовые (самые популярные за последнее время) репозитории.
@@ -77,7 +83,7 @@ class GithubRepositories:
 
             elif period == "monthly":
                 delta = timedelta(days=30)
-                
+
             else:
                 return SkillResult.fail(
                     "Ошибка: period должен быть 'daily', 'weekly' или 'monthly'."
@@ -283,6 +289,92 @@ class GithubRepositories:
             return SkillResult.fail(f"Ошибка при скачивании репозитория: {e}")
 
     @skill()
+    async def get_commit_details(self, owner: str, repo: str, commit_sha: str) -> SkillResult:
+        """
+        Возвращает детальную информацию о коммите, включая точные пути всех измененных файлов.
+        """
+
+        try:
+            data = await self.client.request(
+                "GET", f"/repos/{owner}/{repo}/commits/{commit_sha}"
+            )
+            self.client.state.add_history(f"get_commit: {owner}/{repo}@{commit_sha[:7]}")
+
+            commit_msg = data.get("commit", {}).get("message", "Без описания")
+            author = data.get("author", {}).get("login", "Unknown")
+            stats = data.get("stats", {})
+            files = data.get("files", [])
+
+            lines = [
+                f"Коммит: {commit_sha}",
+                f"Автор: @{author}",
+                f"Сообщение: {commit_msg}",
+                f"Статистика: {stats.get('total')} изменений (+{stats.get('additions')} / -{stats.get('deletions')})",
+                "\nИзмененные файлы:",
+            ]
+
+            if not files:
+                lines.append("Нет измененных файлов.")
+            else:
+                for f in files:
+                    status = f.get("status", "unknown")  # added, modified, removed, renamed
+                    filename = f.get("filename", "unknown")
+                    adds = f.get("additions", 0)
+                    dels = f.get("deletions", 0)
+                    lines.append(f"- [{status.upper()}] {filename} (+{adds} / -{dels})")
+
+            system_logger.info(
+                f"[Github] Прочитаны детали коммита {commit_sha[:7]} в {owner}/{repo}"
+            )
+            return SkillResult.ok("\n".join(lines))
+
+        except Exception as e:
+            return SkillResult.fail(f"Ошибка при получении деталей коммита: {e}")
+
+    @skill()
+    async def list_repo_directory(
+        self, owner: str, repo: str, path: str = "", ref: Optional[str] = None
+    ) -> SkillResult:
+        """
+        Просматривает содержимое (файлы и папки) в указанной директории GitHub репозитория.
+
+        path: путь к директории (оставить пустым "" для просмотра корневой папки).
+        ref: Опционально (имя ветки, тег или коммит).
+        """
+
+        try:
+            params = {"ref": ref} if ref else None
+            # Если path пустой, запрашиваем корень репозитория
+            endpoint = (
+                f"/repos/{owner}/{repo}/contents/{path.strip('/')}"
+                if path
+                else f"/repos/{owner}/{repo}/contents"
+            )
+
+            data = await self.client.request("GET", endpoint, params=params)
+            self.client.state.add_history(f"list_repo_dir: {owner}/{repo}/{path}")
+
+            # Если по указанному пути лежит файл, API возвращает dict, а не list
+            if not isinstance(data, list):
+                return SkillResult.fail(
+                    "Ошибка: Указанный путь является файлом, а не директорией. Используйте навык 'read_file_content'."
+                )
+
+            lines = [f"Содержимое /{path} в {owner}/{repo}:"]
+            for item in data:
+                i_type = "📁 DIR " if item.get("type") == "dir" else "📄 FILE"
+                name = item.get("name")
+                size = item.get("size", 0)
+                size_str = f" ({format_size(size)})" if item.get("type") == "file" else ""
+                lines.append(f"- {i_type}: {name}{size_str}")
+
+            system_logger.info(f"[Github] Прочитана директория /{path} в {owner}/{repo}")
+            return SkillResult.ok("\n".join(lines))
+
+        except Exception as e:
+            return SkillResult.fail(f"Ошибка при просмотре директории репозитория: {e}")
+
+    @skill()
     async def star_repository(self, owner: str, repo: str) -> SkillResult:
         """
         [Требует Agent Account] Ставит звезду репозиторию.
@@ -341,7 +433,6 @@ class GithubRepositories:
         except Exception as e:
             return SkillResult.fail(f"Ошибка при получении списка веток: {e}")
 
-
     @skill()
     async def create_repository(
         self, name: str, description: str = "", private: bool = False
@@ -350,7 +441,7 @@ class GithubRepositories:
         [Требует Agent Account] Создает новый репозиторий в аккаунте агента.
         Автоматически инициализирует с README.md.
         """
-        
+
         if not self.client.config.agent_account:
             return SkillResult.fail("Ошибка: Для создания репозитория нужен Agent Account.")
 
@@ -359,18 +450,20 @@ class GithubRepositories:
                 "name": name,
                 "description": description,
                 "private": private,
-                "auto_init": True  # Инициализируем пустым README
+                "auto_init": True,  # Инициализируем пустым README
             }
-            
+
             data = await self.client.request("POST", "/user/repos", body=payload)
             self.client.state.add_history(f"create_repo: {name}")
-            
+
             repo_full_name = data.get("full_name")
             url = data.get("html_url")
-            
+
             system_logger.info(f"[Github] Создан репозиторий {repo_full_name}")
-            return SkillResult.ok(f"Репозиторий '{repo_full_name}' успешно создан.\nURL: {url}")
-            
+            return SkillResult.ok(
+                f"Репозиторий '{repo_full_name}' успешно создан.\nURL: {url}"
+            )
+
         except Exception as e:
             return SkillResult.fail(f"Ошибка при создании репозитория: {e}")
 
@@ -389,15 +482,15 @@ class GithubRepositories:
             # POST /repos/{owner}/{repo}/forks
             data = await self.client.request("POST", f"/repos/{owner}/{repo}/forks")
             self.client.state.add_history(f"fork_repo: {owner}/{repo}")
-            
+
             fork_name = data.get("full_name")
             url = data.get("html_url")
-            
+
             system_logger.info(f"[Github] Сделан форк {owner}/{repo} -> {fork_name}")
             return SkillResult.ok(
                 f"Форк успешно создан: '{fork_name}'. Теперь его можно клонировать локально.\nURL: {url}"
             )
-            
+
         except Exception as e:
             return SkillResult.fail(f"Ошибка при форке репозитория: {e}")
 
@@ -416,20 +509,16 @@ class GithubRepositories:
             payload = {
                 "description": description,
                 "public": public,
-                "files": {
-                    filename: {
-                        "content": content
-                    }
-                }
+                "files": {filename: {"content": content}},
             }
-            
+
             data = await self.client.request("POST", "/gists", body=payload)
             self.client.state.add_history("create_gist")
-            
+
             url = data.get("html_url")
             system_logger.info(f"[Github] Создан Gist: {filename}")
-            
+
             return SkillResult.ok(f"Gist успешно создан.\nURL: {url}")
-            
+
         except Exception as e:
             return SkillResult.fail(f"Ошибка при создании Gist: {e}")
