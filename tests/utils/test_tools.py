@@ -9,9 +9,14 @@ from src.utils._tools import (
 
 
 def test_format_size():
+    assert format_size(0) == "0 B"
     assert format_size(500) == "500 B"
+    assert format_size(1024) == "1.0 KB"
     assert format_size(1500) == "1.5 KB"
     assert format_size(1500000) == "1.4 MB"
+    assert format_size(5 * 1024 ** 3) == "5.0 GB"
+    assert format_size(2 * 1024 ** 4) == "2.0 TB"
+    assert format_size(-2048) == "-2.0 KB"
 
 
 def test_truncate_text():
