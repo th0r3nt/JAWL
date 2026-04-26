@@ -4,15 +4,12 @@ from src.l2_interfaces.host.os.skills.files import HostOSFiles
 
 @pytest.mark.asyncio
 async def test_os_files_write_and_read(os_client):
-    """Тест: запись файла в песочницу и его чтение."""
     files = HostOSFiles(os_client)
     filepath = str(os_client.sandbox_dir / "hello.txt")
 
-    # Пишем
-    res_write = await files.write_file(filepath, "Hello World", mode="w")
+    res_write = await files.write_file(filepath, "Hello World")
     assert res_write.is_success is True
 
-    # Читаем
     res_read = await files.read_file(filepath)
     assert res_read.is_success is True
     assert "Hello World" in res_read.message

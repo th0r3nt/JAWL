@@ -6,6 +6,7 @@ from src.l2_interfaces.github.client import GithubClient
 from src.l2_interfaces.github.skills.repositories import GithubRepositories
 from src.l2_interfaces.github.skills.issues import GithubIssues
 from src.l2_interfaces.github.skills.accounts import GithubAccounts
+from src.l2_interfaces.github.skills.pull_requests import GithubPullRequests
 
 from src.l3_agent.skills.registry import register_instance
 from src.l3_agent.context.registry import ContextSection
@@ -28,6 +29,7 @@ def setup_github(system: "System", token: str | None) -> List[Any]:
     register_instance(GithubRepositories(client))
     register_instance(GithubIssues(client))
     register_instance(GithubAccounts(client))
+    register_instance(GithubPullRequests(client))
 
     # Регистрация контекста
     system.context_registry.register_provider(

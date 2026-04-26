@@ -47,7 +47,7 @@ async def test_react_invalid_json_retry(
 
     assert mock_session.chat.completions.create.call_count == 2
     assert deps["agent_state"].current_step == 2
-    
+
     # Проверяем, что ошибка JSON была записана в базу тиков
     call_args = deps["sql_ticks"].save_tick.call_args_list[0]
     assert "Format Error" in call_args[1]["results"]["execution_report"]
@@ -72,7 +72,8 @@ async def test_react_max_steps_limit(
     await loop.run("TEST", {}, missed_events=[])
 
     assert mock_session.chat.completions.create.call_count == 2
-    assert deps["agent_state"].current_step == 2
+    # Цикл оборвался, потому что 3 > 2 (лимит достигнут)
+    assert deps["agent_state"].current_step == 3
 
 
 @pytest.mark.asyncio
@@ -136,7 +137,7 @@ async def test_react_no_tool_calls(mock_dependencies, mock_openai_response):
 def test_react_inject_images_no_markers(mock_dependencies):
     deps = mock_dependencies
     loop = ReactLoop(**deps)
-    
+
     # Стейт пустой - инжекта не будет
     loop.agent_state.last_actions_result = "Обычный ответ тулзы"
 
@@ -159,7 +160,9 @@ def test_react_inject_images_success(mock_dependencies, tmp_path):
     fake_img.write_bytes(b"hello")
 
     # Маркер теперь лежит в результатах последнего действия стейта
-    loop.agent_state.last_actions_result = f"Result: [SYSTEM_MARKER_IMAGE_ATTACHED: {fake_img.resolve()}]"
+    loop.agent_state.last_actions_result = (
+        f"Result: [SYSTEM_MARKER_IMAGE_ATTACHED: {fake_img.resolve()}]"
+    )
 
     messages = [
         {"role": "system", "content": "Система"},

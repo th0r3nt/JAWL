@@ -4,50 +4,22 @@ from unittest.mock import patch, AsyncMock, MagicMock
 from src.main import System
 from src.utils.event.bus import EventBus
 from src.utils.event.registry import Events
+from src.utils.settings import load_config
 
 
 @pytest.fixture
 def mock_configs():
-    # Создаем гибкие моки и явно задаем примитивы, чтобы Pydantic не ругался
-    settings = MagicMock()
+    # Загружаем РЕАЛЬНЫЕ дефолтные конфиги
+    # Это 100% избавит нас от всех проблем с MagicMock и типами Pydantic
+    settings, interfaces = load_config()
 
-    # LLM
-    settings.llm.model = "test-model"
-    settings.llm.temperature = 0.7
-    settings.llm.max_react_steps = 15
-
-    # System
-    settings.system.vector_db.embedding_model = "test-model"
-    settings.system.vector_db.vector_size = 384
-    settings.system.timezone = 3
-    settings.system.heartbeat_interval = 30
-    settings.system.continuous_cycle = False
-
-    # Новые моки для когнитивных модулей
-    settings.system.sql.tasks.enabled = True
-    settings.system.sql.tasks.max_tasks = 15
-
-    settings.system.sql.personality_traits.enabled = True
-    settings.system.sql.personality_traits.max_traits = 10
-
-    settings.system.sql.mental_states.enabled = True
-    settings.system.sql.mental_states.max_entities = 10
-
-    settings.system.sql.drives.enabled = True
-    settings.system.sql.drives.decay_rate = 5.0
-    settings.system.sql.drives.decay_interval_sec = 3600 
-    settings.system.sql.drives.max_reflections_history = 3
-    settings.system.sql.drives.max_custom_drives = 5
-
-    # Identity
-    settings.identity.agent_name = "TestAgent"
-
-    # Interfaces
-    interfaces = MagicMock()
-    interfaces.host.os.enabled = True
+    # Отключаем тяжелые/опасные интерфейсы для теста
     interfaces.telegram.telethon.enabled = False
     interfaces.telegram.aiogram.enabled = False
-    interfaces.web.enabled = True
+    interfaces.email.enabled = False
+
+    # Ставим безопасные параметры (например, Observer level)
+    interfaces.host.os.access_level = 1
 
     return settings, interfaces
 
@@ -77,9 +49,6 @@ async def test_system_di_assembly_smoke(
         system.setup_l0_state()
         await system.setup_l1_databases()
 
-        # Чтобы не падал Гейткипер в логах (для красоты)
-        interfaces.host.os.access_level = 1
-
         system.setup_l2_interfaces()
         system.setup_l3_agent(llm_api_url="http://test", llm_api_keys=["key1"])
 
@@ -107,19 +76,16 @@ async def test_system_shutdown_and_reboot_events(mock_configs):
     # Активируем подписки
     system._bridge_events_to_heartbeat()
 
-    # Изначальный код должен быть 0
     assert system._exit_code == 0
 
     # 1. ТЕСТ ПЕРЕЗАГРУЗКИ
     await bus.publish(Events.SYSTEM_REBOOT_REQUESTED)
-    # Ждем, пока EventBus выполнит обработчики в фоне
     if bus.background_tasks:
         await asyncio.gather(*bus.background_tasks)
 
     assert system._exit_code == 1
     system.heartbeat.stop.assert_called_once()
 
-    # Сбрасываем счетчик вызовов мока
     system.heartbeat.stop.reset_mock()
 
     # 2. ТЕСТ ВЫКЛЮЧЕНИЯ

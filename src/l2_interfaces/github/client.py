@@ -3,7 +3,7 @@ import json
 import urllib.error
 import urllib.parse
 import urllib.request
-from typing import Any, Optional, Union
+from typing import Any, Optional, Union, Literal
 
 from src.utils.logger import system_logger
 from src.utils.settings import GithubConfig
@@ -46,14 +46,12 @@ class GithubClient:
             try:
                 # Дергаем профиль, чтобы убедиться, что токен валидный
                 data = await self.request("GET", "/user")
-                login = data.get("login", "Unknown")
+                login = data.get("login", "Unknown") if isinstance(data, dict) else "Unknown"
                 self.state.account_info = f"Agent account online. Logged in as @{login}"
                 system_logger.info(f"[Github] Успешная авторизация как @{login}")
 
             except GithubHTTPError as e:
-                self.state.account_info = (
-                    f"Auth Failed (HTTP {e.status}). Read-Only режим."
-                )
+                self.state.account_info = f"Auth Failed (HTTP {e.status}). Read-Only режим."
                 system_logger.error(f"[Github] Ошибка авторизации: {e}. Проверьте токен.")
                 self.config.agent_account = False  # Фоллбэк
         else:
@@ -83,7 +81,8 @@ class GithubClient:
         params: Optional[dict] = None,
         body: Optional[dict] = None,
         extra_headers: Optional[dict] = None,
-    ) -> Union[dict, list, None]:
+        response_format: Literal["json", "text", "binary"] = "json",
+    ) -> Union[dict, list, str, bytes, None]:
         """Низкоуровневый асинхронный HTTP-запрос к API GitHub."""
 
         def _do_request():
@@ -96,19 +95,34 @@ class GithubClient:
             if body is not None:
                 data_bytes = json.dumps(body).encode("utf-8")
 
+            headers = self._build_headers(extra_headers)
+
+            # GitHub требует Content-Length: 0 для PUT/DELETE без тела (например, для звезд)
+            if method.upper() in ("PUT", "DELETE") and data_bytes is None:
+                data_bytes = b""
+                headers["Content-Length"] = "0"
+
             req = urllib.request.Request(
                 url,
                 data=data_bytes,
                 method=method.upper(),
-                headers=self._build_headers(extra_headers),
+                headers=headers,
             )
 
             try:
                 with urllib.request.urlopen(
                     req, timeout=self.config.request_timeout_sec
                 ) as resp:
+                    if response_format == "binary":
+                        return resp.read()
+
                     raw = resp.read().decode("utf-8", errors="replace")
+
+                    if response_format == "text":
+                        return raw
+
                     return json.loads(raw) if raw else None
+
             except urllib.error.HTTPError as e:
                 raw = e.read().decode("utf-8", errors="replace") if e.fp else ""
                 try:

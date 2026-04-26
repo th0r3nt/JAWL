@@ -1,11 +1,11 @@
 import base64
-import urllib.parse
+import asyncio
 from typing import Optional
 
 from src.l2_interfaces.github.client import GithubClient
 from src.l3_agent.skills.registry import SkillResult, skill
 from src.utils.logger import system_logger
-from src.utils._tools import truncate_text
+from src.utils._tools import truncate_text, validate_sandbox_path, format_size
 
 
 class GithubRepositories:
@@ -46,8 +46,8 @@ class GithubRepositories:
             return SkillResult.fail("Ошибка: Поиск кода требует наличия GITHUB_TOKEN.")
 
         try:
-            params = urllib.parse.urlencode({"q": query, "per_page": per_page})
-            data = await self.client.request("GET", f"/search/code?{params}")
+            params = {"q": query, "per_page": per_page}
+            data = await self.client.request("GET", "/search/code", params=params)
             self.client.state.add_history(f"search_code: '{query}'")
 
             items = data.get("items", [])
@@ -73,11 +73,10 @@ class GithubRepositories:
         """Читает содержимое файла из репозитория GitHub."""
 
         try:
-            endpoint = f"/repos/{owner}/{repo}/contents/{path}"
-            if ref:
-                endpoint += f"?ref={urllib.parse.quote(ref)}"
-
-            data = await self.client.request("GET", endpoint)
+            params = {"ref": ref} if ref else None
+            data = await self.client.request(
+                "GET", f"/repos/{owner}/{repo}/contents/{path}", params=params
+            )
 
             if isinstance(data, list):
                 return SkillResult.fail("Ошибка: Указан путь к директории, а не к файлу.")
@@ -104,8 +103,10 @@ class GithubRepositories:
         """Возвращает последние коммиты репозитория."""
 
         try:
-            params = urllib.parse.urlencode({"per_page": per_page})
-            data = await self.client.request("GET", f"/repos/{owner}/{repo}/commits?{params}")
+            params = {"per_page": per_page}
+            data = await self.client.request(
+                "GET", f"/repos/{owner}/{repo}/commits", params=params
+            )
             self.client.state.add_history(f"list_commits: {owner}/{repo}")
 
             if not data:
@@ -122,3 +123,101 @@ class GithubRepositories:
             return SkillResult.ok("\n".join(lines))
         except Exception as e:
             return SkillResult.fail(f"Ошибка при получении коммитов: {e}")
+
+    @skill()
+    async def download_repository(
+        self, owner: str, repo: str, dest_filename: str, ref: Optional[str] = None
+    ) -> SkillResult:
+        """
+        Скачивает репозиторий в виде ZIP-архива. По умолчанию сохраняет в sandbox/download/.
+        ref: Опционально (имя ветки, тег или коммит).
+        """
+        try:
+            if "/" not in dest_filename and "\\" not in dest_filename:
+                dest_filename = f"download/{dest_filename}"
+
+            safe_path = validate_sandbox_path(dest_filename)
+            safe_path.parent.mkdir(parents=True, exist_ok=True)
+
+            endpoint = f"/repos/{owner}/{repo}/zipball"
+            if ref:
+                endpoint += f"/{ref}"
+
+            binary_data = await self.client.request("GET", endpoint, response_format="binary")
+
+            if not binary_data:
+                return SkillResult.fail("Не удалось скачать архив (пустой ответ от сервера).")
+
+            def _save():
+                with open(safe_path, "wb") as f:
+                    f.write(binary_data)
+
+            await asyncio.to_thread(_save)
+
+            size_str = format_size(safe_path.stat().st_size)
+            self.client.state.add_history(f"download_repo: {owner}/{repo}")
+            system_logger.info(
+                f"[Github] Репозиторий {owner}/{repo} скачан в {safe_path.name} ({size_str})"
+            )
+
+            return SkillResult.ok(
+                f"Репозиторий успешно скачан в архив: sandbox/{safe_path.name} ({size_str})"
+            )
+        except PermissionError as e:
+            return SkillResult.fail(str(e))
+        
+        except Exception as e:
+            return SkillResult.fail(f"Ошибка при скачивании репозитория: {e}")
+
+    @skill()
+    async def star_repository(self, owner: str, repo: str) -> SkillResult:
+        """[Требует Agent Account] Ставит звезду репозиторию."""
+
+        if not self.client.config.agent_account:
+            return SkillResult.fail("Ошибка: Для этого действия нужен Agent Account.")
+
+        try:
+            await self.client.request("PUT", f"/user/starred/{owner}/{repo}")
+            self.client.state.add_history(f"star: {owner}/{repo}")
+            system_logger.info(f"[Github] Поставлена звезда репозиторию {owner}/{repo}")
+            return SkillResult.ok(f"Звезда успешно поставлена репозиторию {owner}/{repo}.")
+        except Exception as e:
+            return SkillResult.fail(f"Ошибка при постановке звезды: {e}")
+
+    @skill()
+    async def unstar_repository(self, owner: str, repo: str) -> SkillResult:
+        """[Требует Agent Account] Убирает звезду с репозитория."""
+
+        if not self.client.config.agent_account:
+            return SkillResult.fail("Ошибка: Для этого действия нужен Agent Account.")
+
+        try:
+            await self.client.request("DELETE", f"/user/starred/{owner}/{repo}")
+            self.client.state.add_history(f"unstar: {owner}/{repo}")
+            system_logger.info(f"[Github] Убрана звезда с репозитория {owner}/{repo}")
+            return SkillResult.ok(f"Звезда успешно убрана с репозитория {owner}/{repo}.")
+        except Exception as e:
+            return SkillResult.fail(f"Ошибка при удалении звезды: {e}")
+
+    @skill()
+    async def list_branches(self, owner: str, repo: str, per_page: int = 30) -> SkillResult:
+        """Возвращает список веток репозитория."""
+        try:
+            params = {"per_page": per_page}
+            data = await self.client.request(
+                "GET", f"/repos/{owner}/{repo}/branches", params=params
+            )
+            self.client.state.add_history(f"list_branches: {owner}/{repo}")
+
+            if not data:
+                return SkillResult.ok("Ветки не найдены.")
+
+            lines = [f"Ветки репозитория {owner}/{repo}:"]
+            for branch in data:
+                protected = " (Защищена)" if branch.get("protected") else ""
+                lines.append(f"- {branch.get('name')}{protected}")
+
+            return SkillResult.ok("\n".join(lines))
+        
+        except Exception as e:
+            return SkillResult.fail(f"Ошибка при получении списка веток: {e}")
