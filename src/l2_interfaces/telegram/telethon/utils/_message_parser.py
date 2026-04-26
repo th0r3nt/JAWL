@@ -104,25 +104,32 @@ class TelethonMessageParser:
     async def parse_forward(msg: Any) -> str:
         """Определяет, является ли сообщение пересланным."""
 
-        if not msg.fwd_from:
+        if not getattr(msg, "fwd_from", None):
             return ""
+
+        fwd_sender = None
         try:
+            # Пытаемся получить полную сущность (чтобы вытащить ID и нормальное имя)
             fwd_sender = await msg.get_forward_sender()
-            if fwd_sender:
-                name = utils.get_display_name(fwd_sender)
-                fwd_id = getattr(fwd_sender, "id", "")
-                id_str = f" (ID: {fwd_id})" if fwd_id else ""
-                return f"\n  ↳[Переслано от: {name}{id_str}]"
+        except Exception:
+            pass  # Юзер не в кэше Telethon, игнорируем и идем к фоллбэкам
 
-            elif msg.fwd_from.from_name:
-                return f"\n  ↳[Переслано от: {msg.fwd_from.from_name} (Скрытый аккаунт)]"
+        if fwd_sender:
+            name = utils.get_display_name(fwd_sender)
+            fwd_id = getattr(fwd_sender, "id", "")
+            id_str = f" (ID: {fwd_id})" if fwd_id else ""
+            return f"\n  ↳[Переслано от: {name}{id_str}]"
 
-            elif msg.fwd_from.from_id:
+        # Фолбэки на случай, если получить сущность не удалось
+        if getattr(msg.fwd_from, "from_name", None):
+            return f"\n  ↳[Переслано от: {msg.fwd_from.from_name} (Скрытый аккаунт)]"
+
+        if getattr(msg.fwd_from, "from_id", None):
+            try:
                 peer_id = utils.get_peer_id(msg.fwd_from.from_id)
                 return f"\n  ↳[Переслано от: ID {peer_id}]"
-
-        except Exception:
-            pass
+            except Exception:
+                pass
 
         return "\n  ↳[Переслано]"
 

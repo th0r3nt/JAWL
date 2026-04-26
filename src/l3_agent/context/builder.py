@@ -58,21 +58,41 @@ class ContextBuilder:
         missed_events: List[Dict[str, Any]],
         **kwargs,
     ) -> str:
-        """Возвращает отформатированный блок контекста текущего Heartbeat."""
+        """
+        Возвращает отформатированный блок контекста текущего Heartbeat.
+        """
 
-        # Форматируем текущий триггер (то, почему мы проснулись прямо сейчас)
+        seen_chat_histories = set()
+
+        # Форматируем текущий триггер (он самый свежий)
+        if payload.get("chat_id") and "recent_history" in payload:
+            seen_chat_histories.add(payload["chat_id"])
+            
         current_trigger = self._format_single_event(event_name, payload)
 
         # Форматируем список пропущенных событий (Event Log)
         log_blocks = []
-        for evt in missed_events:
+        
+        # Идем с конца (от самых свежих к старым), чтобы оставить историю только у самого последнего
+        for evt in reversed(missed_events):
+            evt_payload = evt["payload"].copy()
+            chat_id = evt_payload.get("chat_id")
+
+            if chat_id and "recent_history" in evt_payload:
+                if chat_id in seen_chat_histories:
+                    # История этого чата уже есть в более свежем событии, удаляем дубликат
+                    del evt_payload["recent_history"]
+                else:
+                    seen_chat_histories.add(chat_id)
+
             formatted = self._format_single_event(
                 event_name=evt["name"],
-                payload=evt["payload"],
+                payload=evt_payload,
                 event_time=evt["time"],
                 level=evt["level"],
             )
-            log_blocks.append(formatted)
+            # Вставляем в начало, чтобы вернуть хронологический порядок (старые сверху)
+            log_blocks.insert(0, formatted)
 
         event_log = "\n\n---\n\n".join(log_blocks) if log_blocks else "No other events in log"
 
