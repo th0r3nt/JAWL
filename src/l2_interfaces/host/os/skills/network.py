@@ -1,6 +1,7 @@
 import asyncio
 import platform
 import socket
+import urllib.parse
 import urllib.request
 import urllib.error
 import psutil
@@ -12,6 +13,20 @@ from src.l2_interfaces.host.os.client import HostOSClient
 
 from src.l3_agent.skills.registry import SkillResult, skill
 from typing import Optional
+
+
+_ALLOWED_URL_SCHEMES = ("http", "https")
+
+
+def _ensure_http_scheme(url: str) -> Optional[str]:
+    """Возвращает текст ошибки, если схема URL не http/https. Иначе None."""
+    scheme = urllib.parse.urlparse(url).scheme.lower()
+    if scheme not in _ALLOWED_URL_SCHEMES:
+        return (
+            f"Запрещённая схема URL: '{scheme or '<пусто>'}'. "
+            "Разрешены только http:// и https://."
+        )
+    return None
 
 
 class HostOSNetwork:
@@ -59,6 +74,7 @@ class HostOSNetwork:
 
         except asyncio.TimeoutError:
             process.kill()
+            await process.wait()
             return SkillResult.fail(
                 f"Таймаут: пинг к {clean_host} занял слишком много времени."
             )
@@ -101,6 +117,10 @@ class HostOSNetwork:
         """
 
         limit = self.host_os.config.http_response_max_chars
+
+        scheme_error = _ensure_http_scheme(url)
+        if scheme_error:
+            return SkillResult.fail(scheme_error)
 
         def _make_request():
             req_headers = headers or {"User-Agent": "JAWL-Agent/1.0"}
@@ -185,6 +205,10 @@ class HostOSNetwork:
         """Скачивает файл из сети на диск. По умолчанию сохраняет в sandbox/download/."""
 
         try:
+            scheme_error = _ensure_http_scheme(url)
+            if scheme_error:
+                return SkillResult.fail(scheme_error)
+
             # Если агент передал просто имя файла, кидаем его в папку загрузок
             if "/" not in dest_filename and "\\" not in dest_filename:
                 dest_filename = f"download/{dest_filename}"

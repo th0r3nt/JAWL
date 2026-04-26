@@ -84,6 +84,7 @@ class HostOSExecution:
 
             except asyncio.TimeoutError:
                 process.kill()
+                await process.wait()
                 return SkillResult.fail(
                     f"Скрипт работал дольше {timeout} секунд и был принудительно убит (Таймаут)."
                 )
@@ -144,6 +145,7 @@ class HostOSExecution:
 
             except asyncio.TimeoutError:
                 process.kill()
+                await process.wait()
                 return SkillResult.fail(
                     f"Команда работала дольше {timeout} секунд и была убита (Таймаут)."
                 )
