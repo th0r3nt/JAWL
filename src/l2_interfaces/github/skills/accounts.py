@@ -59,5 +59,29 @@ class GithubAccounts:
 
             system_logger.info(f"[Github] Проверены уведомления (Найдено: {len(data)})")
             return SkillResult.ok("\n".join(lines))
+        
         except Exception as e:
             return SkillResult.fail(f"Ошибка при проверке уведомлений: {e}")
+
+    @skill()
+    async def mark_notifications_as_read(self) -> SkillResult:
+        """
+        [Требует Agent Account] Помечает все текущие непрочитанные уведомления как прочитанные.
+        """
+
+        if not self.client.config.agent_account:
+            return SkillResult.fail("Ошибка: Для этого действия нужен Agent Account.")
+
+        try:
+            # PUT /notifications помечает все уведомления прочитанными
+            await self.client.request("PUT", "/notifications")
+            self.client.state.add_history("mark_notifications_read")
+            
+            # Мгновенно очищаем дашборд агента, не дожидаясь следующего тика фонового поллинга
+            self.client.state.unread_notifications = "Нет новых уведомлений."
+            
+            system_logger.info("[Github] Все уведомления агента помечены как прочитанные.")
+            return SkillResult.ok("Все уведомления успешно помечены как прочитанные (инбокс очищен).")
+            
+        except Exception as e:
+            return SkillResult.fail(f"Ошибка при очистке уведомлений: {e}")

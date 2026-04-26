@@ -251,7 +251,10 @@ class TelethonChats:
     async def mark_as_read(
         self, chat_id: Union[int, str], topic_id: Optional[int] = None
     ) -> SkillResult:
-        """Помечает все сообщения в чате (или конкретном топике) как прочитанные."""
+        """
+        Помечает все сообщения в чате как прочитанные.
+        Полезно, чтобы убрать маркер UNREAD.
+        """
         try:
             client = self.tg_client.client()
             target_entity = await client.get_entity(parse_int_or_str(chat_id))

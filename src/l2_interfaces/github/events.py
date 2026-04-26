@@ -147,7 +147,9 @@ class GithubEvents:
                         repo = (n.get("repository") or {}).get("full_name", "Unknown")
                         n_type = n.get("subject", {}).get("type", "Unknown")
                         time_prefix = self._format_gh_time(n.get("updated_at", ""))
-                        notif_lines.append(f"- {time_prefix}[{repo}] {n_type}: {title}")
+                        notif_lines.append(
+                            f"- {time_prefix}[in repo: {repo}] {n_type}: {title}"
+                        )
                     self.state.unread_notifications = "\n".join(notif_lines)
 
         except Exception as e:
@@ -236,6 +238,7 @@ class GithubEvents:
         """
         Превращает JSON Github Event в читаемую строку с учетом локального времени.
         """
+
         event_type = event.get("type")
         actor = event.get("actor", {}).get("login", "Unknown")
         repo = event.get("repo", {}).get("name", "Unknown")
@@ -250,7 +253,7 @@ class GithubEvents:
                 return None
 
             msg = commits[0].get("message", "").split("\n")[0] if commits else "Без описания"
-            return f"{time_prefix}[{repo}] 🔨 @{actor} запушил {count} коммит(ов). Последний: '{msg}'"
+            return f"{time_prefix}[in repo: {repo}] @{actor} запушил {count} коммит(ов). Последний: '{msg}'"
 
         elif event_type == "IssuesEvent":
             action = payload.get("action")
@@ -258,26 +261,26 @@ class GithubEvents:
                 return None
             issue_num = payload.get("issue", {}).get("number", "?")
             title = payload.get("issue", {}).get("title", "")
-            return f"{time_prefix}[{repo}] 📝 @{actor} {action} issue #{issue_num}: '{title}'"
+            return f"{time_prefix}[in repo: {repo}] @{actor} {action} issue #{issue_num}: '{title}'"
 
         elif event_type == "PullRequestEvent":
             action = payload.get("action")
             pr_num = payload.get("pull_request", {}).get("number", "?")
-            title = payload.get("pull_request", {}).get("title", "")
-            return (
-                f"{time_prefix}[{repo}] 🔀 @{actor} {action} Pull Request #{pr_num}: '{title}'"
-            )
+            title = payload.get("pull_request", {}).get("title", "").strip()
+
+            title_str = f": '{title}'" if title else ""
+            return f"{time_prefix}[in repo: {repo}] @{actor} {action} Pull Request #{pr_num}{title_str}"
 
         elif event_type == "IssueCommentEvent":
             action = payload.get("action")
             if action != "created":
                 return None
             issue_num = payload.get("issue", {}).get("number", "?")
-            return f"{time_prefix}[{repo}] 💬 @{actor} {action} комментарий в Issue/PR #{issue_num}"
+            return f"{time_prefix}[in repo: {repo}] @{actor} {action} комментарий в Issue/PR #{issue_num}"
 
         elif event_type == "ReleaseEvent":
             action = payload.get("action")
             tag = payload.get("release", {}).get("tag_name", "?")
-            return f"{time_prefix}[{repo}] 🚀 @{actor} {action} релиз {tag}"
+            return f"{time_prefix}[in repo: {repo}] @{actor} {action} релиз {tag}"
 
         return None
