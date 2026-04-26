@@ -30,7 +30,7 @@ class MetaConfigurator:
         await self.client.bus.publish(
             Events.SYSTEM_CONFIG_UPDATED, key="heartbeat_interval", value=interval_sec
         )
-        return SkillResult.ok(f"Интервал изменен на {interval_sec} сек.")
+        return SkillResult.ok(f"Интервал успешно изменен на {interval_sec} сек.")
 
     @skill()
     async def change_max_react_steps(self, steps: int) -> SkillResult:
@@ -45,7 +45,7 @@ class MetaConfigurator:
             return SkillResult.fail("Ошибка при сохранении конфигурации.")
 
         self.client.agent_state.max_react_steps = steps
-        return SkillResult.ok(f"Лимит шагов изменен на {steps}.")
+        return SkillResult.ok(f"Лимит шагов успешно изменен на {steps}.")
 
     @skill()
     async def change_database_limits(
@@ -70,8 +70,12 @@ class MetaConfigurator:
         )
 
         if success:
+            # Моментальное обновление в памяти
+            await self.client.bus.publish(
+                Events.SYSTEM_CONFIG_UPDATED, key="db_limit", module=database, value=new_limit
+            )
             return SkillResult.ok(
-                f"Лимит базы данных '{database}' успешно изменен на {new_limit}. Применится при следующем запуске."
+                f"Лимит базы данных '{database}' успешно изменен на {new_limit}. Изменения применены."
             )
         return SkillResult.fail("Ошибка обновления конфигурации.")
 
@@ -96,7 +100,18 @@ class MetaConfigurator:
         )
 
         if s1 and s2:
+            # Обновляем AgentState (чтобы агент видел в промпте)
+            self.client.agent_state.context_ticks = total_ticks
+            self.client.agent_state.context_detailed_ticks = detailed_ticks
+
+            # Обновляем сами классы БД через EventBus
+            await self.client.bus.publish(
+                Events.SYSTEM_CONFIG_UPDATED,
+                key="context_depth",
+                total_ticks=total_ticks,
+                detailed_ticks=detailed_ticks,
+            )
             return SkillResult.ok(
-                f"Глубина контекста изменена (Общие: {total_ticks}, Детальные: {detailed_ticks}). Применится после перезагрузки."
+                f"Глубина контекста изменена (Общие: {total_ticks}, Детальные: {detailed_ticks}). Изменения применены."
             )
         return SkillResult.fail("Ошибка сохранения настроек.")

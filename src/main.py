@@ -108,6 +108,9 @@ class System:
             temperature=self.settings.llm.temperature,
             max_react_steps=self.settings.llm.max_react_steps,
             heartbeat_interval=self.settings.system.heartbeat_interval,
+            continuous_cycle=self.settings.system.continuous_cycle,
+            context_ticks=self.settings.system.context_depth.ticks,
+            context_detailed_ticks=self.settings.system.context_depth.detailed_ticks,
         )
 
         # HOST
@@ -338,9 +341,38 @@ class System:
         # Специфичные подписки
         def handle_config_update(**kwargs):
             key = kwargs.get("key")
-            value = kwargs.get("value")
-            if key and value is not None:
-                self.heartbeat.update_config(key, value)
+            
+            # Настройки Heartbeat
+            if key in ("heartbeat_interval", "continuous_cycle"):
+                if self.heartbeat:
+                    self.heartbeat.update_config(key, kwargs.get("value"))
+            
+            # Лимиты SQL баз данных
+            elif key == "db_limit":
+                module = kwargs.get("module")
+                val = kwargs.get("value")
+                if self.sql:
+                    if module == "tasks":
+                        self.sql.tasks.max_tasks = val
+
+                    elif module == "personality_traits":
+                        self.sql.personality_traits.max_traits = val
+
+                    elif module == "mental_states":
+                        self.sql.mental_states.max_entities = val
+
+                    elif module == "drives_custom":
+                        self.sql.drives.max_custom = val
+
+                system_logger.info(f"[System] Рантайм-обновление лимита для {module}: {val}")
+
+            # Глубина контекста
+            elif key == "context_depth":
+                if self.sql:
+                    self.sql.ticks.ticks_limit = kwargs.get("total_ticks")
+                    self.sql.ticks.detailed_ticks = kwargs.get("detailed_ticks")
+                    
+                system_logger.info(f"[System] Рантайм-обновление контекста: {kwargs.get('total_ticks')} тиков")
 
         # Если агент решил совершить сэппуку
         def handle_shutdown(**kwargs):

@@ -4,7 +4,15 @@ from telethon.tl.functions.account import UpdateProfileRequest, UpdatePersonalCh
 from telethon.tl.functions.photos import UploadProfilePhotoRequest
 from telethon.tl.functions.contacts import AddContactRequest
 from telethon.tl.functions.users import GetFullUserRequest
+from telethon.tl.types import (
+    UserStatusOnline,
+    UserStatusOffline,
+    UserStatusRecently,
+    UserStatusLastWeek,
+    UserStatusLastMonth,
+)
 
+from src.utils.dtime import format_datetime
 from src.utils.logger import system_logger
 from src.utils._tools import format_size, validate_sandbox_path, parse_int_or_str
 
@@ -159,7 +167,7 @@ class TelethonAccount:
 
     @skill()
     async def get_user_info(self, user_id: Union[int, str]) -> SkillResult:
-        """Получает подробную информацию о конкретном пользователе (имя, био, статус)."""
+        """Получает подробную информацию о конкретном пользователе (имя, био, статус в сети)."""
         try:
             client = self.tg_client.client()
             target_entity = await client.get_input_entity(parse_int_or_str(user_id))
@@ -176,8 +184,28 @@ class TelethonAccount:
             if full_user.full_user.about:
                 lines.append(f"О себе (Bio): {full_user.full_user.about}")
 
+            # Парсинг сетевого статуса
+            status_str = "Неизвестно (или скрыто настройками приватности)"
+            if isinstance(user.status, UserStatusOnline):
+                status_str = "В сети (Online)"
+
+            elif isinstance(user.status, UserStatusOffline):
+                dt_str = format_datetime(user.status.was_online, self.tg_client.timezone)
+                status_str = f"Был(а) в сети: {dt_str}"
+
+            elif isinstance(user.status, UserStatusRecently):
+                status_str = "Был(а) недавно"
+
+            elif isinstance(user.status, UserStatusLastWeek):
+                status_str = "Был(а) на этой неделе"
+
+            elif isinstance(user.status, UserStatusLastMonth):
+                status_str = "Был(а) в этом месяце"
+
+            lines.append(f"Сетевой статус: {status_str}")
+
             if user.bot:
-                lines.append("Статус: Бот")
+                lines.append("Статус аккаунта: Бот")
 
             if user.restricted:
                 lines.append(

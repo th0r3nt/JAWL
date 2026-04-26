@@ -23,9 +23,14 @@ class AgentState(BaseModel):
     temperature: float = 0.7
 
     # ReAct цикл
-    current_step: int = 1 # Хранит текущий шаг раздумий агента
+    current_step: int = 1  # Хранит текущий шаг раздумий агента
     max_react_steps: int = 15
     heartbeat_interval: int = 180
+
+    # Системные лимиты
+    continuous_cycle: bool = False
+    context_ticks: int = 15
+    context_detailed_ticks: int = 3
 
     start_time: float = Field(default_factory=time.time)
     last_input_tokens: int = 0
@@ -56,6 +61,8 @@ class AgentState(BaseModel):
         return f"""
 ### AGENT STATE
 * Heartbeat Interval: {self.heartbeat_interval}s
+* Continuous Cycle: {self.continuous_cycle}
+* Context Depth: {self.context_ticks} recent ticks (Detailed: {self.context_detailed_ticks})
 * LLM Model: {self.llm_model}
 * Temperature: {self.temperature}
 * Uptime: {self.get_uptime()}

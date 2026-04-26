@@ -21,6 +21,10 @@ class HostOSFiles:
     def __init__(self, host_os_client: HostOSClient):
         self.host_os = host_os_client
 
+    # =================================================================================
+    # ЧТЕНИЕ ФАЙЛОВ
+    # =================================================================================
+
     @skill()
     async def read_file(
         self, filepath: str, read_from: Literal["head", "tail"] = "head"
@@ -89,8 +93,120 @@ class HostOSFiles:
         except Exception as e:
             return SkillResult.fail(f"Ошибка при чтении файла: {e}")
 
+    @skill()
+    async def read_files_in_directory(
+        self, path: str = ".", max_files: int = 10, recursive: bool = False
+    ) -> SkillResult:
+        """
+        Читает текстовое содержимое сразу нескольких файлов в директории.
+        recursive: Если True, прочитает файлы и во всех вложенных папках.
+        Пропускает бинарные файлы.
+        """
+
+        try:
+            safe_path = self.host_os.validate_path(path, is_write=False)
+
+            if not safe_path.is_dir():
+                return SkillResult.fail(f"Ошибка: Путь не является директорией ({path}).")
+
+            # Берем лимит из конфига и умножаем на 2, так как файлов много,
+            # но в пределах разумного, чтобы не убить контекст агента
+            total_max_chars = self.host_os.config.file_read_max_chars * 2
+
+            def _read_all():
+                results = []
+                total_chars = 0
+                files_read = 0
+
+                # Защита: чтобы при recursive=True не сжечь лимит файлов на мусор
+                ignore_dirs = {
+                    ".git",
+                    "venv",
+                    ".venv",
+                    "env",
+                    "__pycache__",
+                    "node_modules",
+                    ".pytest_cache",
+                }
+
+                iterator = safe_path.rglob("*") if recursive else safe_path.iterdir()
+
+                for item in iterator:
+                    if not item.is_file():
+                        continue
+
+                    rel_path = item.relative_to(safe_path)
+
+                    # Пропускаем мусорные папки
+                    if recursive and any(part in ignore_dirs for part in rel_path.parts):
+                        continue
+
+                    if files_read >= max_files:
+                        results.append(
+                            f"\n... [Достигнут лимит на чтение {max_files} файлов. Остальные скрыты]"
+                        )
+                        break
+
+                    try:
+                        with open(item, "r", encoding="utf-8") as f:
+                            content = f.read()
+
+                        if not content.strip():
+                            continue
+
+                        # Считаем остаток квоты
+                        chars_left = total_max_chars - total_chars
+                        if chars_left <= 0:
+                            results.append(
+                                "\n... [Достигнут глобальный лимит символов для чтения. Операция прервана]"
+                            )
+                            break
+
+                        if len(content) > chars_left:
+                            content = (
+                                content[:chars_left]
+                                + "\n... [Файл обрезан из-за системных лимитов]"
+                            )
+
+                        total_chars += len(content)
+
+                        # Выводим относительный путь для понимания структуры вложенности
+                        results.append(f"--- Файл: {rel_path.as_posix()} ---\n{content}\n")
+                        files_read += 1
+
+                    except UnicodeDecodeError:
+                        # Пропускаем бинарники тихо
+                        continue
+                    except Exception as e:
+                        results.append(
+                            f"--- Файл: {rel_path.as_posix()} ---\n[Ошибка чтения: {e}]\n"
+                        )
+                        files_read += 1
+
+                return results, files_read, total_chars
+
+            results, files_read, total_chars = await asyncio.to_thread(_read_all)
+
+            if not results:
+                return SkillResult.ok(
+                    f"Директория '{path}' пуста или содержит только бинарные файлы."
+                )
+
+            size_str = format_size(total_chars)
+            header = f"[Прочитано файлов: {files_read} из директории {safe_path.name} | Общий объем: {size_str}]\n{'='*60}\n\n"
+
+            system_logger.info(
+                f"[Host OS] Массовое чтение {files_read} файлов из директории: {safe_path.name}"
+            )
+            return SkillResult.ok(header + "\n".join(results))
+
+        except PermissionError as e:
+            return SkillResult.fail(str(e))
+        except Exception as e:
+            return SkillResult.fail(f"Ошибка при массовом чтении файлов: {e}")
+
     # =================================================================================
-    # ХИНСТРУМЕНТЫ РЕДАКТИРОВАНИЯ ФАЙЛОВ
+    # РЕДАКТИРОВАНИЕ ФАЙЛОВ
     # =================================================================================
 
     @skill()

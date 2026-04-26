@@ -69,16 +69,16 @@ meta:
   enabled: false
 
   # 0 - SAFE           (возможность менять llm_model/temperature)
-  # 1 - CONFIGURATOR   (возможность менять heartbeat_interval/max_react_steps/context_depth, дополнительный навык create_custom_prompt() - создание кастомных промптов для себя)
+  # 1 - CONFIGURATOR   (возможность менять heartbeat_interval/max_react_steps/context_depth)
   # 2 - ARCHITECT      (дополнительные навыки: off_system()/reboot_system(), toggle_interface() - возможность включать/отключать интерфейсы)
   access_level: 0
 
 
 multimodality:
-  enabled: false # Поставьте true, если модель мультимодальна
+  enabled: false # Поставьте true, если основная LLM модель агента мультимодальна
 
 
-# Локальный календарь для агента (может ставить себе напоминания, задачи)
+# Локальный календарь для агента (напоминания, задачи, события)
 calendar:
   enabled: true
   polling_interval_sec: 60
