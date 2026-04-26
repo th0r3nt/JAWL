@@ -21,7 +21,7 @@ class GithubHTTPError(Exception):
 class GithubClient:
     """
     Клиент GitHub REST API.
-    Stateful - хранит стейт, управляет авторизацией и фоновым обновлением дашборда.
+    Stateful - хранит стейт, управляет авторизацией.
     """
 
     def __init__(
@@ -37,84 +37,34 @@ class GithubClient:
         self.api_base = "https://api.github.com"
         self.user_agent = "jawl-agent/1.0"
 
-        self._polling_task: Optional[asyncio.Task] = None
-
     async def start(self) -> None:
-        """Запускается при старте системы. Чекает токен, если нужен аккаунт."""
+        """
+        Запускается при старте системы. Чекает токен, если нужен аккаунт.
+        """
 
         self.state.is_online = True
 
         if self.config.agent_account and self.token:
             try:
-                # Дергаем профиль, чтобы убедиться, что токен валидный
                 data = await self.request("GET", "/user")
                 login = data.get("login", "Unknown") if isinstance(data, dict) else "Unknown"
                 self.state.account_info = f"Agent account online. Logged in as @{login}"
-                system_logger.info(f"[Github] Успешная авторизация как @{login}")
 
-                # Запускаем фоновое обновление дашборда аккаунта
-                self._polling_task = asyncio.create_task(self._poll_account_state())
+                system_logger.info(f"[Github] Успешная авторизация как @{login}")
 
             except GithubHTTPError as e:
                 self.state.account_info = f"Auth Failed (HTTP {e.status}). Read-Only режим."
                 system_logger.error(f"[Github] Ошибка авторизации: {e}. Проверьте токен.")
                 self.config.agent_account = False  # Фоллбэк
+
         else:
             auth_type = "token" if self.token else "No token (60 req/hr)"
             self.state.account_info = f"Agent account offline. Read-Only ({auth_type})"
+
             system_logger.info("[Github] Инициализирован в Read-Only режиме.")
 
     async def stop(self) -> None:
         self.state.is_online = False
-        if self._polling_task:
-            self._polling_task.cancel()
-            self._polling_task = None
-
-    async def _poll_account_state(self):
-        """
-        Фоновый сбор данных об аккаунте агента для дашборда (L0 State). 
-        Выполняется раз в N минут.
-        """
-
-        while self.state.is_online:
-            try:
-                # Получаем свои репозитории (топ-5 недавно обновленных)
-                repos_data = await self.request(
-                    "GET", "/user/repos", params={"sort": "updated", "per_page": 5}
-                )
-                if repos_data and isinstance(repos_data, list):
-                    repo_lines = []
-                    for r in repos_data:
-                        name = r.get("full_name")
-                        stars = r.get("stargazers_count", 0)
-                        is_fork = " (Fork)" if r.get("fork") else ""
-                        repo_lines.append(f"- {name}{is_fork} ({stars}⭐)")
-                    self.state.own_repos = (
-                        "\n".join(repo_lines) if repo_lines else "У вас пока нет репозиториев."
-                    )
-
-                # Получаем непрочитанные уведомления
-                notif_data = await self.request(
-                    "GET", "/notifications", params={"all": "false"}
-                )
-                if isinstance(notif_data, list):
-                    count = len(notif_data)
-                    if count == 0:
-                        self.state.unread_notifications = "Нет новых уведомлений."
-                    else:
-                        notif_lines = [f"У вас {count} непрочитанных уведомлений:"]
-                        for n in notif_data[:3]:
-                            title = n.get("subject", {}).get("title", "No title")
-                            repo = (n.get("repository") or {}).get("full_name", "Unknown")
-                            n_type = n.get("subject", {}).get("type", "Unknown")
-                            notif_lines.append(f"- [{repo}] {n_type}: {title}")
-                        self.state.unread_notifications = "\n".join(notif_lines)
-
-            except Exception as e:
-                system_logger.debug(f"[Github] Ошибка фонового обновления профиля: {e}")
-
-            # Используем параметр из конфига
-            await asyncio.sleep(self.config.polling_interval_sec)
 
     def _build_headers(self, extra: Optional[dict] = None) -> dict:
         headers = {
@@ -189,20 +139,30 @@ class GithubClient:
         return await asyncio.to_thread(_do_request)
 
     async def get_context_block(self, **kwargs) -> str:
-        """Отдает блок контекста для L3."""
+        """
+        Отдает отформатированный блок контекста для агента.
+        """
+
         if not self.state.is_online:
             return "### GITHUB [OFF]\nИнтерфейс отключен."
 
         agent_dashboard = ""
         if self.config.agent_account and self.token:
             agent_dashboard = (
-                f"\n* Текущие репозитории (Топ-5 по активности):\n  {self.state.own_repos.replace(chr(10), chr(10)+'  ')}\n"
+                f"\n* Текущие репозитории аккаунта (Топ-5 по активности):\n  {self.state.own_repos.replace(chr(10), chr(10)+'  ')}\n"
                 f"* Уведомления:\n  {self.state.unread_notifications.replace(chr(10), chr(10)+'  ')}"
             )
+
+        watchers_block = ""
+        if self.state.tracked_repos:
+            repos_list = ", ".join(self.state.tracked_repos.keys())
+            events_str = "\n".join(self.state.recent_watcher_events) if self.state.recent_watcher_events else "Нет недавних событий."
+            watchers_block = f"\n* Отслеживаемые репозитории: {repos_list}\n* Последние события в репозиториях:\n{events_str}\n"
 
         return (
             f"### GITHUB [ON]\n"
             f"* Auth: {self.state.account_info}"
-            f"{agent_dashboard}\n"
+            f"{agent_dashboard}"
+            f"{watchers_block}\n"
             f"* История запросов:\n{self.state.github_history}"
         )

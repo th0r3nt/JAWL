@@ -151,6 +151,17 @@ class Events:
     )
 
     # ============================================
+    # GITHUB
+    # ============================================
+
+    GITHUB_REPO_ACTIVITY = EventConfig(
+        name="GITHUB_REPO_ACTIVITY",
+        description="Активность в отслеживаемом GitHub репозитории (коммит, issue, PR).",
+        level=EventLevel.MEDIUM,
+        requires_attention=True,
+    )
+
+    # ============================================
     # Общие системные события
     # ============================================
 

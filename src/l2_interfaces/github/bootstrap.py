@@ -3,11 +3,13 @@ from typing import List, Any, TYPE_CHECKING
 from src.utils.logger import system_logger
 
 from src.l2_interfaces.github.client import GithubClient
+from src.l2_interfaces.github.events import GithubEvents
 from src.l2_interfaces.github.skills.repositories import GithubRepositories
 from src.l2_interfaces.github.skills.issues import GithubIssues
 from src.l2_interfaces.github.skills.accounts import GithubAccounts
 from src.l2_interfaces.github.skills.pull_requests import GithubPullRequests
 from src.l2_interfaces.github.skills.local_git import GithubLocalGit
+from src.l2_interfaces.github.skills.watchers import GithubWatchers
 
 from src.l3_agent.skills.registry import register_instance
 from src.l3_agent.context.registry import ContextSection
@@ -25,6 +27,14 @@ def setup_github(system: "System", token: str | None) -> List[Any]:
         config=config,
         token=token,
     )
+    
+    # Создаем обработчик событий
+    events = GithubEvents(
+        client=client, 
+        state=system.github_state, 
+        event_bus=system.event_bus, 
+        data_dir=system.local_data_dir
+    )
 
     # Регистрация навыков
     register_instance(GithubRepositories(client))
@@ -32,6 +42,7 @@ def setup_github(system: "System", token: str | None) -> List[Any]:
     register_instance(GithubAccounts(client))
     register_instance(GithubPullRequests(client))
     register_instance(GithubLocalGit(client))
+    register_instance(GithubWatchers(client, events))
 
     # Регистрация контекста
     system.context_registry.register_provider(
@@ -41,4 +52,5 @@ def setup_github(system: "System", token: str | None) -> List[Any]:
     )
     system_logger.info("[Github] Интерфейс загружен.")
 
-    return [client]
+    # Возвращаем events, так как у него есть методы start() и stop()
+    return [client, events]
