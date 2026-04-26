@@ -59,6 +59,7 @@ class HostOSNetwork:
 
         except asyncio.TimeoutError:
             process.kill()
+            await process.wait()
             return SkillResult.fail(
                 f"Таймаут: пинг к {clean_host} занял слишком много времени."
             )
