@@ -106,7 +106,7 @@ class HostOSEvents:
         self._is_running: bool = False
         self._monitoring_task: asyncio.Task | None = None
 
-        self._observer: Observer | None = None # type: ignore
+        self._observer: Observer | None = None  # type: ignore
         self._watches: dict[str, Any] = {}
 
         self._persistence_file = (
@@ -122,7 +122,10 @@ class HostOSEvents:
         self._last_sandbox_files = set()
         psutil.cpu_percent(interval=None)
 
-        self._debounce_tasks: dict[str, asyncio.Task] = {}
+        self._batch_queue: dict[str, Any] = {}
+        self._batch_task: asyncio.Task | None = None
+        self._batch_delay: float = 2.0  # Окно сбора массовых изменений (в секундах)
+
         self._file_cache: dict[str, str] = {}
         self._diff_size_limit = 1024 * 100  # Макс 100 КБ для кэша одного текстового файла
 
@@ -235,31 +238,62 @@ class HostOSEvents:
             return []
 
     # ==========================================================
-    # ПОЛЛИНГ
+    # ПОЛЛИНГ И WATCHDOG
     # ==========================================================
 
     async def handle_file_system_event(self, sys_event_config, filepath: str):
-        """Вызывается при изменении файла. Использует Debounce для защиты от спама."""
-        # Отменяем предыдущий таймер для этого файла, если он был (IDE еще пишет файл)
-        if filepath in self._debounce_tasks:
-            self._debounce_tasks[filepath].cancel()
+        """Вызывается при изменении файла. Группирует события для защиты от спама."""
 
-        # Создаем новую задачу с отложенным выполнением
-        task = asyncio.create_task(self._debounced_publish(sys_event_config, filepath))
-        self._debounce_tasks[filepath] = task
+        self._batch_queue[filepath] = sys_event_config
 
-    async def _debounced_publish(self, sys_event_config, filepath: str):
-        try:
-            # Ждем 1.5 секунды тишины. Если IDE еще раз дернет файл, эта задача отменится
-            await asyncio.sleep(1.5)
-        except asyncio.CancelledError:
-            return  # Отменено новым событием для этого же файла
+        # Запускаем таймер окна батчинга, если он еще не запущен
+        if self._batch_task is None or self._batch_task.done():
+            self._batch_task = asyncio.create_task(self._process_batch())
 
-        self._debounce_tasks.pop(filepath, None)
+    async def _process_batch(self):
+        """Ожидает окончания бури событий и отправляет суммарный рапорт."""
 
-        # Перестраиваем ASCII дерево для стейта
+        await asyncio.sleep(self._batch_delay)
+
+        queue_snapshot = self._batch_queue.copy()
+        self._batch_queue.clear()
+
+        if not queue_snapshot:
+            return
+
+        # Перестраиваем ASCII дерево для стейта один раз на весь батч
         self._update_file_trees()
 
+        # Если файлов больше 5 - группируем в одно событие (спасаем контекст агента)
+        if len(queue_snapshot) > 5:
+            created = sum(
+                1 for e in queue_snapshot.values() if e == Events.HOST_OS_FILE_CREATED
+            )
+            modified = sum(
+                1 for e in queue_snapshot.values() if e == Events.HOST_OS_FILE_MODIFIED
+            )
+            deleted = sum(
+                1 for e in queue_snapshot.values() if e == Events.HOST_OS_FILE_DELETED
+            )
+
+            msg = f"Массовая файловая операция в песочнице. Создано: {created}, Изменено: {modified}, Удалено: {deleted}."
+
+            # Тихо чистим кэш удаленных файлов
+            for fp, ev in queue_snapshot.items():
+                if ev == Events.HOST_OS_FILE_DELETED:
+                    self._file_cache.pop(fp, None)
+
+            await self.bus.publish(
+                Events.HOST_OS_FILE_MODIFIED, filepath="[Массив файлов]", message=msg
+            )
+            return
+
+        # Если файлов мало - обрабатываем индивидуально с генерацией diff
+        for filepath, sys_event_config in queue_snapshot.items():
+            await self._publish_single_file_event(filepath, sys_event_config)
+
+    async def _publish_single_file_event(self, filepath: str, sys_event_config):
+        """Обрабатывает единичный файл, генерирует diff и отправляет агенту."""
         try:
             rel_path = str(Path(filepath).relative_to(self.host_os.sandbox_dir))
         except ValueError:
@@ -298,29 +332,33 @@ class HostOSEvents:
 
                         if added > 0 or deleted > 0:
                             limit = self.host_os.config.file_diff_max_chars
-                            
-                            # Генерируем построчный diff (unified_diff)
+
                             diff_gen = difflib.unified_diff(
-                                old_content.splitlines(), 
+                                old_content.splitlines(),
                                 new_content.splitlines(),
-                                n=1, # Показывать только 1 строчку контекста вокруг изменений
-                                lineterm=""
+                                n=1,
+                                lineterm="",
                             )
-                            
-                            # Убираем системные заголовки diff'а (--- и +++) для экономии контекста
+
                             diff_lines = [
-                                line for line in diff_gen 
-                                if not line.startswith('---') and not line.startswith('+++')
+                                line
+                                for line in diff_gen
+                                if not line.startswith("---") and not line.startswith("+++")
                             ]
-                            
+
                             diff_str = "\n".join(diff_lines)
-                            
-                            # Обрезаем, если diff слишком огромный
+
                             if len(diff_str) > limit:
                                 diff_str = diff_str[:limit] + "\n... [Diff обрезан]"
-                                
-                            diff_block = f"\n\nDiff preview:\n```diff\n{diff_str}\n```" if diff_str else ""
-                            diff_msg = f"(Изменения: +{added} симв. / -{deleted} симв.){diff_block}"
+
+                            diff_block = (
+                                f"\n\nDiff preview:\n```diff\n{diff_str}\n```"
+                                if diff_str
+                                else ""
+                            )
+                            diff_msg = (
+                                f"(Изменения: +{added} симв. / -{deleted} симв.){diff_block}"
+                            )
                         else:
                             diff_msg = "(Сохранен без изменений текста)"
 

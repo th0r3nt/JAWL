@@ -718,3 +718,39 @@ class HostOSFiles:
             return SkillResult.fail(str(e))
         except Exception as e:
             return SkillResult.fail(f"Ошибка при сохранении описания: {e}")
+
+    @skill()
+    async def extract_archive(self, archive_path: str, extract_to: str = ".") -> SkillResult:
+        """
+        Распаковывает архив (zip, tar, gz и др.).
+        extract_to: папка, куда будут извлечены файлы (по умолчанию текущая директория).
+        """
+        try:
+            # Проверяем оба пути через гейткипер ОС
+            safe_archive = self.host_os.validate_path(archive_path, is_write=False)
+            safe_dest = self.host_os.validate_path(extract_to, is_write=True)
+            
+            if not safe_archive.is_file():
+                return SkillResult.fail(f"Ошибка: Архив не найден ({safe_archive.name}).")
+                
+            safe_dest.mkdir(parents=True, exist_ok=True)
+            
+            # shutil поддерживает большинство популярных форматов "из коробки"
+            await asyncio.to_thread(shutil.unpack_archive, str(safe_archive), str(safe_dest))
+            
+            system_logger.info(f"[Host OS] Архив {safe_archive.name} распакован в {safe_dest.name}")
+            
+            try:
+                dest_display = safe_dest.relative_to(self.host_os.sandbox_dir).as_posix()
+                dest_msg = f"sandbox/{dest_display}"
+            except ValueError:
+                dest_msg = safe_dest.as_posix()
+
+            return SkillResult.ok(f"Архив {safe_archive.name} успешно распакован в директорию: {dest_msg}")
+            
+        except PermissionError as e:
+            return SkillResult.fail(str(e))
+        except shutil.ReadError:
+            return SkillResult.fail("Ошибка: Неподдерживаемый формат архива или файл поврежден.")
+        except Exception as e:
+            return SkillResult.fail(f"Ошибка при распаковке архива: {e}")
