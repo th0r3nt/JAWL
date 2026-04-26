@@ -41,7 +41,7 @@ host:
   os:
     enabled: false
 telegram:
-  telethon:
+  kurigram:
     enabled: true
 """
     p.write_text(data.strip(), encoding="utf-8")

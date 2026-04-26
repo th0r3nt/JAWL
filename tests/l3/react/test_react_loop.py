@@ -55,6 +55,110 @@ async def test_react_invalid_json_retry(
 
 @pytest.mark.asyncio
 @patch("src.l3_agent.react.loop.execute_skill", new_callable=AsyncMock)
+async def test_react_parses_xmlish_actions_parameter(
+    mock_execute_skill, mock_dependencies, mock_openai_response
+):
+    deps = mock_dependencies
+    loop = ReactLoop(**deps)
+    mock_session = AsyncMock()
+    mock_execute_skill.return_value = "ok"
+
+    mock_session.chat.completions.create.side_effect = [
+        mock_openai_response(
+            """
+Поставлю безопасную реакцию.</thoughts>
+<parameter name="actions">[
+  {
+    "tool_name": "KurigramReactions.set_reaction",
+    "parameters": {"chat_id": 1234567890, "message_id": 609, "reaction": "🗿"}
+  }
+]
+""".strip()
+        ),
+        mock_openai_response('{"thoughts": "Готово.", "actions": []}'),
+    ]
+    deps["llm_client"].get_session = MagicMock(return_value=mock_session)
+
+    await loop.run("TEST", {}, missed_events=[])
+
+    mock_execute_skill.assert_awaited_once()
+    actions = mock_execute_skill.await_args.kwargs["actions"]
+    assert actions[0].tool_name == "KurigramReactions.set_reaction"
+    assert actions[0].parameters["reaction"] == "🗿"
+    assert deps["agent_state"].current_step == 2
+
+
+@pytest.mark.asyncio
+@patch("src.l3_agent.react.loop.execute_skill", new_callable=AsyncMock)
+async def test_react_empty_actions_reads_unread_telegram_dashboard(
+    mock_execute_skill, mock_dependencies, mock_openai_response
+):
+    deps = mock_dependencies
+    deps["context_builder"].build.return_value = """
+### TELEGRAM USER API [ON]
+Account info: Профиль: 1 1
+---
+[User] UnreadUser (ID: 1234567890) [UNREAD: 2]
+[User] Operator (ID: 987654321)
+
+
+### AIOGRAM [OFF]
+Интерфейс отключен.
+""".strip()
+    loop = ReactLoop(**deps)
+    mock_session = AsyncMock()
+    mock_execute_skill.return_value = "chat read"
+
+    mock_session.chat.completions.create.side_effect = [
+        mock_openai_response('{"thoughts": "Пустой хартбит.", "actions": []}'),
+        mock_openai_response('{"thoughts": "Теперь всё.", "actions": []}'),
+    ]
+    deps["llm_client"].get_session = MagicMock(return_value=mock_session)
+
+    await loop.run("HEARTBEAT", {}, missed_events=[])
+
+    mock_execute_skill.assert_awaited_once()
+    actions = mock_execute_skill.await_args.kwargs["actions"]
+    assert actions[0].tool_name == "KurigramChats.read_chat"
+    assert actions[0].parameters == {"chat_id": 1234567890, "limit": 10}
+    assert deps["agent_state"].current_step == 2
+
+
+@pytest.mark.asyncio
+@patch("src.l3_agent.react.loop.execute_skill", new_callable=AsyncMock)
+async def test_react_empty_actions_reads_unread_telegram_list_format(
+    mock_execute_skill, mock_dependencies, mock_openai_response
+):
+    deps = mock_dependencies
+    deps["context_builder"].build.return_value = """
+### TELEGRAM USER API [ON]
+Непрочитанные чаты:
+- User | ID: `1234567890` | UnreadUser | UNREAD: 2
+
+
+### AIOGRAM [OFF]
+Интерфейс отключен.
+""".strip()
+    loop = ReactLoop(**deps)
+    mock_session = AsyncMock()
+    mock_execute_skill.return_value = "chat read"
+
+    mock_session.chat.completions.create.side_effect = [
+        mock_openai_response('{"thoughts": "Пусто.", "actions": []}'),
+        mock_openai_response('{"thoughts": "Готово.", "actions": []}'),
+    ]
+    deps["llm_client"].get_session = MagicMock(return_value=mock_session)
+
+    await loop.run("HEARTBEAT", {}, missed_events=[])
+
+    mock_execute_skill.assert_awaited_once()
+    actions = mock_execute_skill.await_args.kwargs["actions"]
+    assert actions[0].tool_name == "KurigramChats.read_chat"
+    assert actions[0].parameters == {"chat_id": 1234567890, "limit": 10}
+
+
+@pytest.mark.asyncio
+@patch("src.l3_agent.react.loop.execute_skill", new_callable=AsyncMock)
 async def test_react_max_steps_limit(
     mock_execute_skill, mock_dependencies, mock_openai_response
 ):

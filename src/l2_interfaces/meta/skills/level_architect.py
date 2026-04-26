@@ -17,7 +17,7 @@ class MetaArchitect:
         self,
         interface: Literal[
             "host_os",
-            "telegram_telethon",
+            "telegram_kurigram",
             "telegram_aiogram",
             "github",
             "web_search",
@@ -33,7 +33,7 @@ class MetaArchitect:
         # Маппинг ключей из Literal на реальные пути в interfaces.yaml
         ifmap = {
             "host_os": ["host", "os", "enabled"],
-            "telegram_telethon": ["telegram", "telethon", "enabled"],
+            "telegram_kurigram": ["telegram", "kurigram", "enabled"],
             "telegram_aiogram": ["telegram", "aiogram", "enabled"],
             "github": ["github", "enabled"],
             "web_search": ["web", "search", "enabled"],
@@ -45,12 +45,12 @@ class MetaArchitect:
 
         # Проверка зависимостей (.env) перед включением
         if state is True:
-            if interface == "telegram_telethon" and not (
+            if interface == "telegram_kurigram" and not (
                 self.client.has_env_key("TELETHON_API_ID")
                 and self.client.has_env_key("TELETHON_API_HASH")
             ):
                 return SkillResult.fail(
-                    "Ошибка при включении Telethon: отсутствуют TELETHON_API_ID и TELETHON_API_HASH в .env."
+                    "Ошибка при включении Telegram User API / Kurigram: отсутствуют legacy env-переменные TELETHON_API_ID и TELETHON_API_HASH в .env."
                 )
 
             if interface == "telegram_aiogram" and not self.client.has_env_key(

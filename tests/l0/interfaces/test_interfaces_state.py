@@ -1,5 +1,6 @@
 from src.l0_state.interfaces.state import (
-    TelethonState,
+    TelegramUserState,
+    KurigramState,
     AiogramState,
     HostOSState,
     HostTerminalState,
@@ -8,10 +9,14 @@ from src.l0_state.interfaces.state import (
 )
 
 
-def test_telethon_state_init():
-    state = TelethonState(number_of_last_chats=5)
+def test_telegram_user_state_compat_init():
+    state = TelegramUserState(number_of_last_chats=5)
     assert state.number_of_last_chats == 5
     assert state.last_chats == ""
+
+
+def test_telegram_user_state_legacy_aliases():
+    assert KurigramState is TelegramUserState
 
 
 def test_aiogram_state_init():

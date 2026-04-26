@@ -37,47 +37,52 @@ class Events:
     """
 
     # ============================================
-    # Telegram Telethon
+    # Telegram User API / Kurigram
     # ============================================
 
-    TELETHON_MESSAGE_INCOMING = EventConfig(
-        name="TELETHON_MESSAGE_INCOMING",
-        description="Входящее сообщение в Telegram (Telethon).",
+    KURIGRAM_MESSAGE_INCOMING = EventConfig(
+        name="KURIGRAM_MESSAGE_INCOMING",
+        description="Входящее сообщение в Telegram через User API / Kurigram.",
         level=EventLevel.HIGH,
         requires_attention=True,
     )
 
-    TELETHON_GROUP_MENTION = EventConfig(
-        name="TELETHON_GROUP_MENTION",
-        description="Упоминание в Telegram (Telethon).",
+    KURIGRAM_GROUP_MENTION = EventConfig(
+        name="KURIGRAM_GROUP_MENTION",
+        description="Упоминание в Telegram через User API / Kurigram.",
         level=EventLevel.MEDIUM,
         requires_attention=True,
     )
 
-    TELETHON_MESSAGE_REACTION = EventConfig(
-        name="TELETHON_MESSAGE_REACTION",
-        description="Входящее эмодзи-реакция на сообщение в Telegram (Telethon).",
+    KURIGRAM_MESSAGE_REACTION = EventConfig(
+        name="KURIGRAM_MESSAGE_REACTION",
+        description=(
+            "Входящая эмодзи-реакция на сообщение в Telegram через User API / Kurigram."
+        ),
         level=EventLevel.LOW,
         requires_attention=False,
     )
 
-    TELETHON_CHANNEL_MESSAGE = EventConfig(
-        name="TELETHON_CHANNEL_MESSAGE",
-        description="Обычное сообщение в канале (Telethon).",
+    KURIGRAM_CHANNEL_MESSAGE = EventConfig(
+        name="KURIGRAM_CHANNEL_MESSAGE",
+        description="Обычное сообщение в канале Telegram через User API / Kurigram.",
         level=EventLevel.BACKGROUND,
         requires_attention=False,
     )
 
-    TELETHON_CHAT_ACTION = EventConfig(
-        name="TELETHON_CHAT_ACTION",
-        description="Системное действие в чате (вход/выход юзера, смена названия, закреп и т.д.).",
+    KURIGRAM_CHAT_ACTION = EventConfig(
+        name="KURIGRAM_CHAT_ACTION",
+        description=(
+            "Системное действие в Telegram-чате через User API / Kurigram "
+            "(вход/выход юзера, смена названия, закреп и т.д.)."
+        ),
         level=EventLevel.LOW,
         requires_attention=False,
     )
 
-    TELETHON_GROUP_MESSAGE = EventConfig(
-        name="TELETHON_GROUP_MESSAGE",
-        description="Обычное сообщение в чате.",
+    KURIGRAM_GROUP_MESSAGE = EventConfig(
+        name="KURIGRAM_GROUP_MESSAGE",
+        description="Обычное сообщение в Telegram-чате через User API / Kurigram.",
         level=EventLevel.BACKGROUND,
         requires_attention=False,
     )
@@ -199,9 +204,11 @@ class Events:
     @classmethod
     def all(cls) -> list[EventConfig]:
         events = []
-        for attr_name, attr_value in vars(cls).items():
-            if isinstance(attr_value, EventConfig):
+        seen_names = set()
+        for attr_value in vars(cls).values():
+            if isinstance(attr_value, EventConfig) and attr_value.name not in seen_names:
                 events.append(attr_value)
+                seen_names.add(attr_value.name)
         return events
 
 

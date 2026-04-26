@@ -1,7 +1,7 @@
 import shutil
 import yaml
 from pathlib import Path
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, model_validator
 from yaml.constructor import ConstructorError
 
 # ==========================================
@@ -29,7 +29,7 @@ class HostConfig(BaseModel):
     os: HostOSConfig
 
 
-class TelethonConfig(BaseModel):
+class KurigramConfig(BaseModel):
     enabled: bool
     session_name: str
     recent_chats_limit: int = 15
@@ -43,8 +43,16 @@ class AiogramConfig(BaseModel):
 
 
 class TelegramConfig(BaseModel):
-    telethon: TelethonConfig
+    kurigram: KurigramConfig
     aiogram: AiogramConfig
+
+    @model_validator(mode="before")
+    @classmethod
+    def accept_legacy_user_api_key(cls, data):
+        if isinstance(data, dict) and "kurigram" not in data and "telethon" in data:
+            data = dict(data)
+            data["kurigram"] = data["telethon"]
+        return data
 
 
 class GithubConfig(BaseModel):
@@ -52,6 +60,7 @@ class GithubConfig(BaseModel):
     agent_account: bool
     request_timeout_sec: int
     history_limit: int
+    polling_interval_sec: int = 300
 
 
 class EmailConfig(BaseModel):

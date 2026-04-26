@@ -8,22 +8,21 @@ from typing import Literal
 # Он должен просто кинуть взгляд на приборную панель (L0).
 
 # ==================================================================
-# TELETHON
+# TELEGRAM USER API
 # ==================================================================
 
 
-class TelethonChat:
+class TelegramUserChat:
     id: int  # ID чата
     chat_type: Literal["private", "group", "channel"]  # Тип чата
     name: str  # Название чата
     is_unread: bool  # Есть ли непрочитанные?
 
 
-class TelethonState:
+class TelegramUserState:
     """
-    Хранит состояние Telethon-клиента.
+    Хранит состояние Telegram User API клиента.
     Последние n диалогов, статус непрочитанных.
-    Обновляется слушателями (telethon/events.py) в фоне.
     """
 
     def __init__(self, number_of_last_chats: int = 15, private_chat_history_limit: int = 3):
@@ -41,6 +40,9 @@ class TelethonState:
         # Channel | ID: -10011223344 | Название: Хабр: IT Новости
 
         self.account_info = "Данные профиля загружаются..."
+
+
+KurigramState = TelegramUserState
 
 
 # ==================================================================
@@ -74,7 +76,8 @@ class AiogramState:
 class GithubState:
     """
     Хранит состояние Github-клиента.
-    Флаг is_online, информация об аккаунте агента и короткая история запросов.
+    Флаг is_online, информация об аккаунте агента, его репозиториях,
+    уведомлениях и короткая история запросов.
     """
 
     def __init__(self, history_limit: int = 10):
@@ -83,6 +86,8 @@ class GithubState:
         self.history: list[str] = []
 
         self.account_info = "Ожидание инициализации..."
+        self.own_repos = "Репозитории неизвестны."
+        self.unread_notifications = "Уведомлений нет."
 
     def add_history(self, entry: str) -> None:
         """Добавляет запись в начало истории (самые свежие сверху)."""

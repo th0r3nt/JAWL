@@ -340,3 +340,96 @@ class GithubRepositories:
             return SkillResult.ok("\n".join(lines))
         except Exception as e:
             return SkillResult.fail(f"Ошибка при получении списка веток: {e}")
+
+
+    @skill()
+    async def create_repository(
+        self, name: str, description: str = "", private: bool = False
+    ) -> SkillResult:
+        """
+        [Требует Agent Account] Создает новый репозиторий в аккаунте агента.
+        Автоматически инициализирует с README.md.
+        """
+        
+        if not self.client.config.agent_account:
+            return SkillResult.fail("Ошибка: Для создания репозитория нужен Agent Account.")
+
+        try:
+            payload = {
+                "name": name,
+                "description": description,
+                "private": private,
+                "auto_init": True  # Инициализируем пустым README
+            }
+            
+            data = await self.client.request("POST", "/user/repos", body=payload)
+            self.client.state.add_history(f"create_repo: {name}")
+            
+            repo_full_name = data.get("full_name")
+            url = data.get("html_url")
+            
+            system_logger.info(f"[Github] Создан репозиторий {repo_full_name}")
+            return SkillResult.ok(f"Репозиторий '{repo_full_name}' успешно создан.\nURL: {url}")
+            
+        except Exception as e:
+            return SkillResult.fail(f"Ошибка при создании репозитория: {e}")
+
+    @skill()
+    async def fork_repository(self, owner: str, repo: str) -> SkillResult:
+        """
+        [Требует Agent Account] Делает форк (копию) чужого репозитория в аккаунт агента.
+        Необходимо для отправки Pull Request-ов в чужие проекты.
+        Внимание: процесс создания форка на стороне GitHub занимает пару секунд.
+        """
+
+        if not self.client.config.agent_account:
+            return SkillResult.fail("Ошибка: Для создания форка нужен Agent Account.")
+
+        try:
+            # POST /repos/{owner}/{repo}/forks
+            data = await self.client.request("POST", f"/repos/{owner}/{repo}/forks")
+            self.client.state.add_history(f"fork_repo: {owner}/{repo}")
+            
+            fork_name = data.get("full_name")
+            url = data.get("html_url")
+            
+            system_logger.info(f"[Github] Сделан форк {owner}/{repo} -> {fork_name}")
+            return SkillResult.ok(
+                f"Форк успешно создан: '{fork_name}'. Теперь его можно клонировать локально.\nURL: {url}"
+            )
+            
+        except Exception as e:
+            return SkillResult.fail(f"Ошибка при форке репозитория: {e}")
+
+    @skill()
+    async def create_gist(
+        self, filename: str, content: str, description: str = "", public: bool = True
+    ) -> SkillResult:
+        """
+        [Требует Agent Account] Создает Gist (публичный или приватный сниппет кода/текста).
+        Удобно для того, чтобы поделиться логами, длинными скриптами или заметками по ссылке.
+        """
+        if not self.client.config.agent_account:
+            return SkillResult.fail("Ошибка: Для создания Gist нужен Agent Account.")
+
+        try:
+            payload = {
+                "description": description,
+                "public": public,
+                "files": {
+                    filename: {
+                        "content": content
+                    }
+                }
+            }
+            
+            data = await self.client.request("POST", "/gists", body=payload)
+            self.client.state.add_history("create_gist")
+            
+            url = data.get("html_url")
+            system_logger.info(f"[Github] Создан Gist: {filename}")
+            
+            return SkillResult.ok(f"Gist успешно создан.\nURL: {url}")
+            
+        except Exception as e:
+            return SkillResult.fail(f"Ошибка при создании Gist: {e}")

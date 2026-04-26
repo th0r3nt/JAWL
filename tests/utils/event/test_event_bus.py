@@ -1,7 +1,7 @@
 import pytest
 import asyncio
 from src.utils.event.bus import EventBus
-from src.utils.event.registry import EventConfig, EventLevel
+from src.utils.event.registry import EventConfig, EventLevel, Events
 
 # ===================================================================
 # FIXTURES
@@ -42,6 +42,13 @@ def test_subscribe_unsubscribe(bus):
 
     bus.unsubscribe(TEST_EVENT, dummy_handler)
     assert dummy_handler not in bus.listeners[TEST_EVENT.name]
+
+
+def test_kurigram_events_are_canonical_and_unique():
+    assert Events.KURIGRAM_MESSAGE_INCOMING.name == "KURIGRAM_MESSAGE_INCOMING"
+
+    event_names = [event.name for event in Events.all()]
+    assert len(event_names) == len(set(event_names))
 
 
 @pytest.mark.asyncio

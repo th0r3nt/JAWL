@@ -1,5 +1,6 @@
 import openai
 import asyncio
+import json
 from typing import Dict, Any
 from pydantic import ValidationError
 
@@ -54,6 +55,7 @@ class ReactLoop:
 
         # Хранилище Event Log: входящие события с интерфейсов, которые приходят между шагами раздумий агента
         self.current_events: list[Dict[str, Any]] = []
+        self._auto_unread_guard_seen_chat_ids: set[int] = set()
 
     async def run(
         self, event_name: str, payload: Dict[str, Any], missed_events: list[Dict[str, Any]]
@@ -61,6 +63,7 @@ class ReactLoop:
         """Запускает ReAct цикл вызова к LLM (Оркестратор)."""
 
         self.current_events = missed_events.copy()
+        self._auto_unread_guard_seen_chat_ids = set()
 
         try:
             self.agent_state.reset_step()
@@ -103,6 +106,18 @@ class ReactLoop:
                 # =======================================================
                 # Проверка на завершение цикла
                 if not actions:
+                    unread_actions = self._actions_for_unread_telegram_dashboard(messages)
+                    if unread_actions:
+                        system_logger.warning(
+                            "[ReAct] Пустой actions заблокирован: в Telegram dashboard есть unread-чаты. Авточтение."
+                        )
+                        await self._execute_actions(
+                            thoughts or "[System: auto-reading unread Telegram chats]",
+                            unread_actions,
+                        )
+                        self.agent_state.next_step()
+                        continue
+
                     await self._handle_completion(thoughts)
                     break
 
@@ -199,6 +214,67 @@ class ReactLoop:
             },
         )
 
+    def _actions_for_unread_telegram_dashboard(
+        self, messages: list[Dict[str, Any]]
+    ) -> list[ActionCall]:
+        context_text = self._messages_text(messages)
+        telegram_block = self._extract_context_section(
+            context_text, "### TELEGRAM USER API"
+        )
+        if not telegram_block or "UNREAD:" not in telegram_block:
+            return []
+
+        chat_ids: list[int] = []
+        patterns = (
+            r"^\[[^\]]+\]\s+.+?\(ID:\s*(-?\d+)\)\s+\[UNREAD:\s*(\d+)\]",
+            r"^-\s+\w+\s+\|\s+ID:\s+`(-?\d+)`\s+\|.*\bUNREAD:\s*(\d+)",
+        )
+        for pattern in patterns:
+            for match in re.finditer(pattern, telegram_block, re.MULTILINE):
+                unread_count = int(match.group(2))
+                chat_id = int(match.group(1))
+                if (
+                    unread_count <= 0
+                    or chat_id in self._auto_unread_guard_seen_chat_ids
+                    or chat_id in chat_ids
+                ):
+                    continue
+                chat_ids.append(chat_id)
+
+        for chat_id in chat_ids:
+            self._auto_unread_guard_seen_chat_ids.add(chat_id)
+
+        return [
+            ActionCall(
+                tool_name="KurigramChats.read_chat",
+                parameters={"chat_id": chat_id, "limit": 10},
+            )
+            for chat_id in chat_ids
+        ]
+
+    @staticmethod
+    def _messages_text(messages: list[Dict[str, Any]]) -> str:
+        parts: list[str] = []
+        for message in messages:
+            content = message.get("content", "")
+            if isinstance(content, str):
+                parts.append(content)
+                continue
+            if isinstance(content, list):
+                for item in content:
+                    if isinstance(item, dict) and isinstance(item.get("text"), str):
+                        parts.append(item["text"])
+        return "\n".join(parts)
+
+    @staticmethod
+    def _extract_context_section(context_text: str, section_header: str) -> str:
+        match = re.search(
+            rf"^{re.escape(section_header)}.*?(?=^\s*### |\Z)",
+            context_text,
+            re.MULTILINE | re.DOTALL,
+        )
+        return match.group(0) if match else ""
+
     async def _call_llm_with_retries(self, messages: list) -> str | None:
         """
         Обрабатывает запросы к LLM,
@@ -291,6 +367,10 @@ class ReactLoop:
             if match:
                 clean_answer = match.group(0)
 
+        xml_actions_response = self._parse_xmlish_actions_response(clean_answer)
+        if xml_actions_response is not None:
+            return xml_actions_response
+
         if not clean_answer.startswith("{"):
             # Имитация пустого действия
             return AgentResponse(thoughts=clean_answer, actions=[])
@@ -313,6 +393,55 @@ class ReactLoop:
             )
             self.agent_state.last_actions_result = err_msg
             return None
+
+    def _parse_xmlish_actions_response(self, raw_answer: str) -> AgentResponse | None:
+        """
+        Claude-compatible fallback: sometimes a forced tool call is returned as
+        text with `<parameter name="actions">[...]` instead of JSON arguments.
+        """
+
+        parameter_match = re.search(
+            r"<parameter\s+name=[\"']actions[\"']\s*>", raw_answer, re.IGNORECASE
+        )
+        if not parameter_match:
+            return None
+
+        actions_tail = raw_answer[parameter_match.end() :].strip()
+        if actions_tail.startswith("```"):
+            actions_tail = re.sub(r"^```(?:json)?\s*", "", actions_tail, flags=re.I)
+
+        array_start = actions_tail.find("[")
+        if array_start < 0:
+            return AgentResponse(
+                thoughts=self._extract_xmlish_thoughts(raw_answer, parameter_match.start()),
+                actions=[],
+            )
+
+        decoder = json.JSONDecoder()
+        try:
+            actions_payload, _ = decoder.raw_decode(actions_tail[array_start:])
+            return AgentResponse.model_validate(
+                {
+                    "thoughts": self._extract_xmlish_thoughts(
+                        raw_answer, parameter_match.start()
+                    ),
+                    "actions": actions_payload,
+                }
+            )
+        except (json.JSONDecodeError, ValidationError) as e:
+            system_logger.warning(f"[ReAct] Ошибка парсинга XML-ish actions: {e}")
+            return None
+
+    def _extract_xmlish_thoughts(self, raw_answer: str, parameter_start: int) -> str:
+        thoughts_prefix = raw_answer[:parameter_start].strip()
+        thoughts_match = re.search(
+            r"<thoughts>(?P<thoughts>.*)</thoughts>",
+            thoughts_prefix,
+            re.DOTALL | re.IGNORECASE,
+        )
+        if thoughts_match:
+            return thoughts_match.group("thoughts").strip()
+        return re.sub(r"</thoughts>\s*$", "", thoughts_prefix, flags=re.IGNORECASE).strip()
 
     def add_realtime_event(self, event_data: Dict[str, Any]) -> None:
         """

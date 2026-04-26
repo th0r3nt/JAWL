@@ -24,7 +24,7 @@ from src.l0_state.agent.state import AgentState
 from src.l0_state.interfaces.state import (
     HostOSState,
     HostTerminalState,
-    TelethonState,
+    TelegramUserState,
     AiogramState,
     WebSearchState,
     CalendarState,
@@ -84,7 +84,7 @@ class System:
         self.root_dir = Path.cwd()
         self.local_data_dir = self.root_dir / "src" / "utils" / "local" / "data"
 
-        # Хранилище компонентов, которые нужно запустить (например, поллинг Telethon)
+        # Хранилище компонентов, которые нужно запустить (например, Telegram User API)
         self._lifecycle_components: list[Any] = []
 
         # Возвращает в конце работы
@@ -119,10 +119,11 @@ class System:
         self.terminal_state = HostTerminalState(number_of_last_messages=15)
 
         # TELEGRAM
-        self.telethon_state = TelethonState(
-            number_of_last_chats=self.interfaces_config.telegram.telethon.recent_chats_limit,
-            private_chat_history_limit=self.interfaces_config.telegram.telethon.private_chat_history_limit,
+        self.telegram_user_state = TelegramUserState(
+            number_of_last_chats=self.interfaces_config.telegram.kurigram.recent_chats_limit,
+            private_chat_history_limit=self.interfaces_config.telegram.kurigram.private_chat_history_limit,
         )
+        self.kurigram_state = self.telegram_user_state
         self.aiogram_state = AiogramState(
             number_of_last_chats=self.interfaces_config.telegram.aiogram.recent_chats_limit
         )
@@ -240,9 +241,9 @@ class System:
 
     def setup_l2_interfaces(
         self,
-        # Telethon
-        telethon_api_id: Optional[str] = None,
-        telethon_api_hash: Optional[str] = None,
+        # Telegram User API (legacy env names)
+        telegram_user_api_id: Optional[str] = None,
+        telegram_user_api_hash: Optional[str] = None,
         # Aiogram
         aiogram_bot_token: Optional[str] = None,
         # GitHub
@@ -256,9 +257,9 @@ class System:
         system_logger.info("[System] Инициализация L2 Interfaces.")
 
         env_vars = {
-            # Telethon
-            "TELETHON_API_ID": telethon_api_id,
-            "TELETHON_API_HASH": telethon_api_hash,
+            # Telegram User API (legacy env names)
+            "TELETHON_API_ID": telegram_user_api_id,
+            "TELETHON_API_HASH": telegram_user_api_hash,
             # Aiogram
             "AIOGRAM_BOT_TOKEN": aiogram_bot_token,
             # GitHub
@@ -287,7 +288,7 @@ class System:
         rag_memories = RAGMemories(
             vector_knowledge=self.vector.knowledge,
             vector_thoughts=self.vector.thoughts,
-            telethon_state=self.telethon_state,
+            telegram_user_state=self.telegram_user_state,
             agent_state=self.agent_state,
             auto_rag_top_k=self.settings.system.vector_db.auto_rag_top_k,
             auto_rag_max_query_chars=self.settings.system.vector_db.auto_rag_max_query_chars,
@@ -413,9 +414,9 @@ class System:
         self,
         llm_api_url: str,
         llm_api_keys: list[str],
-        # Telethon
-        telethon_api_id: Optional[str] = None,
-        telethon_api_hash: Optional[str] = None,
+        # Telegram User API (legacy env names)
+        telegram_user_api_id: Optional[str] = None,
+        telegram_user_api_hash: Optional[str] = None,
         # Aiogram
         aiogram_bot_token: Optional[str] = None,
         # GitHub
@@ -443,9 +444,9 @@ class System:
 
             # L2 INTERFACES
             self.setup_l2_interfaces(
-                # Telethon
-                telethon_api_id=telethon_api_id,
-                telethon_api_hash=telethon_api_hash,
+                # Telegram User API (legacy env names)
+                telegram_user_api_id=telegram_user_api_id,
+                telegram_user_api_hash=telegram_user_api_hash,
                 # Aiogram
                 aiogram_bot_token=aiogram_bot_token,
                 # GitHub
@@ -582,9 +583,9 @@ async def main() -> int:
     )
     try:
         # Пробуем взять .env токены/API для интерфейсов
-        # Telethon
-        TELETHON_API_ID = os.getenv("TELETHON_API_ID", None)
-        TELETHON_API_HASH = os.getenv("TELETHON_API_HASH", None)
+        # Telegram User API (legacy env names)
+        telegram_user_api_id = os.getenv("TELETHON_API_ID", None)
+        telegram_user_api_hash = os.getenv("TELETHON_API_HASH", None)
         # Aiogram
         AIOGRAM_BOT_TOKEN = os.getenv("AIOGRAM_BOT_TOKEN", None)
         # GitHub 
@@ -604,9 +605,9 @@ async def main() -> int:
         exit_code = await system.run(
             llm_api_url=LLM_API_URL,
             llm_api_keys=LLM_API_KEYS,
-            # Telethon
-            telethon_api_id=TELETHON_API_ID,
-            telethon_api_hash=TELETHON_API_HASH,
+            # Telegram User API (legacy env names)
+            telegram_user_api_id=telegram_user_api_id,
+            telegram_user_api_hash=telegram_user_api_hash,
             # Aiogram
             aiogram_bot_token=AIOGRAM_BOT_TOKEN,
             # GitHub
