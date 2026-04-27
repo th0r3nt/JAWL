@@ -240,7 +240,12 @@ class HostOSExecution:
 
             # Лог-файл для STDOUT/STDERR демона
             safe_name = "".join(c if c.isalnum() else "_" for c in name)
-            log_path = self.host_os.sandbox_dir / f"daemon_{safe_name}.log"
+            
+            # Складируем логи в отдельную папку sandbox/logs/
+            logs_dir = self.host_os.sandbox_dir / "logs"
+            logs_dir.mkdir(exist_ok=True)
+            
+            log_path = logs_dir / f"daemon_{safe_name}.log"
             log_file = open(log_path, "a", encoding="utf-8")
 
             # Параметры отсоединения процесса

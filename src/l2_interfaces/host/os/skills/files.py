@@ -1,4 +1,5 @@
 import ast
+from pathlib import Path
 from typing import Literal
 import shutil
 import asyncio
@@ -414,7 +415,7 @@ class HostOSFiles:
     async def open_file(self, filepath: str) -> SkillResult:
         """
         'Открывает' файл. Содержимое открытого файла всегда будет отображаться в системном промпте (вкладки редактора).
-        Полезно использовать, чтобы держать нужный код перед глазами во время работы над ним.
+        Крайне полезно и рекомендовано использовать, чтобы держать нужный код перед глазами во время работы над ним.
         """
 
         try:
@@ -469,13 +470,15 @@ class HostOSFiles:
 
         except Exception as e:
             return SkillResult.fail(f"Ошибка при закрытии файла: {e}")
-        
+
     @skill()
-    async def open_directory_workspace(self, path: str = ".", recursive: bool = False) -> SkillResult:
+    async def open_directory_workspace(
+        self, path: str = ".", recursive: bool = False
+    ) -> SkillResult:
         """
         Массово 'открывает' файлы из указанной директории во вкладках редактора.
         recursive: если True, откроет файлы и во всех вложенных подпапках.
-        Крайне полезно, когда нужно держать перед глазами сразу несколько файлов одного модуля.
+        Крайне полезно и рекомендовано, когда нужно держать перед глазами сразу несколько файлов одного модуля.
         """
         try:
             safe_path = self.host_os.validate_path(path, is_write=False)
@@ -491,32 +494,60 @@ class HostOSFiles:
                 )
 
             ignore_exts = {
-                ".pyc", ".pyo", ".pyd", ".tmp", ".swp", ".exe", ".dll", ".so", 
-                ".png", ".jpg", ".jpeg", ".zip", ".tar", ".gz", ".db", ".sqlite", 
-                ".sqlite3", ".pdf", ".mp4", ".mp3", ".wav", ".class"
+                ".pyc",
+                ".pyo",
+                ".pyd",
+                ".tmp",
+                ".swp",
+                ".exe",
+                ".dll",
+                ".so",
+                ".png",
+                ".jpg",
+                ".jpeg",
+                ".zip",
+                ".tar",
+                ".gz",
+                ".db",
+                ".sqlite",
+                ".sqlite3",
+                ".pdf",
+                ".mp4",
+                ".mp3",
+                ".wav",
+                ".class",
             }
-            
+
             ignore_dirs = {
-                ".git", "venv", ".venv", "env", "__pycache__", "node_modules", ".pytest_cache"
+                ".git",
+                "venv",
+                ".venv",
+                "env",
+                "__pycache__",
+                "node_modules",
+                ".pytest_cache",
             }
 
             opened_now = []
             skipped_limit = 0
 
             iterator = safe_path.rglob("*") if recursive else safe_path.iterdir()
-            
+
             # Сортируем пути для детерминированного порядка открытия
             items = sorted([p for p in iterator if p.is_file()])
-            
+
             for item in items:
                 # Пропускаем скрытые файлы и бинарники
                 if item.name.startswith(".") or item.suffix.lower() in ignore_exts:
                     continue
-                    
+
                 # При рекурсивном обходе пропускаем мусорные папки
                 if recursive:
                     rel_to_base = item.relative_to(safe_path)
-                    if any(part in ignore_dirs or part.startswith(".") for part in rel_to_base.parts):
+                    if any(
+                        part in ignore_dirs or part.startswith(".")
+                        for part in rel_to_base.parts
+                    ):
                         continue
 
                 if len(self.host_os.state.opened_workspace_files) >= limit:
@@ -538,17 +569,19 @@ class HostOSFiles:
                     msg += f" Пропущено из-за лимита: {skipped_limit} файлов."
                 return SkillResult.ok(msg)
 
-            system_logger.info(f"[Host OS] Массово открыты файлы из '{safe_path.name}' в рабочей среде (рекурсивно: {recursive}).")
-            
+            system_logger.info(
+                f"[Host OS] Массово открыты файлы из '{safe_path.name}' в рабочей среде (рекурсивно: {recursive})."
+            )
+
             msg = f"Успешно добавлены во вкладки: {', '.join(opened_now)}."
             if skipped_limit > 0:
                 msg += f" (Пропущено из-за лимита открытых файлов: {skipped_limit})"
-            
+
             return SkillResult.ok(msg)
 
         except PermissionError as e:
             return SkillResult.fail(str(e))
-        
+
         except Exception as e:
             return SkillResult.fail(f"Ошибка при открытии директории: {e}")
 
@@ -557,9 +590,11 @@ class HostOSFiles:
     # =================================================================================
 
     @skill()
-    async def list_directory(self, path: str = ".") -> SkillResult:
-        """Показывает содержимое папки и размеры файлов."""
-
+    async def list_directory(self, path: str = ".", max_depth: int = 1) -> SkillResult:
+        """
+        Показывает содержимое директории в виде красивого дерева (иерархии).
+        max_depth: насколько глубоко заглядывать во вложенные папки (0 - только текущая папка, 1 - на один уровень вглубь, и т.д.)
+        """
         limit = self.host_os.config.file_list_limit
 
         try:
@@ -576,40 +611,97 @@ class HostOSFiles:
 
             meta = self.host_os.get_file_metadata()
 
-            items = []
-            for i, item in enumerate(safe_path.iterdir()):
-                if i >= limit:
-                    items.append(f"... [Показано {limit} элементов. Остальные скрыты] ...")
-                    break
+            ignore_exts = {".pyc", ".pyo", ".pyd", ".tmp", ".swp"}
+            ignore_dirs = {
+                ".git",
+                "venv",
+                ".venv",
+                "env",
+                "__pycache__",
+                "node_modules",
+                ".pytest_cache",
+            }
+
+            lines = []
+            lines_count = 0
+
+            def _build_tree(current_dir: Path, current_depth: int, prefix: str):
+                nonlocal lines_count
+                if current_depth > max_depth or lines_count >= limit:
+                    return
 
                 try:
-                    size_str = format_size(item.stat().st_size) if item.is_file() else "DIR"
-                except Exception:
-                    size_str = "???"
+                    items = []
+                    for p in current_dir.iterdir():
+                        if p.name.startswith(".") and p.name not in {".env"}:
+                            continue
+                        if p.is_dir() and p.name in ignore_dirs:
+                            continue
+                        if p.is_file() and p.suffix.lower() in ignore_exts:
+                            continue
+                        items.append(p)
 
-                prefix = "📁" if item.is_dir() else "📄"
+                    # Сортировка: папки сначала, затем файлы (по алфавиту)
+                    items.sort(key=lambda x: (not x.is_dir(), x.name.lower()))
+                    total_items = len(items)
 
-                desc = ""
-                try:
-                    if item.is_relative_to(self.host_os.sandbox_dir):
-                        rel_path = item.relative_to(self.host_os.sandbox_dir).as_posix()
-                        if rel_path in meta:
-                            desc = f" [Description: {meta[rel_path]}]"
+                    for i, item in enumerate(items):
+                        if lines_count >= limit:
+                            return
+
+                        is_last = i == total_items - 1
+                        connector = "└── " if is_last else "├── "
+
+                        if item.is_dir():
+                            lines.append(f"{prefix}{connector}📂 {item.name}/")
+                            lines_count += 1
+
+                            if current_depth < max_depth:
+                                extension = "    " if is_last else "│   "
+                                _build_tree(item, current_depth + 1, prefix + extension)
+                        else:
+                            try:
+                                size_str = format_size(item.stat().st_size)
+                            except Exception:
+                                size_str = "???"
+
+                            desc = ""
+                            try:
+                                if item.is_relative_to(self.host_os.sandbox_dir):
+                                    rel_path = item.relative_to(
+                                        self.host_os.sandbox_dir
+                                    ).as_posix()
+                                    if rel_path in meta:
+                                        desc = f" [Description: {meta[rel_path]}]"
+                            except Exception:
+                                pass
+
+                            lines.append(
+                                f"{prefix}{connector}📄 {item.name} ({size_str}){desc}"
+                            )
+                            lines_count += 1
+
                 except Exception:
                     pass
 
-                items.append(f"{prefix} {item.name} ({size_str}){desc}")
+            root_icon = "🏠" if dir_display == self.host_os.framework_dir.name else "📂"
+            lines.append(f"{root_icon} {dir_display}/")
 
-            if not items:
-                return SkillResult.ok(f"Директория '{dir_display}/' пуста.")
+            _build_tree(safe_path, 0, "")
 
-            system_logger.info(f"[Host OS] Просмотр директории: {safe_path.name}")
-            # Возвращаем с понятным заголовком
-            return SkillResult.ok(f"Содержимое '{dir_display}/':\n" + "\n".join(items))
+            if lines_count >= limit:
+                lines.append(
+                    f"└── ... [Лимит вывода {limit} элементов достигнут. Остальные скрыты]"
+                )
+
+            if len(lines) == 1:
+                lines.append("└── (Пустая директория)")
+
+            system_logger.info(f"[Host OS] Просмотр директории (дерево): {safe_path.name}")
+            return SkillResult.ok("\n".join(lines))
 
         except PermissionError as e:
             return SkillResult.fail(str(e))
-
         except Exception as e:
             return SkillResult.fail(f"Ошибка при чтении директории: {e}")
 
