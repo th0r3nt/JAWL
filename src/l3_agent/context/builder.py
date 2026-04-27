@@ -62,19 +62,37 @@ class ContextBuilder:
         Возвращает отформатированный блок контекста текущего Heartbeat.
         """
 
+        local_event_name = event_name
+        local_payload = payload.copy()
+        local_missed_events = missed_events.copy()
+
+        # На шагах > 1 прячем оригинальный триггер в лог, а текущим ставим HEARTBEAT
+        if self.agent_state.current_step > 1 and local_event_name != "HEARTBEAT":
+            processed_event = {
+                "name": f"{local_event_name} [Уже получено на 1-м шаге]",
+                "payload": local_payload.copy(),
+                "time": "Step 1",
+                "level": "PROCESSED",
+            }
+            local_missed_events.append(processed_event)
+
+            # Подменяем текущий триггер
+            local_event_name = "HEARTBEAT"
+            local_payload = {}
+
         seen_chat_histories = set()
 
         # Форматируем текущий триггер (он самый свежий)
-        if payload.get("chat_id") and "recent_history" in payload:
-            seen_chat_histories.add(payload["chat_id"])
-            
-        current_trigger = self._format_single_event(event_name, payload)
+        if local_payload.get("chat_id") and "recent_history" in local_payload:
+            seen_chat_histories.add(local_payload["chat_id"])
+
+        current_trigger = self._format_single_event(local_event_name, local_payload)
 
         # Форматируем список пропущенных событий (Event Log)
         log_blocks = []
-        
+
         # Идем с конца (от самых свежих к старым), чтобы оставить историю только у самого последнего
-        for evt in reversed(missed_events):
+        for evt in reversed(local_missed_events):
             evt_payload = evt["payload"].copy()
             chat_id = evt_payload.get("chat_id")
 
@@ -88,8 +106,8 @@ class ContextBuilder:
             formatted = self._format_single_event(
                 event_name=evt["name"],
                 payload=evt_payload,
-                event_time=evt["time"],
-                level=evt["level"],
+                event_time=evt.get("time"),
+                level=evt.get("level"),
             )
             # Вставляем в начало, чтобы вернуть хронологический порядок (старые сверху)
             log_blocks.insert(0, formatted)

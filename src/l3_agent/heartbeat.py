@@ -92,7 +92,7 @@ class Heartbeat:
             # Пробрасываем событие прямо в активный цикл
             self.react_loop.add_realtime_event(event_data)
 
-            # Если множитель 0.0 - это жесткое прерывание текущего процесса (например, SYSTEM_SHUTDOWN)
+            # Если множитель 0.0 - это жесткое прерывание текущего процесса
             if multiplier <= 0.01:
                 system_logger.warning(
                     f"[Heartbeat] Прерывание текущего ReAct-цикла из-за события: {event_name}"
@@ -101,9 +101,14 @@ class Heartbeat:
                 self._wake_payload = payload
                 self._wake_level = level.value
                 self._is_interrupted = True
+                
+                # Сбрасываем таймер в ноль, чтобы после cancel() цикл стартанул моментально
+                self._next_tick_time = time.time()
+                self._wake_event.set()
+                
                 self._active_react_task.cancel()
 
-            # Таймер следующего сна (_next_tick_time) НЕ трогаем
+            # Таймер следующего сна (_next_tick_time) НЕ трогаем (если это не прерывание)
             return
 
         # =========================================================
