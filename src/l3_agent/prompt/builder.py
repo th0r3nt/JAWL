@@ -8,10 +8,12 @@ class PromptBuilder:
     Динамический контекст (память, время, логи) добавляется отдельно в context/builder.py.
     """
 
-    def __init__(self, prompt_dir: str | Path):
+    def __init__(self, prompt_dir: str | Path, drives_enabled: bool = False):
         self.prompt_dir = Path(prompt_dir)
         # Убеждаемся, что папка для кастомных промптов существует
         (self.prompt_dir / "custom").mkdir(parents=True, exist_ok=True)
+
+        self.drives_enabled = drives_enabled
 
     def _gather_markdown(self, sub_folder: Literal["personality", "system", "custom"]) -> str:
         """
@@ -23,9 +25,13 @@ class PromptBuilder:
         if not target_dir.exists() or not target_dir.is_dir():
             return ""
 
-        valid_files = [
+        valid_files =[
             f for f in target_dir.rglob("*.md") if not f.name.endswith(".example.md")
         ]
+
+        # Исключаем DRIVES.md, если модуль выключен
+        if not self.drives_enabled:
+            valid_files =[f for f in valid_files if f.name.upper() != "DRIVES.md"]
 
         def sort_key(path: Path):
             name = path.name.upper()

@@ -148,36 +148,36 @@ class System:
     async def setup_l1_databases(self):
         """Поднимает базы данных и регистрирует их CRUD-скиллы."""
 
-        sys_cfg = self.settings.system
+        self.sys_cfg = self.settings.system
         system_logger.info("[System] Инициализация L1 Databases.")
 
         # SQL DB
         self.sql = SQLManager(
             db_path=self.local_data_dir / "sql" / "db" / "agent.db",
             # Ticks
-            ticks_limit=sys_cfg.context_depth.ticks,
+            ticks_limit=self.sys_cfg.context_depth.ticks,
             # Детальные тики
-            detailed_ticks=sys_cfg.context_depth.detailed_ticks,
-            tick_action_max_chars=sys_cfg.context_depth.tick_action_max_chars,
-            tick_result_max_chars=sys_cfg.context_depth.tick_result_max_chars,
+            detailed_ticks=self.sys_cfg.context_depth.detailed_ticks,
+            tick_action_max_chars=self.sys_cfg.context_depth.tick_action_max_chars,
+            tick_result_max_chars=self.sys_cfg.context_depth.tick_result_max_chars,
             # Старые тики
-            tick_thoughts_short_max_chars=sys_cfg.context_depth.tick_thoughts_short_max_chars,
-            tick_action_short_max_chars=sys_cfg.context_depth.tick_action_short_max_chars,
-            tick_result_short_max_chars=sys_cfg.context_depth.tick_result_short_max_chars,
+            tick_thoughts_short_max_chars=self.sys_cfg.context_depth.tick_thoughts_short_max_chars,
+            tick_action_short_max_chars=self.sys_cfg.context_depth.tick_action_short_max_chars,
+            tick_result_short_max_chars=self.sys_cfg.context_depth.tick_result_short_max_chars,
             # Tasks
-            max_tasks=sys_cfg.sql.tasks.max_tasks,
+            max_tasks=self.sys_cfg.sql.tasks.max_tasks,
             # Mental State
-            max_mental_state_entities=sys_cfg.sql.mental_states.max_entities,
+            max_mental_state_entities=self.sys_cfg.sql.mental_states.max_entities,
             # Personality Traits
-            max_traits=sys_cfg.sql.personality_traits.max_traits,
+            max_traits=self.sys_cfg.sql.personality_traits.max_traits,
             # Drives
-            drives_enabled=sys_cfg.sql.drives.enabled,
-            decay_rate=sys_cfg.sql.drives.decay_rate,
-            decay_interval_sec=sys_cfg.sql.drives.decay_interval_sec,
-            max_history_drives=sys_cfg.sql.drives.max_reflections_history,
-            max_custom_drives=sys_cfg.sql.drives.max_custom_drives,
+            drives_enabled=self.sys_cfg.sql.drives.enabled,
+            decay_rate=self.sys_cfg.sql.drives.decay_rate,
+            decay_interval_sec=self.sys_cfg.sql.drives.decay_interval_sec,
+            max_history_drives=self.sys_cfg.sql.drives.max_reflections_history,
+            max_custom_drives=self.sys_cfg.sql.drives.max_custom_drives,
             # Время
-            timezone=sys_cfg.timezone,
+            timezone=self.sys_cfg.timezone,
         )
         await self.sql.connect()
 
@@ -186,14 +186,14 @@ class System:
         # =========================================================
 
         # DRIVES
-        if sys_cfg.sql.drives.enabled:
+        if self.sys_cfg.sql.drives.enabled:
             register_instance(self.sql.drives)
             self.context_registry.register_provider(
                 "sql_drives", self.sql.drives.get_context_block, section=ContextSection.DRIVES
             )
 
         # PERSONALITY TRAITS
-        if sys_cfg.sql.personality_traits.enabled:
+        if self.sys_cfg.sql.personality_traits.enabled:
             register_instance(self.sql.personality_traits)
             self.context_registry.register_provider(
                 "sql_traits",
@@ -202,14 +202,14 @@ class System:
             )
 
         # TASKS
-        if sys_cfg.sql.tasks.enabled:
+        if self.sys_cfg.sql.tasks.enabled:
             register_instance(self.sql.tasks)
             self.context_registry.register_provider(
                 "sql_tasks", self.sql.tasks.get_context_block, section=ContextSection.TASKS
             )
 
         # MENTAL STATES
-        if sys_cfg.sql.mental_states.enabled:
+        if self.sys_cfg.sql.mental_states.enabled:
             register_instance(self.sql.mental_states)
             self.context_registry.register_provider(
                 "sql_mental_states",
@@ -288,7 +288,8 @@ class System:
         self.llm_client = LLMClient(api_url=llm_api_url, api_keys_rotator=rotator)
 
         prompt_builder = PromptBuilder(
-            prompt_dir=self.root_dir / "src" / "l3_agent" / "prompt"
+            prompt_dir=self.root_dir / "src" / "l3_agent" / "prompt",
+            drives_enabled=self.sys_cfg.sql.drives.enabled
         )
 
         # Поднимаем RAG-провайдер и регистрируем его
