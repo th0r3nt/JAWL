@@ -161,7 +161,7 @@ def draw_header(version: str = "v0.9.0") -> None:
     panel = Panel(content, border_style="cyan", expand=False)
 
     # Центрируем саму собранную плашку
-    console.print(Align.center(panel))
+    console.print(panel)
 
 
 def print_success(msg: str) -> None:
