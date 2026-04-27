@@ -24,8 +24,7 @@ class HostOSExecution:
     @skill()
     async def execute_script(self, filepath: str) -> SkillResult:
         """
-        Запускает скрипт (.py, .sh, .bat, .js).
-        При Access level = 1 запускает только из папки sandbox/.
+        [1/OBSERVER] Запускает скрипт (.py, .sh, .bat, .js).
         """
 
         timeout = self.host_os.config.execution_timeout_sec
@@ -121,15 +120,14 @@ class HostOSExecution:
     @skill()
     async def execute_shell_command(self, command: str) -> SkillResult:
         """
-        Запускает сырую bash/cmd команду в терминале ОС.
-        Доступно только при Access Level >= 2.
+        [3/ROOT] Запускает сырую bash/cmd команду в терминале ОС.
         """
 
         timeout = self.host_os.config.execution_timeout_sec
 
-        if self.host_os.access_level < HostOSAccessLevel.OPERATOR:
+        if self.host_os.access_level < HostOSAccessLevel.ROOT:
             return SkillResult.fail(
-                "Отказано в доступе: выполнение shell-команд требует access_level >= 2 (OPERATOR)."
+                "Отказано в доступе: выполнение shell-команд по всей ОС требует access_level = 3 (ROOT)."
             )
 
         try:
@@ -177,17 +175,16 @@ class HostOSExecution:
     @skill()
     async def kill_process(self, pid: int) -> SkillResult:
         """
-        Принудительно завершает процесс ОС по его PID.
-        Доступно только при Access Level >= 2.
+        [3/ROOT] Принудительно завершает процесс ОС по его PID.
         """
 
-        if self.host_os.access_level < HostOSAccessLevel.OPERATOR:
+        if self.host_os.access_level < HostOSAccessLevel.ROOT:
             return SkillResult.fail(
-                "Отказано в доступе: управление процессами ОС требует access_level >= 2 (OPERATOR)."
+                "Отказано в доступе: управление процессами ОС требует access_level = 3 (ROOT)."
             )
 
         try:
-            process = psutil.Process(pid)
+            process = psutil.Process(int(pid))
             process_name = process.name()
 
             process.terminate()
@@ -212,77 +209,82 @@ class HostOSExecution:
         except Exception as e:
             return SkillResult.fail(f"Ошибка при попытке завершить процесс: {e}")
 
-
     @skill()
     async def start_daemon(self, filepath: str, name: str, description: str) -> SkillResult:
         """
-        Запускает Python-скрипт как фоновый процесс (демон).
+        [1/OBSERVER] Запускает Python-скрипт как фоновый процесс (демон).
         Скрипт будет работать автономно. Его вывод (print, ошибки) будет перенаправлен в файл daemon_<name>.log в песочнице.
 
         Можно использовать 'jawl_api.py' внутри скрипта для отправки событий (вебхуков) агенту. Пример:
         from jawl_api import send_event
-        send_event("Парсинг окончен", {"new_items": 15})
+        send_event(message="Парсинг окончен", payload={"new_items": 15})
         """
         import time
         import subprocess
-        
+
         if self.host_os.access_level < HostOSAccessLevel.OBSERVER:
-            return SkillResult.fail("Отказано в доступе: запуск демонов разрешен при Access Level >= 1.")
+            return SkillResult.fail(
+                "Отказано в доступе: запуск демонов разрешен при Access Level >= 1."
+            )
 
         try:
             safe_path = self.host_os.validate_path(filepath, is_write=False)
 
             if not safe_path.is_file():
                 return SkillResult.fail(f"Ошибка: Скрипт не найден ({safe_path.name}).")
-                
+
             if safe_path.suffix.lower() != ".py":
-                return SkillResult.fail("Ошибка: В качестве демонов поддерживается запуск только .py скриптов.")
+                return SkillResult.fail(
+                    "Ошибка: В качестве демонов поддерживается запуск только .py скриптов."
+                )
 
             # Лог-файл для STDOUT/STDERR демона
             safe_name = "".join(c if c.isalnum() else "_" for c in name)
-            
+
             # Складируем логи в отдельную папку sandbox/logs/
             logs_dir = self.host_os.sandbox_dir / "logs"
             logs_dir.mkdir(exist_ok=True)
-            
+
             log_path = logs_dir / f"daemon_{safe_name}.log"
             log_file = open(log_path, "a", encoding="utf-8")
 
             # Параметры отсоединения процесса
             kwargs = {}
             if sys.platform == "win32":
-                kwargs["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP | 0x00000008  # DETACHED_PROCESS
+                kwargs["creationflags"] = (
+                    subprocess.CREATE_NEW_PROCESS_GROUP | 0x00000008
+                )  # DETACHED_PROCESS
             else:
                 kwargs["start_new_session"] = True
 
             cmd = [sys.executable, str(safe_path)]
-            
+
             # Запускаем неблокирующе
             process = subprocess.Popen(
                 cmd,
                 stdout=log_file,
                 stderr=subprocess.STDOUT,
                 cwd=str(safe_path.parent),
-                **kwargs
+                **kwargs,
             )
-            
+
             pid = process.pid
-            
+
             # Сохраняем в реестр
             registry = self.host_os.get_daemons_registry()
             registry[str(pid)] = {
                 "name": name,
                 "description": description,
                 "filepath": str(safe_path.relative_to(self.host_os.sandbox_dir)),
-                "start_time": time.time()
+                "start_time": time.time(),
             }
             self.host_os.set_daemons_registry(registry)
-            
+
             system_logger.info(f"[Host OS] Запущен фоновый демон '{name}' (PID: {pid})")
             return SkillResult.ok(
                 f"Демон '{name}' успешно запущен (PID: {pid}).\n"
                 f"Логи перенаправлены в файл: sandbox/{log_path.name}\n"
-                f"Вы можете отслеживать его статус в контексте Host OS (Active Daemons) или остановить с помощью stop_daemon."
+                f"Теперь можно отслеживать его статус в контексте Host OS (Active Daemons) или остановить с помощью stop_daemon."
             )
 
         except PermissionError as e:
@@ -292,22 +294,25 @@ class HostOSExecution:
 
     @skill()
     async def stop_daemon(self, pid: int) -> SkillResult:
-        """Останавливает работающий фоновый демон по его PID."""
+        """
+        [1/OBSERVER] Останавливает работающий фоновый демон по его PID.
+        """
+
         if self.host_os.access_level < HostOSAccessLevel.OBSERVER:
             return SkillResult.fail("Отказано в доступе.")
 
         try:
             registry = self.host_os.get_daemons_registry()
             pid_str = str(pid)
-            
+
             if pid_str not in registry:
                 return SkillResult.fail(f"Ошибка: Демон с PID {pid} не найден в реестре.")
-                
+
             name = registry[pid_str]["name"]
 
             # Убиваем процесс
             try:
-                proc = psutil.Process(pid)
+                proc = psutil.Process(int(pid))
                 proc.terminate()
                 proc.wait(timeout=3)
             except psutil.NoSuchProcess:
@@ -320,26 +325,28 @@ class HostOSExecution:
             # Удаляем из реестра
             del registry[pid_str]
             self.host_os.set_daemons_registry(registry)
-            
+
             system_logger.info(f"[Host OS] Остановлен фоновый демон '{name}' (PID: {pid})")
             return SkillResult.ok(f"Демон '{name}' (PID: {pid}) успешно остановлен вручную.")
 
         except Exception as e:
             return SkillResult.fail(f"Ошибка при остановке демона: {e}")
-        
+
     @skill()
     async def execute_sandbox_func(
         self, filepath: str, func_name: str, kwargs: dict = None
     ) -> SkillResult:
         """
-        Универсальный шлюз для безопасного вызова конкретной функции или корутины из Python-скрипта в песочнице.
-        Позволяет передать аргументы и напрямую получить возвращаемый результат (return), минуя создание одноразовых файлов.
+        [1/OBSERVER] Универсальный шлюз для безопасного вызова конкретной функции или корутины из Python-скрипта в песочнице.
+        Позволяет передать аргументы и напрямую получить возвращаемый результат.
+
         - filepath: путь к скрипту (например, 'sandbox/directory/api.py')
         - func_name: имя функции для вызова (например, 'create_comment')
         - kwargs: словарь аргументов, которые будут переданы в функцию.
         """
 
-        if kwargs is None:
+        # Броня: если LLM прислала не словарь (например, число из-за галлюцинации), исправляем
+        if not isinstance(kwargs, dict):
             kwargs = {}
 
         timeout = self.host_os.config.execution_timeout_sec
@@ -457,7 +464,9 @@ if __name__ == "__main__":
             rpc_prefix = "---JAWL_RPC_RESULT---"
             if rpc_prefix in out_str:
                 parts = out_str.split(rpc_prefix)
-                script_stdout = parts[0].strip()  # Вывод, который функция сделала через print()
+                script_stdout = parts[
+                    0
+                ].strip()  # Вывод, который функция сделала через print()
                 rpc_json_str = parts[1].strip()
 
                 try:
@@ -467,15 +476,13 @@ if __name__ == "__main__":
                         f"Скрипт отработал, но результат невалиден.\nSTDOUT:\n{out_str}\nSTDERR:\n{err_str}"
                     )
 
-                report =[]
+                report = []
                 if script_stdout:
                     report.append(
                         f"STDOUT скрипта:\n```\n{truncate_text(script_stdout, 2000)}\n```"
                     )
                 if err_str:
-                    report.append(
-                        f"STDERR скрипта:\n```\n{truncate_text(err_str, 2000)}\n```"
-                    )
+                    report.append(f"STDERR скрипта:\n```\n{truncate_text(err_str, 2000)}\n```")
 
                 if rpc_result.get("status") == "ok":
                     result_data = rpc_result.get("result")
@@ -503,6 +510,6 @@ if __name__ == "__main__":
 
         except PermissionError as e:
             return SkillResult.fail(str(e))
-        
+
         except Exception as e:
             return SkillResult.fail(f"Внутренняя ошибка RPC: {e}")

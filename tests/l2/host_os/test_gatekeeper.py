@@ -42,6 +42,25 @@ def test_gatekeeper_observer(os_client):
         os_client.validate_path(os_path, is_write=False)
 
 
+def test_gatekeeper_operator(os_client):
+    """Тест OPERATOR (2): чтение и запись (с сессиями) строго внутри фреймворка."""
+    os_client.access_level = HostOSAccessLevel.OPERATOR
+
+    safe_path = os_client.sandbox_dir / "test.txt"
+    framework_path = os_client.framework_dir / "code.py"
+    os_path = Path("/etc/passwd") if os.name != "nt" else Path("C:/Windows/System32/config")
+
+    # Чтение/запись в песочнице - ОК
+    assert os_client.validate_path(safe_path, is_write=True) == safe_path.resolve()
+
+    # Чтение фреймворка - ОК
+    assert os_client.validate_path(framework_path, is_write=False) == framework_path.resolve()
+
+    # Чтение чужой системы - Запрещено
+    with pytest.raises(PermissionError, match="OPERATOR"):
+        os_client.validate_path(os_path, is_write=False)
+
+
 def test_gatekeeper_env_protection(os_client):
     """Тест: запрет доступа к .env файлам работает даже в режиме ROOT."""
     os_client.access_level = HostOSAccessLevel.ROOT

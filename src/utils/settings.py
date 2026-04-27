@@ -15,7 +15,12 @@ class HostOSConfig(BaseModel):
 
     access_level: int
     env_access: bool
+
+    require_deploy_sessions: bool = True
+    deploy_max_retries: int = 5
+
     framework_tree_depth: int = 1
+
     monitoring_interval_sec: int
     execution_timeout_sec: int
     file_read_max_chars: int

@@ -7,11 +7,13 @@ from src.utils.logger import system_logger
 from src.utils.settings import HostOSConfig
 from src.l0_state.interfaces.state import HostOSState
 
+from src.l2_interfaces.host.os.deploy_manager import HostOSDeployManager
+
 
 class HostOSAccessLevel(IntEnum):
     SANDBOX = 0  # Read/Write только внутри sandbox/
     OBSERVER = 1  # Read фреймворка, Write в sandbox/
-    OPERATOR = 2  # Read всей ОС, Write только внутри фреймворка (может менять свой код)
+    OPERATOR = 2  # Read/Write только внутри директории фреймворка JAWL
     ROOT = 3  # Полный Read/Write по всей системе
 
 
@@ -77,6 +79,11 @@ class HostOSClient:
 
         self._ensure_sandbox_api()
 
+        # Инициализация менеджера деплоя
+        self.deploy_manager = HostOSDeployManager(
+            self.framework_dir, max_retries=self.config.deploy_max_retries
+        )
+
     def validate_path(self, target_path: str | Path, is_write: bool = False) -> Path:
         """
         Умный гейткипер. Парсит пути так, как их видит агент в дереве контекста,
@@ -139,25 +146,41 @@ class HostOSClient:
                 f"SYSTEM DENIED: Доступ к файлам конфигурации ({resolved_path.name}) запрещен."
             )
 
+        # Сначала проверяем базовые права уровня доступа
         if self.access_level == HostOSAccessLevel.ROOT:
-            return resolved_path
-
-        if self.access_level == HostOSAccessLevel.OPERATOR:
-            if is_write and not resolved_path.is_relative_to(self.framework_dir):
-                raise PermissionError("OPERATOR: Запись разрешена только в директории JAWL.")
-            return resolved_path
-
-        if self.access_level == HostOSAccessLevel.OBSERVER:
+            pass
+        elif self.access_level == HostOSAccessLevel.OPERATOR:
+            if not resolved_path.is_relative_to(self.framework_dir):
+                raise PermissionError(
+                    "OPERATOR: Доступ (чтение и запись) разрешен строго только в директории JAWL."
+                )
+        elif self.access_level == HostOSAccessLevel.OBSERVER:
             if is_write and not resolved_path.is_relative_to(self.sandbox_dir):
                 raise PermissionError("OBSERVER: Запись разрешена строго в папке sandbox/.")
             if not is_write and not resolved_path.is_relative_to(self.framework_dir):
                 raise PermissionError("OBSERVER: Чтение разрешено только в пределах JAWL.")
-            return resolved_path
-
-        if not resolved_path.is_relative_to(self.sandbox_dir):
+        elif not resolved_path.is_relative_to(self.sandbox_dir):
             raise PermissionError(
                 f"SANDBOX: Доступ разрешен строго внутри sandbox/. Путь '{resolved_path}' отклонен."
             )
+
+        # Логика деплой-сессий (только если базовые права позволяют запись)
+        is_framework_code = (
+            resolved_path.is_relative_to(self.framework_dir)
+            and not resolved_path.is_relative_to(self.sandbox_dir)
+            and not resolved_path.is_relative_to(self.framework_dir / "logs")
+            and not resolved_path.is_relative_to(
+                self.framework_dir / "src" / "utils" / "local" / "data"
+            )
+        )
+
+        if is_write and is_framework_code and self.config.require_deploy_sessions:
+            if not self.deploy_manager.is_active:
+                raise PermissionError(
+                    "SYSTEM DENIED: Для изменения исходного кода фреймворка необходимо сначала открыть деплой-сессию (навык start_deploy_session)."
+                )
+            # Если пишем в код во время сессии - делаем бекап
+            self.deploy_manager.backup_file(resolved_path)
 
         return resolved_path
 
@@ -232,9 +255,12 @@ def send_event(message: str, payload: dict = None):
         access_levels_desc = (
             "  - 0/SANDBOX: Read/Write только внутри папки sandbox/.\n"
             "  - 1/OBSERVER: Read для всего кода фреймворка, Write только в sandbox/.\n"
-            "  - 2/OPERATOR: Read всей ОС, управление процессами, Write только для файлов фреймворка.\n"
+            "  - 2/OPERATOR: Read/Write только внутри директории фреймворка JAWL.\n"
             "  - 3/ROOT: Полный доступ. Read/Write всей системы и управление процессами."
         )
+
+        if self.deploy_manager.is_active:
+            access_levels_desc += f"\n\n[DEPLOY SESSION ACTIVE] Активирована возможность менять код фреймворка. Попыток коммита осталось: {self.deploy_manager.retries_left}."
 
         # ===============================================
         # Сборка открытых файлов

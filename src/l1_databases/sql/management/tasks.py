@@ -27,11 +27,11 @@ ALLOWED_TAGS = [
 ]
 
 STATUS_EMOJIS = {
-    "todo": "📝 TODO",
-    "in_progress": "🔄 IN_PROGRESS",
-    "blocked": "⛔ BLOCKED",
-    "done": "✅ DONE",
-    "cancelled": "❌ CANCELLED",
+    "todo": "TODO",
+    "in_progress": "IN_PROGRESS",
+    "blocked": "BLOCKED",
+    "done": "DONE",
+    "cancelled": "CANCELLED",
 }
 
 
@@ -43,21 +43,35 @@ class SQLTasks:
         self.max_tasks = max_tasks
         self.tz_offset = tz_offset
 
-    def _validate_tags(self, tags: list[str]) -> tuple[bool, str]:
-        for tag in tags:
+    def _validate_tags(self, tags: Any) -> tuple[bool, str, list[str]]:
+        """Броня для тегов: конвертирует строку в список и фильтрует мусор."""
+        if not tags:
+            return True, "", []
+
+        if isinstance(tags, str):
+            tags = [tags]
+        elif not isinstance(tags, list):
+            try:
+                tags = list(tags)
+            except Exception:
+                tags = [str(tags)]
+
+        clean_tags = [str(t) for t in tags]
+        for tag in clean_tags:
             if tag not in ALLOWED_TAGS:
                 return (
                     False,
                     f"Тег '{tag}' недопустим. Разрешенные теги: {', '.join(ALLOWED_TAGS)}",
+                    [],
                 )
-        return True, ""
+        return True, "", clean_tags
 
     @skill()
     async def create_task(
         self,
         title: str,
         description: str,
-        tags: list[str],
+        tags: Optional[list[str]] = None,
         dependencies: Optional[list[str]] = None,
         subtasks: Optional[list[dict[str, Any]]] = None,
         due_date_str: Optional[str] = None,
@@ -72,7 +86,10 @@ class SQLTasks:
 
         task_id = str(uuid.uuid4())[:8]
 
-        is_valid, err_msg = self._validate_tags(tags)
+        if tags is None:
+            tags = []
+
+        is_valid, err_msg, clean_tags = self._validate_tags(tags)
         if not is_valid:
             return SkillResult.fail(err_msg)
 
@@ -103,7 +120,7 @@ class SQLTasks:
                 description=description,
                 status="todo",
                 progress=0,
-                tags=tags,
+                tags=clean_tags,
                 dependencies=safe_deps,
                 subtasks=safe_subtasks,
                 due_date=due_date_ts,
@@ -142,8 +159,9 @@ class SQLTasks:
                 f"Недопустимый статус. Варианты: {', '.join(STATUS_EMOJIS.keys())}"
             )
 
+        clean_tags = None
         if tags is not None:
-            is_valid, err_msg = self._validate_tags(tags)
+            is_valid, err_msg, clean_tags = self._validate_tags(tags)
             if not is_valid:
                 return SkillResult.fail(err_msg)
 
@@ -170,8 +188,8 @@ class SQLTasks:
                 if task.progress == 100 and task.status != "done":
                     task.status = "done"
 
-            if tags is not None:
-                task.tags = tags
+            if clean_tags is not None:
+                task.tags = clean_tags
 
             if dependencies is not None:
                 task.dependencies = dependencies

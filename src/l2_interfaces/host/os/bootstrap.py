@@ -10,6 +10,7 @@ from src.l2_interfaces.host.os.skills.monitoring import HostOSMonitoring
 from src.l2_interfaces.host.os.skills.network import HostOSNetwork
 from src.l2_interfaces.host.os.skills.system import HostOSSystem
 from src.l2_interfaces.host.os.skills.desktop import HostOSDesktop
+from src.l2_interfaces.host.os.skills.deploy import HostOSDeploy
 
 from src.l3_agent.skills.registry import register_instance
 from src.l3_agent.context.registry import ContextSection 
@@ -37,6 +38,7 @@ def setup_host_os(system: "System") -> List[Any]:
     register_instance(HostOSNetwork(client))
     register_instance(HostOSSystem(client))
     register_instance(HostOSMonitoring(client, events))
+    register_instance(HostOSDeploy(client))
 
     # Если включены десктопные взаимодействия
     if system.interfaces_config.host.os.desktop_interactions:

@@ -101,6 +101,12 @@ def setup_specific_logger(name: str, log_file: str, level: Union[int, str]) -> l
     log_dir = Path("logs")
     log_dir.mkdir(exist_ok=True)
 
+    is_testing = "pytest" in sys.modules
+
+    # Изолируем логи тестов в отдельный файл, чтобы подпроцесс деплоя не засорял system.log агента
+    if is_testing:
+        log_file = "pytest.log"
+
     full_path = log_dir / log_file
 
     file_format = "%(asctime)s.%(msecs)03d - %(name)s - %(levelname)s - %(message)s"
@@ -119,7 +125,7 @@ def setup_specific_logger(name: str, log_file: str, level: Union[int, str]) -> l
     )
     console_handler.setFormatter(color_formatter)
 
-    if "pytest" in sys.modules:
+    if is_testing:
         console_handler.setLevel(logging.CRITICAL)
 
     specific_logger = logging.getLogger(name)
@@ -152,7 +158,9 @@ def update_log_level(level_str: str) -> None:
     system_logger.setLevel(numeric_level)
 
     for handler in system_logger.handlers:
-        # Защищаем нашу тишину в консоли от сброса во время тестов
-        if "pytest" in sys.modules and isinstance(handler, logging.StreamHandler):
+        # Защищаем нашу тишину в консоли от сброса во время тестов.
+        # Используем type(handler) is logging.StreamHandler, т.к. RotatingFileHandler наследуется от StreamHandler,
+        # и isinstance() случайно замьютил бы и файловый лог.
+        if "pytest" in sys.modules and type(handler) is logging.StreamHandler:
             continue
         handler.setLevel(numeric_level)

@@ -8,7 +8,7 @@ from src.l2_interfaces.host.os.skills.system import HostOSSystem
 @pytest.mark.asyncio
 async def test_execute_shell_command_safe(os_client):
     """Тест: выполнение простой безопасной кроссплатформенной команды."""
-    os_client.access_level = HostOSAccessLevel.OPERATOR  # Требуется для shell_command
+    os_client.access_level = HostOSAccessLevel.ROOT  # Требуется для shell_command
     executor = HostOSExecution(os_client)
 
     # Используем python -c, так как это работает везде (Windows, Linux, Mac)
@@ -25,7 +25,7 @@ async def test_execution_kill_process_not_found(mock_process, os_client):
     """Тест: Агент пытается убить процесс, которого не существует."""
     import psutil
 
-    os_client.access_level = HostOSAccessLevel.OPERATOR
+    os_client.access_level = HostOSAccessLevel.ROOT
     executor = HostOSExecution(os_client)
 
     mock_process.side_effect = psutil.NoSuchProcess(pid=99999)
