@@ -22,18 +22,18 @@ async def test_db_initialization(tmp_path):
 
 @pytest.mark.asyncio
 @patch("src.l1_databases.vector.embedding.TextEmbedding")
-async def test_embedding_model_wrapper(mock_fastembed):
+async def test_embedding_model_wrapper(mock_fastembed, tmp_path):
     """Тест: EmbeddingModel корректно вызывает генератор fastembed и возвращает list."""
     from src.l1_databases.vector.embedding import EmbeddingModel
     import numpy as np
 
-    # Настраиваем мок так, чтобы он возвращал генератор с одним numpy array (как в реальности)
     mock_instance = MagicMock()
     mock_instance.embed.return_value = iter([np.array([0.1, 0.2, 0.3])])
     mock_fastembed.return_value = mock_instance
 
-    # Инициализируем модель (fastembed не будет качаться, так как он замокан)
-    model = EmbeddingModel(model_path="/fake", model_name="fake-model")
+    # Используем безопасную временную директорию вместо абсолютного /fake
+    safe_path = str(tmp_path / "fake")
+    model = EmbeddingModel(model_path=safe_path, model_name="fake-model")
 
     # Запрашиваем вектор
     vector = await model.get_embedding("Тестовый текст")
