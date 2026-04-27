@@ -33,7 +33,7 @@ async def _chat_loop(port: int, history_file: Path, agent_name: str):
         await writer.drain()
 
     except ConnectionRefusedError:
-        print_error("Не удалось подключиться к терминалу.")
+        print_error("Не удалось подключиться к чату.")
         print_info("Проверьте, что агент запущен и интерфейс 'Host Terminal' включен.")
         print("\nНажмите Enter для возврата...")
         input()
@@ -42,10 +42,11 @@ async def _chat_loop(port: int, history_file: Path, agent_name: str):
     clear_screen()
     console.print(
         Panel(
-            f"[bold cyan]Интерактивный терминал с агентом {agent_name}[/bold cyan]\n"
+            f"[bold cyan]Интерактивный чат с агентом {agent_name}[/bold cyan]\n"
             "[dim]Отправка: Enter[/dim]\n"
             "[dim]Выход: /exit или Ctrl+C[/dim]",
             border_style="cyan",
+            expand=False,
         )
     )
 
@@ -102,7 +103,15 @@ async def _chat_loop(port: int, history_file: Path, agent_name: str):
             pass
         except Exception as e:
             with patch_stdout():
-                print_error(f"Связь разорвана: {e}")
+                # Заменяем конфликтующий rich на нативный HTML-форматтер prompt_toolkit
+                print_formatted_text(
+                    HTML(f"\n<ansired><b>✗ Связь разорвана:</b> {e}</ansired>")
+                )
+                print_formatted_text(
+                    HTML(
+                        "<style fg='gray'>Введите /exit или нажмите Ctrl+C для выхода.</style>\n"
+                    )
+                )
 
     receive_task = asyncio.create_task(receive_messages())
 
@@ -140,10 +149,10 @@ def terminal_chat_screen() -> None:
         draw_header()
 
         choice = questionary.select(
-            "Терминал с агентом:",
+            "Чат с агентом:",
             choices=[
-                questionary.Choice("💬 Открыть терминал", "open"),
-                questionary.Choice("🧹 Очистить историю терминала", "clear_history"),
+                questionary.Choice("💬 Открыть чат", "open"),
+                questionary.Choice("🧹 Очистить историю чата", "clear_history"),
                 questionary.Separator(" "),
                 questionary.Choice("↩ Назад", "back"),
             ],

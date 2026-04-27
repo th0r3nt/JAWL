@@ -157,8 +157,11 @@ def draw_header(version: str = "v0.9.0") -> None:
         Align.center(status_text),
     )
 
-    panel = Panel(content, border_style="cyan")
-    console.print(panel)
+    # expand=False запрещает рамке растягиваться на весь экран, спасая от поломок при ресайзе
+    panel = Panel(content, border_style="cyan", expand=False)
+
+    # Центрируем саму собранную плашку
+    console.print(Align.center(panel))
 
 
 def print_success(msg: str) -> None:

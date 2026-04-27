@@ -81,6 +81,7 @@ def logs_screen() -> None:
             "[bold green]Стриминг system.log в реальном времени[/bold green]\n"
             "[dim]Нажмите Ctrl+C для возврата в главное меню[/dim]",
             border_style="green",
+            expand=False,
         )
     )
 

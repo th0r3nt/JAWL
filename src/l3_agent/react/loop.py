@@ -215,10 +215,10 @@ class ReactLoop:
                     model=self.agent_state.llm_model,
                     messages=messages,
                     tools=self.tools,
-                    tool_choice={
-                        "type": "function",
-                        "function": {"name": "execute_skill"},
-                    },
+                    # tool_choice={
+                    #     "type": "function",
+                    #     "function": {"name": "execute_skill"},
+                    # },
                     temperature=self.agent_state.temperature,
                     # max_tokens=60000,
                     timeout=120.0,

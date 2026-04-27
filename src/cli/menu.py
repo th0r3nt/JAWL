@@ -31,8 +31,8 @@ def main_menu() -> None:
             choices=[
                 questionary.Choice("🚀 Запустить агента", "start"),
                 questionary.Choice("⏹️ Остановить агента", "stop"),
-                questionary.Choice("💻 Терминал с агентом", "terminal"),
-                questionary.Choice("📋 Открыть логи", "logs"),
+                questionary.Choice("💻 Чат", "terminal"),
+                questionary.Choice("📋 Логи", "logs"),
                 questionary.Choice("⚙️ Мастер настройки интерфейсов", "setup"),
                 questionary.Choice("🗄️ Управление базами данных", "db_manager"),
                 questionary.Separator(" "),

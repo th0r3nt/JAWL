@@ -153,7 +153,7 @@ class Events:
     HOST_TERMINAL_MESSAGE = EventConfig(
         name="HOST_TERMINAL_MESSAGE",
         description="Входящее сообщение от пользователя через локальный терминал.",
-        level=EventLevel.CRITICAL,  # Сам святой админ пишет как никак
+        level=EventLevel.HIGH,  # Сам святой админ пишет как никак
         requires_attention=True,
     )
 

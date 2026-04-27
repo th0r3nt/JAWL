@@ -1,5 +1,4 @@
 from src.l0_state.interfaces.state import (
-    TelethonState,
     AiogramState,
     HostOSState,
     HostTerminalState,

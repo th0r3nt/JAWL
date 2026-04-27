@@ -347,7 +347,7 @@ def start_agent_screen() -> None:
 
         print_success("Агент успешно запущен в фоновом режиме.")
         time.sleep(1)
-        print_info(" Для просмотра логов выберите 'Открыть логи' в главном меню.")
+        print_info(" Для просмотра логов выберите 'Логи' в главном меню.")
 
     except Exception as e:
         print_error(f"Не удалось запустить агента: {e}")
