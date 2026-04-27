@@ -26,6 +26,12 @@ _REGISTRY: Dict[str, Callable] = {}
 _SKILL_DOCS: list[str] = []
 
 
+def clear_registry():
+    """Очищает реестр скиллов (необходимо для чистой перезагрузки агента)."""
+    _REGISTRY.clear()
+    _SKILL_DOCS.clear()
+
+
 def _build_skill_name(
     func: Callable, override: Optional[str] = None, instance: Optional[Any] = None
 ) -> str:
@@ -74,6 +80,7 @@ F = TypeVar("F", bound=Callable[..., Any])
 
 def skill(name_override: Optional[str] = None) -> Callable[[F], F]:
     """Декоратор со строгой типизацией, регистрирующий функции для агента."""
+
     def decorator(func: F) -> F:
         sig = inspect.signature(func)
         if "self" in sig.parameters:
@@ -102,6 +109,7 @@ def register_instance(instance: Any):
 def get_skills_library() -> str:
     return "\n".join(_SKILL_DOCS)
 
+
 async def execute_skill(actions: list[ActionCall]) -> str:
     if not actions:
         return "Цикл завершен: действий не передано."
@@ -112,8 +120,10 @@ async def execute_skill(actions: list[ActionCall]) -> str:
         params = act.parameters
 
         # Ограничиваем длину параметров для логов
-        params_str = truncate_text(str(params), max_chars=250, suffix="... [Параметры обрезаны]")
-        
+        params_str = truncate_text(
+            str(params), max_chars=250, suffix="... [Параметры обрезаны]"
+        )
+
         system_logger.info(f"[Agent Action] {name}({params_str})")
         tasks.append(_run_single_skill(name, params))
 
@@ -125,12 +135,13 @@ async def execute_skill(actions: list[ActionCall]) -> str:
 
     return "\n".join(report)
 
+
 async def _run_single_skill(name: str, params: dict) -> SkillResult:
     """
     Выполняет одну функцию, которую вызвал агент.
     Возвращает результат вызова функции.
     """
-    
+
     func = _REGISTRY.get(name)
     if not func:
         system_logger.info(f"[Agent Action Result] Скилл '{name}' не найден.")
@@ -141,9 +152,11 @@ async def _run_single_skill(name: str, params: dict) -> SkillResult:
         }
 
         result = await func(**valid_params)
-        
+
         # Обрезаем результат ТОЛЬКО для логов, чтобы не засорять system.log и экран CLI
-        res_msg = truncate_text(str(result.message), max_chars=800, suffix="... [Результат обрезан для логов]")
+        res_msg = truncate_text(
+            str(result.message), max_chars=800, suffix="... [Результат обрезан для логов]"
+        )
         status = "Success" if result.is_success else "Fail"
         system_logger.info(f"[Agent Action Result] {name} ({status}): {res_msg}")
 

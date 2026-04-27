@@ -1,4 +1,5 @@
 import os
+import time
 import asyncio
 import traceback
 from pathlib import Path
@@ -61,7 +62,7 @@ from src.l3_agent.react.loop import ReactLoop
 
 from src.l3_agent.heartbeat import Heartbeat
 
-from src.l3_agent.skills.registry import register_instance
+from src.l3_agent.skills.registry import register_instance, clear_registry
 from src.l3_agent.skills.schema import ACTION_SCHEMA
 
 
@@ -569,8 +570,11 @@ async def main() -> int:
     Возвращает код завершения (0 - выключение, 1 - перезагрузка).
     """
 
-    # Загружаем переменные окружения
-    load_dotenv()
+    # Загружаем переменные окружения (override=True нужен, чтобы при ребуте подхватить изменения из .env)
+    load_dotenv(override=True)
+
+    # Очищаем глобальный кэш скиллов перед стартом, чтобы избежать дублирования при ребуте
+    clear_registry()
 
     event_bus = EventBus()
     settings_config, interfaces_config = load_config()
@@ -587,7 +591,7 @@ async def main() -> int:
         TELETHON_API_HASH = os.getenv("TELETHON_API_HASH", None)
         # Aiogram
         AIOGRAM_BOT_TOKEN = os.getenv("AIOGRAM_BOT_TOKEN", None)
-        # GitHub 
+        # GitHub
         GITHUB_TOKEN = os.getenv("GITHUB_TOKEN", None)
         # Email
         EMAIL_ACCOUNT = os.getenv("EMAIL_ACCOUNT", None)
@@ -634,5 +638,17 @@ async def main() -> int:
 
 
 if __name__ == "__main__":
+    while True:
+        try:
+            # Запускаем новый изолированный asyncio event loop
+            exit_code = asyncio.run(main())
 
-    asyncio.run(main())
+            if exit_code == 1:
+                system_logger.info("[System] Инициализирована перезагрузка.")
+                time.sleep(3)  # Даем ОС время на полное освобождение сокетов и дескрипторов
+                continue
+            else:
+                break  # exit_code 0 -> штатное выключение
+
+        except KeyboardInterrupt:
+            break
