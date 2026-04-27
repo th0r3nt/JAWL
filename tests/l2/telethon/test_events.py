@@ -25,7 +25,6 @@ async def test_update_state(telethon_events, mock_tg_client, state):
 
     client_mock = mock_tg_client.client()
     client_mock.iter_dialogs = mock_iter_dialogs
-    # AsyncMock позволяет делать await
     client_mock.get_messages = AsyncMock(return_value=[])
     client_mock.get_dialogs = AsyncMock(return_value=MagicMock(total=2))
 
@@ -59,6 +58,9 @@ async def test_on_group_message_mentioned(mock_get_display_name, telethon_events
     client_mock = telethon_events.tg_client.client()
     client_mock.iter_dialogs = mock_iter_dialogs
     client_mock.get_messages = AsyncMock(return_value=[])
+
+    # ФИКС: Мокаем вспомогательный метод, чтобы он возвращал int, а не MagicMock
+    telethon_events._get_unread_count = AsyncMock(return_value=2)
 
     await telethon_events._on_group_message(event)
 
