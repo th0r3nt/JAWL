@@ -85,6 +85,7 @@ meta:
   # 0 - SAFE           (возможность менять llm_model/temperature)
   # 1 - CONFIGURATOR   (возможность менять heartbeat_interval/max_react_steps/context_depth)
   # 2 - ARCHITECT      (дополнительные навыки: off_system()/reboot_system(), toggle_interface() - возможность включать/отключать интерфейсы)
+  # 3 - CREATOR        (возможность создавать кастомные навыки для себя из скриптов sandbox/)
   access_level: 0
 
 

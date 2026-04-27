@@ -1,3 +1,4 @@
+# Файл: src/l2_interfaces/github/events.py
 import asyncio
 import json
 from datetime import datetime
@@ -38,6 +39,10 @@ class GithubEvents:
         self._persistence_file = self.data_dir / "github" / "tracked_repos.json"
         self._persistence_file.parent.mkdir(parents=True, exist_ok=True)
 
+        # Кэш просмотренных событий для обхода проблемы GitHub Eventual Consistency
+        self._seen_event_ids = {}
+        self._initialized_repos = set()
+
     async def start(self) -> None:
         if self._is_running:
             return
@@ -77,11 +82,9 @@ class GithubEvents:
             system_logger.error(f"[Github] Ошибка сохранения tracked_repos.json: {e}")
 
     def _format_gh_time(self, iso_str: str) -> str:
-        """Хелпер: переводит время из формата GitHub (ISO 8601 UTC) в локальное время агента."""
         if not iso_str:
             return ""
         try:
-            # Парсим строку вида "2026-04-27T10:30:00Z"
             dt = datetime.strptime(iso_str.replace("Z", "+0000"), "%Y-%m-%dT%H:%M:%S%z")
             return f"[{format_datetime(dt, self.timezone, '%m-%d %H:%M')}] "
         except Exception:
@@ -92,17 +95,11 @@ class GithubEvents:
     # ==========================================================
 
     async def _loop(self):
-        """
-        Единый цикл для обновления профиля и отслеживаемых реп.
-        """
-
         while self._is_running:
             try:
-                # 1. Обновляем дашборд аккаунта (если включено)
                 if self.client.config.agent_account and self.client.token:
                     await self._poll_account_state()
 
-                # 2. Опрашиваем отслеживаемые репозитории
                 if self.state.tracked_repos:
                     await self._poll_watched_repos()
 
@@ -114,10 +111,6 @@ class GithubEvents:
             await asyncio.sleep(self.client.config.polling_interval_sec)
 
     async def _poll_account_state(self):
-        """
-        Собирает дашборд.
-        """
-
         try:
             repos_data = await self.client.request(
                 "GET", "/user/repos", params={"sort": "updated", "per_page": 5}
@@ -156,13 +149,10 @@ class GithubEvents:
             system_logger.debug(f"[Github] Ошибка фонового обновления профиля: {e}")
 
     async def _poll_watched_repos(self):
-        """Опрашивает /events для каждого отслеживаемого репозитория."""
-
         modified = False
 
         for repo_name, last_event_id in list(self.state.tracked_repos.items()):
             try:
-                # Увеличили лимит до 30, чтобы мусорные ивенты не вытеснили пуши
                 events_data = await self.client.request(
                     "GET", f"/repos/{repo_name}/events", params={"per_page": 30}
                 )
@@ -170,50 +160,57 @@ class GithubEvents:
                 if not isinstance(events_data, list) or not events_data:
                     continue
 
-                events_data.reverse()
+                events_data.reverse()  # Идем от старых к новым
 
-                is_initial_load = not bool(last_event_id)
-                needs_dashboard_fill = len(self.state.recent_watcher_events) == 0
+                is_first_poll = repo_name not in self._initialized_repos
+                self._initialized_repos.add(repo_name)
 
                 highest_parsed_id = last_event_id
 
                 for event in events_data:
                     event_id = str(event.get("id"))
-                    if not event_id:
+                    if not event_id or event_id in self._seen_event_ids:
                         continue
 
-                    try:
-                        is_new = int(event_id) > int(last_event_id) if last_event_id else True
-                    except (ValueError, TypeError):
-                        is_new = event_id > str(last_event_id)
+                    # Отмечаем как просмотренное
+                    self._seen_event_ids[event_id] = True
+
+                    # Защита от утечки памяти
+                    if len(self._seen_event_ids) > 1000:
+                        for k in list(self._seen_event_ids.keys())[:500]:
+                            del self._seen_event_ids[k]
 
                     parsed_msg = self._parse_github_event(event)
 
-                    # Если событие неинтересное (звезда, форк) - мы не обновляем ватермарку ID
-                    # Это решает проблему GitHub Eventual Consistency
                     if not parsed_msg:
                         continue
 
-                    if is_initial_load:
-                        self.state.add_watcher_event(parsed_msg)
-                        highest_parsed_id = event_id
-                        continue
+                    # Определяем, нужно ли триггерить систему
+                    is_new = False
+                    if not last_event_id:
+                        # Только начали отслеживать репозиторий - заполняем тихо
+                        is_new = False
 
-                    if not is_new:
-                        if (
-                            needs_dashboard_fill
-                            and parsed_msg not in self.state.recent_watcher_events
-                        ):
-                            self.state.add_watcher_event(parsed_msg)
-                        continue
+                    elif is_first_poll:
+                        # Рестарт агента. Публикуем только те, что объективно больше последнего сохраненного ID
+                        try:
+                            is_new = int(event_id) > int(last_event_id)
+                        except (ValueError, TypeError):
+                            is_new = event_id > str(last_event_id)
+                            
+                    else:
+                        # Рантайм. Раз мы его еще не видели (прошли проверку seen_event_ids) - значит оно новое.
+                        # Это решает проблему GitHub Eventual Consistency (когда PushEvent приходит с задержкой)
+                        is_new = True
 
-                    # НОВОЕ ЗНАЧИМОЕ СОБЫТИЕ
                     self.state.add_watcher_event(parsed_msg)
-                    await self.bus.publish(
-                        Events.GITHUB_REPO_ACTIVITY, repo=repo_name, message=parsed_msg
-                    )
 
-                    # Обновляем ID только по значимым событиям
+                    if is_new:
+                        await self.bus.publish(
+                            Events.GITHUB_REPO_ACTIVITY, repo=repo_name, message=parsed_msg
+                        )
+
+                    # Обновляем ватермарку ID для сохранения на диск
                     try:
                         if (
                             int(event_id) > int(highest_parsed_id)
@@ -235,10 +232,6 @@ class GithubEvents:
             self.save_persisted_repos()
 
     def _parse_github_event(self, event: dict) -> Optional[str]:
-        """
-        Превращает JSON Github Event в читаемую строку с учетом локального времени.
-        """
-
         event_type = event.get("type")
         actor = event.get("actor", {}).get("login", "Unknown")
         repo = event.get("repo", {}).get("name", "Unknown")
@@ -271,7 +264,6 @@ class GithubEvents:
             pr_num = pr_obj.get("number", "?")
             title = pr_obj.get("title", "").strip()
 
-            # Отличаем успешный merge от простого закрытия PR
             if action == "closed":
                 action = "merged" if pr_obj.get("merged") else "closed (without merge)"
 
