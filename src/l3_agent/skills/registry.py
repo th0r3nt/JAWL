@@ -1,3 +1,4 @@
+# Файл: src/l3_agent/skills/registry.py
 import inspect
 import asyncio
 from dataclasses import dataclass
@@ -24,18 +25,31 @@ class SkillResult:
 
 _REGISTRY: Dict[str, Callable] = {}
 _SKILL_DOCS: list[str] = []
+_CUSTOM_SKILL_DOCS: list[str] = []
 
 
 def clear_registry():
     """Очищает реестр скиллов (необходимо для чистой перезагрузки агента)."""
     _REGISTRY.clear()
     _SKILL_DOCS.clear()
+    _CUSTOM_SKILL_DOCS.clear()
+
+
+def unregister_skill(skill_name: str):
+    """Удаляет навык из реестра и документации."""
+    global _SKILL_DOCS, _CUSTOM_SKILL_DOCS
+    if skill_name in _REGISTRY:
+        del _REGISTRY[skill_name]
+
+    _SKILL_DOCS = [doc for doc in _SKILL_DOCS if not doc.startswith(f"`{skill_name}(")]
+    _CUSTOM_SKILL_DOCS = [
+        doc for doc in _CUSTOM_SKILL_DOCS if not doc.startswith(f"`{skill_name}(")
+    ]
 
 
 def _build_skill_name(
     func: Callable, override: Optional[str] = None, instance: Optional[Any] = None
 ) -> str:
-    """Хелпер для формирования красивого имени функции."""
     if override:
         return override
 
@@ -51,8 +65,6 @@ def _build_skill_name(
 def _register_callable(
     func: Callable, override: Optional[str] = None, instance: Optional[Any] = None
 ):
-    """Ядро регистрации. Формирует докстринги и сохраняет ссылку на вызов."""
-
     skill_name = _build_skill_name(func, override, instance)
     sig = inspect.signature(func)
 
@@ -75,12 +87,31 @@ def _register_callable(
     system_logger.info(f"[Skills] Зарегистрирован скилл: {skill_name}")
 
 
+def register_custom_callable(func: Callable, skill_name: str, description: str, filepath: str):
+    """Регистрирует кастомный скилл с отдельным блоком документации."""
+    sig = inspect.signature(func)
+
+    formatted_params = []
+    for name, param in sig.parameters.items():
+        param_str = f"{name}: {param.annotation}"
+        if param.default is inspect.Parameter.empty:
+            param_str += " <REQUIRED>"
+        formatted_params.append(param_str)
+
+    clean_sig = f"({', '.join(formatted_params)})"
+    clean_doc = " ".join(description.split())
+
+    doc_str = f"`{skill_name}{clean_sig}` - {clean_doc} [Файл: {filepath}]"
+
+    _CUSTOM_SKILL_DOCS.append(doc_str)
+    _REGISTRY[skill_name] = func
+    system_logger.info(f"[Skills] Зарегистрирован кастомный скилл: {skill_name}")
+
+
 F = TypeVar("F", bound=Callable[..., Any])
 
 
 def skill(name_override: Optional[str] = None) -> Callable[[F], F]:
-    """Декоратор со строгой типизацией, регистрирующий функции для агента."""
-
     def decorator(func: F) -> F:
         sig = inspect.signature(func)
         if "self" in sig.parameters:
@@ -95,10 +126,6 @@ def skill(name_override: Optional[str] = None) -> Callable[[F], F]:
 
 
 def register_instance(instance: Any):
-    """
-    Проходится по объекту класса и регистрирует все методы, помеченные @skill.
-    Вызывать в main.py после создания инстансов баз/интерфейсов.
-    """
     for attr_name in dir(instance):
         method = getattr(instance, attr_name)
         if callable(method) and getattr(method, "__is_skill__", False):
@@ -107,7 +134,10 @@ def register_instance(instance: Any):
 
 
 def get_skills_library() -> str:
-    return "\n".join(_SKILL_DOCS)
+    base = "\n".join(_SKILL_DOCS)
+    if _CUSTOM_SKILL_DOCS:
+        base += "\n\n### CUSTOM SKILLS\n" + "\n".join(_CUSTOM_SKILL_DOCS)
+    return base
 
 
 async def execute_skill(actions: list[ActionCall]) -> str:
@@ -119,13 +149,12 @@ async def execute_skill(actions: list[ActionCall]) -> str:
         name = act.tool_name
         params = act.parameters
 
-        # Ограничиваем длину параметров для логов
         params_str = truncate_text(
             str(params), max_chars=250, suffix="... [Параметры обрезаны]"
         )
 
         system_logger.info(f"[Agent Action] {name}({params_str})")
-        tasks.append(_run_single_skill(name, params))
+        tasks.append(call_skill(name, params))
 
     results = await asyncio.gather(*tasks)
 
@@ -136,16 +165,13 @@ async def execute_skill(actions: list[ActionCall]) -> str:
     return "\n".join(report)
 
 
-async def _run_single_skill(name: str, params: dict) -> SkillResult:
-    """
-    Выполняет одну функцию, которую вызвал агент.
-    Возвращает результат вызова функции.
-    """
-
+async def call_skill(name: str, params: dict) -> SkillResult:
+    """Выполняет один скилл по его имени (публичный метод для прокси-функций)."""
     func = _REGISTRY.get(name)
     if not func:
-        system_logger.info(f"[Agent Action Result] Скилл '{name}' не найден.")
-        return SkillResult.fail(f"Скилл '{name}' не найден.")
+        err_msg = f"Скилл '{name}' не найден."
+        system_logger.info(f"[Agent Action Result] {err_msg}")
+        return SkillResult.fail(err_msg)
     try:
         valid_params = {
             k: v for k, v in params.items() if k in inspect.signature(func).parameters
@@ -153,7 +179,6 @@ async def _run_single_skill(name: str, params: dict) -> SkillResult:
 
         result = await func(**valid_params)
 
-        # Обрезаем результат ТОЛЬКО для логов, чтобы не засорять system.log и экран CLI
         res_msg = truncate_text(
             str(result.message), max_chars=800, suffix="... [Результат обрезан для логов]"
         )

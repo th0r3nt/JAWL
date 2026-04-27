@@ -61,14 +61,17 @@ class MetaClient:
         access_levels_desc = (
             "  - 0/SAFE: Базовые настройки.\n"
             "  - 1/CONFIGURATOR: Управление памятью и продвинутые настройки конфигурации.\n"
-            "  - 2/ARCHITECT: Управление системой и интерфейсами."
+            "  - 2/ARCHITECT: Управление системой и интерфейсами.\n"
+            "  - 3/CREATOR: Регистрация кастомных скриптов как нативных навыков."
         )
 
         # Формируем список моделей для вывода
-        models_str = ", ".join(self.available_models) if self.available_models else "Список пуст"
+        models_str = (
+            ", ".join(self.available_models) if self.available_models else "Список пуст"
+        )
 
         return (
             f"### META [ON]\n"
-            f"* Access Level: {self.access_level} / 2\n{access_levels_desc}\n"
+            f"* Access Level: {self.access_level} / 3\n{access_levels_desc}\n"
             f"* Available LLM models: [{models_str}]"
         )
