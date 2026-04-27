@@ -158,7 +158,7 @@ def terminal_chat_screen() -> None:
             ],
             style=style,
             qmark="",
-            instruction="",
+            instruction="\n (Стрелочки ↑/↓ для навигации)\n",
         ).ask()
 
         if choice == "back" or choice is None:

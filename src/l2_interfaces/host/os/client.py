@@ -45,7 +45,7 @@ class HostOSClient:
         self.events_dir.mkdir(parents=True, exist_ok=True)
 
         system_logger.info(
-            f"[Host OS] Клиент инициализирован (ОС: {self.os_platform}, Access Level: {self.access_level.name})."
+            f"[Host OS] Клиент инициализирован (ОС: {self.os_platform}, Access Level: {self.access_level})."
         )
         self.state.is_online = True
 
@@ -340,7 +340,7 @@ def send_event(message: str, payload: dict = None):
 
         return f"""### HOST OS [ON]
 * OS: {self.state.os_info}
-* Access Level: {self.access_level.value} ({self.access_level.name}) / 3
+* Current Access Level: {self.access_level.value}/{self.access_level.name}
 {access_levels_desc}
 * Polling interval: {self.state.polling_interval}
 * Datetime: {self.state.datetime}

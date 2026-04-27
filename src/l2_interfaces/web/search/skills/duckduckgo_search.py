@@ -1,4 +1,5 @@
 import asyncio
+import time
 from duckduckgo_search import DDGS
 from typing import Any
 
@@ -13,8 +14,19 @@ class DuckDuckGoSearch:
 
     async def search_raw(self, query: str, max_results: int = 5) -> list[dict[str, Any]]:
         def _do_search():
-            with DDGS() as ddgs:
-                return list(ddgs.text(query, max_results=max_results))
+            last_err = None
+            # DDG часто кидает 202 RateLimit. Делаем 3 попытки с увеличивающейся паузой.
+            for attempt in range(3):
+                try:
+                    with DDGS() as ddgs:
+                        return list(ddgs.text(query, max_results=max_results))
+                except Exception as e:
+                    last_err = e
+                    # Ждем 1.5с, затем 3.0с перед повтором
+                    time.sleep(1.5 * (attempt + 1))
+            
+            # Если 3 раза упало - значит IP реально улетел в шэдоу-бан на некоторое время
+            raise last_err
 
         return await asyncio.to_thread(_do_search)
 
