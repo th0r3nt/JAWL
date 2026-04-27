@@ -135,12 +135,13 @@ def setup_and_run() -> None:
     # =========================================================
     # Если мы ВНУТРИ виртуального окружения
     # =========================================================
-
     sys.path.append(str(root_dir))
 
     # Механизм самовосстановления: если модулей нет, докачиваем их и проактивно стартуем
     try:
         from src.cli.menu import main_menu
+        from src.cli.screens.logs import logs_screen
+        from src.cli.screens.terminal_chat import _open_terminal_chat
     except ModuleNotFoundError as e:
         if os.environ.get("JAWL_RECOVERY_ATTEMPTED") == "1":
             print(
@@ -177,8 +178,13 @@ def setup_and_run() -> None:
         )
         sys.exit(exit_code)
 
-    # Если всё импортировалось успешно — запускаем меню
-    main_menu()
+    # Если всё импортировалось успешно - проверяем флаги
+    if "--logs" in sys.argv:
+        logs_screen()
+    elif "--terminal" in sys.argv:
+        _open_terminal_chat()
+    else:
+        main_menu()
 
 
 if __name__ == "__main__":

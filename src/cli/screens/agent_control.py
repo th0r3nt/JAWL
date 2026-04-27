@@ -93,7 +93,7 @@ def _check_and_setup_env() -> tuple[bool, bool]:
                 break
 
     if not key_found:
-        print_info("Похоже, вы еще не настроили подключение к LLM.")
+        print_info(" Похоже, вы еще не настроили подключение к LLM.")
 
         api_url = questionary.text(
             "Введите Base URL для LLM (например, ссылку для Gemini или локальной модели).\nОставьте пустым для стандартного OpenAI API:"

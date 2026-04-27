@@ -1,6 +1,8 @@
 import os
 import yaml
 import sys
+import platform
+import subprocess
 from pathlib import Path
 
 from src.utils._tools import is_agent_running
@@ -47,6 +49,50 @@ def _get_agent_status() -> dict:
             pass
 
     return status
+
+
+def launch_in_new_window(arg: str) -> None:
+    """Запускает jawl.py с определенным аргументом в новом окне ОС терминала."""
+    script_path = ROOT_DIR / "jawl.py"
+
+    # sys.executable указывает на Python внутри нашего venv
+    cmd = [sys.executable, str(script_path), arg]
+
+    system = platform.system()
+
+    try:
+        if system == "Windows":
+            subprocess.Popen(cmd, creationflags=subprocess.CREATE_NEW_CONSOLE)
+        elif system == "Darwin":
+            # macOS AppleScript
+            cmd_str = f'"{sys.executable}" "{script_path}" {arg}'
+            cmd_str_escaped = cmd_str.replace('"', '\\"')
+            script = f'tell application "Terminal" to do script "{cmd_str_escaped}"'
+            subprocess.Popen(["osascript", "-e", script])
+        else:
+            # Linux (пытаемся найти популярный терминал)
+            import shutil
+
+            terminals = [
+                ("gnome-terminal", ["--"]),
+                ("konsole", ["-e"]),
+                ("xfce4-terminal", ["-e"]),
+                ("alacritty", ["-e"]),
+                ("xterm", ["-e"]),
+            ]
+            for term, args in terminals:
+                if shutil.which(term):
+                    subprocess.Popen([term] + args + cmd)
+                    return
+
+            # Fallback если ничего не нашли
+            print_error(
+                "Не удалось найти терминал для открытия нового окна. Запускаем в текущем..."
+            )
+            subprocess.Popen(cmd)
+
+    except Exception as e:
+        print_error(f"Ошибка при открытии нового окна: {e}")
 
 
 def flush_input() -> None:

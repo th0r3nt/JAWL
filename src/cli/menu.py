@@ -1,16 +1,16 @@
-"""
-Главное меню CLI-интерфейса JAWL.
-Выступает в роли маршрутизатора между экранами настроек и управления агентом.
-"""
-
 import sys
 import time
 import questionary
 
-from src.cli.widgets.ui import draw_header, print_info, get_custom_style, flush_input
+from src.cli.widgets.ui import (
+    draw_header,
+    print_info,
+    get_custom_style,
+    flush_input,
+    launch_in_new_window,
+)
 
 from src.cli.screens.agent_control import start_agent_screen, stop_agent_screen
-from src.cli.screens.logs import logs_screen
 from src.cli.screens.setup_wizard import setup_wizard_screen
 from src.cli.screens.database_manager import database_manager_screen
 from src.cli.screens.terminal_chat import terminal_chat_screen
@@ -24,8 +24,6 @@ def main_menu() -> None:
     while True:
         draw_header()
 
-        # Сбрасываем фантомные нажатия клавиш (особенно Enter),
-        # чтобы меню не выбирало пункты само по себе
         flush_input()
 
         choice = questionary.select(
@@ -37,12 +35,12 @@ def main_menu() -> None:
                 questionary.Choice("📋 Открыть логи", "logs"),
                 questionary.Choice("⚙️ Мастер настройки интерфейсов", "setup"),
                 questionary.Choice("🗄️ Управление базами данных", "db_manager"),
-                questionary.Separator(" "),  # Заменяем дефисы на пустую строку для воздуха
+                questionary.Separator(" "),
                 questionary.Choice("❌ Выход", "exit"),
             ],
             style=style,
-            qmark="",  # Убираем дефолтный знак вопроса '?' слева
-            instruction="\n (Используйте стрелочки ↑/↓ и Enter)\n",  # Переносим инструкцию на новую строку с отступом
+            qmark="",
+            instruction="\n (Используйте стрелочки ↑/↓ и Enter)\n",
         ).ask()
 
         if choice is None or choice == "exit":
@@ -61,7 +59,7 @@ def main_menu() -> None:
             terminal_chat_screen()
 
         elif choice == "logs":
-            logs_screen()
+            launch_in_new_window("--logs")
 
         elif choice == "setup":
             setup_wizard_screen()

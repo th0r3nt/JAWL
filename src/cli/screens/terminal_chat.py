@@ -3,7 +3,7 @@ import json
 from pathlib import Path
 
 import questionary
-from prompt_toolkit import PromptSession
+from prompt_toolkit import PromptSession, print_formatted_text, HTML
 from prompt_toolkit.patch_stdout import patch_stdout
 from rich.panel import Panel
 from rich.markdown import Markdown
@@ -16,6 +16,7 @@ from src.cli.widgets.ui import (
     clear_screen,
     draw_header,
     get_custom_style,
+    launch_in_new_window,
 )
 from src.utils.settings import load_config
 from src.cli.screens.agent_control import _is_agent_running
@@ -59,12 +60,15 @@ async def _chat_loop(port: int, history_file: Path, agent_name: str):
                 text = msg.get("text", "")
 
                 if sender == "User":
-                    console.print(f"[bold green]Вы:[/bold green] {text}")
+                    # Используем нативный форматер prompt_toolkit
+                    print_formatted_text(HTML(f"<ansigreen><b>Вы:</b></ansigreen> {text}"))
                 else:
-                    console.print(f"\n[bold magenta]{sender}:[/bold magenta]")
+                    print_formatted_text(
+                        HTML(f"\n<ansimagenta><b>{sender}:</b></ansimagenta>")
+                    )
                     console.print(Markdown(text))
 
-            console.print("\n[dim]--- Конец истории ---[/dim]\n")
+            print_formatted_text(HTML("\n<style fg='gray'>--- Конец истории ---</style>\n"))
         except Exception:
             pass
 
@@ -88,9 +92,11 @@ async def _chat_loop(port: int, history_file: Path, agent_name: str):
                     message_text = raw_text
 
                 with patch_stdout():
-                    console.print(f"\n[bold magenta]{agent_name}:[/bold magenta]")
+                    print_formatted_text(
+                        HTML(f"\n<ansimagenta><b>{agent_name}:</b></ansimagenta>")
+                    )
                     console.print(Markdown(message_text))
-                    console.print()
+                    print("")  # Пустая строка для "воздуха"
 
         except asyncio.CancelledError:
             pass
@@ -103,7 +109,10 @@ async def _chat_loop(port: int, history_file: Path, agent_name: str):
     try:
         while True:
             with patch_stdout():
-                user_input = await session.prompt_async("Вы: ")
+                # Раскрашиваем строку ввода
+                user_input = await session.prompt_async(
+                    HTML("<ansigreen><b>Вы:</b></ansigreen> ")
+                )
 
             text = user_input.strip()
             if not text:
@@ -147,7 +156,7 @@ def terminal_chat_screen() -> None:
             break
 
         if choice == "open":
-            _open_terminal_chat()
+            launch_in_new_window("--terminal")  # Запускаем в новом окне
         elif choice == "clear_history":
             _clear_terminal_history()
 
@@ -205,11 +214,9 @@ def _clear_terminal_history() -> None:
 
     if history_file.exists():
         try:
-            # Очищаем файл, записывая пустой JSON-массив
             with open(history_file, "w", encoding="utf-8") as f:
                 json.dump([], f, ensure_ascii=False)
             print_success("История терминала успешно очищена.")
-
         except Exception as e:
             print_error(f"Не удалось очистить историю: {e}")
     else:
