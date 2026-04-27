@@ -181,7 +181,7 @@ class HostOSClient:
 
     def _ensure_sandbox_api(self):
         """Инжектит мини-библиотеку для скриптов агента в песочницу."""
-
+        
         api_path = self.sandbox_dir / "jawl_api.py"
         api_code = """\
 import json
@@ -197,11 +197,17 @@ def send_event(message: str, payload: dict = None):
     events_dir.mkdir(parents=True, exist_ok=True)
     
     event_id = str(uuid.uuid4())
+    temp_path = events_dir / f"{int(time.time())}_{event_id}.tmp"
     file_path = events_dir / f"{int(time.time())}_{event_id}.json"
     
     data = {"message": message, "payload": payload}
-    with open(file_path, "w", encoding="utf-8") as f:
+    
+    # Атомарная запись: пишем во временный файл, затем переименовываем. 
+    # Защищает от чтения наполовину готового файла быстрым поллингом агента.
+    with open(temp_path, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False)
+        
+    temp_path.rename(file_path)
 """
         api_path.write_text(api_code, encoding="utf-8")
 

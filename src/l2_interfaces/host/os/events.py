@@ -104,7 +104,9 @@ class HostOSEvents:
         self.bus = event_bus
 
         self._is_running: bool = False
+
         self._monitoring_task: asyncio.Task | None = None
+        self._fast_monitoring_task: asyncio.Task | None = None
 
         self._observer: Observer | None = None  # type: ignore
         self._watches: dict[str, Any] = {}
@@ -149,6 +151,7 @@ class HostOSEvents:
             )
 
         self._monitoring_task = asyncio.create_task(self._loop())
+        self._fast_monitoring_task = asyncio.create_task(self._fast_loop())
 
         # Запуск Watchdog
         self._observer = Observer()
@@ -174,6 +177,10 @@ class HostOSEvents:
         if self._monitoring_task:
             self._monitoring_task.cancel()
             self._monitoring_task = None
+
+        if self._fast_monitoring_task:
+            self._fast_monitoring_task.cancel()
+            self._fast_monitoring_task = None
 
         if self._observer:
             self._observer.stop()
@@ -394,8 +401,6 @@ class HostOSEvents:
                 await self._update_network()
                 # Мы всё равно периодически чекаем песочницу на случай, если watchdog что-то пропустил
                 self._update_file_trees()
-                await self._poll_sandbox_events()
-                await self._update_daemons_status()
 
             except asyncio.CancelledError:
                 break
@@ -404,6 +409,20 @@ class HostOSEvents:
                 system_logger.error(f"[Host OS] Ошибка в цикле мониторинга: {e}")
 
             await asyncio.sleep(self.host_os.config.monitoring_interval_sec)
+
+    async def _fast_loop(self):
+        """Быстрый цикл (каждую секунду) для моментальной реакции на события демонов."""
+        while self._is_running:
+
+            try:
+                await self._poll_sandbox_events()
+                await self._update_daemons_status()
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                system_logger.error(f"[Host OS] Ошибка в быстром цикле мониторинга: {e}")
+                
+            await asyncio.sleep(1)
 
     def _is_ignored(self, path: Path) -> bool:
         """Единый фильтр мусора. Отсекает кэш, логи, скрытые файлы и виртуальные окружения."""
@@ -612,15 +631,11 @@ class HostOSEvents:
             try:
                 with open(file_path, "r", encoding="utf-8") as f:
                     data = json.load(f)
-                
+
                 msg = data.get("message", "Событие из песочницы.")
                 payload = data.get("payload", {})
-                
-                await self.bus.publish(
-                    Events.HOST_OS_SANDBOX_EVENT,
-                    message=msg,
-                    **payload
-                )
+
+                await self.bus.publish(Events.HOST_OS_SANDBOX_EVENT, message=msg, **payload)
             except Exception as e:
                 system_logger.error(f"[Host OS] Ошибка чтения события из песочницы: {e}")
             finally:
@@ -633,22 +648,22 @@ class HostOSEvents:
         """
         Пингует процессы демонов, обновляет их Uptime или удаляет упавшие.
         """
-        
+
         daemons = self.host_os.get_daemons_registry()
         if not daemons:
             self.state.active_daemons = "Нет запущенных демонов."
             return
 
-        lines =[]
+        lines = []
         modified = False
-        dead_daemons =[]
+        dead_daemons = []
 
         for pid_str, info in list(daemons.items()):
             pid = int(pid_str)
             name = info.get("name", "Unknown")
             desc = info.get("description", "Без описания")
             start_time = info.get("start_time", time.time())
-            
+
             is_alive = False
             if psutil.pid_exists(pid):
                 try:
@@ -657,7 +672,7 @@ class HostOSEvents:
                         is_alive = True
                 except (psutil.NoSuchProcess, psutil.AccessDenied):
                     pass
-            
+
             if is_alive:
                 uptime = seconds_to_duration_str(time.time() - start_time)
                 lines.append(f"- [PID: {pid}] {name} (Uptime: {uptime})\n  Описание: {desc}")
@@ -672,7 +687,7 @@ class HostOSEvents:
                 await self.bus.publish(
                     Events.HOST_OS_SANDBOX_EVENT,
                     message=f"Фоновый скрипт '{d_name}' завершил работу (успешно или упал).",
-                    log_hint="Проверьте его лог-файл (sandbox/daemon_*.log), чтобы узнать причину."
+                    log_hint="Проверьте его лог-файл (sandbox/daemon_*.log), чтобы узнать причину.",
                 )
 
         if lines:
