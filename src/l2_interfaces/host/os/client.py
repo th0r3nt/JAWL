@@ -237,35 +237,52 @@ def send_event(message: str, payload: dict = None):
         )
 
         # ===============================================
-        # Сборка истории файлов
+        # Сборка открытых файлов
 
         workspace_block = ""
         if self.state.opened_workspace_files:
+            max_tabs = self.config.workspace_max_opened_files
+            current_tabs = len(self.state.opened_workspace_files)
 
-            ws_lines = ["\n* [Вкладки редактора] - Открытые файлы:"]
+            ws_lines = [
+                f"\n* [Вкладки редактора] - Открытые файлы ({current_tabs}/{max_tabs}):"
+            ]
+
             for rel_path in list(self.state.opened_workspace_files):
-
                 try:
                     full_path = self.validate_path(rel_path, is_write=False)
                     if full_path.exists() and full_path.is_file():
+
+                        try:
+                            display_path = full_path.relative_to(self.framework_dir).as_posix()
+                        except ValueError:
+                            display_path = full_path.as_posix()
+
                         content = full_path.read_text(encoding="utf-8", errors="replace")
 
-                        limit = 10000  # Жесткий лимит на 1 вкладку, чтобы не сжечь контекст
+                        limit = self.config.workspace_max_file_chars
                         if len(content) > limit:
                             content = (
                                 content[:limit]
-                                + "\n... [Файл слишком большой, обрезан. Использовать сооветствующий файл для полного чтения]"
+                                + f"\n... [Файл слишком большой, обрезан (больше {limit} символов). Для полного содержания - использовать соответствующий навык]"
                             )
+
+                        ext = full_path.suffix.lower().strip(".")
+                        lang = (
+                            ext
+                            if ext in ["py", "json", "yaml", "yml", "md", "html", "js", "css"]
+                            else ""
+                        )
+                        if ext == "py":
+                            lang = "python"
+
                         ws_lines.append(
-                            f"--- Вкладка: {rel_path} ---\n```python\n{content}\n```"
+                            f"--- Вкладка: {display_path} ---\n```{lang}\n{content}\n```"
                         )
                     else:
-                        # Файл удален, тихо закрываем вкладку
                         self.state.opened_workspace_files.discard(rel_path)
-
                 except Exception:
                     pass
-
             workspace_block = "\n" + "\n".join(ws_lines) + "\n"
 
         # ===============================================

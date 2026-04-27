@@ -26,6 +26,7 @@ class HostOSConfig(BaseModel):
 
     workspace_max_opened_files: int = 3
     recent_file_changes_limit: int = 5
+    workspace_max_file_chars: int = 10000
 
 
 class HostConfig(BaseModel):

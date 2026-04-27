@@ -28,6 +28,7 @@ host:
 
     workspace_max_opened_files: 10 # Лимит открытых файлов в контексте агента (важно, если агент пишет сложный код)
     recent_file_changes_limit: 5 # В контексте будут отображаться последние n изменений в файлах (в кратком diff формате)
+    workspace_max_file_chars: 10000 # Лимит символов на один открытый файл в контексте
 
 
 telegram:
@@ -58,8 +59,8 @@ github:
 email:
   enabled: false # Перед включением добавьте EMAIL_ACCOUNT и EMAIL_PASSWORD в .env
   polling_interval_sec: 60
-  recent_limit: 5
-  # Сервера и порты система подберет сама на основе @gmail.com
+  recent_limit: 5 # Отображает последние n писем в ящике в кратком формате
+  # Сервера и порты система подберет сама
 
 
 web:
