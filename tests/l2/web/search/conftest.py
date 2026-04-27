@@ -1,8 +1,10 @@
 import pytest
 from src.l2_interfaces.web.search.client import WebSearchClient
 from src.l0_state.interfaces.state import WebSearchState
-from src.l2_interfaces.web.search.skills.duckduckgo import DuckDuckGoSearch
-from src.l2_interfaces.web.search.skills.webpages import WebPages
+from src.l2_interfaces.web.search.skills.duckduckgo_search import DuckDuckGoSearch
+from src.l2_interfaces.web.search.skills.tavily_search import TavilySearch
+from src.l2_interfaces.web.search.skills.trafilatura_read import TrafilaturaReader
+from src.l2_interfaces.web.search.skills.jina_read import JinaReader
 
 
 @pytest.fixture
@@ -11,10 +13,20 @@ def web_client():
 
 
 @pytest.fixture
-def search_skill(web_client):
+def ddg_skill(web_client):
     return DuckDuckGoSearch(client=web_client)
 
 
 @pytest.fixture
-def pages_skill(web_client):
-    return WebPages(client=web_client)
+def tavily_skill(web_client):
+    return TavilySearch(client=web_client, api_key="fake_key_123")
+
+
+@pytest.fixture
+def trafilatura_skill(web_client):
+    return TrafilaturaReader(client=web_client)
+
+
+@pytest.fixture
+def jina_skill(web_client):
+    return JinaReader(client=web_client)
