@@ -11,7 +11,7 @@ from src.utils._tools import get_pid_file_path
 # Утилиты
 # ==========================================
 
-from src.utils.logger import system_logger
+from src.utils.logger import system_logger, apply_logger_config
 from src.utils.event.bus import EventBus
 from src.utils.event.registry import Events
 from src.utils.settings import load_config, SettingsConfig, InterfacesConfig
@@ -578,6 +578,10 @@ async def main() -> int:
 
     event_bus = EventBus()
     settings_config, interfaces_config = load_config()
+    apply_logger_config(
+        max_size_mb=settings_config.system.logging.max_file_size_mb,
+        backup_count=settings_config.system.logging.backup_count,
+    )
 
     system = System(
         event_bus=event_bus,

@@ -1,7 +1,7 @@
 import shutil
 import yaml
 from pathlib import Path
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 from yaml.constructor import ConstructorError
 
 # ==========================================
@@ -128,6 +128,11 @@ class LLMConfig(BaseModel):
     max_react_steps: int
 
 
+class LoggingConfig(BaseModel):
+    max_file_size_mb: float = 5.0
+    backup_count: int = 1
+
+
 class VectorDBConfig(BaseModel):
     similarity_threshold: float
     embedding_model: str
@@ -186,6 +191,7 @@ class SQLConfig(BaseModel):
 
 class SystemConfig(BaseModel):
     timezone: int
+    logging: LoggingConfig = Field(default_factory=LoggingConfig) # Обратная совместимость для старых yaml
     vector_db: VectorDBConfig
     heartbeat_interval: int
     continuous_cycle: bool

@@ -2,6 +2,7 @@ import logging
 import sys
 from typing import Union
 from pathlib import Path
+from logging.handlers import RotatingFileHandler
 
 
 class LogColors:
@@ -105,7 +106,10 @@ def setup_specific_logger(name: str, log_file: str, level: Union[int, str]) -> l
     file_format = "%(asctime)s.%(msecs)03d - %(name)s - %(levelname)s - %(message)s"
     date_format = "%Y-%m-%d %H:%M:%S"
 
-    file_handler = logging.FileHandler(full_path, encoding="utf-8", mode="a")
+    # RotatingFileHandler - базовые 5 МБ, обновится позже из конфига
+    file_handler = RotatingFileHandler(
+        full_path, maxBytes=5 * 1024 * 1024, backupCount=1, encoding="utf-8"
+    )
     file_formatter = logging.Formatter(fmt=file_format, datefmt=date_format)
     file_handler.setFormatter(file_formatter)
 
@@ -121,7 +125,6 @@ def setup_specific_logger(name: str, log_file: str, level: Union[int, str]) -> l
     specific_logger = logging.getLogger(name)
     specific_logger.setLevel(level)
 
-    # Защита от дублирования логов при перезагрузках
     if not specific_logger.handlers:
         specific_logger.addHandler(file_handler)
         specific_logger.addHandler(console_handler)
@@ -132,6 +135,15 @@ def setup_specific_logger(name: str, log_file: str, level: Union[int, str]) -> l
 
 # Создаем логгер с уровнем INFO по умолчанию
 system_logger = setup_specific_logger(name="SYSTEM", log_file="system.log", level=logging.INFO)
+
+
+def apply_logger_config(max_size_mb: float, backup_count: int) -> None:
+    """Динамически обновляет лимиты ротации логов из YAML конфигурации."""
+    max_bytes = int(max_size_mb * 1024 * 1024)
+    for handler in system_logger.handlers:
+        if isinstance(handler, RotatingFileHandler):
+            handler.maxBytes = max_bytes
+            handler.backupCount = backup_count
 
 
 def update_log_level(level_str: str) -> None:

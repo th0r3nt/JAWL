@@ -107,6 +107,12 @@ def logs_screen() -> None:
                 line = f.readline()
                 if not line:
                     time.sleep(0.1)
+
+                    # Простая защита на случай ротации логов
+                    # Если размер файла внезапно стал меньше нашей позиции (очистился), начинаем читать сначала
+                    if LOG_FILE.exists() and LOG_FILE.stat().st_size < f.tell():
+                        f.seek(0)
+
                     continue
 
                 console.print(_colorize_log_line(line))
