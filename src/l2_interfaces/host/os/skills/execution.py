@@ -1,6 +1,8 @@
 import asyncio
 import sys
 import psutil
+import json
+import uuid
 
 from src.utils.logger import system_logger
 from src.utils._tools import truncate_text
@@ -319,3 +321,183 @@ class HostOSExecution:
 
         except Exception as e:
             return SkillResult.fail(f"Ошибка при остановке демона: {e}")
+        
+    @skill()
+    async def execute_sandbox_func(
+        self, filepath: str, func_name: str, kwargs: dict = None
+    ) -> SkillResult:
+        """
+        Универсальный шлюз для безопасного вызова конкретной функции или корутины из Python-скрипта в песочнице.
+        Позволяет передать аргументы и напрямую получить возвращаемый результат (return), минуя создание одноразовых файлов.
+        - filepath: путь к скрипту (например, 'sandbox/directory/api.py')
+        - func_name: имя функции для вызова (например, 'create_comment')
+        - kwargs: словарь аргументов, которые будут переданы в функцию.
+        """
+
+        if kwargs is None:
+            kwargs = {}
+
+        timeout = self.host_os.config.execution_timeout_sec
+
+        if self.host_os.access_level < HostOSAccessLevel.OBSERVER:
+            return SkillResult.fail("Отказано в доступе.")
+
+        try:
+            safe_path = self.host_os.validate_path(filepath, is_write=False)
+
+            if not safe_path.is_file() or safe_path.suffix.lower() != ".py":
+                return SkillResult.fail(
+                    f"Ошибка: Файл не найден или это не .py скрипт ({safe_path.name})."
+                )
+
+            # Создаем временную директорию для оберток, чтобы не мусорить
+            tmp_dir = self.host_os.sandbox_dir / ".tmp"
+            tmp_dir.mkdir(exist_ok=True)
+
+            wrapper_id = str(uuid.uuid4())[:8]
+            wrapper_path = tmp_dir / f"rpc_wrapper_{wrapper_id}.py"
+
+            # Невидимый скрипт-обертка:
+            # 1. Забирает kwargs из stdin (чтобы избежать экранирования в строке)
+            # 2. Динамически импортирует целевой файл
+            # 3. Выполняет функцию (поддерживает async/await)
+            # 4. Принтит результат в JSON с уникальным маркером
+            wrapper_code = """\
+import sys
+import json
+import asyncio
+import traceback
+from importlib.util import spec_from_file_location, module_from_spec
+from pathlib import Path
+
+# Обеспечиваем корректные импорты для целевого скрипта
+target_filepath = sys.argv[1]
+func_name = sys.argv[2]
+target_dir = str(Path(target_filepath).parent)
+if target_dir not in sys.path:
+    sys.path.insert(0, target_dir)
+
+async def _runner(func, kwargs):
+    if asyncio.iscoroutinefunction(func):
+        return await func(**kwargs)
+    return func(**kwargs)
+
+def main():
+    try:
+        input_data = sys.stdin.read()
+        kwargs = json.loads(input_data) if input_data.strip() else {}
+
+        spec = spec_from_file_location("dynamic_sandbox_module", target_filepath)
+        if spec is None or spec.loader is None:
+            raise ImportError(f"Не удалось загрузить модуль {target_filepath}")
+            
+        module = module_from_spec(spec)
+        sys.modules["dynamic_sandbox_module"] = module
+        spec.loader.exec_module(module)
+
+        if not hasattr(module, func_name):
+            raise AttributeError(f"В модуле {target_filepath} нет функции '{func_name}'")
+
+        func = getattr(module, func_name)
+        result = asyncio.run(_runner(func, kwargs))
+        
+        # Кастомный принт, чтобы отличить наш JSON от принтов самого скрипта
+        sys.stdout.write("\\n---JAWL_RPC_RESULT---\\n")
+        sys.stdout.write(json.dumps({"status": "ok", "result": result}, ensure_ascii=False) + "\\n")
+
+    except Exception as e:
+        sys.stdout.write("\\n---JAWL_RPC_RESULT---\\n")
+        sys.stdout.write(json.dumps({
+            "status": "error", 
+            "error": str(e), 
+            "traceback": traceback.format_exc()
+        }, ensure_ascii=False) + "\\n")
+
+if __name__ == "__main__":
+    main()
+"""
+            wrapper_path.write_text(wrapper_code, encoding="utf-8")
+
+            process = await asyncio.create_subprocess_exec(
+                sys.executable,
+                str(wrapper_path),
+                str(safe_path),
+                func_name,
+                stdin=asyncio.subprocess.PIPE,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+                cwd=str(self.host_os.sandbox_dir),
+            )
+
+            stdin_data = json.dumps(kwargs, ensure_ascii=False).encode("utf-8")
+
+            try:
+                stdout, stderr = await asyncio.wait_for(
+                    process.communicate(input=stdin_data), timeout=timeout
+                )
+            except asyncio.TimeoutError:
+                process.kill()
+                await process.wait()
+                wrapper_path.unlink(missing_ok=True)
+                return SkillResult.fail(
+                    f"Функция работала дольше {timeout} секунд и была убита (Таймаут)."
+                )
+
+            # Чистим временный файл-обертку
+            wrapper_path.unlink(missing_ok=True)
+
+            out_str = stdout.decode("utf-8", errors="replace").strip()
+            err_str = stderr.decode("utf-8", errors="replace").strip()
+
+            rpc_prefix = "---JAWL_RPC_RESULT---"
+            if rpc_prefix in out_str:
+                parts = out_str.split(rpc_prefix)
+                script_stdout = parts[0].strip()  # Вывод, который функция сделала через print()
+                rpc_json_str = parts[1].strip()
+
+                try:
+                    rpc_result = json.loads(rpc_json_str)
+                except json.JSONDecodeError:
+                    return SkillResult.fail(
+                        f"Скрипт отработал, но результат невалиден.\nSTDOUT:\n{out_str}\nSTDERR:\n{err_str}"
+                    )
+
+                report =[]
+                if script_stdout:
+                    report.append(
+                        f"STDOUT скрипта:\n```\n{truncate_text(script_stdout, 2000)}\n```"
+                    )
+                if err_str:
+                    report.append(
+                        f"STDERR скрипта:\n```\n{truncate_text(err_str, 2000)}\n```"
+                    )
+
+                if rpc_result.get("status") == "ok":
+                    result_data = rpc_result.get("result")
+                    report.append(
+                        f"Возвращенный результат (Return):\n```json\n{json.dumps(result_data, ensure_ascii=False, indent=2)}\n```"
+                    )
+                    system_logger.info(
+                        f"[Host OS] RPC-шлюз успешно выполнил функцию '{func_name}' из {safe_path.name}"
+                    )
+                    return SkillResult.ok("\n\n".join(report))
+                else:
+                    err_msg = rpc_result.get("error")
+                    tb = rpc_result.get("traceback")
+                    report.append(
+                        f"Ошибка выполнения '{func_name}': {err_msg}\n\nTraceback:\n```python\n{tb}\n```"
+                    )
+                    return SkillResult.fail("\n\n".join(report))
+            else:
+                # Если RPC-маркер не найден, значит функция упала с фатальной ошибкой (например, syntax error)
+                return SkillResult.fail(
+                    f"Скрипт завершился с ошибкой (код {process.returncode}).\n"
+                    f"STDOUT:\n{truncate_text(out_str, 2000)}\n"
+                    f"STDERR:\n{truncate_text(err_str, 2000)}"
+                )
+
+        except PermissionError as e:
+            return SkillResult.fail(str(e))
+        
+        except Exception as e:
+            return SkillResult.fail(f"Внутренняя ошибка RPC: {e}")

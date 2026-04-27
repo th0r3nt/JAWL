@@ -210,10 +210,16 @@ class HostOSFiles:
     # =================================================================================
 
     @skill()
-    async def write_file(self, filepath: str, content: str) -> SkillResult:
+    async def write_file(self, filepath: str, content: str, description: str = None) -> SkillResult:
         """
         Создает новый файл или полностью перезаписывает существующий.
+
+        Если передан 'description', к файлу сразу будет привязано текстовое описание.
+        description: советуется писать полезную информацию. Например, "в файле есть функция X, которая делает Y, принимает на вход аргумент Z, возвращает W".
+
+        В будущем это поможет искать нужные функции намного быстрее.
         """
+
         try:
             safe_path = self.host_os.validate_path(filepath, is_write=True)
             safe_path.parent.mkdir(parents=True, exist_ok=True)
@@ -224,10 +230,21 @@ class HostOSFiles:
 
             await asyncio.to_thread(_write)
 
+            # Сохраняем описание, если оно передано
+            desc_msg = ""
+            if description:
+                try:
+                    rel_path = safe_path.relative_to(self.host_os.sandbox_dir).as_posix()
+                    clean_desc = description.replace("\n", " ").strip()
+                    await asyncio.to_thread(self.host_os.set_file_metadata, rel_path, clean_desc)
+                    desc_msg = " Описание файла успешно сохранено."
+                except Exception as e:
+                    desc_msg = f" (Не удалось сохранить метаданные: {e})"
+
             size_str = format_size(safe_path.stat().st_size)
             system_logger.info(f"[Host OS] Перезаписан файл: {safe_path.name} ({size_str})")
             return SkillResult.ok(
-                f"Файл {safe_path.name} успешно перезаписан. Записано: {len(content)} симв. Размер: {size_str}."
+                f"Файл {safe_path.name} успешно перезаписан. Записано: {len(content)} симв. Размер: {size_str}.{desc_msg}"
             )
 
         except PermissionError as e:
