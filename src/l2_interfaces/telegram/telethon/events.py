@@ -168,6 +168,7 @@ class TelethonEvents:
                             recent_msgs = await client.get_messages(entity, limit=fetch_limit)
                             if recent_msgs:
                                 block = f"[User] {dialog.name}{bot_tag} (ID: {dialog.id}) [UNREAD: {dialog.unread_count}]:"
+                                block += f"\n    Last {len(recent_msgs)} messages:"
                                 msg_lines = []
                                 for m in reversed(recent_msgs):
                                     formatted = await TelethonMessageParser.build_string(
@@ -177,12 +178,13 @@ class TelethonEvents:
                                         timezone=self.tg_client.timezone,
                                         truncate_text_flag=True,
                                     )
+                                    # Делаем красивый двойной отступ для сообщений
                                     indented = "\n".join(
-                                        [f"    {line}" for line in formatted.split("\n")]
+                                        [f"        {line}" for line in formatted.split("\n")]
                                     )
                                     msg_lines.append(indented)
 
-                                block += "\n" + "\n\n".join(msg_lines)
+                                block += "\n\n" + "\n\n".join(msg_lines)
                                 unread_blocks.append(block)
                         except Exception as e:
                             system_logger.debug(
