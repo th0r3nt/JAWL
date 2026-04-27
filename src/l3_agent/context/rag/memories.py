@@ -101,14 +101,15 @@ class RAGMemories:
             if chat_name and chat_name.lower() != "unknown":
                 raw_queries.add(chat_name.strip())
 
-            msg = payload.get("message", "")
+            # Ищем сырой текст без визуальных маркеров (для чистоты эмбеддинг-пространства)
+            msg = payload.get("raw_text") or payload.get("message", "")
             if len(msg) > 10 or len(msg.split()) > 2:
                 raw_queries.add(msg.strip())
 
             # Берем только ПОСЛЕДНИЙ пропущенный ивент
             if missed_events:
                 last_evt = missed_events[-1].get("payload", {})
-                match_msg = last_evt.get("message", "")
+                match_msg = last_evt.get("raw_text") or last_evt.get("message", "")
                 if len(match_msg) > 15 or len(match_msg.split()) > 3:
                     raw_queries.add(match_msg.strip())
 
@@ -185,4 +186,7 @@ class RAGMemories:
         if not final_blocks:
             return ""
 
-        return "## RELEVANT INFORMATION (автоматический RAG-поиск: информация из векторной базы данных) \n" + "\n\n".join(final_blocks)
+        return (
+            "## RELEVANT INFORMATION (автоматический RAG-поиск: информация из векторной базы данных) \n"
+            + "\n\n".join(final_blocks)
+        )

@@ -114,6 +114,7 @@ class AiogramEvents:
         await self.bus.publish(
             Events.AIOGRAM_MESSAGE_INCOMING,
             message=message.text or message.caption or "[Медиа]",
+            raw_text=message.text or message.caption or "",
             sender_name=sender_name,
             chat_id=message.chat.id,
             msg_id=message.message_id,
@@ -142,6 +143,7 @@ class AiogramEvents:
         await self.bus.publish(
             event_type,
             message=message.text or message.caption or "[Медиа]",
+            raw_text=message.text or message.caption or "",
             sender_name=sender_name,
             chat_id=message.chat.id,
             msg_id=message.message_id,

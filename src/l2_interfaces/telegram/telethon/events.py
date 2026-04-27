@@ -236,6 +236,7 @@ class TelethonEvents:
 
         payload = {
             "message": enriched_message,
+            "raw_text": msg_text, 
             "sender_name": sender_name,
             "chat_name": chat_name,
             "chat_id": event.chat_id,
@@ -291,6 +292,7 @@ class TelethonEvents:
 
         payload = {
             "message": enriched_message,
+            "raw_text": msg_text, 
             "sender_name": sender_name,
             "chat_name": chat_name,
             "chat_id": event.chat_id,
@@ -361,6 +363,7 @@ class TelethonEvents:
 
         payload = {
             "message": enriched_message,
+            "raw_text": msg_text, 
             "sender_name": sender_name,
             "chat_name": chat_name,
             "chat_id": event.chat_id,
