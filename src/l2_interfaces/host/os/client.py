@@ -178,10 +178,9 @@ class HostOSClient:
         with open(self.metadata_file, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, indent=4)
 
-
     def _ensure_sandbox_api(self):
         """Инжектит мини-библиотеку для скриптов агента в песочницу."""
-        
+
         api_path = self.sandbox_dir / "jawl_api.py"
         api_code = """\
 import json
@@ -223,7 +222,6 @@ def send_event(message: str, payload: dict = None):
             json.dump(data, f, ensure_ascii=False, indent=4)
 
     async def get_context_block(self, **kwargs) -> str:
-
         if not self.state.is_online:
             return "### HOST OS [OFF]\nИнтерфейс отключен."
 
@@ -237,6 +235,50 @@ def send_event(message: str, payload: dict = None):
             "  - 2/OPERATOR: Read всей ОС, управление процессами, Write только для файлов фреймворка.\n"
             "  - 3/ROOT: Полный доступ. Read/Write всей системы и управление процессами."
         )
+
+        # ===============================================
+        # Сборка истории файлов
+
+        workspace_block = ""
+        if self.state.opened_workspace_files:
+
+            ws_lines = ["\n* [Вкладки редактора] - Открытые файлы:"]
+            for rel_path in list(self.state.opened_workspace_files):
+
+                try:
+                    full_path = self.validate_path(rel_path, is_write=False)
+                    if full_path.exists() and full_path.is_file():
+                        content = full_path.read_text(encoding="utf-8", errors="replace")
+
+                        limit = 10000  # Жесткий лимит на 1 вкладку, чтобы не сжечь контекст
+                        if len(content) > limit:
+                            content = (
+                                content[:limit]
+                                + "\n... [Файл слишком большой, обрезан. Использовать сооветствующий файл для полного чтения]"
+                            )
+                        ws_lines.append(
+                            f"--- Вкладка: {rel_path} ---\n```python\n{content}\n```"
+                        )
+                    else:
+                        # Файл удален, тихо закрываем вкладку
+                        self.state.opened_workspace_files.discard(rel_path)
+
+                except Exception:
+                    pass
+
+            workspace_block = "\n" + "\n".join(ws_lines) + "\n"
+
+        # ===============================================
+        # Сборка истории изменений
+
+        recent_changes_block = ""
+        if self.state.recent_file_changes:
+            rc_lines = ["\n* [Недавние изменения в коде]:"]
+            rc_lines.extend(self.state.recent_file_changes)
+            recent_changes_block = "\n" + "\n".join(rc_lines) + "\n"
+
+        # ===============================================
+        # Финальная сборка
 
         return f"""### HOST OS [ON]
 * OS: {self.state.os_info}
@@ -253,4 +295,7 @@ def send_event(message: str, payload: dict = None):
 {self.state.active_daemons}
 
 * Sandbox Directory:
-{self.state.sandbox_files}{framework_block}""".strip()
+{self.state.sandbox_files}{framework_block}
+
+{workspace_block}{recent_changes_block}
+""".strip()

@@ -26,6 +26,9 @@ host:
     top_processes_limit: 10
     file_diff_max_chars: 300 # При появлении события OS_FILE_MODIFIED (отслеживание изменений в файлах sandbox/) - будут показываться последние n измененных символов 
 
+    workspace_max_opened_files: 10 # Лимит открытых файлов в контексте агента (важно, если агент пишет сложный код)
+    recent_file_changes_limit: 5 # В контексте будут отображаться последние n изменений в файлах (в кратком diff формате)
+
 
 telegram:
   telethon:

@@ -24,6 +24,9 @@ class HostOSConfig(BaseModel):
     top_processes_limit: int
     file_diff_max_chars: int = 300
 
+    workspace_max_opened_files: int = 3
+    recent_file_changes_limit: int = 5
+
 
 class HostConfig(BaseModel):
     os: HostOSConfig

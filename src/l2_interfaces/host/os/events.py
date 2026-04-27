@@ -323,7 +323,6 @@ class HostOSEvents:
 
                     old_content = self._file_cache.get(filepath)
 
-                    # Считаем разницу, если файл уже был в кэше
                     if old_content is not None and old_content != new_content:
                         matcher = difflib.SequenceMatcher(None, old_content, new_content)
                         added = 0
@@ -355,6 +354,19 @@ class HostOSEvents:
 
                             diff_str = "\n".join(diff_lines)
 
+                            # ========================================================
+                            # СОХРАНЕНИЕ DIFF ДЛЯ КОНТЕКСТА АГЕНТА
+
+                            if diff_str:
+                                time_str = get_now_formatted(self.host_os.timezone, "%H:%M:%S")
+                                diff_record = f"[{time_str}] {rel_path}:\n```diff\n{diff_str[:limit]}\n```"
+                                self.state.recent_file_changes.insert(0, diff_record)
+                                
+                                # Берем лимит из конфига
+                                limit_changes = self.host_os.config.recent_file_changes_limit
+                                if len(self.state.recent_file_changes) > limit_changes:
+                                    self.state.recent_file_changes.pop()
+                                    
                             if len(diff_str) > limit:
                                 diff_str = diff_str[:limit] + "\n... [Diff обрезан]"
 
@@ -375,7 +387,7 @@ class HostOSEvents:
                     # Обновляем кэш
                     self._file_cache[filepath] = new_content
             except UnicodeDecodeError:
-                pass  # Если бинарник - игнорируем diff
+                pass
             except Exception:
                 pass
 
@@ -387,7 +399,6 @@ class HostOSEvents:
 
         message = f"Файл '{rel_path}' был {action_word}. {diff_msg}".strip()
 
-        # Публикуем ЕДИНСТВЕННОЕ событие агенту
         await self.bus.publish(sys_event_config, filepath=rel_path, message=message)
 
     async def _loop(self):
@@ -421,7 +432,7 @@ class HostOSEvents:
                 break
             except Exception as e:
                 system_logger.error(f"[Host OS] Ошибка в быстром цикле мониторинга: {e}")
-                
+
             await asyncio.sleep(1)
 
     def _is_ignored(self, path: Path) -> bool:

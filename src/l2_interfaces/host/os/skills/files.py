@@ -210,7 +210,9 @@ class HostOSFiles:
     # =================================================================================
 
     @skill()
-    async def write_file(self, filepath: str, content: str, description: str = None) -> SkillResult:
+    async def write_file(
+        self, filepath: str, content: str, description: str = None
+    ) -> SkillResult:
         """
         Создает новый файл или полностью перезаписывает существующий.
 
@@ -236,7 +238,9 @@ class HostOSFiles:
                 try:
                     rel_path = safe_path.relative_to(self.host_os.sandbox_dir).as_posix()
                     clean_desc = description.replace("\n", " ").strip()
-                    await asyncio.to_thread(self.host_os.set_file_metadata, rel_path, clean_desc)
+                    await asyncio.to_thread(
+                        self.host_os.set_file_metadata, rel_path, clean_desc
+                    )
                     desc_msg = " Описание файла успешно сохранено."
                 except Exception as e:
                     desc_msg = f" (Не удалось сохранить метаданные: {e})"
@@ -344,6 +348,127 @@ class HostOSFiles:
             return SkillResult.fail(str(e))
         except Exception as e:
             return SkillResult.fail(f"Ошибка при удалении строк: {e}")
+
+    @skill()
+    async def patch_file(
+        self, filepath: str, search_block: str, replace_block: str
+    ) -> SkillResult:
+        """
+        Точечно заменяет один кусок кода на другой в существующем файле (Search & Replace).
+        Важно: search_block должен идеально совпадать с тем, что есть в файле.
+        Включая все пробелы, отступы и переносы строк.
+        """
+        if not search_block:
+            return SkillResult.fail("Ошибка: search_block не может быть пустым.")
+
+        try:
+            safe_path = self.host_os.validate_path(filepath, is_write=True)
+            if not safe_path.is_file():
+                return SkillResult.fail(f"Ошибка: Файл не найден ({filepath}).")
+
+            def _patch():
+                with open(safe_path, "r", encoding="utf-8") as f:
+                    content = f.read()
+
+                # Сначала пробуем строгое совпадение
+                if search_block not in content:
+                    # Если строгий поиск не сработал - у LLM часто проблемы с концевыми переносами строк
+                    # Делаем умный fallback: чистим \r и ищем без учета пустых строк по краям
+                    clean_search = search_block.replace("\r\n", "\n").strip()
+                    clean_content = content.replace("\r\n", "\n")
+
+                    if clean_search not in clean_content:
+                        return (
+                            False,
+                            "Блок для поиска (search_block) не найден в файле.",
+                        )
+
+                    # Если нашлось в чистом виде - берем замену
+                    new_content = clean_content.replace(clean_search, replace_block.strip())
+                else:
+                    new_content = content.replace(search_block, replace_block)
+
+                with open(safe_path, "w", encoding="utf-8") as f:
+                    f.write(new_content)
+
+                return True, "Файл успешно пропатчен."
+
+            is_success, msg = await asyncio.to_thread(_patch)
+
+            if is_success:
+                system_logger.info(f"[Host OS] Пропатчен файл: {safe_path.name}")
+                return SkillResult.ok(msg)
+            else:
+                return SkillResult.fail(msg)
+
+        except PermissionError as e:
+            return SkillResult.fail(str(e))
+        except Exception as e:
+            return SkillResult.fail(f"Ошибка при патчинге файла: {e}")
+
+    # =================================================================================
+    # РАБОЧАЯ СРЕДА
+    # =================================================================================
+
+    @skill()
+    async def open_file(self, filepath: str) -> SkillResult:
+        """
+        'Открывает' файл. Содержимое открытого файла всегда будет отображаться в системном промпте (вкладки редактора).
+        Полезно использовать, чтобы держать нужный код перед глазами во время работы над ним.
+        """
+
+        try:
+            safe_path = self.host_os.validate_path(filepath, is_write=False)
+            if not safe_path.is_file():
+                return SkillResult.fail(f"Ошибка: Файл не найден ({filepath}).")
+
+            # Сохраняем относительный путь для универсальности
+            try:
+                rel_path = safe_path.relative_to(self.host_os.sandbox_dir).as_posix()
+            except ValueError:
+                rel_path = safe_path.as_posix()
+
+            limit = self.host_os.config.workspace_max_opened_files
+            if len(self.host_os.state.opened_workspace_files) >= limit:
+                return SkillResult.fail(
+                    f"Ошибка: Открыто максимальное количество файлов ({limit}). Рекомендуется закрыть ненужные."
+                )
+
+            self.host_os.state.opened_workspace_files.add(rel_path)
+            system_logger.info(f"[Host OS] Файл '{rel_path}' открыт в рабочей среде.")
+
+            return SkillResult.ok(
+                f"Файл '{rel_path}' открыт. Теперь его содержимое будет всегда перед глазами."
+            )
+
+        except PermissionError as e:
+            return SkillResult.fail(str(e))
+
+        except Exception as e:
+            return SkillResult.fail(f"Ошибка при открытии файла: {e}")
+
+    @skill()
+    async def close_file(self, filepath: str) -> SkillResult:
+        """
+        'Закрывает' файл, убирая его из системного промпта (вкладок редактора).
+        """
+
+        try:
+            safe_path = self.host_os.validate_path(filepath, is_write=False)
+            try:
+                rel_path = safe_path.relative_to(self.host_os.sandbox_dir).as_posix()
+            except ValueError:
+                rel_path = safe_path.as_posix()
+
+            if rel_path in self.host_os.state.opened_workspace_files:
+                self.host_os.state.opened_workspace_files.remove(rel_path)
+                system_logger.info(f"[Host OS] Файл '{rel_path}' закрыт.")
+                return SkillResult.ok(f"Файл '{rel_path}' закрыт и убран из рабочей среды.")
+            else:
+                return SkillResult.ok(f"Файл '{rel_path}' и так не был открыт.")
+
+        except Exception as e:
+            return SkillResult.fail(f"Ошибка при закрытии файла: {e}")
 
     # =================================================================================
     # ОСТАЛЬНЫЕ НАВЫКИ ФАЙЛОВОЙ СИСТЕМЫ
@@ -573,7 +698,7 @@ class HostOSFiles:
 
         except PermissionError as e:
             return SkillResult.fail(str(e))
-        
+
         except Exception as e:
             return SkillResult.fail(f"Ошибка при поиске текста: {e}")
 
@@ -679,7 +804,7 @@ class HostOSFiles:
         system_logger.info(f"[Host OS] Созданы директории: {', '.join(created)}")
 
         return SkillResult.ok(msg)
-    
+
     @skill()
     async def move_or_rename(self, source_path: str, destination_path: str) -> SkillResult:
         """
@@ -702,7 +827,9 @@ class HostOSFiles:
 
             await asyncio.to_thread(_move)
 
-            system_logger.info(f"[Host OS] Перемещен/переименован объект: {safe_src.name} -> {safe_dst.name}")
+            system_logger.info(
+                f"[Host OS] Перемещен/переименован объект: {safe_src.name} -> {safe_dst.name}"
+            )
             return SkillResult.ok(f"Успешно. Объект перемещен по пути: {safe_dst.as_posix()}")
 
         except PermissionError as e:
@@ -746,28 +873,34 @@ class HostOSFiles:
             # Проверяем оба пути через гейткипер ОС
             safe_archive = self.host_os.validate_path(archive_path, is_write=False)
             safe_dest = self.host_os.validate_path(extract_to, is_write=True)
-            
+
             if not safe_archive.is_file():
                 return SkillResult.fail(f"Ошибка: Архив не найден ({safe_archive.name}).")
-                
+
             safe_dest.mkdir(parents=True, exist_ok=True)
-            
+
             # shutil поддерживает большинство популярных форматов "из коробки"
             await asyncio.to_thread(shutil.unpack_archive, str(safe_archive), str(safe_dest))
-            
-            system_logger.info(f"[Host OS] Архив {safe_archive.name} распакован в {safe_dest.name}")
-            
+
+            system_logger.info(
+                f"[Host OS] Архив {safe_archive.name} распакован в {safe_dest.name}"
+            )
+
             try:
                 dest_display = safe_dest.relative_to(self.host_os.sandbox_dir).as_posix()
                 dest_msg = f"sandbox/{dest_display}"
             except ValueError:
                 dest_msg = safe_dest.as_posix()
 
-            return SkillResult.ok(f"Архив {safe_archive.name} успешно распакован в директорию: {dest_msg}")
-            
+            return SkillResult.ok(
+                f"Архив {safe_archive.name} успешно распакован в директорию: {dest_msg}"
+            )
+
         except PermissionError as e:
             return SkillResult.fail(str(e))
         except shutil.ReadError:
-            return SkillResult.fail("Ошибка: Неподдерживаемый формат архива или файл поврежден.")
+            return SkillResult.fail(
+                "Ошибка: Неподдерживаемый формат архива или файл поврежден."
+            )
         except Exception as e:
             return SkillResult.fail(f"Ошибка при распаковке архива: {e}")

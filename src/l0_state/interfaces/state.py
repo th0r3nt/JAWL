@@ -161,6 +161,11 @@ class HostOSState:
 
         self.polling_interval = ""
 
+        self.opened_workspace_files: set[str] = set()  # Файлы, открытые в "редакторе" агента
+        self.recent_file_changes: list[str] = (
+            []
+        )  # Кэш последних diff-ов (чтобы агент помнил, что менял)
+
 
 # ==================================================================
 # Host Terminal
