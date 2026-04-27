@@ -1,0 +1,43 @@
+name: Bug Report
+description: Сообщить об ошибке в JAWL или падении агента
+title: "[BUG]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Спасибо, что помогаете делать JAWL лучше! Пожалуйста, заполните форму ниже.
+  - type: textarea
+    id: description
+    attributes:
+      label: Описание ошибки
+      description: Что произошло? Что агент сделал не так или где упал код?
+      placeholder: Я запустил агента, попросил его сделать X, а он выдал ошибку Y...
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: Операционная система
+      options:
+        - Windows
+        - Linux (Ubuntu/Debian и т.д.)
+        - macOS
+        - Другое
+    validations:
+      required: true
+  - type: input
+    id: python-version
+    attributes:
+      label: Версия Python
+      placeholder: Например, 3.10.11
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Логи или Traceback
+      description: Скопируйте сюда кусок из logs/system.log или терминала, где видна ошибка.
+      render: python
+    validations:
+      required: false
