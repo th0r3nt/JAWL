@@ -251,6 +251,8 @@ class System:
         # Email
         email_account: Optional[str] = None,
         email_password: Optional[str] = None,
+        # Web Search
+        tavily_api_key: Optional[str] = None,
     ):
         """Читает конфиг, поднимает нужные интерфейсы и регистрирует их скиллы."""
 
@@ -267,6 +269,8 @@ class System:
             # Email
             "EMAIL_ACCOUNT": email_account,
             "EMAIL_PASSWORD": email_password,
+            # Web Search
+            "TAVILY_API_KEY": tavily_api_key,
         }
 
         # Вся магия сборки интерфейсов скрыта здесь
@@ -424,6 +428,8 @@ class System:
         # Email
         email_account: Optional[str] = None,
         email_password: Optional[str] = None,
+        # Web Search
+        tavily_api_key: Optional[str] = None,
     ) -> int:
         """Запуск системы."""
 
@@ -454,6 +460,8 @@ class System:
                 # Email
                 email_account=email_account,
                 email_password=email_password,
+                # Web Search
+                tavily_api_key=tavily_api_key,
             )
 
             # L3 AGENT
@@ -600,6 +608,8 @@ async def main() -> int:
         # Email
         EMAIL_ACCOUNT = os.getenv("EMAIL_ACCOUNT", None)
         EMAIL_PASSWORD = os.getenv("EMAIL_PASSWORD", None)
+        # Web Search
+        TAVILY_API_KEY = os.getenv("TAVILY_API_KEY", None)
 
         # Динамически собираем все ключи, которые начинаются с LLM_API_KEY_
         LLM_API_URL = os.getenv("LLM_API_URL", None)
@@ -622,6 +632,8 @@ async def main() -> int:
             # Email
             email_account=EMAIL_ACCOUNT,
             email_password=EMAIL_PASSWORD,
+            # Web Search
+            tavily_api_key=TAVILY_API_KEY,
         )
         return exit_code
 

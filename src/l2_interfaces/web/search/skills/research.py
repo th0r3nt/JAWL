@@ -1,25 +1,20 @@
 import asyncio
-from typing import List
+from typing import List, Any
 
 from src.utils.logger import system_logger
 from src.utils._tools import truncate_text
 
 from src.l2_interfaces.web.search.client import WebSearchClient
-from src.l2_interfaces.web.search.skills.duckduckgo import DuckDuckGoSearch
-from src.l2_interfaces.web.search.skills.webpages import WebPages
 
 from src.l3_agent.skills.registry import skill, SkillResult
 
 
 class DeepResearch:
-    """Навыки для глубокого параллельного ресерча в интернете."""
+    """
+    Навыки для глубокого параллельного ресерча в интернете.
+    """
 
-    def __init__(
-        self,
-        client: WebSearchClient,
-        searcher: DuckDuckGoSearch,
-        reader: WebPages,
-    ):
+    def __init__(self, client: WebSearchClient, searcher: Any, reader: Any):
         self.client = client
         self.searcher = searcher
         self.reader = reader

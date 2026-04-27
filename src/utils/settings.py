@@ -75,6 +75,8 @@ class DeepResearchConfig(BaseModel):
 
 class WebSearchConfig(BaseModel):
     enabled: bool
+    search_engine: str = "duckduckgo"  # дефолты для защиты от краша
+    reader_engine: str = "trafilatura"
     request_timeout_sec: int
     max_page_chars: int
     deep_research: DeepResearchConfig
@@ -191,7 +193,9 @@ class SQLConfig(BaseModel):
 
 class SystemConfig(BaseModel):
     timezone: int
-    logging: LoggingConfig = Field(default_factory=LoggingConfig) # Обратная совместимость для старых yaml
+    logging: LoggingConfig = Field(
+        default_factory=LoggingConfig
+    )  # Обратная совместимость для старых yaml
     vector_db: VectorDBConfig
     heartbeat_interval: int
     continuous_cycle: bool

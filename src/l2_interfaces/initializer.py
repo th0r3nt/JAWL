@@ -121,7 +121,7 @@ def initialize_l2_interfaces(system: "System", env_vars: Dict[str, str | None]) 
     # ================================================================
 
     if config.web.search.enabled:
-        components.extend(setup_web_search(system))
+        components.extend(setup_web_search(system, env_vars.get("TAVILY_API_KEY")))
     else:
         system.context_registry.register_provider(
             "web search", make_off_provider("WEB SEARCH"), ContextSection.INTERFACES
