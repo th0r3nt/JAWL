@@ -16,16 +16,16 @@ if TYPE_CHECKING:
 # Жестко заданный список тегов для классификации
 VectorTag = Literal[
     # Домены знаний
-    "domain:tech", # Техническая инфа
-    "domain:lore", # Инфа про субъектов
-    "domain:self", # Инфа про себя
+    "domain:tech",  # Техническая инфа
+    "domain:lore",  # Инфа про субъектов
+    "domain:self",  # Инфа про себя
     # Типы знаний
-    "type:fact", # Строгие факты
-    "type:concept", # Абстрактные знания
-    "type:rule", # Правила поведения
+    "type:fact",  # Строгие факты
+    "type:concept",  # Абстрактные знания
+    "type:rule",  # Правила поведения
     # Длительность знаний
-    "retention:core", # Фундаментально
-    "retention:ephemeral", # Временно
+    "retention:core",  # Фундаментально
+    "retention:ephemeral",  # Временно
 ]
 
 
@@ -53,14 +53,21 @@ class VectorKnowledge:
         if not tags:
             return SkillResult.fail("Ошибка: Необходимо указать хотя бы один тег из списка.")
 
+        # Броня от галлюцинаций LLM
+        if isinstance(tags, str):
+            tags = [tags]
+        elif not isinstance(tags, list):
+            tags = [str(tags)]
+        tags = [str(t) for t in tags]
+
         if not self.db.client:
             return SkillResult.fail("Векторная БД не инициализирована.")
 
         try:
-            vector = await self.embedding_model.get_embedding(knowledge_text)
+            vector = await self.embedding_model.get_embedding(str(knowledge_text))
             point_id = str(uuid.uuid4())
 
-            payload = {"text": knowledge_text, "created_at": time.time(), "tags": tags}
+            payload = {"text": str(knowledge_text), "created_at": time.time(), "tags": tags}
 
             await self.db.client.upsert(
                 collection_name=self.collection.name,
@@ -86,13 +93,19 @@ class VectorKnowledge:
         tags_filter: Опциональный массив тегов. Если передан, найдет только те записи, которые содержат все указанные теги.
         """
         try:
-            query_vector = await self.embedding_model.get_embedding(query)
+            query_str = str(query)
+            query_vector = await self.embedding_model.get_embedding(query_str)
 
             # Строим фильтр (Логическое И - должны совпасть все переданные теги)
             query_filter = None
             if tags_filter:
+                if isinstance(tags_filter, str):
+                    tags_filter = [tags_filter]
+                elif not isinstance(tags_filter, list):
+                    tags_filter = [str(tags_filter)]
+
                 must_conditions = [
-                    models.FieldCondition(key="tags", match=models.MatchValue(value=tag))
+                    models.FieldCondition(key="tags", match=models.MatchValue(value=str(tag)))
                     for tag in tags_filter
                 ]
                 query_filter = models.Filter(must=must_conditions)
@@ -115,7 +128,7 @@ class VectorKnowledge:
                 system_logger.debug(msg)
                 return SkillResult.ok(msg)
 
-            short_query = truncate_text(query.replace("\n", " "), 50, "... [Обрезано]")
+            short_query = truncate_text(query_str.replace("\n", " "), 50, "... [Обрезано]")
             system_logger.info(
                 f"[Vector DB] Знания: найдено {len(points)} записей по запросу '{short_query}'"
             )
@@ -124,8 +137,19 @@ class VectorKnowledge:
             for point in points:
                 score = round(point.score, 2)
                 text = point.payload.get("text", "")
+
+                # Защита от битых данных в самой БД (от прошлых галлюцинаций)
                 point_tags = point.payload.get("tags", [])
-                tags_str = f"[{', '.join(point_tags)}]" if point_tags else "[Без тегов]"
+                if isinstance(point_tags, str):
+                    point_tags = [point_tags]
+                elif not isinstance(point_tags, list):
+                    point_tags = [str(point_tags)]
+
+                tags_str = (
+                    f"[{', '.join(str(t) for t in point_tags)}]"
+                    if point_tags
+                    else "[Без тегов]"
+                )
                 time_str = safe_format_timestamp(
                     point.payload.get("created_at"), self.timezone
                 )
@@ -146,7 +170,7 @@ class VectorKnowledge:
         try:
             await self.db.client.delete(
                 collection_name=self.collection.name,
-                points_selector=models.PointIdsList(points=[point_id]),
+                points_selector=models.PointIdsList(points=[str(point_id)]),
                 wait=True,
             )
             msg = f"[Vector DB] Знание успешно удалено из базы данных (ID: {point_id})."
@@ -165,8 +189,13 @@ class VectorKnowledge:
         try:
             query_filter = None
             if tags_filter:
+                if isinstance(tags_filter, str):
+                    tags_filter = [tags_filter]
+                elif not isinstance(tags_filter, list):
+                    tags_filter = [str(tags_filter)]
+
                 must_conditions = [
-                    models.FieldCondition(key="tags", match=models.MatchValue(value=tag))
+                    models.FieldCondition(key="tags", match=models.MatchValue(value=str(tag)))
                     for tag in tags_filter
                 ]
                 query_filter = models.Filter(must=must_conditions)
@@ -187,8 +216,18 @@ class VectorKnowledge:
             formatted_results = []
             for point in records:
                 text = point.payload.get("text", "")
+
                 point_tags = point.payload.get("tags", [])
-                tags_str = f"[{', '.join(point_tags)}]" if point_tags else "[Без тегов]"
+                if isinstance(point_tags, str):
+                    point_tags = [point_tags]
+                elif not isinstance(point_tags, list):
+                    point_tags = [str(point_tags)]
+
+                tags_str = (
+                    f"[{', '.join(str(t) for t in point_tags)}]"
+                    if point_tags
+                    else "[Без тегов]"
+                )
                 time_str = safe_format_timestamp(
                     point.payload.get("created_at"), self.timezone
                 )
