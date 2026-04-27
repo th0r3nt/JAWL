@@ -153,7 +153,6 @@ class ContextBuilder:
         """Вспомогательный метод для красивого Markdown-оформления события."""
 
         proactive_prompt = """
-
 [SYSTEM]
 Рекомендуется проактивное выполнение действий.
 
@@ -174,7 +173,10 @@ class ContextBuilder:
             header = f"[{event_time}] [{level}] {header}"
 
         if event_name == "HEARTBEAT":
-            return f"{header}\n[Статус: Heartbeat тик] \n{proactive_prompt}"
+            if self.agent_state.proactive_guidance:
+                return f"{header}\n[Статус: Heartbeat тик] \n{proactive_prompt}"
+            else:
+                return f"{header}\n[Статус: Heartbeat тик]"
 
         if event_name == "SYSTEM_CORE_START":
             return f"{header}\n[Статус: Инициализация ядра JAWL. Запуск подсистем завершен]"

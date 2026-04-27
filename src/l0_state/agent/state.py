@@ -29,6 +29,8 @@ class AgentState(BaseModel):
 
     # Системные лимиты
     continuous_cycle: bool = False
+    proactive_guidance: bool = False
+    
     context_ticks: int = 15
     context_detailed_ticks: int = 3
 

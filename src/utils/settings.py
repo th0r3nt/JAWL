@@ -212,6 +212,7 @@ class SystemConfig(BaseModel):
     vector_db: VectorDBConfig
     heartbeat_interval: int
     continuous_cycle: bool
+    proactive_guidance: bool = False
     event_acceleration: EventAccelerationConfig
     context_depth: ContextDepthConfig
 

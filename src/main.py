@@ -111,6 +111,7 @@ class System:
             max_react_steps=self.settings.llm.max_react_steps,
             heartbeat_interval=self.settings.system.heartbeat_interval,
             continuous_cycle=self.settings.system.continuous_cycle,
+            proactive_guidance=self.settings.system.proactive_guidance,
             context_ticks=self.settings.system.context_depth.ticks,
             context_detailed_ticks=self.settings.system.context_depth.detailed_ticks,
         )
