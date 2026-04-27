@@ -54,7 +54,7 @@ class TelethonClient:
             # Сразу после старта стягиваем полные данные
             await self.update_profile_state()
 
-            system_logger.info(f"[Telegram Telethon] Успешная авторизация как: {name}")
+            system_logger.info(f"[Telegram Telethon] Успешная авторизация как: @{name}")
             self.state.is_online = True
 
         except Exception as e:

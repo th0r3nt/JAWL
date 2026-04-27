@@ -220,7 +220,6 @@ class ReactLoop:
                         "function": {"name": "execute_skill"},
                     },
                     temperature=self.agent_state.temperature,
-                    reasoning_effort="xhigh",
                     # max_tokens=60000,
                     timeout=120.0,
                 )
