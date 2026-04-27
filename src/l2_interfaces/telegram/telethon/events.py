@@ -89,7 +89,9 @@ class TelethonEvents:
         self._last_state_update = now
 
         client = self.tg_client.client()
-        chats = []
+
+        overview_lines = []
+        unread_blocks = []
 
         try:
             # Быстро получаем общее количество диалогов для статистики
@@ -104,37 +106,34 @@ class TelethonEvents:
                 entity = dialog.entity
 
                 # =============================================================
-                # ГРУППЫ/КАНАЛЫ
+                # СБОР МЕТАДАННЫХ ЧАТА (ОПИСАНИЯ, ПОДПИСЧИКИ И Т.Д.)
 
-                # Ленивая подгрузка описаний для каналов и групп
-                if (
-                    dialog.is_group or dialog.is_channel
-                ) and entity.id not in self._chat_desc_cache:
-                    try:
-                        about = ""
-                        if isinstance(entity, Channel):
-                            full = await client(GetFullChannelRequest(channel=entity))
-                            about = full.full_chat.about or ""
+                desc_str = ""
+                if dialog.is_group or dialog.is_channel:
+                    if entity.id not in self._chat_desc_cache:
+                        try:
+                            about = ""
+                            if isinstance(entity, Channel):
+                                full = await client(GetFullChannelRequest(channel=entity))
+                                about = full.full_chat.about or ""
 
-                        elif isinstance(entity, Chat):
-                            full = await client(GetFullChatRequest(chat_id=entity.id))
-                            about = full.full_chat.about or ""
+                            elif isinstance(entity, Chat):
+                                full = await client(GetFullChatRequest(chat_id=entity.id))
+                                about = full.full_chat.about or ""
 
-                        self._chat_desc_cache[entity.id] = about.strip()
+                            self._chat_desc_cache[entity.id] = about.strip()
 
-                    except FloodWaitError:
-                        pass
-                    except Exception:
-                        self._chat_desc_cache[entity.id] = ""
+                        except FloodWaitError:
+                            pass
+                        except Exception:
+                            self._chat_desc_cache[entity.id] = ""
 
-                desc = self._chat_desc_cache.get(entity.id, "")
-                if desc:
-                    clean_desc = desc.replace("\n", " ")
-                    desc_str = (
-                        f" | Описание: {truncate_text(clean_desc, 100, '... [Обрезано]')}"
-                    )
-                else:
-                    desc_str = ""
+                    desc = self._chat_desc_cache.get(entity.id, "")
+                    if desc:
+                        clean_desc = desc.replace("\n", " ")
+                        desc_str = (
+                            f" | Описание: {truncate_text(clean_desc, 100, '... [Обрезано]')}"
+                        )
 
                 # Public/Private
                 is_public = bool(getattr(entity, "username", None))
@@ -148,18 +147,28 @@ class TelethonEvents:
                 unread = f" [UNREAD: {dialog.unread_count}]" if dialog.unread_count > 0 else ""
 
                 # =============================================================
-                # USERS
+                # ФОРМИРОВАНИЕ БЛОКОВ
 
                 if dialog.is_user:
                     bot_tag = " [Bot]" if getattr(entity, "bot", False) else ""
-                    chats.append(f"[User] {dialog.name}{bot_tag} (ID: {dialog.id}){unread}")
 
-                    limit = self.state.private_chat_history_limit
-                    if limit > 0:
+                    # Добавляем в общий список одной строкой
+                    overview_lines.append(
+                        f"- [User] {dialog.name}{bot_tag} (ID: `{dialog.id}`){unread}"
+                    )
+
+                    # Если есть непрочитанные, подтягиваем историю в отдельный блок "Требуют внимания"
+                    if dialog.unread_count > 0:
+                        # Берем как минимум 2 последних сообщения для контекста, но не больше incoming_history_limit (чтобы не забить промпт спамом)
+                        fetch_limit = max(
+                            2, min(dialog.unread_count, self.config.incoming_history_limit)
+                        )
+
                         try:
-                            recent_msgs = await client.get_messages(entity, limit=limit)
+                            recent_msgs = await client.get_messages(entity, limit=fetch_limit)
                             if recent_msgs:
-                                chats.append(f"    Last {limit} messages:")
+                                block = f"[User] {dialog.name}{bot_tag} (ID: {dialog.id}) [UNREAD: {dialog.unread_count}]:"
+                                msg_lines = []
                                 for m in reversed(recent_msgs):
                                     formatted = await TelethonMessageParser.build_string(
                                         client=client,
@@ -169,32 +178,76 @@ class TelethonEvents:
                                         truncate_text_flag=True,
                                     )
                                     indented = "\n".join(
-                                        [f"        {line}" for line in formatted.split("\n")]
+                                        [f"    {line}" for line in formatted.split("\n")]
                                     )
-                                    chats.append(indented)
-                        except Exception:
-                            chats.append("    [Ошибка загрузки истории]")
+                                    msg_lines.append(indented)
 
-                elif dialog.is_group:
-                    chats.append(
-                        f"[{status_str} Group] {dialog.name} (ID: {dialog.id}){part_str}{desc_str}{unread}"
-                    )
-                elif dialog.is_channel:
-                    chats.append(
-                        f"[{status_str} Channel] {dialog.name} (ID: {dialog.id}){part_str}{desc_str}{unread}"
+                                block += "\n" + "\n\n".join(msg_lines)
+                                unread_blocks.append(block)
+                        except Exception as e:
+                            system_logger.debug(
+                                f"[Telethon] Ошибка загрузки истории для {dialog.id}: {e}"
+                            )
+
+                elif dialog.is_group or dialog.is_channel:
+                    chat_type = "Group" if dialog.is_group else "Channel"
+
+                    forum_str = ""
+                    if getattr(dialog.entity, "forum", False):
+                        chat_type = "Forum"
+                        topics_list = []
+                        try:
+                            topics_data = await self._get_topics(
+                                client, dialog.entity, limit=10
+                            )
+                            for topic in topics_data:
+                                t_unread = (
+                                    f" (UNREAD: {topic.unread_count})"
+                                    if getattr(topic, "unread_count", 0) > 0
+                                    else ""
+                                )
+                                topics_list.append(
+                                    f"      ↳ Топик '{getattr(topic, 'title', 'Unknown')}' (ID: {topic.id}){t_unread}"
+                                )
+                        except Exception as e:
+                            system_logger.debug(
+                                f"[Telethon] Ошибка при получении топиков: {e}"
+                            )
+
+                        if not topics_list and dialog.unread_count > 0:
+                            topics_list.append(
+                                f"      ↳ General / Общий топик (UNREAD: {dialog.unread_count})"
+                            )
+
+                        if topics_list:
+                            forum_str = "\n" + "\n".join(topics_list)
+
+                    overview_lines.append(
+                        f"- [{status_str} {chat_type}] {dialog.name} (ID: `{dialog.id}`){part_str}{desc_str}{unread}{forum_str}"
                     )
 
-            if not chats:
-                self.state.last_chats = "Список диалогов пуст."
-            else:
-                res_str = "\n\n".join(chats)
+            # =============================================================
+            # ФИНАЛЬНАЯ СБОРКА ПРОМПТА
+
+            res_str = ""
+
+            if unread_blocks:
+                res_str += "ТРЕБУЮТ ВНИМАНИЯ (Непрочитанные личные сообщения):\n"
+                res_str += "\n\n".join(unread_blocks)
+                res_str += "\n\n---\n\n"
+
+            if overview_lines:
+                res_str += "ПОСЛЕДНИЕ ДИАЛОГИ (Общий список):\n"
+                res_str += "\n".join(overview_lines)
 
                 # Считаем, сколько чатов осталось скрыто за лимитом
-                if total_dialogs > len(chats):
-                    hidden = total_dialogs - len(chats)
-                    res_str += f"\n\n...и еще {hidden} чатов скрыто для экономии контекста. Для просмотра - сооветствующая функция с увеличенным лимитом."
+                if total_dialogs > len(overview_lines):
+                    hidden = total_dialogs - len(overview_lines)
+                    res_str += f"\n\n...и еще {hidden} чатов скрыто для экономии контекста. Для просмотра - используйте get_chats(limit=...)."
+            else:
+                res_str += "Список диалогов пуст."
 
-                self.state.last_chats = res_str
+            self.state.last_chats = res_str
 
         except Exception as e:
             system_logger.error(f"[Telethon] Ошибка обновления стейта: {e}")
@@ -236,7 +289,7 @@ class TelethonEvents:
 
         payload = {
             "message": enriched_message,
-            "raw_text": msg_text, 
+            "raw_text": msg_text,
             "sender_name": sender_name,
             "chat_name": chat_name,
             "chat_id": event.chat_id,
@@ -292,7 +345,7 @@ class TelethonEvents:
 
         payload = {
             "message": enriched_message,
-            "raw_text": msg_text, 
+            "raw_text": msg_text,
             "sender_name": sender_name,
             "chat_name": chat_name,
             "chat_id": event.chat_id,
@@ -363,7 +416,7 @@ class TelethonEvents:
 
         payload = {
             "message": enriched_message,
-            "raw_text": msg_text, 
+            "raw_text": msg_text,
             "sender_name": sender_name,
             "chat_name": chat_name,
             "chat_id": event.chat_id,
