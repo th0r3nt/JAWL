@@ -4,7 +4,6 @@ from src.utils.event.registry import Events
 
 
 def create_mock_message(chat_id, chat_type, text, from_user_name="John"):
-    """Хелпер для создания мок-сообщения Aiogram."""
     msg = MagicMock()
     msg.chat.id = chat_id
     msg.chat.type = chat_type
@@ -24,7 +23,6 @@ def create_mock_message(chat_id, chat_type, text, from_user_name="John"):
 
 @pytest.mark.asyncio
 async def test_update_state_mru_logic(aiogram_events, state):
-    """Тест: кэш чатов должен соблюдать лимит (2) и логику Most Recently Used."""
     msg1 = create_mock_message(111, "private", "1")
     msg2 = create_mock_message(222, "group", "2")
     msg3 = create_mock_message(333, "private", "3")
@@ -41,7 +39,6 @@ async def test_update_state_mru_logic(aiogram_events, state):
 
 @pytest.mark.asyncio
 async def test_on_private_message(aiogram_events, mock_bus):
-    """Тест: личное сообщение генерирует правильный ивент."""
     msg = create_mock_message(12345, "private", "Привет", "Alex")
 
     await aiogram_events._on_private_message(msg)
@@ -49,6 +46,7 @@ async def test_on_private_message(aiogram_events, mock_bus):
     mock_bus.publish.assert_called_once_with(
         Events.AIOGRAM_MESSAGE_INCOMING,
         message="Привет",
+        raw_text="Привет",
         sender_name="Alex",
         chat_id=12345,
         msg_id=42,
@@ -57,7 +55,6 @@ async def test_on_private_message(aiogram_events, mock_bus):
 
 @pytest.mark.asyncio
 async def test_on_group_message_mention(aiogram_events, mock_bus):
-    """Тест: сообщение в группе с упоминанием бота (@test_bot) генерирует MENTION."""
     msg = create_mock_message(200, "group", "Эй @test_bot, ответь", "Bob")
 
     await aiogram_events._on_group_message(msg)
@@ -65,6 +62,7 @@ async def test_on_group_message_mention(aiogram_events, mock_bus):
     mock_bus.publish.assert_called_once_with(
         Events.AIOGRAM_GROUP_MENTION,
         message="Эй @test_bot, ответь",
+        raw_text="Эй @test_bot, ответь",
         sender_name="Bob",
         chat_id=200,
         msg_id=42,
@@ -73,7 +71,6 @@ async def test_on_group_message_mention(aiogram_events, mock_bus):
 
 @pytest.mark.asyncio
 async def test_on_group_message_background(aiogram_events, mock_bus):
-    """Тест: обычное сообщение в группе генерирует фоновый ивент."""
     msg = create_mock_message(200, "group", "Обычный текст", "Bob")
 
     await aiogram_events._on_group_message(msg)
@@ -81,6 +78,7 @@ async def test_on_group_message_background(aiogram_events, mock_bus):
     mock_bus.publish.assert_called_once_with(
         Events.AIOGRAM_GROUP_MESSAGE,
         message="Обычный текст",
+        raw_text="Обычный текст",
         sender_name="Bob",
         chat_id=200,
         msg_id=42,

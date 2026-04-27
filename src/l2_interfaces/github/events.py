@@ -1,4 +1,3 @@
-# Файл: src/l2_interfaces/github/events.py
 import asyncio
 import json
 from datetime import datetime
@@ -197,7 +196,7 @@ class GithubEvents:
                             is_new = int(event_id) > int(last_event_id)
                         except (ValueError, TypeError):
                             is_new = event_id > str(last_event_id)
-                            
+
                     else:
                         # Рантайм. Раз мы его еще не видели (прошли проверку seen_event_ids) - значит оно новое.
                         # Это решает проблему GitHub Eventual Consistency (когда PushEvent приходит с задержкой)

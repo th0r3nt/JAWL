@@ -30,7 +30,6 @@ async def test_chats_join_chat(mock_tg_client):
 
 @pytest.mark.asyncio
 async def test_chats_read_chat_complex_parsing(mock_tg_client):
-    """Тест: сложное чтение чата со всеми медиа, реплаями и реакциями."""
     skills = TelethonChats(mock_tg_client)
     mock_tg_client.timezone = 3
 
@@ -42,6 +41,8 @@ async def test_chats_read_chat_complex_parsing(mock_tg_client):
 
     mock_sender = MagicMock()
     mock_sender.first_name = "Th0r3nt"
+    # Сделаем deleted=False, чтобы парсер корректно вытащил имя
+    mock_sender.deleted = False
     mock_msg.sender = mock_sender
     mock_msg.sender_id = 999
 
@@ -62,8 +63,6 @@ async def test_chats_read_chat_complex_parsing(mock_tg_client):
     mock_reaction.reaction.emoticon = "🔥"
     mock_reaction.count = 5
     mock_msg.reactions.results = [mock_reaction]
-
-    # Отключаем recent_reactions, чтобы отработал блок results
     mock_msg.reactions.recent_reactions = None
 
     mock_btn = MagicMock()
@@ -78,11 +77,27 @@ async def test_chats_read_chat_complex_parsing(mock_tg_client):
     mock_tg_client.client().get_entity = AsyncMock(return_value="mock_entity")
     mock_tg_client.client().get_messages = AsyncMock(return_value=None)
 
+    # Важно замокать get_display_name, так как он используется внутри парсера
+    import telethon.utils
+
+    original_get_display_name = telethon.utils.get_display_name
+
+    def fake_display_name(entity):
+        if entity == mock_sender:
+            return "Th0r3nt"
+        return original_get_display_name(entity)
+
+    telethon.utils.get_display_name = fake_display_name
+
     res = await skills.read_chat(chat_id=123, limit=1)
+
+    # Возвращаем оригинальный метод
+    telethon.utils.get_display_name = original_get_display_name
 
     assert res.is_success is True, res.message
     assert "[Фотография] Смотри мем" in res.message
-    assert "[Переслано от: Meme Channel]" in res.message
+    # Обновленный ассерт:
+    assert "[Переслано от: Meme Channel (Скрытый аккаунт)]" in res.message
     assert "(В ответ на сообщение ID 42 от Unknown)" in res.message
     assert "[Реакции: 🔥 x5]" in res.message
     assert "[Кнопки: [Лайк]]" in res.message
