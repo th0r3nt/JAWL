@@ -243,7 +243,7 @@ class TelethonEvents:
                 # Считаем, сколько чатов осталось скрыто за лимитом
                 if total_dialogs > len(overview_lines):
                     hidden = total_dialogs - len(overview_lines)
-                    res_str += f"\n\n...и еще {hidden} чатов скрыто для экономии контекста. Для просмотра - используйте get_chats(limit=...)."
+                    res_str += f"\n\n...и еще {hidden} чатов скрыто для экономии контекста. Для просмотра - сооветствующая функция."
             else:
                 res_str += "Список диалогов пуст."
 

@@ -12,12 +12,14 @@ async def test_update_state(telethon_events, mock_tg_client, state):
     dlg1 = MagicMock(
         is_user=True, is_group=False, is_channel=False, id=111, name="Иван", unread_count=1
     )
-    dlg1.entity = MagicMock(username=None, bot=False, participants_count=None)
+    # Явно указываем forum=False
+    dlg1.entity = MagicMock(username=None, bot=False, participants_count=None, forum=False)
 
     dlg2 = MagicMock(
         is_user=False, is_group=True, is_channel=False, id=222, name="Dev Chat", unread_count=0
     )
-    dlg2.entity = MagicMock(username="devchat", participants_count=42)
+    # Явно указываем forum=False
+    dlg2.entity = MagicMock(username="devchat", participants_count=42, forum=False)
 
     async def mock_iter_dialogs(*args, **kwargs):
         yield dlg1
@@ -25,13 +27,15 @@ async def test_update_state(telethon_events, mock_tg_client, state):
 
     client_mock = mock_tg_client.client()
     client_mock.iter_dialogs = mock_iter_dialogs
+    # AsyncMock позволяет делать await
     client_mock.get_messages = AsyncMock(return_value=[])
     client_mock.get_dialogs = AsyncMock(return_value=MagicMock(total=2))
 
     await telethon_events._update_state(force=True)
 
-    assert "[User]" in state.last_chats and "ID: 111" in state.last_chats
-    assert "Group]" in state.last_chats and "ID: 222" in state.last_chats
+    # Проверяем обновленный формат с бэктиками
+    assert "[User]" in state.last_chats and "`111`" in state.last_chats
+    assert "Group]" in state.last_chats and "`222`" in state.last_chats
 
 
 @pytest.mark.asyncio
