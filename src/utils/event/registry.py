@@ -139,6 +139,13 @@ class Events:
         requires_attention=False,
     )
 
+    HOST_OS_SANDBOX_EVENT = EventConfig(
+        name="HOST_OS_SANDBOX_EVENT",
+        description="Событие от фонового демона или скрипта в песочнице.",
+        level=EventLevel.HIGH,
+        requires_attention=True,
+    )
+
     # ============================================
     # Email
     # ============================================

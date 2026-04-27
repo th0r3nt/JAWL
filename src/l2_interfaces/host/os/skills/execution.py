@@ -209,3 +209,113 @@ class HostOSExecution:
 
         except Exception as e:
             return SkillResult.fail(f"Ошибка при попытке завершить процесс: {e}")
+
+
+    @skill()
+    async def start_daemon(self, filepath: str, name: str, description: str) -> SkillResult:
+        """
+        Запускает Python-скрипт как фоновый процесс (демон).
+        Скрипт будет работать автономно. Его вывод (print, ошибки) будет перенаправлен в файл daemon_<name>.log в песочнице.
+
+        Можно использовать 'jawl_api.py' внутри скрипта для отправки событий (вебхуков) агенту. Пример:
+        from jawl_api import send_event
+        send_event("Парсинг окончен", {"new_items": 15})
+        """
+        import time
+        import subprocess
+        
+        if self.host_os.access_level < HostOSAccessLevel.OBSERVER:
+            return SkillResult.fail("Отказано в доступе: запуск демонов разрешен при Access Level >= 1.")
+
+        try:
+            safe_path = self.host_os.validate_path(filepath, is_write=False)
+
+            if not safe_path.is_file():
+                return SkillResult.fail(f"Ошибка: Скрипт не найден ({safe_path.name}).")
+                
+            if safe_path.suffix.lower() != ".py":
+                return SkillResult.fail("Ошибка: В качестве демонов поддерживается запуск только .py скриптов.")
+
+            # Лог-файл для STDOUT/STDERR демона
+            safe_name = "".join(c if c.isalnum() else "_" for c in name)
+            log_path = self.host_os.sandbox_dir / f"daemon_{safe_name}.log"
+            log_file = open(log_path, "a", encoding="utf-8")
+
+            # Параметры отсоединения процесса
+            kwargs = {}
+            if sys.platform == "win32":
+                kwargs["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP | 0x00000008  # DETACHED_PROCESS
+            else:
+                kwargs["start_new_session"] = True
+
+            cmd = [sys.executable, str(safe_path)]
+            
+            # Запускаем неблокирующе
+            process = subprocess.Popen(
+                cmd,
+                stdout=log_file,
+                stderr=subprocess.STDOUT,
+                cwd=str(safe_path.parent),
+                **kwargs
+            )
+            
+            pid = process.pid
+            
+            # Сохраняем в реестр
+            registry = self.host_os.get_daemons_registry()
+            registry[str(pid)] = {
+                "name": name,
+                "description": description,
+                "filepath": str(safe_path.relative_to(self.host_os.sandbox_dir)),
+                "start_time": time.time()
+            }
+            self.host_os.set_daemons_registry(registry)
+            
+            system_logger.info(f"[Host OS] Запущен фоновый демон '{name}' (PID: {pid})")
+            return SkillResult.ok(
+                f"Демон '{name}' успешно запущен (PID: {pid}).\n"
+                f"Логи перенаправлены в файл: sandbox/{log_path.name}\n"
+                f"Вы можете отслеживать его статус в контексте Host OS (Active Daemons) или остановить с помощью stop_daemon."
+            )
+
+        except PermissionError as e:
+            return SkillResult.fail(str(e))
+        except Exception as e:
+            return SkillResult.fail(f"Ошибка при запуске демона: {e}")
+
+    @skill()
+    async def stop_daemon(self, pid: int) -> SkillResult:
+        """Останавливает работающий фоновый демон по его PID."""
+        if self.host_os.access_level < HostOSAccessLevel.OBSERVER:
+            return SkillResult.fail("Отказано в доступе.")
+
+        try:
+            registry = self.host_os.get_daemons_registry()
+            pid_str = str(pid)
+            
+            if pid_str not in registry:
+                return SkillResult.fail(f"Ошибка: Демон с PID {pid} не найден в реестре.")
+                
+            name = registry[pid_str]["name"]
+
+            # Убиваем процесс
+            try:
+                proc = psutil.Process(pid)
+                proc.terminate()
+                proc.wait(timeout=3)
+            except psutil.NoSuchProcess:
+                pass  # Уже мертв
+            except psutil.TimeoutExpired:
+                proc.kill()
+            except Exception as e:
+                return SkillResult.fail(f"Не удалось завершить процесс: {e}")
+
+            # Удаляем из реестра
+            del registry[pid_str]
+            self.host_os.set_daemons_registry(registry)
+            
+            system_logger.info(f"[Host OS] Остановлен фоновый демон '{name}' (PID: {pid})")
+            return SkillResult.ok(f"Демон '{name}' (PID: {pid}) успешно остановлен вручную.")
+
+        except Exception as e:
+            return SkillResult.fail(f"Ошибка при остановке демона: {e}")

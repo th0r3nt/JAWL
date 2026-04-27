@@ -187,7 +187,7 @@ class TelethonEvents:
             if not chats:
                 self.state.last_chats = "Список диалогов пуст."
             else:
-                res_str = "\n".join(chats)
+                res_str = "\n\n".join(chats)
 
                 # Считаем, сколько чатов осталось скрыто за лимитом
                 if total_dialogs > len(chats):

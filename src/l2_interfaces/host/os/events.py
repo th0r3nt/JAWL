@@ -394,6 +394,8 @@ class HostOSEvents:
                 await self._update_network()
                 # Мы всё равно периодически чекаем песочницу на случай, если watchdog что-то пропустил
                 self._update_file_trees()
+                await self._poll_sandbox_events()
+                await self._update_daemons_status()
 
             except asyncio.CancelledError:
                 break
@@ -596,3 +598,84 @@ class HostOSEvents:
                 self.state.framework_files = "Пусто"
         else:
             self.state.framework_files = ""
+
+    async def _poll_sandbox_events(self):
+        """
+        Проверяет папку .jawl_events на наличие пингов от фоновых скриптов.
+        """
+
+        events_dir = self.host_os.events_dir
+        if not events_dir.exists():
+            return
+
+        for file_path in events_dir.glob("*.json"):
+            try:
+                with open(file_path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                
+                msg = data.get("message", "Событие из песочницы.")
+                payload = data.get("payload", {})
+                
+                await self.bus.publish(
+                    Events.HOST_OS_SANDBOX_EVENT,
+                    message=msg,
+                    **payload
+                )
+            except Exception as e:
+                system_logger.error(f"[Host OS] Ошибка чтения события из песочницы: {e}")
+            finally:
+                try:
+                    file_path.unlink()
+                except Exception:
+                    pass
+
+    async def _update_daemons_status(self):
+        """
+        Пингует процессы демонов, обновляет их Uptime или удаляет упавшие.
+        """
+        
+        daemons = self.host_os.get_daemons_registry()
+        if not daemons:
+            self.state.active_daemons = "Нет запущенных демонов."
+            return
+
+        lines =[]
+        modified = False
+        dead_daemons =[]
+
+        for pid_str, info in list(daemons.items()):
+            pid = int(pid_str)
+            name = info.get("name", "Unknown")
+            desc = info.get("description", "Без описания")
+            start_time = info.get("start_time", time.time())
+            
+            is_alive = False
+            if psutil.pid_exists(pid):
+                try:
+                    proc = psutil.Process(pid)
+                    if proc.is_running() and proc.status() != psutil.STATUS_ZOMBIE:
+                        is_alive = True
+                except (psutil.NoSuchProcess, psutil.AccessDenied):
+                    pass
+            
+            if is_alive:
+                uptime = seconds_to_duration_str(time.time() - start_time)
+                lines.append(f"- [PID: {pid}] {name} (Uptime: {uptime})\n  Описание: {desc}")
+            else:
+                dead_daemons.append(name)
+                del daemons[pid_str]
+                modified = True
+
+        if modified:
+            self.host_os.set_daemons_registry(daemons)
+            for d_name in dead_daemons:
+                await self.bus.publish(
+                    Events.HOST_OS_SANDBOX_EVENT,
+                    message=f"Фоновый скрипт '{d_name}' завершил работу (успешно или упал).",
+                    log_hint="Проверьте его лог-файл (sandbox/daemon_*.log), чтобы узнать причину."
+                )
+
+        if lines:
+            self.state.active_daemons = "\n".join(lines)
+        else:
+            self.state.active_daemons = "Нет запущенных демонов."

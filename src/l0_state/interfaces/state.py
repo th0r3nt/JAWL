@@ -89,7 +89,7 @@ class GithubState:
 
         # Watchers: { "owner/repo": "last_event_id" }
         self.tracked_repos: dict[str, str] = {}
-        
+
         # MRU-кэш последних событий для вывода в контекст агента
         self.recent_watcher_events: list[str] = []
 
@@ -157,6 +157,7 @@ class HostOSState:
         self.telemetry = ""  # CPU, ОЗУ, процессы
         self.sandbox_files = ""  # Текущие файлы в Sandbox
         self.framework_files = ""  # Дерево директории JAWL
+        self.active_daemons = "Нет запущенных демонов."
 
         self.polling_interval = ""
 

@@ -36,9 +36,11 @@ class HostOSClient:
         self.framework_dir = Path(base_dir).resolve()
         self.sandbox_dir = self.framework_dir / "sandbox"
         self.download_dir = self.sandbox_dir / "download"
+        self.events_dir = self.sandbox_dir / ".jawl_events"
 
         self.sandbox_dir.mkdir(parents=True, exist_ok=True)
         self.download_dir.mkdir(parents=True, exist_ok=True)
+        self.events_dir.mkdir(parents=True, exist_ok=True)
 
         system_logger.info(
             f"[Host OS] Клиент инициализирован (ОС: {self.os_platform}, Access Level: {self.access_level.name})."
@@ -58,6 +60,22 @@ class HostOSClient:
         self.metadata_file.parent.mkdir(parents=True, exist_ok=True)
         if not self.metadata_file.exists():
             self.metadata_file.write_text("{}", encoding="utf-8")
+
+        # Файл-реестр запущенных демонов
+        self.daemons_file = (
+            self.framework_dir
+            / "src"
+            / "utils"
+            / "local"
+            / "data"
+            / "host os"
+            / "daemons.json"
+        )
+        self.daemons_file.parent.mkdir(parents=True, exist_ok=True)
+        if not self.daemons_file.exists():
+            self.daemons_file.write_text("{}", encoding="utf-8")
+
+        self._ensure_sandbox_api()
 
     def validate_path(self, target_path: str | Path, is_write: bool = False) -> Path:
         """
@@ -160,6 +178,44 @@ class HostOSClient:
         with open(self.metadata_file, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, indent=4)
 
+
+    def _ensure_sandbox_api(self):
+        """Инжектит мини-библиотеку для скриптов агента в песочницу."""
+
+        api_path = self.sandbox_dir / "jawl_api.py"
+        api_code = """\
+import json
+import uuid
+import time
+from pathlib import Path
+
+def send_event(message: str, payload: dict = None):
+    \"\"\"Отправляет событие главному агенту JAWL.\"\"\"
+    if payload is None:
+        payload = {}
+    events_dir = Path(__file__).parent / ".jawl_events"
+    events_dir.mkdir(parents=True, exist_ok=True)
+    
+    event_id = str(uuid.uuid4())
+    file_path = events_dir / f"{int(time.time())}_{event_id}.json"
+    
+    data = {"message": message, "payload": payload}
+    with open(file_path, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False)
+"""
+        api_path.write_text(api_code, encoding="utf-8")
+
+    def get_daemons_registry(self) -> dict:
+        try:
+            with open(self.daemons_file, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            return {}
+
+    def set_daemons_registry(self, data: dict) -> None:
+        with open(self.daemons_file, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=4)
+
     async def get_context_block(self, **kwargs) -> str:
 
         if not self.state.is_online:
@@ -186,6 +242,9 @@ class HostOSClient:
 * Network: \n{getattr(self.state, 'network', 'Неизвестно')}
 
 {self.state.telemetry}
+
+* Active Daemons:
+{self.state.active_daemons}
 
 * Sandbox Directory:
 {self.state.sandbox_files}{framework_block}""".strip()
