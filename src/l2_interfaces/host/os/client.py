@@ -56,7 +56,9 @@ class HostOSClient:
             / "utils"
             / "local"
             / "data"
-            / "host os"
+            / "interfaces"
+            / "host"
+            / "os"
             / "file_meta.json"
         )
         self.metadata_file.parent.mkdir(parents=True, exist_ok=True)
@@ -70,7 +72,9 @@ class HostOSClient:
             / "utils"
             / "local"
             / "data"
-            / "host os"
+            / "interfaces"
+            / "host"
+            / "os"
             / "daemons.json"
         )
         self.daemons_file.parent.mkdir(parents=True, exist_ok=True)
@@ -200,6 +204,17 @@ class HostOSClient:
         data[rel_path] = description
         with open(self.metadata_file, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, indent=4)
+
+    def remove_file_metadata(self, rel_path: str) -> None:
+        """
+        Удаляет описание файла из реестра, если оно существует.
+        """
+
+        data = self.get_file_metadata()
+        if rel_path in data:
+            del data[rel_path]
+            with open(self.metadata_file, "w", encoding="utf-8") as f:
+                json.dump(data, f, ensure_ascii=False, indent=4)
 
     def _ensure_sandbox_api(self):
         """Инжектит мини-библиотеку для скриптов агента в песочницу."""

@@ -35,7 +35,7 @@ class GithubEvents:
         self._is_running = False
         self._polling_task: Optional[asyncio.Task] = None
 
-        self._persistence_file = self.data_dir / "github" / "tracked_repos.json"
+        self._persistence_file = self.data_dir / "interfaces" / "github" / "tracked_repos.json"
         self._persistence_file.parent.mkdir(parents=True, exist_ok=True)
 
         # Кэш просмотренных событий для обхода проблемы GitHub Eventual Consistency

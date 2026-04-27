@@ -23,7 +23,7 @@ class CalendarClient:
         self.timezone = timezone
         self.upcoming_events_limit = upcoming_events_limit
 
-        self.calendar_dir = data_dir / "calendar"
+        self.calendar_dir = data_dir / "interfaces" / "calendar" 
         self.calendar_dir.mkdir(parents=True, exist_ok=True)
         self.filepath = self.calendar_dir / "events.json"
 

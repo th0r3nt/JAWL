@@ -16,6 +16,7 @@ class MetaClient:
         interfaces_path: Path,
         access_level: int,
         available_models: list[str],
+        custom_skills_enabled: bool,
     ):
         self.agent_state = agent_state
         self.bus = event_bus
@@ -23,6 +24,7 @@ class MetaClient:
         self.interfaces_path = interfaces_path
         self.access_level = access_level
         self.available_models = available_models
+        self.custom_skills_enabled = custom_skills_enabled
 
         self.yaml = YAML()
         self.yaml.preserve_quotes = True
@@ -65,13 +67,17 @@ class MetaClient:
             "  - 3/CREATOR: Регистрация кастомных скриптов как нативных навыков."
         )
 
-        # Формируем список моделей для вывода
         models_str = (
             ", ".join(self.available_models) if self.available_models else "Список пуст"
         )
 
+        custom_status = "отключены"
+        if self.custom_skills_enabled:
+            custom_status = "включены (требуется 3/CREATOR)"
+
         return (
             f"### META [ON]\n"
             f"* Access Level: {self.access_level} / 3\n{access_levels_desc}\n"
+            f"* Custom Skills: {custom_status}\n"
             f"* Available LLM models: [{models_str}]"
         )

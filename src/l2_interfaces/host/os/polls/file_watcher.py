@@ -68,7 +68,7 @@ class FileWatcher:
 
         self._is_running = False
         self._task: asyncio.Task | None = None
-        self._observer: Observer | None = None # type: ignore
+        self._observer: Observer | None = None  # type: ignore
         self._watches: dict[str, Any] = {}
 
         self._persistence_file = (
@@ -77,6 +77,8 @@ class FileWatcher:
             / "utils"
             / "local"
             / "data"
+            / "interfaces"
+            / "host"
             / "os"
             / "tracked_dirs.json"
         )
@@ -211,6 +213,12 @@ class FileWatcher:
             for fp, ev in queue_snapshot.items():
                 if ev == Events.HOST_OS_FILE_DELETED:
                     self._file_cache.pop(fp, None)
+                    # Вычисляем относительный путь и чистим метаданные
+                    try:
+                        rel_path = str(Path(fp).relative_to(self.client.sandbox_dir))
+                    except ValueError:
+                        rel_path = str(fp)
+                    self.client.remove_file_metadata(rel_path)
 
             await self.bus.publish(
                 Events.HOST_OS_FILE_MODIFIED, filepath="[Массив файлов]", message=msg
@@ -231,6 +239,7 @@ class FileWatcher:
 
         if sys_event_config == Events.HOST_OS_FILE_DELETED:
             self._file_cache.pop(filepath, None)
+            self.client.remove_file_metadata(rel_path)
 
         elif path_obj.exists() and path_obj.is_file():
             try:

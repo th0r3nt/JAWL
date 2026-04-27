@@ -5,6 +5,7 @@ if TYPE_CHECKING:
 
 # Импорт интерфейсов
 from src.l2_interfaces.host.os.bootstrap import setup_host_os
+from src.l2_interfaces.host.terminal.bootstrap import setup_host_terminal
 from src.l2_interfaces.meta.bootstrap import setup_meta
 from src.l2_interfaces.telegram.telethon.bootstrap import setup_telethon
 from src.l2_interfaces.telegram.aiogram.bootstrap import setup_aiogram
@@ -46,6 +47,17 @@ def initialize_l2_interfaces(system: "System", env_vars: Dict[str, str | None]) 
     else:
         system.context_registry.register_provider(
             "host os", make_off_provider("HOST OS"), ContextSection.INTERFACES
+        )
+
+    # ================================================================
+    # HOST TERMINAL
+    # ================================================================
+
+    if config.host.terminal.enabled:
+        components.extend(setup_host_terminal(system))
+    else:
+        system.context_registry.register_provider(
+            "host terminal", make_off_provider("HOST TERMINAL"), ContextSection.INTERFACES
         )
 
     # ================================================================
@@ -134,8 +146,13 @@ def initialize_l2_interfaces(system: "System", env_vars: Dict[str, str | None]) 
     if getattr(config, "meta", None) and config.meta.enabled:
         components.extend(setup_meta(system))
     else:
+        # Кастомный провайдер для Meta, чтобы показывать статус скиллов даже в OFF режиме
+        async def meta_off_provider(**kwargs) -> str:
+            custom_status = "включены (но интерфейс отключен)" if config.meta.custom_skills_enabled else "отключены"
+            return f"### META [OFF]\nИнтерфейс отключен.\n* Custom Skills: {custom_status}"
+
         system.context_registry.register_provider(
-            "meta", make_off_provider("META"), ContextSection.INTERFACES
+            "meta", meta_off_provider, ContextSection.INTERFACES
         )
 
     # ================================================================

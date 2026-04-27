@@ -61,4 +61,5 @@ def meta_client(tmp_settings, tmp_interfaces):
         interfaces_path=tmp_interfaces,
         access_level=2,
         available_models=["claude-opus-4.7", "gpt-4o"],
+        custom_skills_enabled=True,
     )

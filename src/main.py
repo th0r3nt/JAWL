@@ -117,7 +117,9 @@ class System:
 
         # HOST
         self.os_state = HostOSState()
-        self.terminal_state = HostTerminalState(number_of_last_messages=15)
+        self.terminal_state = HostTerminalState(
+            context_limit=self.interfaces_config.host.terminal.context_limit
+        )
 
         # TELEGRAM
         self.telethon_state = TelethonState(
@@ -150,7 +152,7 @@ class System:
 
         # SQL DB
         self.sql = SQLManager(
-            db_path=self.local_data_dir / "sql_db" / "agent.db",
+            db_path=self.local_data_dir / "sql" / "db" / "agent.db",
             # Ticks
             ticks_limit=sys_cfg.context_depth.ticks,
             # Детальные тики
@@ -226,8 +228,8 @@ class System:
 
         # Vector DB
         self.vector = VectorManager(
-            db_path=self.local_data_dir / "vector_db",
-            embedding_model_path=self.local_data_dir / "embeddings",
+            db_path=self.local_data_dir / "vector" / "db",
+            embedding_model_path=self.local_data_dir / "vector" / "embeddings",
             embedding_model_name=self.settings.system.vector_db.embedding_model,
             vector_size=self.settings.system.vector_db.vector_size,
             similarity_threshold=self.settings.system.vector_db.similarity_threshold,

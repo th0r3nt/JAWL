@@ -35,6 +35,12 @@ host:
     recent_file_changes_limit: 5 # В контексте будут отображаться последние n изменений в файлах (в кратком diff формате)
     workspace_max_file_chars: 10000 # Лимит символов на один открытый файл в контексте
 
+  terminal:
+    enabled: true
+    history_limit: 50 # Сколько сообщений хранить в локальном JSON
+    context_limit: 10 # Сколько последних сообщений показывать агенту в системном промпте
+
+
 
 telegram:
   telethon:
@@ -99,6 +105,7 @@ meta:
   # 2 - ARCHITECT      (дополнительные навыки: off_system()/reboot_system(), toggle_interface() - возможность включать/отключать интерфейсы)
   # 3 - CREATOR        (возможность создавать кастомные навыки для себя из скриптов sandbox/)
   access_level: 0
+  custom_skills_enabled: true # Если false, отключает загрузку и создание кастомных навыков
 
 
 multimodality:

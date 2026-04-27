@@ -34,8 +34,15 @@ class HostOSConfig(BaseModel):
     workspace_max_file_chars: int = 10000
 
 
+class HostTerminalConfig(BaseModel):
+    enabled: bool
+    history_limit: int = 50
+    context_limit: int = 15
+
+
 class HostConfig(BaseModel):
     os: HostOSConfig
+    terminal: HostTerminalConfig
 
 
 class TelethonConfig(BaseModel):
@@ -93,7 +100,8 @@ class WebConfig(BaseModel):
 
 class MetaConfig(BaseModel):
     enabled: bool
-    access_level: int = 0  # 0: SAFE, 1: CONFIGURATOR, 2: ARCHITECT
+    access_level: int = 0  # 0: SAFE, 1: CONFIGURATOR, 2: ARCHITECT, 3: CREATOR
+    custom_skills_enabled: bool = True
 
 
 class MultimodalityConfig(BaseModel):

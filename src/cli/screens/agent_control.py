@@ -211,7 +211,7 @@ def _telethon_auth_flow() -> bool:
 
     # Путь к сессии
     session_name = interfaces.telegram.telethon.session_name
-    session_dir = ROOT_DIR / "src" / "utils" / "local" / "data" / "telethon"
+    session_dir = ROOT_DIR / "src" / "utils" / "local" / "data" / "interfaces" / "telegram" /"telethon"
     session_dir.mkdir(parents=True, exist_ok=True)
     session_path = session_dir / session_name
 

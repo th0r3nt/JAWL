@@ -13,6 +13,7 @@ from src.cli.screens.agent_control import start_agent_screen, stop_agent_screen
 from src.cli.screens.logs import logs_screen
 from src.cli.screens.setup_wizard import setup_wizard_screen
 from src.cli.screens.database_manager import database_manager_screen
+from src.cli.screens.terminal_chat import terminal_chat_screen
 
 
 def main_menu() -> None:
@@ -32,6 +33,7 @@ def main_menu() -> None:
             choices=[
                 questionary.Choice("🚀 Запустить агента", "start"),
                 questionary.Choice("⏹️ Остановить агента", "stop"),
+                questionary.Choice("💻 Терминал с агентом", "terminal"),
                 questionary.Choice("📋 Открыть логи", "logs"),
                 questionary.Choice("⚙️ Мастер настройки интерфейсов", "setup"),
                 questionary.Choice("🗄️ Управление базами данных", "db_manager"),
@@ -54,6 +56,9 @@ def main_menu() -> None:
 
         elif choice == "stop":
             stop_agent_screen()
+
+        elif choice == "terminal":
+            terminal_chat_screen()
 
         elif choice == "logs":
             logs_screen()

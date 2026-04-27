@@ -22,8 +22,8 @@ from src.cli.screens.agent_control import _is_agent_running
 ROOT_DIR = Path(__file__).resolve().parent.parent.parent.parent
 
 DB_DIR = ROOT_DIR / "src" / "utils" / "local" / "data"
-SQL_DB_FILE = DB_DIR / "sql_db" / "agent.db"
-VECTOR_DB_DIR = DB_DIR / "vector_db"
+SQL_DB_FILE = DB_DIR / "sql" / "db" / "agent.db"
+VECTOR_DB_DIR = DB_DIR / "vector" / "db"
 
 SETTINGS_FILE = ROOT_DIR / "config" / "settings.yaml"
 SETTINGS_EXAMPLE = ROOT_DIR / "config" / "settings.example.yaml"

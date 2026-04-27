@@ -13,7 +13,7 @@ class CustomSkillsRegistry:
     """
 
     def __init__(self, data_dir: Path):
-        self.json_path = data_dir / "custom_skills.json"
+        self.json_path = data_dir / "meta" /"custom_skills.json"
         self.json_path.parent.mkdir(parents=True, exist_ok=True)
 
         if not self.json_path.exists():
@@ -111,7 +111,7 @@ class CustomSkillsRegistry:
         """
         Удаляет навык из манифеста и промпта.
         """
-        
+
         try:
             with open(self.json_path, "r", encoding="utf-8") as f:
                 data = json.load(f)

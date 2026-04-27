@@ -147,6 +147,17 @@ class Events:
     )
 
     # ============================================
+    # Host Terminal
+    # ============================================
+
+    HOST_TERMINAL_MESSAGE = EventConfig(
+        name="HOST_TERMINAL_MESSAGE",
+        description="Входящее сообщение от пользователя через локальный терминал.",
+        level=EventLevel.CRITICAL,  # Сам святой админ пишет как никак
+        requires_attention=True,
+    )
+
+    # ============================================
     # Email
     # ============================================
 

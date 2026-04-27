@@ -30,7 +30,7 @@ def setup_telethon(system: "System", api_id: str | None, api_hash: str | None) -
         return []
 
     config = system.interfaces_config.telegram.telethon
-    session_path = str(system.local_data_dir / "telethon" / config.session_name)
+    session_path = str(system.local_data_dir / "interfaces" / "telegram" / "telethon" / config.session_name)
 
     # Приводим api_id к числу, как того требует Telethon
     clean_api_id = int(api_id) if str(api_id).isdigit() else api_id

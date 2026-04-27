@@ -28,13 +28,17 @@ def setup_meta(system: "System") -> List[Any]:
         interfaces_path=interfaces_path,
         access_level=meta_config.access_level,
         available_models=system.settings.llm.available_models,
+        custom_skills_enabled=meta_config.custom_skills_enabled,
     )
 
     # L3 Registry для кастомных навыков
     custom_registry = CustomSkillsRegistry(system.local_data_dir)
-    custom_registry.load_and_register_all()
 
-    # Динамическая регистрация навыков
+    # Загружаем кастомные навыки только если тумблер включен
+    if meta_config.custom_skills_enabled:
+        custom_registry.load_and_register_all()
+
+    # Динамическая регистрация встроенных навыков
     register_instance(MetaSafe(client))
 
     if meta_config.access_level >= 1:
@@ -43,8 +47,14 @@ def setup_meta(system: "System") -> List[Any]:
     if meta_config.access_level >= 2:
         register_instance(MetaArchitect(client))
 
+    # Выдаем агенту "руки" для создания навыков только если тумблер включен
     if meta_config.access_level >= 3:
-        register_instance(MetaCreator(client, custom_registry))
+        if meta_config.custom_skills_enabled:
+            register_instance(MetaCreator(client, custom_registry))
+        else:
+            system_logger.info(
+                "[Meta] Access Level 3 (CREATOR) активен, но кастомные навыки отключены в settings.yaml (custom_skills_enabled=false)."
+            )
 
     system.context_registry.register_provider(
         name="meta", provider_func=client.get_context_block, section=ContextSection.INTERFACES

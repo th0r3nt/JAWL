@@ -130,10 +130,6 @@ def setup_and_run() -> None:
             [str(venv_python), str(root_dir / "jawl.py")] + sys.argv[1:]
         )
 
-        # Если произошел краш на уровне CLI, ставим паузу (чтобы окно не закрылось)
-        if exit_code != 0 and os.name == "nt":
-            input("\n[!] Процесс завершился с ошибкой. Нажмите Enter для выхода.")
-
         sys.exit(exit_code)
 
     # =========================================================
