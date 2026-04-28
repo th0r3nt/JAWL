@@ -1,3 +1,4 @@
+# Файл: src/l2_interfaces/host/os/skills/execution.py
 import asyncio
 import sys
 import os
@@ -26,12 +27,34 @@ class HostOSExecution:
     def __init__(self, host_os_client: HostOSClient):
         self.host_os = host_os_client
 
+    def _kill_process_tree(self, pid: int) -> None:
+        """
+        Рекурсивно убивает всё дерево процессов (родителя и всех потомков).
+        Необходимо для предотвращения зависания communicate(), если дочерние
+        процессы (например node) удерживают открытые пайпы (stdout/stderr) после смерти родителя.
+        """
+
+        try:
+            parent = psutil.Process(pid)
+            children = parent.children(recursive=True)
+
+            for child in children:
+                try:
+                    child.kill()
+                except (psutil.NoSuchProcess, psutil.AccessDenied):
+                    pass
+
+            parent.kill()
+        except (psutil.NoSuchProcess, psutil.AccessDenied):
+            pass
+
     @skill()
     @require_access(HostOSAccessLevel.OBSERVER)
     async def execute_script(self, filepath: str) -> SkillResult:
         """
         [1/OBSERVER] Запускает скрипт (.py, .sh, .bat, .js).
         """
+
         timeout = self.host_os.config.execution_timeout_sec
 
         try:
@@ -85,10 +108,10 @@ class HostOSExecution:
             try:
                 stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=timeout)
             except asyncio.TimeoutError:
-                process.kill()
+                self._kill_process_tree(process.pid)
                 await process.wait()
                 return SkillResult.fail(
-                    f"Скрипт работал дольше {timeout} секунд и был принудительно убит (Таймаут)."
+                    f"Скрипт работал дольше {timeout} секунд и всё его дерево процессов было принудительно убито (Таймаут)."
                 )
 
             stdout_str = truncate_text(
@@ -114,18 +137,19 @@ class HostOSExecution:
 
         except PermissionError as e:
             return SkillResult.fail(str(e))
-        
+
         except Exception as e:
             err_msg = f"Критическая ошибка при запуске скрипта: {e}\n\nTraceback:\n{traceback.format_exc()}"
             system_logger.error(f"[Host OS] {err_msg}")
             return SkillResult.fail(err_msg)
 
     @skill()
-    @require_access(HostOSAccessLevel.OBSERVER)
+    @require_access(HostOSAccessLevel.ROOT)
     async def execute_shell_command(self, command: str) -> SkillResult:
         """
         [3/ROOT] Запускает сырую bash/cmd команду в терминале ОС.
         """
+
         timeout = self.host_os.config.execution_timeout_sec
 
         try:
@@ -140,10 +164,10 @@ class HostOSExecution:
                 stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=timeout)
 
             except asyncio.TimeoutError:
-                process.kill()
+                self._kill_process_tree(process.pid)
                 await process.wait()
                 return SkillResult.fail(
-                    f"Команда работала дольше {timeout} секунд и была убита (Таймаут)."
+                    f"Команда работала дольше {timeout} секунд и всё её дерево процессов было убито (Таймаут)."
                 )
 
             stdout_str = truncate_text(
@@ -173,6 +197,7 @@ class HostOSExecution:
         """
         [3/ROOT] Принудительно завершает процесс ОС по его PID.
         """
+
         try:
             process = psutil.Process(int(pid))
             process_name = process.name()
@@ -185,16 +210,18 @@ class HostOSExecution:
 
         except psutil.NoSuchProcess:
             return SkillResult.fail(f"Ошибка: Процесс с PID {pid} не найден.")
-        
+
         except psutil.AccessDenied:
             return SkillResult.fail(
                 f"Отказано в доступе (ОС не позволила убить процесс {pid})."
             )
-        
+
         except psutil.TimeoutExpired:
-            process.kill()
-            return SkillResult.ok(f"Процесс {pid} завис и был убит принудительно (kill).")
-        
+            self._kill_process_tree(int(pid))
+            return SkillResult.ok(
+                f"Процесс {pid} завис и всё его дерево было убито принудительно (kill)."
+            )
+
         except Exception as e:
             return SkillResult.fail(f"Ошибка при попытке завершить процесс: {e}")
 
@@ -293,7 +320,7 @@ class HostOSExecution:
                 pass
 
             except psutil.TimeoutExpired:
-                proc.kill()
+                self._kill_process_tree(int(pid))
 
             except Exception as e:
                 return SkillResult.fail(f"Не удалось завершить процесс: {e}")
@@ -334,59 +361,15 @@ class HostOSExecution:
             wrapper_id = str(uuid.uuid4())[:8]
             wrapper_path = tmp_dir / f"rpc_wrapper_{wrapper_id}.py"
 
-            # Перехватываем BaseException, чтобы не упускать SystemExit, KeyboardInterrupt и т.д.
-            wrapper_code = """\
-import sys
-import json
-import asyncio
-import traceback
-from importlib.util import spec_from_file_location, module_from_spec
-from pathlib import Path
+            template_path = (
+                self.host_os.framework_dir / "src" / "utils" / "rpc_wrapper_template.py"
+            )
+            if not template_path.exists():
+                return SkillResult.fail(
+                    "Системная ошибка: Шаблон RPC-обертки не найден (src/utils/rpc_wrapper_template.py)."
+                )
 
-target_filepath = sys.argv[1]
-func_name = sys.argv[2]
-target_dir = str(Path(target_filepath).parent)
-if target_dir not in sys.path:
-    sys.path.insert(0, target_dir)
-
-async def _runner(func, kwargs):
-    if asyncio.iscoroutinefunction(func):
-        return await func(**kwargs)
-    return func(**kwargs)
-
-def main():
-    try:
-        input_data = sys.stdin.read()
-        kwargs = json.loads(input_data) if input_data.strip() else {}
-
-        spec = spec_from_file_location("dynamic_sandbox_module", target_filepath)
-        if spec is None or spec.loader is None:
-            raise ImportError(f"Не удалось загрузить модуль {target_filepath}")
-            
-        module = module_from_spec(spec)
-        sys.modules["dynamic_sandbox_module"] = module
-        spec.loader.exec_module(module)
-
-        if not hasattr(module, func_name):
-            raise AttributeError(f"В модуле {target_filepath} нет функции '{func_name}'")
-
-        func = getattr(module, func_name)
-        result = asyncio.run(_runner(func, kwargs))
-        
-        sys.stdout.write("\\n---JAWL_RPC_RESULT---\\n")
-        sys.stdout.write(json.dumps({"status": "ok", "result": result}, ensure_ascii=False) + "\\n")
-
-    except BaseException as e:
-        sys.stdout.write("\\n---JAWL_RPC_RESULT---\\n")
-        sys.stdout.write(json.dumps({
-            "status": "error", 
-            "error": f"{type(e).__name__}: {str(e)}", 
-            "traceback": traceback.format_exc()
-        }, ensure_ascii=False) + "\\n")
-
-if __name__ == "__main__":
-    main()
-"""
+            wrapper_code = template_path.read_text(encoding="utf-8")
             wrapper_path.write_text(wrapper_code, encoding="utf-8")
 
             # Формируем изолированное окружение
@@ -415,11 +398,11 @@ if __name__ == "__main__":
                 )
 
             except asyncio.TimeoutError:
-                process.kill()
+                self._kill_process_tree(process.pid)
                 await process.wait()
                 wrapper_path.unlink(missing_ok=True)
                 return SkillResult.fail(
-                    f"Функция работала дольше {timeout} секунд и была убита (Таймаут)."
+                    f"Функция работала дольше {timeout} секунд и всё дерево процессов было убито (Таймаут)."
                 )
 
             wrapper_path.unlink(missing_ok=True)
@@ -457,7 +440,7 @@ if __name__ == "__main__":
                         f"[Host OS] RPC-шлюз успешно выполнил функцию '{func_name}' из {safe_path.name}"
                     )
                     return SkillResult.ok("\n\n".join(report))
-                
+
                 else:
                     err_msg = rpc_result.get("error")
                     tb = rpc_result.get("traceback")
@@ -474,7 +457,7 @@ if __name__ == "__main__":
 
         except PermissionError as e:
             return SkillResult.fail(str(e))
-        
+
         except Exception as e:
             err_msg = f"Внутренняя ошибка RPC: {e}\n\nTraceback:\n{traceback.format_exc()}"
             system_logger.error(f"[Host OS] {err_msg}")
