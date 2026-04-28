@@ -47,7 +47,7 @@ class EmbeddingModel:
     async def get_embedding(self, text: str) -> list[float]:
         """
         Асинхронная обертка для генерации вектора.
-        Используем asyncio.to_thread, чтобы синхронный FastEmbed не заблокировал event_loop агента!
+        Используем asyncio.to_thread, чтобы синхронный FastEmbed не заблокировал event_loop агента.
         """
         if not self.model:
             raise RuntimeError("Ошибка: модель не инициализирована.")

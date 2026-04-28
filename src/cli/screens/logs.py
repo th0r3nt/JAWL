@@ -86,40 +86,43 @@ def logs_screen() -> None:
     )
 
     try:
-        # errors="replace" спасет от краша, если seek() попадет в середину русской буквы (многобайтового символа)
         with open(LOG_FILE, "r", encoding="utf-8", errors="replace") as f:
             f.seek(0, 2)
-            file_size = f.tell()
+
+            # Надежный способ отслеживать ротацию логов
+            last_size = LOG_FILE.stat().st_size if LOG_FILE.exists() else 0
 
             # Прыгаем на 2000 байт назад
-            if file_size > 2000:
-                f.seek(file_size - 2000)
-                # Выкидываем первую строку, так как мы почти наверняка приземлились на её середину
+            if last_size > 2000:
+                f.seek(last_size - 2000)
                 f.readline()
             else:
                 f.seek(0)
 
-            # 1. Сначала выводим всю накопленную предысторию
+            # 1. Выводим предысторию
             for line in f:
                 console.print(_colorize_log_line(line))
 
-            # 2. Переходим в режим ожидания новых строк (tail -f)
+            # 2. Режим tail -f
             while True:
                 line = f.readline()
                 if not line:
                     time.sleep(0.1)
 
-                    # Простая защита на случай ротации логов
-                    # Если размер файла внезапно стал меньше нашей позиции (очистился), начинаем читать сначала
-                    if LOG_FILE.exists() and LOG_FILE.stat().st_size < f.tell():
-                        f.seek(0)
+                    if LOG_FILE.exists():
+                        current_size = LOG_FILE.stat().st_size
+                        # Если размер файла резко уменьшился — произошла ротация
+                        if current_size < last_size:
+                            f.seek(0)
+
+                        # Обновляем last_size в любом случае (файл мог вырасти)
+                        last_size = current_size
 
                     continue
 
                 console.print(_colorize_log_line(line))
 
     except KeyboardInterrupt:
-        # Юзер нажал Ctrl+C
         print_info(" Выход из режима просмотра логов.")
-        time.sleep(3)
+        time.sleep(1)
         return

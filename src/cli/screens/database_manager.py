@@ -194,7 +194,7 @@ def _manage_sql_module(
 
             if current_count >= cfg[limit_key]:
                 print_error(
-                    "Достигнут максимальный лимит записей! Удалите старые или увеличьте лимит."
+                    "Достигнут максимальный лимит записей. Удалите старые или увеличьте лимит."
                 )
                 wait_for_enter()
                 continue
@@ -369,7 +369,7 @@ def _manage_drives_screen():
                 continue
 
             if stats["drives_cust"] >= cfg["max_custom_drives"]:
-                print_error("Достигнут лимит кастомных мотиваций!")
+                print_error("Достигнут лимит кастомных мотиваций.")
                 wait_for_enter()
                 continue
 
