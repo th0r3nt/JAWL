@@ -21,8 +21,10 @@ class HostOSSystem:
         psutil.cpu_percent(interval=None)
 
     async def get_telemetry(self) -> SkillResult:
-        """Возвращает загрузку CPU, свободной RAM и аптайм системы."""
-        
+        """
+        Возвращает загрузку CPU, свободной RAM и аптайм системы.
+        """
+
         try:
             cpu_usage = psutil.cpu_percent(interval=None)
             mem = psutil.virtual_memory()
@@ -47,7 +49,9 @@ class HostOSSystem:
 
     @skill()
     async def list_top_processes(self) -> SkillResult:
-        """Показывает процессы, потребляющие больше всего оперативной памяти."""
+        """
+        Показывает процессы, потребляющие больше всего оперативной памяти.
+        """
 
         limit = self.host_os.config.top_processes_limit
 
@@ -83,10 +87,14 @@ class HostOSSystem:
             return SkillResult.fail(f"Ошибка при получении списка процессов: {e}")
 
     async def get_uptime(self) -> SkillResult:
-        """Возвращает время непрерывной работы хост-системы (аптайм)."""
+        """
+        Возвращает время непрерывной работы хост-системы.
+        """
         uptime_str = seconds_to_duration_str(time.time() - psutil.boot_time())
         return SkillResult.ok(uptime_str)
 
     async def get_datetime(self) -> SkillResult:
-        """Возвращает текущую дату и время на сервере."""
+        """
+        Возвращает текущую дату и время на сервере.
+        """
         return SkillResult.ok(get_now_formatted(self.host_os.timezone))

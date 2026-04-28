@@ -48,14 +48,6 @@ class SQLTasks:
         if not tags:
             return True, "", []
 
-        if isinstance(tags, str):
-            tags = [tags]
-        elif not isinstance(tags, list):
-            try:
-                tags = list(tags)
-            except Exception:
-                tags = [str(tags)]
-
         clean_tags = [str(t) for t in tags]
         for tag in clean_tags:
             if tag not in ALLOWED_TAGS:

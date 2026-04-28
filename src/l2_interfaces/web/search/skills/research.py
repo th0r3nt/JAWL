@@ -29,14 +29,6 @@ class DeepResearch:
         if not queries:
             return SkillResult.fail("Ошибка: Список запросов пуст.")
 
-        # Броня от неверных типов из-за галлюцинаций
-        if isinstance(queries, str):
-            queries = [queries]
-        elif not isinstance(queries, list):
-            return SkillResult.fail(
-                "Ошибка: Аргумент queries должен быть массивом (списком) строк."
-            )
-
         queries = [str(q) for q in queries]
 
         # Берем настройки из клиента

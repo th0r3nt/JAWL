@@ -20,7 +20,9 @@ class HostOSNetwork:
 
     @skill()
     async def ping_host(self, host: str, count: int = 4) -> SkillResult:
-        """Проверяет доступность узла через ICMP Ping (кроссплатформенно)."""
+        """
+        Проверяет доступность узла через ICMP Ping.
+        """
 
         # Защита от shell-инъекций: убираем спецсимволы
         clean_host = "".join(c for c in host if c.isalnum() or c in ".-_")
@@ -65,7 +67,10 @@ class HostOSNetwork:
 
     @skill()
     async def check_port(self, host: str, port: int, timeout: int = 3) -> SkillResult:
-        """Проверяет доступность TCP-порта."""
+        """
+        Проверяет доступность TCP-порта.
+        """
+
         try:
             reader, writer = await asyncio.wait_for(
                 asyncio.open_connection(host, int(port)), timeout=timeout
@@ -91,7 +96,9 @@ class HostOSNetwork:
 
     @skill()
     async def list_active_connections(self, state: str = "LISTEN") -> SkillResult:
-        """Показывает активные сетевые соединения на хосте."""
+        """
+        Показывает активные сетевые соединения на хосте.
+        """
 
         try:
             connections = psutil.net_connections(kind="inet")
@@ -120,7 +127,9 @@ class HostOSNetwork:
 
     @skill()
     async def resolve_dns(self, domain: str) -> SkillResult:
-        """Возвращает IP-адреса, привязанные к домену."""
+        """
+        Возвращает IP-адреса, привязанные к домену.
+        """
 
         try:
             # socket.gethostbyname_ex возвращает: (hostname, aliaslist, ipaddrlist)

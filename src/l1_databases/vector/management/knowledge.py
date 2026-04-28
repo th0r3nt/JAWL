@@ -53,13 +53,6 @@ class VectorKnowledge:
         if not tags:
             return SkillResult.fail("Ошибка: Необходимо указать хотя бы один тег из списка.")
 
-        # Броня от галлюцинаций LLM
-        if isinstance(tags, str):
-            tags = [tags]
-        elif not isinstance(tags, list):
-            tags = [str(tags)]
-        tags = [str(t) for t in tags]
-
         if not self.db.client:
             return SkillResult.fail("Векторная БД не инициализирована.")
 

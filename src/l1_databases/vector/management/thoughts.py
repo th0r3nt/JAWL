@@ -52,13 +52,6 @@ class VectorThoughts:
         if not tags:
             return SkillResult.fail("Ошибка: Необходимо указать хотя бы один тег из списка.")
 
-        # Броня от галлюцинаций LLM
-        if isinstance(tags, str):
-            tags = [tags]
-        elif not isinstance(tags, list):
-            tags = [str(tags)]
-        tags = [str(t) for t in tags]
-
         try:
             vector = await self.embedding_model.get_embedding(str(thought_text))
             point_id = str(uuid.uuid4())

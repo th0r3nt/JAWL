@@ -27,7 +27,8 @@ def test_custom_registry_register_and_unregister(custom_registry):
     assert "Custom.test_skill" in registry._REGISTRY
 
     # Проверяем метапрограммирование сигнатуры
-    func = registry._REGISTRY["Custom.test_skill"]
+    func = registry._REGISTRY["Custom.test_skill"]["func"]
+    
     sig = inspect.signature(func)
     assert "arg1" in sig.parameters
 

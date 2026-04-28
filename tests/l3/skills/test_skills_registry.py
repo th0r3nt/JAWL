@@ -116,4 +116,50 @@ async def test_execute_skill_mixed_results(mock_plain_func):
 
     assert "Action [mock.plain_func]: Plain: A" in report
     assert "Action [mock.unknown_func]: Скилл 'mock.unknown_func' не найден" in report
-    assert "Action [mock.fail_func]: Ошибка: Критический сбой" in report
+    assert "Action [mock.fail_func]: Внутренняя ошибка навыка: Критический сбой" in report
+
+
+@pytest.fixture
+def mock_typed_func():
+    @skill(name_override="mock.typed_func")
+    async def dummy_typed_func(
+        my_list: list[str], my_int: int, my_bool: bool = False
+    ) -> SkillResult:
+        return SkillResult.ok(f"Int: {my_int}, Bool: {my_bool}, ListLen: {len(my_list)}")
+
+    return dummy_typed_func
+
+
+@pytest.mark.asyncio
+async def test_guard_type_coercion(mock_typed_func):
+    """Тест: Pydantic Guard Layer на лету чинит простые типы (Type Coercion)."""
+    # LLM присылает строку "42" вместо числа и строку "true" вместо bool
+    actions = [
+        ActionCall(
+            tool_name="mock.typed_func",
+            parameters={"my_list": ["a", "b"], "my_int": "42", "my_bool": "true"},
+        )
+    ]
+    report = await execute_skill(actions)
+
+    # Guard должен сам сконвертировать типы и пропустить вызов
+    assert "Int: 42, Bool: True, ListLen: 2" in report
+
+
+@pytest.mark.asyncio
+async def test_guard_validation_error_feedback(mock_typed_func):
+    """Тест: Guard Layer отлавливает критические галлюцинации и возвращает понятную ошибку LLM."""
+    # LLM галлюцинирует и присылает строку вместо списка
+    actions = [
+        ActionCall(
+            tool_name="mock.typed_func",
+            parameters={"my_list": "This is a string, not a list", "my_int": 42},
+        )
+    ]
+    report = await execute_skill(actions)
+
+    # Функция НЕ должна была выполниться, а LLM должна получить фидбек с указанием ошибки
+    assert "Ошибка валидации параметров" in report
+    assert "my_list" in report
+    # Ошибка Pydantic о том, что ожидался массив
+    assert "valid array" in report.lower() or "valid list" in report.lower()

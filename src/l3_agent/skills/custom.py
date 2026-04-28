@@ -39,18 +39,28 @@ class CustomSkillsRegistry:
         func_name = info["func_name"]
         description = info["description"]
         params_dict = info.get("params", {})
+        
+        type_mapping = {
+            "str": str, "int": int, "float": float, "bool": bool, 
+            "list": list, "dict": dict
+        }
 
         # Метапрограммирование: создаем фейковые параметры для inspect.signature
         parameters = []
         for p_name, p_desc in params_dict.items():
-            is_optional = "optional" in str(p_desc).lower()
+            is_optional = "optional" in str(p_desc).lower() or "=" in str(p_desc)
             default = None if is_optional else inspect.Parameter.empty
+            
+            # Достаем базовый тип, например "str = None" -> "str"
+            base_type_str = str(p_desc).split("=")[0].strip().lower()
+            real_type = type_mapping.get(base_type_str, Any)
+            
             parameters.append(
                 inspect.Parameter(
                     name=p_name,
                     kind=inspect.Parameter.KEYWORD_ONLY,
                     default=default,
-                    annotation=str(p_desc),
+                    annotation=real_type,
                 )
             )
 

@@ -14,7 +14,10 @@ class HostOSMonitoring:
 
     @skill()
     async def track_directory(self, path: str) -> SkillResult:
-        """Начинает отслеживание изменений в указанной директории (создание, удаление, изменение файлов)."""
+        """
+        Начинает отслеживание изменений в указанной директории.
+        (создание, удаление, изменение файлов)
+        """
         try:
             # Гейткипер проверит, имеет ли агент права на чтение этой папки
             safe_path = self.host_os.validate_path(path, is_write=False)
@@ -28,16 +31,19 @@ class HostOSMonitoring:
 
         except ValueError as e:
             return SkillResult.fail(str(e))
-        
+
         except PermissionError as e:
             return SkillResult.fail(str(e))
-        
+
         except Exception as e:
             return SkillResult.fail(f"Ошибка при добавлении отслеживания: {e}")
 
     @skill()
     async def untrack_directory(self, path: str) -> SkillResult:
-        """Прекращает отслеживание директории."""
+        """
+        Прекращает отслеживание директории.
+        """
+
         try:
             safe_path = self.host_os.validate_path(path, is_write=False)
             success = self.events.untrack_path(str(safe_path))
@@ -59,7 +65,10 @@ class HostOSMonitoring:
 
     @skill()
     async def get_tracked_directories(self) -> SkillResult:
-        """Возвращает список всех отслеживаемых директорий."""
+        """
+        Возвращает список всех отслеживаемых директорий.
+        """
+
         tracked = list(self.events._watches.keys())
 
         if not tracked:

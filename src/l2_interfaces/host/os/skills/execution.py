@@ -12,6 +12,8 @@ from src.utils.logger import system_logger
 from src.utils._tools import truncate_text
 
 from src.l2_interfaces.host.os.client import HostOSClient, HostOSAccessLevel
+from src.l2_interfaces.host.os.decorators import require_access
+
 from src.l3_agent.skills.registry import SkillResult, skill
 
 
@@ -25,17 +27,12 @@ class HostOSExecution:
         self.host_os = host_os_client
 
     @skill()
+    @require_access(HostOSAccessLevel.OBSERVER)
     async def execute_script(self, filepath: str) -> SkillResult:
         """
         [1/OBSERVER] Запускает скрипт (.py, .sh, .bat, .js).
         """
-
         timeout = self.host_os.config.execution_timeout_sec
-
-        if self.host_os.access_level < HostOSAccessLevel.OBSERVER:
-            return SkillResult.fail(
-                "Отказано в доступе: выполнение скриптов разрешено при Access Level >= 1."
-            )
 
         try:
             safe_path = self.host_os.validate_path(filepath, is_write=False)
@@ -124,17 +121,12 @@ class HostOSExecution:
             return SkillResult.fail(err_msg)
 
     @skill()
+    @require_access(HostOSAccessLevel.OBSERVER)
     async def execute_shell_command(self, command: str) -> SkillResult:
         """
         [3/ROOT] Запускает сырую bash/cmd команду в терминале ОС.
         """
-
         timeout = self.host_os.config.execution_timeout_sec
-
-        if self.host_os.access_level < HostOSAccessLevel.ROOT:
-            return SkillResult.fail(
-                "Отказано в доступе: выполнение shell-команд по всей ОС требует access_level = 3 (ROOT)."
-            )
 
         try:
             process = await asyncio.create_subprocess_shell(
@@ -176,16 +168,11 @@ class HostOSExecution:
             return SkillResult.fail(f"Ошибка выполнения shell-команды: {e}")
 
     @skill()
+    @require_access(HostOSAccessLevel.ROOT)
     async def kill_process(self, pid: int) -> SkillResult:
         """
         [3/ROOT] Принудительно завершает процесс ОС по его PID.
         """
-
-        if self.host_os.access_level < HostOSAccessLevel.ROOT:
-            return SkillResult.fail(
-                "Отказано в доступе: управление процессами ОС требует access_level = 3 (ROOT)."
-            )
-
         try:
             process = psutil.Process(int(pid))
             process_name = process.name()
@@ -212,15 +199,11 @@ class HostOSExecution:
             return SkillResult.fail(f"Ошибка при попытке завершить процесс: {e}")
 
     @skill()
+    @require_access(HostOSAccessLevel.OBSERVER)
     async def start_daemon(self, filepath: str, name: str, description: str) -> SkillResult:
         """
         [1/OBSERVER] Запускает Python-скрипт как фоновый процесс (демон).
         """
-
-        if self.host_os.access_level < HostOSAccessLevel.OBSERVER:
-            return SkillResult.fail(
-                "Отказано в доступе: запуск демонов разрешен при Access Level >= 1."
-            )
 
         try:
             safe_path = self.host_os.validate_path(filepath, is_write=False)
@@ -287,14 +270,11 @@ class HostOSExecution:
             return SkillResult.fail(f"Ошибка при запуске демона: {e}")
 
     @skill()
+    @require_access(HostOSAccessLevel.OBSERVER)
     async def stop_daemon(self, pid: int) -> SkillResult:
         """
         [1/OBSERVER] Останавливает работающий фоновый демон по его PID.
         """
-
-        if self.host_os.access_level < HostOSAccessLevel.OBSERVER:
-            return SkillResult.fail("Отказано в доступе.")
-
         try:
             registry = self.host_os.get_daemons_registry()
             pid_str = str(pid)
@@ -328,20 +308,17 @@ class HostOSExecution:
             return SkillResult.fail(f"Ошибка при остановке демона: {e}")
 
     @skill()
+    @require_access(HostOSAccessLevel.OBSERVER)
     async def execute_sandbox_func(
         self, filepath: str, func_name: str, kwargs: dict = None
     ) -> SkillResult:
         """
         [1/OBSERVER] Вызов функции из Python-скрипта в песочнице (RPC).
         """
-
         if not isinstance(kwargs, dict):
             kwargs = {}
 
         timeout = self.host_os.config.execution_timeout_sec
-
-        if self.host_os.access_level < HostOSAccessLevel.OBSERVER:
-            return SkillResult.fail("Отказано в доступе.")
 
         try:
             safe_path = self.host_os.validate_path(filepath, is_write=False)
