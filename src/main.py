@@ -31,6 +31,7 @@ from src.l0_state.interfaces.state import (
     AiogramState,
     WebSearchState,
     WebHTTPState,
+    WebBrowserState,
     CalendarState,
     GithubState,
     EmailState,
@@ -147,6 +148,9 @@ class System:
 
         # WEB HTTP
         self.web_http_state = WebHTTPState(history_limit=10)
+
+        # WEB BROWSER
+        self.web_browser_state = WebBrowserState()
 
         # CALENDAR
         self.calendar_state = CalendarState()

@@ -10,10 +10,11 @@ from src.l2_interfaces.meta.bootstrap import setup_meta
 from src.l2_interfaces.telegram.telethon.bootstrap import setup_telethon
 from src.l2_interfaces.telegram.aiogram.bootstrap import setup_aiogram
 from src.l2_interfaces.web.search.bootstrap import setup_web_search
+from src.l2_interfaces.web.http.bootstrap import setup_web_http
+from src.l2_interfaces.web.browser.bootstrap import setup_web_browser
 from src.l2_interfaces.multimodality.bootstrap import setup_multimodality
 from src.l2_interfaces.calendar.bootstrap import setup_calendar
 from src.l2_interfaces.github.bootstrap import setup_github
-from src.l2_interfaces.web.http.bootstrap import setup_web_http
 
 # Импортируйте сюда свой кастомный интерфейс
 # from src.l2_interfaces.interface_name.bootstrap import setup_interface
@@ -149,6 +150,17 @@ def initialize_l2_interfaces(system: "System", env_vars: Dict[str, str | None]) 
     else:
         system.context_registry.register_provider(
             "web http", make_off_provider("WEB HTTP"), ContextSection.INTERFACES
+        )
+
+    # ================================================================
+    # WEB BROWSER
+    # ================================================================
+
+    if getattr(config.web, "browser", None) and config.web.browser.enabled:
+        components.extend(setup_web_browser(system))
+    else:
+        system.context_registry.register_provider(
+            "web browser", make_off_provider("WEB BROWSER"), ContextSection.INTERFACES
         )
 
     # ================================================================

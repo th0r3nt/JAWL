@@ -73,7 +73,7 @@ def _check_and_setup_env() -> tuple[bool, bool]:
 
     # Магия защиты от блокнота Windows
     try:
-         with open(ENV_FILE, "r", encoding="utf-8-sig") as f:
+        with open(ENV_FILE, "r", encoding="utf-8-sig") as f:
             env_content = f.readlines()
     except UnicodeDecodeError:
         with open(ENV_FILE, "r", encoding="cp1251") as f:
@@ -282,15 +282,28 @@ def start_agent_screen() -> None:
         print("\n")
         print_info(" [Первичная инициализация завершена]")
         print_info(
-            " Были созданы базовые файлы конфигурации, файлы личности агента и/или .env."
+            " Были созданы базовые файлы конфигурации."
+        )
+        
+        print_info(
+            " Обязательно зайдите в config/interfaces.yaml и настройте под себя возможности агента."
         )
         print_info(
-            " Рекомендуется просмотреть и при необходимости отредактировать их перед стартом."
+            " По умолчанию большинство интерфейсов отключено в целях безопасности."
         )
         print_info(
-            " В том числе файлы в src/l3_agent/prompt/personality/ (личность и характер агента)."
+            " Также проверьте config/settings.yaml для настройки параметров модели, БД и лимитов."
         )
-        print_success("После проверки выберите 'Запустить агента' в меню еще раз.")
+
+        print("\n Были созданы файлы личности агента и/или .env.")
+
+        print_info(
+            " Просмотрите src/l3_agent/prompt/personality/, чтобы настроить личность и характер агента."
+        )
+        print_info(
+            " [Опционально] По умолчанию в src/l3_agent/prompt/system/ уже лежат настроенные системные промпты. При желании можно настроить и эту папку, если вам нужны специфичные системные инструкции для вашего агента."
+        )
+        print_success("После финальной настройки выберите 'Запустить агента' в меню еще раз.")
         wait_for_enter()
         return
 

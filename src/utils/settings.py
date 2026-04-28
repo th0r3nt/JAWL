@@ -101,9 +101,19 @@ class WebHTTPConfig(BaseModel):
     max_response_chars: int = 10000
 
 
+class WebBrowserConfig(BaseModel):
+    enabled: bool = False
+    headless: bool = True  # Показывать ли графическое окно (False полезно для отладки)
+    timeout_sec: int = 30  # Таймаут на загрузку страниц
+    idle_timeout_sec: int = (
+        900  # 15 минут простоя перед авто-закрытием браузера для очистки ОЗУ
+    )
+
+
 class WebConfig(BaseModel):
     search: WebSearchConfig = Field(default_factory=WebSearchConfig)
     http: WebHTTPConfig = Field(default_factory=WebHTTPConfig)
+    browser: WebBrowserConfig = Field(default_factory=WebBrowserConfig)
 
 
 class MetaConfig(BaseModel):

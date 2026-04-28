@@ -1,13 +1,15 @@
 host:
+
+  # Полноценное взаимодействия с хост-OS с разными уровнями доступа (см. ниже)
   os:
-    enabled: true
+    enabled: false
 
     # Навыки для графического десктопа (открытие папок, ссылок в браузере, уведомления). Отлично работают на Win/Mac/Linux Desktop
     # На дефолтном сервере (VPS без монитора) лучше отключить за ненадобностью
-    desktop_interactions: true
+    desktop_interactions: false
 
     # Уровень доступа агента к файловой системе и ОС
-    # 0 - SANDBOX   (Read/Write только внутри папки sandbox/)
+    # 0 - SANDBOX   (Безопасность. Read/Write только внутри папки sandbox/)
     # 1 - OBSERVER  (Тестировщик. Read для всего кода фреймворка, Write только в sandbox/)
     # 2 - OPERATOR  (Разработчик. Read/Write для всего кода фреймворка)
     # 3 - ROOT      (Системный администратор. Полный доступ: Read/Write всей хост-системы и управление процессами)
@@ -34,6 +36,7 @@ host:
     recent_file_changes_limit: 5 # В контексте будут отображаться последние n изменений в файлах (в кратком diff формате)
     workspace_max_file_chars: 10000 # Лимит символов на один открытый файл в контексте
 
+  # Консольное окно терминала для общения с агентом
   terminal:
     enabled: true
     history_limit: 50 # Сколько сообщений хранить в локальном JSON
@@ -76,13 +79,13 @@ email:
 web:
   # HTTP запросы и скачивание файлов
   http:
-    enabled: true
+    enabled: false
     request_timeout_sec: 15
     max_response_chars: 10000
 
   # Поиск и чтение страниц
   search:
-    enabled: true
+    enabled: false
 
     # Варианты: "duckduckgo", "tavily"
     search_engine: "duckduckgo" # Перед включением tavily введите TAVILY_API_KEY в .env
@@ -99,6 +102,13 @@ web:
       max_results_per_query: 5     # Сколько топ-ссылок брать из каждого запроса
       max_pages_to_read: 15        # Сколько уникальных страниц в итоге читать параллельно
       total_max_chars: 30000       # Общий лимит символов для всех прочитанных страниц (чтобы не убить контекст)
+
+  # Полноценный браузер (Playwright). Позволяет логиниться, кликать и читать SPA-сайты
+  browser:
+    enabled: false
+    headless: true
+    timeout_sec: 30
+    idle_timeout_sec: 900
 
 
 # Интерфейс, позволяющий агенту менять свои параметры в settings/interfaces.yaml и управлять системой сразу в рантайме
@@ -119,6 +129,6 @@ multimodality:
 
 # Локальный календарь для агента (напоминания, задачи, события)
 calendar:
-  enabled: true
+  enabled: false
   polling_interval_sec: 60
   upcoming_events_limit: 10

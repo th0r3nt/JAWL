@@ -3,6 +3,22 @@
 Все значимые изменения в проекте JAWL фиксируются в этом файле. Формат базируется на [Keep a Changelog](https://keepachangelog.com/ru/1.0.0/).
 
 
+## [0.9.3-beta] - 2026-04-28
+
+### Added
+- **New Interface - Web Browser**: реализация асинхронного веб-браузера с cookie, созданием скриншотов, scroll, click и подобными навыками. 
+- **Coordinate Grid Overlay**: В новый навык `take_screenshot` добавлен параметр `with_grid=True`. Агент теперь может накладывать полупрозрачную координатную сетку с шагом 100px поверх скриншотов веб-страниц для точного визуального позиционирования.
+- **Pixel-perfect Interactions**: Добавлены навыки `click_coordinates(x,y)`, `hover_coordinates(x,y)` и `type_text(text)`. Если ARIA-дерево пустое (например, из-за антифрода или сложных `<canvas>` элементов), агент может взаимодействовать с сайтами, вычисляя пиксели по сетке.
+- **Playwright Auto-install**: Если в системе установлена библиотека, но отсутствуют бинарники браузеров, клиент `WebBrowserClient` автоматически вызовет `playwright install chromium` при первом старте.
+
+### Changed
+- **Web Navigation**: Изменен механизм ожидания Playwright с `networkidle` на `load`. Это полностью устраняет падение браузера по Timeout на современных SPA-сайтах (GitHub, Ozon), которые держат бесконечные фоновые WebSocket соединения.
+- **Native ARIA Snapshots**: Вырезан самописный костыль `_flatten_aom`. Фреймворк мигрировал на новый нативный метод Playwright `aria_snapshot()`, который идеально оптимизирован для AI-агентов и отдает легкую YAML-структуру страницы.
+
+### Fixed
+- Исправлена ошибка `ModuleNotFoundError`, так как зависимость `playwright` отсутствовала в requirements.
+
+---
 
 ## [0.9.2.1-beta] - 2026-04-28
 

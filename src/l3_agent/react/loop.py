@@ -297,6 +297,7 @@ class ReactLoop:
         try:
             parsed_response = AgentResponse.model_validate_json(clean_answer)
             return parsed_response
+        
         except ValidationError as e:
             system_logger.warning("[ReAct] Ошибка структуры JSON.")
             err_msg = f"Format Error: {e}"
