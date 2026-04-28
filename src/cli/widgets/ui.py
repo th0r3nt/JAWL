@@ -119,7 +119,7 @@ def clear_screen() -> None:
     os.system("cls" if os.name == "nt" else "clear")
 
 
-def draw_header(version: str = "v0.9.0") -> None:
+def draw_header(version: str = "v0.9.1") -> None:
     """Очищает экран и отрисовывает главный логотип JAWL со статусом агента."""
     clear_screen()
 
