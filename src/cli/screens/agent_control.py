@@ -55,7 +55,7 @@ def _check_and_setup_env() -> tuple[bool, bool]:
         if ENV_EXAMPLE.exists():
             # Автовосстановление кодировки при копировании
             try:
-                with open(ENV_EXAMPLE, "r", encoding="utf-8") as f:
+                with open(ENV_EXAMPLE, "r", encoding="utf-8-sig") as f:
                     content = f.read()
 
             except UnicodeDecodeError:
@@ -73,7 +73,7 @@ def _check_and_setup_env() -> tuple[bool, bool]:
 
     # Магия защиты от блокнота Windows
     try:
-        with open(ENV_FILE, "r", encoding="utf-8") as f:
+         with open(ENV_FILE, "r", encoding="utf-8-sig") as f:
             env_content = f.readlines()
     except UnicodeDecodeError:
         with open(ENV_FILE, "r", encoding="cp1251") as f:
@@ -164,8 +164,10 @@ def _validate_configs() -> bool:
         for err in e.errors():
             loc = " -> ".join(map(str, err.get("loc", [])))
             print_info(f"[{loc}]: {err.get('msg')}")
-            
-        print_info("\n 💡 Подсказка: если вы обновили JAWL, удалите старые файлы settings.yaml и interfaces.yaml в папке config/, чтобы система пересоздала их из актуальных шаблонов.")
+
+        print_info(
+            "\n 💡 Подсказка: если вы обновили JAWL, удалите старые файлы settings.yaml и interfaces.yaml в папке config/, чтобы система пересоздала их из актуальных шаблонов."
+        )
 
         return False
 
@@ -183,7 +185,7 @@ def _telethon_auth_flow() -> bool:
     if not interfaces.telegram.telethon.enabled:
         return True
 
-    env_dict = dotenv_values(ENV_FILE)
+    env_dict = dotenv_values(ENV_FILE, encoding="utf-8-sig")
     api_id = env_dict.get("TELETHON_API_ID")
     api_hash = env_dict.get("TELETHON_API_HASH")
 
@@ -213,7 +215,9 @@ def _telethon_auth_flow() -> bool:
 
     # Путь к сессии
     session_name = interfaces.telegram.telethon.session_name
-    session_dir = ROOT_DIR / "src" / "utils" / "local" / "data" / "interfaces" / "telegram" /"telethon"
+    session_dir = (
+        ROOT_DIR / "src" / "utils" / "local" / "data" / "interfaces" / "telegram" / "telethon"
+    )
     session_dir.mkdir(parents=True, exist_ok=True)
     session_path = session_dir / session_name
 
@@ -307,7 +311,7 @@ def start_agent_screen() -> None:
         kwargs["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP
     else:
         kwargs["start_new_session"] = True
-        
+
     try:
         # Создаем файл для перехвата критических ошибок уровня Python (Traceback)
         crash_log_path = ROOT_DIR / "logs" / "startup_error.log"
@@ -334,7 +338,7 @@ def start_agent_screen() -> None:
                 PID_FILE.unlink()
 
             print_error("Агент завершился с ошибкой сразу после старта.")
-            
+
             # Читаем и выводим реальную причину падения
             if crash_log_path.exists():
                 error_output = crash_log_path.read_text(encoding="utf-8").strip()
@@ -342,7 +346,9 @@ def start_agent_screen() -> None:
                     print_info("Детали критической ошибки (Traceback):")
                     print(f"\n{error_output}\n")
                 else:
-                    print_info(" Проверьте основной лог (logs/system.log) для получения деталей.")
+                    print_info(
+                        " Проверьте основной лог (logs/system.log) для получения деталей."
+                    )
 
             wait_for_enter()
             return

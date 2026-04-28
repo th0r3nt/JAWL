@@ -16,6 +16,7 @@
 ### Fixed
 - **DuckDuckGo Rate Limits**: Переписан клиент DDG. Добавлен `asyncio.Semaphore` и экспоненциальная задержка, чтобы Cloudflare не банил агента при массовых параллельных запросах во время `DeepResearch`.
 
+---
 
 ## [0.9.1-beta] - 2026-04-27
 

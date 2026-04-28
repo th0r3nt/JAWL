@@ -41,7 +41,7 @@ def _check_api_keys() -> tuple[bool, bool]:
     if not ENV_FILE.exists():
         return False, False
 
-    env_dict = dotenv_values(ENV_FILE)
+    env_dict = dotenv_values(ENV_FILE, encoding="utf-8-sig")
 
     telethon_ok = bool(env_dict.get("TELETHON_API_ID")) and bool(
         env_dict.get("TELETHON_API_HASH")

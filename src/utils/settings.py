@@ -274,7 +274,7 @@ def load_yaml(file_path: Path) -> dict:
         raise FileNotFoundError(f"Конфигурационный файл не найден: {file_path}")
 
     try:
-        with open(file_path, "r", encoding="utf-8") as f:
+        with open(file_path, "r", encoding="utf-8-sig") as f:
             return yaml.load(f, Loader=UniqueKeyLoader) or {}
     except UnicodeDecodeError:
         with open(file_path, "r", encoding="cp1251") as f:
