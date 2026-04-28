@@ -35,9 +35,11 @@ async def test_web_search_empty(mock_ddgs_class, ddg_skill):
 
 
 @pytest.mark.asyncio
+@patch("src.l2_interfaces.web.search.skills.duckduckgo_search.asyncio.sleep") # Мокаем сон
 @patch("src.l2_interfaces.web.search.skills.duckduckgo_search.DDGS")
-async def test_web_search_exception(mock_ddgs_class, ddg_skill):
-    """Тест: перехват сетевой ошибки."""
+async def test_web_search_exception(mock_ddgs_class, mock_sleep, ddg_skill):
+    """Тест: перехват сетевой ошибки (без ожидания ретраев)."""
+    # Имитируем падение DDGS
     mock_ddgs_class.side_effect = Exception("Connection Reset")
 
     res = await ddg_skill.search("test query")
@@ -45,3 +47,6 @@ async def test_web_search_exception(mock_ddgs_class, ddg_skill):
     assert res.is_success is False
     assert "Ошибка веб-поиска" in res.message
     assert "Connection Reset" in res.message
+    
+    # Проверяем, что ретраи реально были (sleep вызывался 3 раза)
+    assert mock_sleep.call_count == 3
