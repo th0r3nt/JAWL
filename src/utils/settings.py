@@ -28,7 +28,6 @@ class HostOSConfig(BaseModel):
     execution_timeout_sec: int = 60
     file_read_max_chars: int = 10000
     file_list_limit: int = 100
-    http_response_max_chars: int = 10000
     top_processes_limit: int = 10
     file_diff_max_chars: int = 300
 
@@ -96,8 +95,15 @@ class WebSearchConfig(BaseModel):
     deep_research: DeepResearchConfig = Field(default_factory=DeepResearchConfig)
 
 
+class WebHTTPConfig(BaseModel):
+    enabled: bool = True
+    request_timeout_sec: int = 15
+    max_response_chars: int = 10000
+
+
 class WebConfig(BaseModel):
     search: WebSearchConfig = Field(default_factory=WebSearchConfig)
+    http: WebHTTPConfig = Field(default_factory=WebHTTPConfig)
 
 
 class MetaConfig(BaseModel):
@@ -297,7 +303,7 @@ def _log_missing_defaults(model: BaseModel, prefix: str = "", file_name: str = "
 
 def load_config() -> tuple[SettingsConfig, InterfacesConfig]:
     """
-    Загружает и валидирует настройки из YAML файлов. 
+    Загружает и валидирует настройки из YAML файлов.
     Автовосстанавливает при отсутствии.
     """
 

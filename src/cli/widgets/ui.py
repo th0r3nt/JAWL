@@ -3,6 +3,8 @@ import yaml
 import sys
 import platform
 import subprocess
+import io
+import shutil
 from pathlib import Path
 
 from src.utils._tools import is_agent_running
@@ -34,13 +36,12 @@ SETTINGS_FILE = ROOT_DIR / "config" / "settings.yaml"
 
 
 def _get_agent_status() -> dict:
-    """Легковесно собирает статус агента (без IPC, напрямую из ОС и конфигов)."""
+    """
+    Легковесно собирает статус агента (без IPC, напрямую из ОС и конфигов).
+    """
 
-    # Убрали сбор аптайма, так как статичное меню не обновляет время.
-    # is_agent_running() уже сам проверяет наличие и живость процесса через psutil
     status = {"is_running": is_agent_running(), "model": "unknown", "interval": 0}
 
-    # Читаем конфигурацию
     if SETTINGS_FILE.exists():
         try:
             with open(SETTINGS_FILE, "r", encoding="utf-8") as f:
@@ -53,28 +54,80 @@ def _get_agent_status() -> dict:
     return status
 
 
+def _build_header_panel(version: str) -> Panel:
+    """
+    Собирает Rich Panel для шапки системы.
+    """
+
+    status = _get_agent_status()
+
+    logo_text = Text(LOGO, style="bold cyan")
+    subtitle_text = Text("Just A While Loop", style="bold cyan")
+    version_text = Text(f"{version}\n", style="dim cyan")
+
+    status_text = Text()
+    if status["is_running"]:
+        status_text.append("● ONLINE", style="bold green")
+        status_text.append(
+            f"  |  Model: {status['model']}  |  Heartbeat: {status['interval']}s",
+            style="bold white",
+        )
+    else:
+        status_text.append("○ OFFLINE", style="bold red")
+        status_text.append(
+            f"  |  Model: {status['model']}  |  Heartbeat: {status['interval']}s",
+            style="dim white",
+        )
+
+    content = Group(
+        Align.center(logo_text),
+        Align.center(subtitle_text),
+        Align.center(version_text),
+        Align.center(status_text),
+    )
+
+    return Panel(content, border_style="cyan", expand=False)
+
+
+def get_header_ansi(version: str = __version__) -> str:
+    """
+    Генерирует заголовок и возвращает его в виде ANSI строки (для prompt_toolkit).
+    """
+
+    panel = _build_header_panel(version)
+    term_width = shutil.get_terminal_size().columns
+    str_console = Console(file=io.StringIO(), force_terminal=True, width=term_width)
+    str_console.print(panel)
+    return str_console.file.getvalue()
+
+
+def draw_header(version: str = __version__) -> None:
+    """
+    Очищает экран и отрисовывает главный логотип JAWL со статусом агента.
+    """
+
+    clear_screen()
+    console.print(_build_header_panel(version))
+
+
 def launch_in_new_window(arg: str) -> None:
-    """Запускает jawl.py с определенным аргументом в новом окне ОС терминала."""
+    """
+    Запускает jawl.py с определенным аргументом в новом окне ОС терминала.
+    """
+
     script_path = ROOT_DIR / "jawl.py"
-
-    # sys.executable указывает на Python внутри нашего venv
     cmd = [sys.executable, str(script_path), arg]
-
     system = platform.system()
 
     try:
         if system == "Windows":
             subprocess.Popen(cmd, creationflags=subprocess.CREATE_NEW_CONSOLE)
         elif system == "Darwin":
-            # macOS AppleScript
             cmd_str = f'"{sys.executable}" "{script_path}" {arg}'
             cmd_str_escaped = cmd_str.replace('"', '\\"')
             script = f'tell application "Terminal" to do script "{cmd_str_escaped}"'
             subprocess.Popen(["osascript", "-e", script])
         else:
-            # Linux (пытаемся найти популярный терминал)
-            import shutil
-
             terminals = [
                 ("gnome-terminal", ["--"]),
                 ("konsole", ["-e"]),
@@ -87,7 +140,6 @@ def launch_in_new_window(arg: str) -> None:
                     subprocess.Popen([term] + args + cmd)
                     return
 
-            # Fallback если ничего не нашли
             print_error(
                 "Не удалось найти терминал для открытия нового окна. Запускаем в текущем..."
             )
@@ -100,8 +152,8 @@ def launch_in_new_window(arg: str) -> None:
 def flush_input() -> None:
     """
     Кроссплатформенная очистка буфера ввода (stdin).
-    Удаляет все случайные нажатия клавиш, которые накопились, пока CLI был занят.
     """
+
     try:
         if os.name == "nt":
             import msvcrt
@@ -121,74 +173,24 @@ def clear_screen() -> None:
     os.system("cls" if os.name == "nt" else "clear")
 
 
-def draw_header(version: str = __version__) -> None:
-    """Очищает экран и отрисовывает главный логотип JAWL со статусом агента."""
-    clear_screen()
-
-    status = _get_agent_status()
-
-    # 1. Логотип (чистый арт без лишних отступов)
-    logo_text = Text(LOGO, style="bold cyan")
-
-    # 2. Подзаголовок вынесен отдельно для идеального математического центрирования
-    subtitle_text = Text("Just A While Loop", style="bold cyan")
-
-    # 3. Версия (добавляем \n в конце для отступа перед статусом)
-    version_text = Text(f"{version}\n", style="dim cyan")
-
-    # 4. Плашка статуса
-    status_text = Text()
-    if status["is_running"]:
-        status_text.append("● ONLINE", style="bold green")
-        status_text.append(
-            f"  |  Model: {status['model']}  |  Heartbeat: {status['interval']}s",
-            style="bold white",
-        )
-    else:
-        status_text.append("○ OFFLINE", style="bold red")
-        status_text.append(
-            f"  |  Model: {status['model']}  |  Heartbeat: {status['interval']}s",
-            style="dim white",
-        )
-
-    # Группируем и выравниваем каждый элемент НЕЗАВИСИМО друг от друга
-    content = Group(
-        Align.center(logo_text),
-        Align.center(subtitle_text),
-        Align.center(version_text),
-        Align.center(status_text),
-    )
-
-    # expand=False запрещает рамке растягиваться на весь экран, спасая от поломок при ресайзе
-    panel = Panel(content, border_style="cyan", expand=False)
-
-    # Центрируем саму собранную плашку
-    console.print(panel)
-
-
 def print_success(msg: str) -> None:
-    """Выводит сообщение об успехе."""
     console.print(f"[bold green] ✓ {msg}[/bold green]")
 
 
 def print_error(msg: str) -> None:
-    """Выводит сообщение об ошибке."""
     console.print(f"[bold red]✗ {msg}[/bold red]")
 
 
 def print_info(msg: str) -> None:
-    """Выводит информационное сообщение."""
     console.print(f"[bold blue]ℹ {msg}[/bold blue]")
 
 
 def wait_for_enter() -> None:
-    """Ставит CLI на паузу, ожидая нажатия Enter от пользователя."""
     console.print("\n[dim]Нажмите Enter для продолжения.[/dim]")
     input()
 
 
 def get_custom_style() -> questionary.Style:
-    """Возвращает единый стиль для всех меню Questionary."""
     return questionary.Style(
         [
             ("pointer", "fg:cyan bold"),

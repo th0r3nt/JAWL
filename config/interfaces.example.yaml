@@ -27,7 +27,6 @@ host:
     execution_timeout_sec: 60 # Таймаут на выполнение скриптов агентом
     file_read_max_chars: 10000
     file_list_limit: 100
-    http_response_max_chars: 10000
     top_processes_limit: 10
     file_diff_max_chars: 300 # При появлении события OS_FILE_MODIFIED (отслеживание изменений в файлах sandbox/) - будут показываться последние n измененных символов 
 
@@ -75,6 +74,12 @@ email:
 
 
 web:
+  # HTTP запросы и скачивание файлов
+  http:
+    enabled: true
+    request_timeout_sec: 15
+    max_response_chars: 10000
+
   # Поиск и чтение страниц
   search:
     enabled: true

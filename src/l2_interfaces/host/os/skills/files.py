@@ -702,6 +702,7 @@ class HostOSFiles:
 
         except PermissionError as e:
             return SkillResult.fail(str(e))
+        
         except Exception as e:
             return SkillResult.fail(f"Ошибка при чтении директории: {e}")
 

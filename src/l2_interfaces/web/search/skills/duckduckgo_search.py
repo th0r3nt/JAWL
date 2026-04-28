@@ -22,8 +22,7 @@ class DuckDuckGoSearch:
                         return list(ddgs.text(query, max_results=max_results))
                 except Exception as e:
                     last_err = e
-                    # Ждем 1.5с, затем 3.0с перед повтором
-                    time.sleep(1.5 * (attempt + 1))
+                    time.sleep(1 * (attempt + 1))
             
             # Если 3 раза упало - значит IP реально улетел в шэдоу-бан на некоторое время
             raise last_err

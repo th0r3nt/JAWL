@@ -121,7 +121,7 @@ def setup_wizard_screen() -> None:
             "Выберите интерфейс, нажмите Enter и измените значение:\n",
             choices=choices,
             style=style,
-            instruction="(Стрелочки ↑/↓ для навигации)",
+            instruction="(Стрелочки ↑/↓ для навигации)\n",
         ).ask()
 
         if choice is None or choice == "exit":

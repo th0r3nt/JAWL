@@ -13,6 +13,7 @@ from src.l2_interfaces.web.search.bootstrap import setup_web_search
 from src.l2_interfaces.multimodality.bootstrap import setup_multimodality
 from src.l2_interfaces.calendar.bootstrap import setup_calendar
 from src.l2_interfaces.github.bootstrap import setup_github
+from src.l2_interfaces.web.http.bootstrap import setup_web_http
 
 # Импортируйте сюда свой кастомный интерфейс
 # from src.l2_interfaces.interface_name.bootstrap import setup_interface
@@ -140,6 +141,17 @@ def initialize_l2_interfaces(system: "System", env_vars: Dict[str, str | None]) 
         )
 
     # ================================================================
+    # WEB HTTP
+    # ================================================================
+
+    if config.web.http.enabled:
+        components.extend(setup_web_http(system))
+    else:
+        system.context_registry.register_provider(
+            "web http", make_off_provider("WEB HTTP"), ContextSection.INTERFACES
+        )
+
+    # ================================================================
     # META
     # ================================================================
 
@@ -148,7 +160,11 @@ def initialize_l2_interfaces(system: "System", env_vars: Dict[str, str | None]) 
     else:
         # Кастомный провайдер для Meta, чтобы показывать статус скиллов даже в OFF режиме
         async def meta_off_provider(**kwargs) -> str:
-            custom_status = "включены (но интерфейс отключен)" if config.meta.custom_skills_enabled else "отключены"
+            custom_status = (
+                "включены (но интерфейс отключен)"
+                if config.meta.custom_skills_enabled
+                else "отключены"
+            )
             return f"### META [OFF]\nИнтерфейс отключен.\n* Custom Skills: {custom_status}"
 
         system.context_registry.register_provider(

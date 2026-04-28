@@ -30,6 +30,7 @@ from src.l0_state.interfaces.state import (
     TelethonState,
     AiogramState,
     WebSearchState,
+    WebHTTPState,
     CalendarState,
     GithubState,
     EmailState,
@@ -140,8 +141,11 @@ class System:
         # EMAIL
         self.email_state = EmailState(recent_limit=self.interfaces_config.email.recent_limit)
 
-        # WEB
+        # WEB SEARCH
         self.web_search_state = WebSearchState(history_limit=10)
+
+        # WEB HTTP
+        self.web_http_state = WebHTTPState(history_limit=10)
 
         # CALENDAR
         self.calendar_state = CalendarState()

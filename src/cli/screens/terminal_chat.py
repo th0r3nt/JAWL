@@ -166,6 +166,7 @@ def terminal_chat_screen() -> None:
 
         if choice == "open":
             launch_in_new_window("--terminal")  # Запускаем в новом окне
+            
         elif choice == "clear_history":
             _clear_terminal_history()
 
