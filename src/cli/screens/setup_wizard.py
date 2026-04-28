@@ -64,12 +64,15 @@ def _save_yaml(data: dict) -> None:
 
 
 def _toggle_interface(data: dict, path_keys: list[str]) -> None:
-    """Инвертирует значение флага enabled по вложенному пути."""
+    """Инвертирует значение флага enabled по вложенному пути. Создает ключи, если их нет."""
     target = data
     for key in path_keys[:-1]:
+        if key not in target:
+            target[key] = {}
         target = target[key]
 
-    current_value = target[path_keys[-1]]
+    # Если самого ключа 'enabled' не было, считаем его False и инвертируем
+    current_value = target.get(path_keys[-1], False)
     target[path_keys[-1]] = not current_value
 
 
