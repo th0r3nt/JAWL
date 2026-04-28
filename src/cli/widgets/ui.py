@@ -140,10 +140,13 @@ def launch_in_new_window(arg: str) -> None:
                     subprocess.Popen([term] + args + cmd)
                     return
 
-            print_error(
-                "Не удалось найти терминал для открытия нового окна. Запускаем в текущем..."
-            )
-            subprocess.Popen(cmd)
+                print_error(
+                    "Не удалось найти графический терминал (вероятно, это сервер без GUI). Открытие в текущем окне."
+                )
+                import time
+                time.sleep(1)
+                # Используем блокирующий call вместо фонового Popen
+                subprocess.call(cmd)
 
     except Exception as e:
         print_error(f"Ошибка при открытии нового окна: {e}")

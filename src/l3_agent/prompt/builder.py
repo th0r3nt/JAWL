@@ -8,12 +8,24 @@ class PromptBuilder:
     Динамический контекст (память, время, логи) добавляется отдельно в context/builder.py.
     """
 
-    def __init__(self, prompt_dir: str | Path, drives_enabled: bool = False):
+    def __init__(
+        self,
+        prompt_dir: str | Path,
+        drives_enabled: bool = False,
+        tasks_enabled: bool = False,
+        traits_enabled: bool = False,
+        mental_states_enabled: bool = False,
+    ):
         self.prompt_dir = Path(prompt_dir)
-        # Убеждаемся, что папка для кастомных промптов существует
+
+        # Убеждаемся, что системные папки существуют
         (self.prompt_dir / "custom").mkdir(parents=True, exist_ok=True)
+        (self.prompt_dir / "system" / "optional").mkdir(parents=True, exist_ok=True)
 
         self.drives_enabled = drives_enabled
+        self.tasks_enabled = tasks_enabled
+        self.traits_enabled = traits_enabled
+        self.mental_states_enabled = mental_states_enabled
 
     def _gather_markdown(self, sub_folder: Literal["personality", "system", "custom"]) -> str:
         """
@@ -25,23 +37,32 @@ class PromptBuilder:
         if not target_dir.exists() or not target_dir.is_dir():
             return ""
 
-        valid_files =[
+        valid_files = [
             f for f in target_dir.rglob("*.md") if not f.name.endswith(".example.md")
         ]
 
-        # Исключаем DRIVES.md, если модуль выключен
+        # Фильтруем системные модули (если они выключены в настройках)
         if not self.drives_enabled:
-            valid_files =[f for f in valid_files if f.name.upper() != "DRIVES.md"]
+            valid_files = [f for f in valid_files if f.name.upper() != "DRIVES.md"]
+
+        if not self.tasks_enabled:
+            valid_files = [f for f in valid_files if f.name.upper() != "TASKS.md"]
+
+        if not self.traits_enabled:
+            valid_files = [f for f in valid_files if f.name.upper() != "PERSONALITY_TRAITS.md"]
+
+        if not self.mental_states_enabled:
+            valid_files = [f for f in valid_files if f.name.upper() != "MENTAL_STATES.md"]
 
         def sort_key(path: Path):
             name = path.name.upper()
 
-            if name in ("SOUL.md", "INSTRUCTIONS.md"):
+            if name in ("SOUL.MD", "INSTRUCTIONS.MD"):
                 return 0, name
-            
-            elif name in ("EXAMPLES_OF_STYLE.md", "FUNCTION_CALL.md"):
+
+            elif name in ("EXAMPLES_OF_STYLE.MD", "FUNCTION_CALL.MD"):
                 return 2, name
-            
+
             else:
                 return 1, name
 

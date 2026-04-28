@@ -302,7 +302,10 @@ class System:
 
         prompt_builder = PromptBuilder(
             prompt_dir=self.root_dir / "src" / "l3_agent" / "prompt",
-            drives_enabled=self.sys_cfg.sql.drives.enabled
+            drives_enabled=self.sys_cfg.sql.drives.enabled,
+            tasks_enabled=self.sys_cfg.sql.tasks.enabled,
+            traits_enabled=self.sys_cfg.sql.personality_traits.enabled,
+            mental_states_enabled=self.sys_cfg.sql.mental_states.enabled
         )
 
         # Поднимаем RAG-провайдер и регистрируем его
