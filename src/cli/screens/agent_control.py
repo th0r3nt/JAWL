@@ -164,7 +164,9 @@ def _validate_configs() -> bool:
         for err in e.errors():
             loc = " -> ".join(map(str, err.get("loc", [])))
             print_info(f"[{loc}]: {err.get('msg')}")
-
+            
+        print_info("\n 💡 Подсказка: скорее всего, вы обновили JAWL, и в конфигурации появились новые обязательные поля.")
+        print_info(" Удалите старые файлы settings.yaml и interfaces.yaml в папке config/, чтобы система пересоздала их из новых шаблонов.")
         return False
 
     except Exception as e:
