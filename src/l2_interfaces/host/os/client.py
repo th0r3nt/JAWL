@@ -2,6 +2,7 @@ import sys
 import json
 from enum import IntEnum
 from pathlib import Path
+import shutil
 
 from src.utils.logger import system_logger
 from src.utils.settings import HostOSConfig
@@ -149,6 +150,13 @@ class HostOSClient:
             raise PermissionError(
                 f"SYSTEM DENIED: Доступ к файлам конфигурации ({resolved_path.name}) запрещен."
             )
+        
+        # Защита святого Грааля (системного API песочницы)
+        if is_write and resolved_path == (self.sandbox_dir / "framework_api.py").resolve():
+            raise PermissionError(
+                "SYSTEM DENIED: Файл 'framework_api.py' является критическим системным мостом (API). Его изменение, перемещение или удаление запрещено на аппаратном уровне."
+            )
+
 
         # Сначала проверяем базовые права уровня доступа
         if self.access_level == HostOSAccessLevel.ROOT:
@@ -217,36 +225,15 @@ class HostOSClient:
                 json.dump(data, f, ensure_ascii=False, indent=4)
 
     def _ensure_sandbox_api(self):
-        """Инжектит мини-библиотеку для скриптов агента в песочницу."""
+        """Копирует библиотеку framework_api для скриптов агента в песочницу."""
 
-        api_path = self.sandbox_dir / "jawl_api.py"
-        api_code = """\
-import json
-import uuid
-import time
-from pathlib import Path
+        api_path = self.sandbox_dir / "framework_api.py"
+        template_path = self.framework_dir / "src" / "utils" / "framework_api_template.py"
 
-def send_event(message: str, payload: dict = None):
-    \"\"\"Отправляет событие главному агенту JAWL.\"\"\"
-    if payload is None:
-        payload = {}
-    events_dir = Path(__file__).parent / ".jawl_events"
-    events_dir.mkdir(parents=True, exist_ok=True)
-    
-    event_id = str(uuid.uuid4())
-    temp_path = events_dir / f"{int(time.time())}_{event_id}.tmp"
-    file_path = events_dir / f"{int(time.time())}_{event_id}.json"
-    
-    data = {"message": message, "payload": payload}
-    
-    # Атомарная запись: пишем во временный файл, затем переименовываем. 
-    # Защищает от чтения наполовину готового файла быстрым поллингом агента.
-    with open(temp_path, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False)
-        
-    temp_path.rename(file_path)
-"""
-        api_path.write_text(api_code, encoding="utf-8")
+        if template_path.exists():
+            shutil.copy2(template_path, api_path)
+        else:
+            system_logger.warning("[Host OS] Шаблон framework_api_template.py не найден!")
 
     def get_daemons_registry(self) -> dict:
         try:
@@ -278,7 +265,7 @@ def send_event(message: str, payload: dict = None):
             access_levels_desc += f"\n\n[DEPLOY SESSION ACTIVE] Активирована возможность менять код фреймворка. Попыток коммита осталось: {self.deploy_manager.retries_left}."
 
         # ===============================================
-        # Сборка открытых файлов
+        # Сборка открытых файлов (те файлы, которые агент открыл в контексте)
 
         workspace_block = ""
         if self.state.opened_workspace_files:
@@ -353,7 +340,19 @@ def send_event(message: str, payload: dict = None):
 {self.state.active_daemons}
 
 * Sandbox Directory:
-{self.state.sandbox_files}{framework_block}
+{self.state.sandbox_files}
 
-{workspace_block}{recent_changes_block}
+* Framework Directory:
+{framework_block}
+
+* Workspace:
+{workspace_block}
+
+* Recent Changes in Files:
+{recent_changes_block}
+
+[Напоминание]: Внутри sandbox/ находится файл 'framework_api.py'. 
+Этот файл позволяет взаимодействовать с пробуждениями и контекстом агента.
+Для более подробной информации рекомендуется прочитать файл.
+Удалять его не рекомендуется.
 """.strip()

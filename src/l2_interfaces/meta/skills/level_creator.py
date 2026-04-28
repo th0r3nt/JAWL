@@ -1,5 +1,7 @@
 from typing import Dict
 
+from src.utils.event.registry import Events
+
 from src.l2_interfaces.meta.client import MetaClient
 from src.l3_agent.skills.registry import SkillResult, skill
 from src.l3_agent.skills.custom import CustomSkillsRegistry
@@ -69,3 +71,24 @@ class MetaCreator:
             )
 
         return SkillResult.ok("\n".join(lines))
+
+    @skill()
+    # TODO: добавить декоратор requered_access для Meta?
+    async def set_dashboard_block(self, name: str, markdown_content: str) -> SkillResult:
+        """
+        [3/CREATOR] Вручную создает или обновляет кастомный блок в системном контексте.
+        Удобно для создания собственных "приборных панелей", чтобы информация всегда была в контексте. 
+        Например: отслеживание цен, кастомных метрик и статусов.
+        """
+        await self.client.bus.publish(
+            Events.SYSTEM_DASHBOARD_UPDATE, name=name, content=markdown_content
+        )
+        return SkillResult.ok(f"Дашборд '{name}' успешно обновлен.")
+
+    @skill()
+    async def remove_dashboard_block(self, name: str) -> SkillResult:
+        """
+        [3/CREATOR] Удаляет кастомный блок из системного контекста (полностью очищая его содержимое).
+        """
+        await self.client.bus.publish(Events.SYSTEM_DASHBOARD_UPDATE, name=name, content="")
+        return SkillResult.ok(f"Дашборд '{name}' удален.")

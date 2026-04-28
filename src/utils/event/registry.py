@@ -180,6 +180,35 @@ class Events:
     )
 
     # ============================================
+    # META
+    # ============================================
+
+    SYSTEM_DASHBOARD_UPDATE = EventConfig(
+        name="SYSTEM_DASHBOARD_UPDATE",
+        description="Обновление кастомного дашборда из песочницы или навыков.",
+        level=EventLevel.INFO,
+        requires_attention=False,  # Не нужно будить агента экстренно ради инфо-апдейта
+    )
+
+    SYSTEM_CONFIG_UPDATED = EventConfig(
+        name="SYSTEM_CONFIG_UPDATED",
+        description="Обновление конфигурации системы через Meta-интерфейс.",
+        level=EventLevel.INFO,
+        requires_attention=False,
+    )
+
+    # ============================================
+    # CALENDAR
+    # ============================================
+
+    SYSTEM_CALENDAR_ALARM = EventConfig(
+        name="SYSTEM_CALENDAR_ALARM",
+        description="Сработал таймер или регулярная задача из календаря.",  # TODO: в коде вообще используется поле description?
+        level=EventLevel.HIGH,
+        requires_attention=True,
+    )
+
+    # ============================================
     # Общие системные события
     # ============================================
 
@@ -194,20 +223,6 @@ class Events:
         name="SYSTEM_CORE_STOP",
         description="Отключение всей системы.",
         level=EventLevel.CRITICAL,
-        requires_attention=False,
-    )
-
-    SYSTEM_CALENDAR_ALARM = EventConfig(
-        name="SYSTEM_CALENDAR_ALARM",
-        description="Сработал таймер или регулярная задача из календаря.",  # TODO: в коде вообще используется поле description?
-        level=EventLevel.HIGH,
-        requires_attention=True,  # TODO: это вообще влияет на что-нибудь?
-    )
-
-    SYSTEM_CONFIG_UPDATED = EventConfig(
-        name="SYSTEM_CONFIG_UPDATED",
-        description="Обновление конфигурации системы через Meta-интерфейс.",
-        level=EventLevel.INFO,
         requires_attention=False,
     )
 

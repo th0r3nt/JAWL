@@ -63,7 +63,18 @@ class DaemonsPoller:
                 msg = data.get("message", "Событие из песочницы.")
                 payload = data.get("payload", {})
 
-                await self.bus.publish(Events.HOST_OS_SANDBOX_EVENT, message=msg, **payload)
+                # Проверяем, не является ли это скрытым системным обновлением дашборда
+                # При обновлении дашборда в пейлоаде всегда идет это маркер
+                if payload.get("_jawl_internal_type") == "dashboard_update":
+                    await self.bus.publish(
+                        Events.SYSTEM_DASHBOARD_UPDATE,
+                        name=payload.get("name"),
+                        content=payload.get("content"),
+                    )
+                else:
+                    await self.bus.publish(
+                        Events.HOST_OS_SANDBOX_EVENT, message=msg, **payload
+                    )
 
             except Exception as e:
                 system_logger.error(f"[Host OS] Ошибка чтения события из песочницы: {e}")
@@ -71,7 +82,6 @@ class DaemonsPoller:
             finally:
                 try:
                     file_path.unlink()
-
                 except Exception:
                     pass
 

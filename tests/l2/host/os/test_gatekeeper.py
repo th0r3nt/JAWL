@@ -74,3 +74,16 @@ def test_gatekeeper_env_protection(os_client):
 
     with pytest.raises(PermissionError, match="SYSTEM DENIED"):
         os_client.validate_path(dev_secret_path, is_write=True)
+
+def test_gatekeeper_framework_api_protection(os_client):
+    """Тест: защита системного файла framework_api.py от изменения агентом."""
+    os_client.access_level = HostOSAccessLevel.ROOT  # Даже рут не может его трогать
+    
+    api_path = os_client.sandbox_dir / "framework_api.py"
+    
+    # Чтение разрешено
+    assert os_client.validate_path(api_path, is_write=False) == api_path.resolve()
+    
+    # Любая запись/удаление/перемещение заблокированы
+    with pytest.raises(PermissionError, match="SYSTEM DENIED: Файл 'framework_api.py'"):
+        os_client.validate_path(api_path, is_write=True)

@@ -1,9 +1,12 @@
+import pytest
+
 from src.l0_state.interfaces.state import (
     AiogramState,
     HostOSState,
     HostTerminalState,
     WebSearchState,
     CalendarState,
+    CustomDashboardState,
 )
 
 
@@ -47,3 +50,24 @@ def test_web_search_state_mru():
 
     assert "site_C" in state.browser_history
     assert "site_A" not in state.browser_history
+
+
+@pytest.mark.asyncio
+async def test_custom_dashboard_state_formatting():
+    """Тест: CustomDashboardState корректно форматирует блоки в Markdown."""
+    state = CustomDashboardState()
+
+    # 1. Пустой стейт должен возвращать пустую строку
+    assert await state.get_context_block() == ""
+
+    # 2. Добавляем данные
+    state.blocks["Crypto"] = "BTC: $100k"
+    state.blocks["Weather"] = "Sunny, +25C"
+
+    block = await state.get_context_block()
+
+    # 3. Проверяем форматирование
+    assert "### CUSTOM: Crypto" in block
+    assert "BTC: $100k" in block
+    assert "### CUSTOM: Weather" in block
+    assert "Sunny, +25C" in block

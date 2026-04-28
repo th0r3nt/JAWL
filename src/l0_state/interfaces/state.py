@@ -226,14 +226,16 @@ class WebSearchState:
         if not self.history:
             return "История пуста."
         return "\n".join(f"- {item}" for item in self.history)
-    
+
 
 # ==================================================================
 # Web HTTP
 # ==================================================================
 
+
 class WebHTTPState:
     """Хранит состояние простых HTTP запросов агента."""
+
     def __init__(self, history_limit: int = 10):
         self.is_online = False
         self.history_limit = history_limit
@@ -265,3 +267,32 @@ class CalendarState:
     def __init__(self):
         self.is_online = False
         self.upcoming_events = "Событий нет."
+
+
+# ==================================================================
+# Custom Dashboard
+# ==================================================================
+
+
+class CustomDashboardState:
+    """
+    Хранит кастомные блоки контекста (Markdown) для агента.
+    Обновляется по событиям из песочницы или через навыки.
+    """
+
+    def __init__(self):
+        self.blocks: dict[str, str] = {}
+
+    async def get_context_block(self, **kwargs) -> str:
+        """
+        Провайдер контекста для сборщика промптов.
+        """
+        
+        if not self.blocks:
+            return ""
+
+        lines = []
+        for name, content in self.blocks.items():
+            lines.append(f"### CUSTOM: {name}\n{content}")
+
+        return "\n\n".join(lines)

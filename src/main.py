@@ -34,6 +34,7 @@ from src.l0_state.interfaces.state import (
     CalendarState,
     GithubState,
     EmailState,
+    CustomDashboardState
 )
 
 # ==========================================
@@ -149,6 +150,9 @@ class System:
 
         # CALENDAR
         self.calendar_state = CalendarState()
+
+        # CUSTOM DASHBOARD
+        self.dashboard_state = CustomDashboardState()
 
     async def setup_l1_databases(self):
         """Поднимает базы данных и регистрирует их CRUD-скиллы."""
@@ -310,6 +314,13 @@ class System:
             "rag memories", rag_memories.get_context_block, section=ContextSection.RAG_MEMORIES
         )
 
+        # Регистрируем провайдер кастомных дашбордов
+        self.context_registry.register_provider(
+            "custom_dashboard", 
+            self.dashboard_state.get_context_block, 
+            section=ContextSection.INTERFACES
+        )
+
         # Инициализируем тонкий ContextBuilder
         context_builder = ContextBuilder(
             agent_state=self.agent_state, registry=self.context_registry
@@ -402,6 +413,15 @@ class System:
                     f"[System] Рантайм-обновление контекста: {kwargs.get('total_ticks')} тиков"
                 )
 
+        def handle_dashboard_update(**kwargs):
+            name = kwargs.get("name")
+            content = kwargs.get("content")
+            if name:
+                if content:
+                    self.dashboard_state.blocks[name] = content
+                else:
+                    self.dashboard_state.blocks.pop(name, None)
+
         # Если агент решил совершить сэппуку
         def handle_shutdown(**kwargs):
             self._exit_code = 0
@@ -418,6 +438,8 @@ class System:
         self.event_bus.subscribe(Events.SYSTEM_REBOOT_REQUESTED, handle_reboot)
 
         self.event_bus.subscribe(Events.SYSTEM_CONFIG_UPDATED, handle_config_update)
+
+        self.event_bus.subscribe(Events.SYSTEM_DASHBOARD_UPDATE, handle_dashboard_update)
 
     # ===========================================
     # RUN & STOP
