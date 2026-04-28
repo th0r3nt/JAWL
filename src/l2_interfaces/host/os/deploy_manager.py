@@ -4,6 +4,8 @@ import shutil
 import asyncio
 from pathlib import Path
 
+from src import __version__
+
 from src.utils.logger import system_logger
 
 
@@ -36,7 +38,7 @@ class HostOSDeployManager:
         if not self.manifest_file.exists():
             self.manifest_file.touch()
 
-        system_logger.info("[Deploy] Деплой-сессия успешно инициализирована.")
+        system_logger.info(f"[Deploy] Деплой-сессия успешно инициализирована (JAWL v{__version__}).")
         return (
             True,
             f"Деплой-сессия начата. У вас есть {self.max_retries} попытки на прохождение тестов при коммите.",

@@ -5,6 +5,8 @@ import urllib.parse
 import urllib.request
 from typing import Any, Optional, Union, Literal
 
+from src.__init__ import __version__
+
 from src.utils.logger import system_logger
 from src.utils.settings import GithubConfig
 from src.l0_state.interfaces.state import GithubState
@@ -35,7 +37,7 @@ class GithubClient:
         self.token = token
 
         self.api_base = "https://api.github.com"
-        self.user_agent = "jawl-agent/1.0"
+        self.user_agent = f"JAWL-Agent/{__version__}"
 
     async def start(self) -> None:
         """

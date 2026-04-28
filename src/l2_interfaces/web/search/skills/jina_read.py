@@ -2,6 +2,8 @@ import asyncio
 import urllib.request
 import urllib.error
 
+from src import __version__
+
 from src.utils.logger import system_logger
 from src.utils._tools import truncate_text
 from src.l2_interfaces.web.search.client import WebSearchClient
@@ -16,7 +18,7 @@ class JinaReader:
         def _fetch():
             req_url = f"https://r.jina.ai/{url}"
             req = urllib.request.Request(req_url)
-            req.add_header("User-Agent", "JAWL-Agent/1.0")
+            req.add_header("User-Agent", f"JAWL-Agent/{__version__}")
 
             with urllib.request.urlopen(req, timeout=self.client.timeout) as response:
                 return response.read().decode("utf-8", errors="replace")

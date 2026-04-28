@@ -6,6 +6,8 @@ import urllib.request
 import urllib.error
 import psutil
 
+from src import __version__
+
 from src.utils.logger import system_logger
 from src.utils._tools import truncate_text
 
@@ -123,7 +125,7 @@ class HostOSNetwork:
             return SkillResult.fail(scheme_error)
 
         def _make_request():
-            req_headers = headers or {"User-Agent": "JAWL-Agent/1.0"}
+            req_headers = headers or {"User-Agent": f"JAWL-Agent/{__version__}"}
             req = urllib.request.Request(url, method=method.upper(), headers=req_headers)
 
             try:
@@ -217,7 +219,7 @@ class HostOSNetwork:
             safe_path = self.host_os.validate_path(dest_filename, is_write=True)
 
             def _download():
-                req = urllib.request.Request(url, headers={"User-Agent": "JAWL-Agent/1.0"})
+                req = urllib.request.Request(url, headers={"User-Agent": f"JAWL-Agent/{__version__}"})
                 with urllib.request.urlopen(req, timeout=30) as response, open(
                     safe_path, "wb"
                 ) as out_file:

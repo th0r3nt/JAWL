@@ -14,6 +14,8 @@ from pathlib import Path
 import json
 import uuid
 
+from src import __version__
+
 
 def is_venv() -> bool:
     """Проверяет, запущен ли скрипт внутри виртуального окружения."""
@@ -181,8 +183,13 @@ def setup_and_run() -> None:
     # Если всё импортировалось успешно - проверяем флаги
     if "--logs" in sys.argv:
         logs_screen()
+
     elif "--terminal" in sys.argv:
         _open_terminal_chat()
+
+    elif "--version" in sys.argv:
+        print(f"JAWL Framework v{__version__}")
+        sys.exit(0)
     else:
         main_menu()
 

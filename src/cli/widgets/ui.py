@@ -13,6 +13,8 @@ from rich.text import Text
 from rich.align import Align
 import questionary
 
+from src.__init__ import __version__
+
 console = Console()
 
 LOGO = "\n".join(
@@ -119,7 +121,7 @@ def clear_screen() -> None:
     os.system("cls" if os.name == "nt" else "clear")
 
 
-def draw_header(version: str = "v0.9.1") -> None:
+def draw_header(version: str = __version__) -> None:
     """Очищает экран и отрисовывает главный логотип JAWL со статусом агента."""
     clear_screen()
 

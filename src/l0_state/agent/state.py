@@ -3,6 +3,8 @@ from enum import Enum
 from pydantic import BaseModel, Field
 from src.utils.dtime import seconds_to_duration_str
 
+from src import __version__
+
 
 class AgentStatus(str, Enum):
     IDLE = "idle"  # Ждет следующего тика
@@ -30,7 +32,7 @@ class AgentState(BaseModel):
     # Системные лимиты
     continuous_cycle: bool = False
     proactive_guidance: bool = False
-    
+
     context_ticks: int = 15
     context_detailed_ticks: int = 3
 
@@ -62,12 +64,16 @@ class AgentState(BaseModel):
     async def get_context_block(self, **kwargs) -> str:
         return f"""
 ### AGENT STATE
+* JAWL Version: {__version__}
+* Uptime: {self.get_uptime()}
+
 * Heartbeat Interval: {self.heartbeat_interval}s
 * Continuous Cycle: {self.continuous_cycle}
 * Context Depth: {self.context_ticks} recent ticks (Detailed: {self.context_detailed_ticks})
+
 * LLM Model: {self.llm_model}
 * Temperature: {self.temperature}
-* Uptime: {self.get_uptime()}
+
 * ReAct Step: {self.current_step}/{self.max_react_steps}
 * Input Tokens (current step): {self.last_input_tokens}
         """.strip()

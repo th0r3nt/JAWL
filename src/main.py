@@ -17,6 +17,8 @@ from src.utils.event.registry import Events
 from src.utils.settings import load_config, SettingsConfig, InterfacesConfig
 from src.utils.token_tracker import TokenTracker
 
+from src import __version__
+
 # ==========================================
 # L0 State
 # ==========================================
@@ -64,7 +66,6 @@ from src.l3_agent.heartbeat import Heartbeat
 
 from src.l3_agent.skills.registry import register_instance, clear_registry
 from src.l3_agent.skills.schema import ACTION_SCHEMA
-
 
 class System:
     """
@@ -442,7 +443,7 @@ class System:
         pid_file.parent.mkdir(parents=True, exist_ok=True)
         pid_file.write_text(str(os.getpid()))
 
-        system_logger.info(f"[System] Инициализация JAWL (PID: {os.getpid()}).")
+        system_logger.info(f"[System] Инициализация JAWL v{__version__} (PID: {os.getpid()}).")
 
         # Инициализация слоев
         try:
