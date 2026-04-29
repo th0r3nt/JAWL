@@ -6,7 +6,6 @@ from src.l2_interfaces.host.os.client import HostOSAccessLevel
 def require_access(level: HostOSAccessLevel):
     """
     Guard-декоратор для проверки уровня доступа к ОС.
-    Применяется к МЕТОДАМ классов, у которых есть атрибут self.host_os (HostOSClient).
     """
 
     def decorator(func):
@@ -14,9 +13,7 @@ def require_access(level: HostOSAccessLevel):
         async def wrapper(self, *args, **kwargs):
             client = getattr(self, "host_os", None)
             if not client:
-                return SkillResult.fail(
-                    "Внутренняя ошибка Guard: не найден HostOSClient для проверки прав."
-                )
+                return SkillResult.fail("[Guard] Внутренняя ошибка: не найден HostOSClient.")
 
             if client.access_level < level:
                 return SkillResult.fail(
@@ -25,6 +22,8 @@ def require_access(level: HostOSAccessLevel):
                 )
             return await func(self, *args, **kwargs)
 
+        # Сохраняем требуемый уровень доступа для динамической фильтрации в системном промпте
+        wrapper.__required_os_level__ = level.value
         return wrapper
 
     return decorator

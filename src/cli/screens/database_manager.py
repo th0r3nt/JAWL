@@ -16,6 +16,7 @@ from src.cli.widgets.ui import (
     print_success,
     wait_for_enter,
     clear_screen,
+    set_window_title,
 )
 from src.cli.screens.agent_control import _is_agent_running
 
@@ -573,6 +574,12 @@ def _manage_vector_collection(collection_name: str):
 
 
 def database_manager_screen() -> None:
+    """
+    Открывает окно управления базами данных.
+    """
+
+    set_window_title("JAWL - Управление базами данных")
+
     if _is_agent_running():
         print_error("Ошибка: Нельзя управлять базами данных во время работы агента.")
         print_info("Остановите агента в главном меню (чтобы избежать SQLite Locks).")

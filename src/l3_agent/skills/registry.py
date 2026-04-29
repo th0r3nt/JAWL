@@ -24,27 +24,17 @@ class SkillResult:
         return cls(is_success=False, message=message)
 
 
-# Храним не просто функцию, а словарь: func и Pydantic-модель (Guard)
+# Храним функцию, инстанс, Pydantic-схему и строку докстринга
 _REGISTRY: Dict[str, Dict[str, Any]] = {}
-_SKILL_DOCS: list[str] = []
-_CUSTOM_SKILL_DOCS: list[str] = []
 
 
 def clear_registry():
     _REGISTRY.clear()
-    _SKILL_DOCS.clear()
-    _CUSTOM_SKILL_DOCS.clear()
 
 
 def unregister_skill(skill_name: str):
-    global _SKILL_DOCS, _CUSTOM_SKILL_DOCS
     if skill_name in _REGISTRY:
         del _REGISTRY[skill_name]
-
-    _SKILL_DOCS = [doc for doc in _SKILL_DOCS if not doc.startswith(f"`{skill_name}(")]
-    _CUSTOM_SKILL_DOCS = [
-        doc for doc in _CUSTOM_SKILL_DOCS if not doc.startswith(f"`{skill_name}(")
-    ]
 
 
 def _build_skill_name(
@@ -57,15 +47,22 @@ def _build_skill_name(
         return f"{instance.__class__.__name__}.{func.__name__}"
 
     segments = func.__module__.split(".")
+
+    # Очищаем ненужные пути, оставляя только 'Класс.имя_функции'
     useless = {"src", "l0_state", "l1_databases", "l2_interfaces", "skills", "l3_agent"}
     clean_segments = [s for s in segments if s not in useless]
+
     return ".".join(clean_segments) + f".{func.__name__}"
 
 
 def _create_pydantic_guard(func: Callable, skill_name: str) -> type[BaseModel]:
-    """Динамически генерирует Pydantic схему на основе сигнатуры функции."""
+    """
+    Динамически генерирует Pydantic схему на основе сигнатуры функции.
+    """
+
     sig = inspect.signature(func)
     fields = {}
+
     for name, param in sig.parameters.items():
         if name == "self":
             continue
@@ -74,7 +71,6 @@ def _create_pydantic_guard(func: Callable, skill_name: str) -> type[BaseModel]:
             param.annotation if param.annotation is not inspect.Parameter.empty else Any
         )
         default = param.default if param.default is not inspect.Parameter.empty else ...
-
         fields[name] = (annotation, default)
 
     safe_name = skill_name.replace(".", "_") + "_Guard"
@@ -103,18 +99,20 @@ def _register_callable(
     raw_doc = inspect.getdoc(func) or "Без описания."
     clean_doc = " ".join(raw_doc.split())
 
-    _SKILL_DOCS.append(f"`{skill_name}{clean_sig}` - {clean_doc}")
+    doc_str = f"`{skill_name}{clean_sig}` - {clean_doc}"
 
-    # Генерируем Guard
-    guard_model = _create_pydantic_guard(func, skill_name)
-    _REGISTRY[skill_name] = {"func": func, "guard": guard_model}
-
+    _REGISTRY[skill_name] = {
+        "func": func,
+        "guard": _create_pydantic_guard(func, skill_name),
+        "instance": instance,
+        "doc_string": doc_str,
+        "is_custom": False,
+    }
     system_logger.info(f"[Skills] Зарегистрирован скилл: {skill_name}")
 
 
 def register_custom_callable(func: Callable, skill_name: str, description: str, filepath: str):
     sig = inspect.signature(func)
-
     formatted_params = []
     for name, param in sig.parameters.items():
         param_str = f"{name}: {param.annotation.__name__ if hasattr(param.annotation, '__name__') else param.annotation}"
@@ -124,13 +122,15 @@ def register_custom_callable(func: Callable, skill_name: str, description: str, 
 
     clean_sig = f"({', '.join(formatted_params)})"
     clean_doc = " ".join(description.split())
-
     doc_str = f"`{skill_name}{clean_sig}` - {clean_doc} [Файл: {filepath}]"
-    _CUSTOM_SKILL_DOCS.append(doc_str)
 
-    guard_model = _create_pydantic_guard(func, skill_name)
-    _REGISTRY[skill_name] = {"func": func, "guard": guard_model}
-
+    _REGISTRY[skill_name] = {
+        "func": func,
+        "guard": _create_pydantic_guard(func, skill_name),
+        "instance": None,
+        "doc_string": doc_str,
+        "is_custom": True,
+    }
     system_logger.info(f"[Skills] Зарегистрирован кастомный скилл: {skill_name}")
 
 
@@ -144,7 +144,6 @@ def skill(name_override: Optional[str] = None) -> Callable[[F], F]:
             setattr(func, "__is_skill__", True)
             setattr(func, "__skill_name_override__", name_override)
             return func
-
         _register_callable(func, name_override)
         return func
 
@@ -160,9 +159,47 @@ def register_instance(instance: Any):
 
 
 def get_skills_library() -> str:
-    base = "\n".join(_SKILL_DOCS)
-    if _CUSTOM_SKILL_DOCS:
-        base += "\n\n### CUSTOM SKILLS\n" + "\n".join(_CUSTOM_SKILL_DOCS)
+    """Собирает Markdown с документацией навыков. Скрывает недоступные навыки."""
+    active_docs = []
+    custom_docs = []
+
+    # Сортируем ключи, чтобы скиллы шли по алфавиту (и группировались по классам)
+    for skill_name in sorted(_REGISTRY.keys()):
+        data = _REGISTRY[skill_name]
+
+        if data.get("is_custom"):
+            custom_docs.append(data["doc_string"])
+            continue
+
+        func = data["func"]
+        instance = data["instance"]
+        doc = data["doc_string"]
+
+        # Динамическая фильтрация по правам доступа к ОС (Access Level)
+        req_level = getattr(func, "__required_os_level__", None)
+        if req_level is not None and instance is not None:
+            host_os = getattr(instance, "host_os", None)
+            if host_os is not None and host_os.access_level.value < req_level:
+                continue  # Скрываем скилл из промпта агента
+
+        active_docs.append(doc)
+
+    # Форматируем с пустыми строками между разными классами (для читаемости)
+    formatted_docs = []
+    last_prefix = ""
+    for doc in active_docs:
+        skill_name_match = doc.split("(", 1)[0].replace("`", "")
+        prefix = skill_name_match.split(".")[0] if "." in skill_name_match else ""
+
+        if last_prefix and prefix != last_prefix:
+            formatted_docs.append("")
+
+        formatted_docs.append(doc)
+        last_prefix = prefix
+
+    base = "\n".join(formatted_docs)
+    if custom_docs:
+        base += "\n\n### CUSTOM SKILLS\n" + "\n".join(custom_docs)
     return base
 
 
@@ -174,20 +211,16 @@ async def execute_skill(actions: list[ActionCall]) -> str:
     for act in actions:
         name = act.tool_name
         params = act.parameters
-
         params_str = truncate_text(
             str(params), max_chars=250, suffix="... [Параметры обрезаны]"
         )
-
         system_logger.info(f"[Agent Action] {name}({params_str})")
         tasks.append(call_skill(name, params))
 
     results = await asyncio.gather(*tasks)
-
-    report = []
-    for i, res in enumerate(results):
-        report.append(f"\n* Action [{actions[i].tool_name}]: {res.message}")
-
+    report = [
+        f"\n* Action [{actions[i].tool_name}]: {res.message}" for i, res in enumerate(results)
+    ]
     return "\n".join(report)
 
 
@@ -201,31 +234,21 @@ async def call_skill(name: str, params: dict) -> SkillResult:
     func = item["func"]
     guard_model = item["guard"]
 
-    # Pydantic Guard Layer: валидация и авто-каст типов
     try:
         validated_params = guard_model(**params)
         clean_kwargs = validated_params.model_dump()
-
     except ValidationError as e:
-        errors = []
-
-        for err in e.errors():
-            loc = ".".join(map(str, err["loc"]))
-            errors.append(f"- Аргумент '{loc}': {err['msg']}")
-
-        err_msg = (
-            "Ошибка валидации параметров:\n"
-            + "\n".join(errors)
-            + "\nРекомендуется исправить типы данных и вызвать функцию снова."
-        )
-
+        errors = [
+            f"- Аргумент '{err['loc'][0] if err['loc'] else 'unknown'}': {err['msg']}"
+            for err in e.errors()
+        ]
+        err_msg = "Ошибка валидации параметров:\n" + "\n".join(errors)
         system_logger.warning(f"[Guard] Отклонен вызов {name}: Ошибка типов.")
         return SkillResult.fail(err_msg)
 
     # Выполнение бизнес-логики
     try:
         result = await func(**clean_kwargs)
-
         res_msg = truncate_text(
             str(result.message), max_chars=500, suffix="... [Результат обрезан для логов]"
         )
@@ -233,7 +256,6 @@ async def call_skill(name: str, params: dict) -> SkillResult:
         system_logger.info(f"[Agent Action Result] {name} ({status}): {res_msg}")
 
         return result
-    
     except Exception as e:
         system_logger.info(f"[Agent Action Result] Ошибка в скилле {name}: {str(e)}")
         return SkillResult.fail(f"Внутренняя ошибка навыка: {str(e)}")

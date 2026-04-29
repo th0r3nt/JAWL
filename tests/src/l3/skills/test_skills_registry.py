@@ -17,18 +17,13 @@ from src.l3_agent.skills.registry import (
 @pytest.fixture(autouse=True)
 def clean_registry():
     original_registry = registry._REGISTRY.copy()
-    original_docs = registry._SKILL_DOCS.copy()
 
     registry._REGISTRY.clear()
-    registry._SKILL_DOCS.clear()
 
     yield
 
-    # Возвращаем всё как было
     registry._REGISTRY.clear()
-    registry._SKILL_DOCS.clear()
     registry._REGISTRY.update(original_registry)
-    registry._SKILL_DOCS.extend(original_docs)
 
 
 class DummyInterface:

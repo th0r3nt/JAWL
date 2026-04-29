@@ -276,7 +276,7 @@ class HostOSExecution:
 
             kwargs = {}
             if sys.platform == "win32":
-                kwargs["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP | 0x00000008
+                kwargs["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP | 0x08000000
             else:
                 kwargs["start_new_session"] = True
 

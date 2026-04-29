@@ -35,13 +35,20 @@ PID_FILE = ROOT_DIR / "src" / "utils" / "local" / "data" / "agent.pid"
 SETTINGS_FILE = ROOT_DIR / "config" / "settings.yaml"
 
 
+def set_window_title(title: str) -> None:
+    """Изменяет заголовок окна консоли/терминала (кроссплатформенно)."""
+    if os.name == "nt":
+        import ctypes
+
+        ctypes.windll.kernel32.SetConsoleTitleW(title)
+        
+    else:
+        sys.stdout.write(f"\033]0;{title}\007")
+        sys.stdout.flush()
+
+
 def _get_agent_status() -> dict:
-    """
-    Легковесно собирает статус агента (без IPC, напрямую из ОС и конфигов).
-    """
-
     status = {"is_running": is_agent_running(), "model": "unknown", "interval": 0}
-
     if SETTINGS_FILE.exists():
         try:
             with open(SETTINGS_FILE, "r", encoding="utf-8") as f:
@@ -50,17 +57,11 @@ def _get_agent_status() -> dict:
                 status["interval"] = config.get("system", {}).get("heartbeat_interval", 0)
         except Exception:
             pass
-
     return status
 
 
 def _build_header_panel(version: str) -> Panel:
-    """
-    Собирает Rich Panel для шапки системы.
-    """
-
     status = _get_agent_status()
-
     logo_text = Text(LOGO, style="bold cyan")
     subtitle_text = Text("Just A While Loop", style="bold cyan")
     version_text = Text(f"{version}\n", style="dim cyan")
@@ -85,15 +86,10 @@ def _build_header_panel(version: str) -> Panel:
         Align.center(version_text),
         Align.center(status_text),
     )
-
     return Panel(content, border_style="cyan", expand=False)
 
 
 def get_header_ansi(version: str = __version__) -> str:
-    """
-    Генерирует заголовок и возвращает его в виде ANSI строки (для prompt_toolkit).
-    """
-
     panel = _build_header_panel(version)
     term_width = shutil.get_terminal_size().columns
     str_console = Console(file=io.StringIO(), force_terminal=True, width=term_width)
@@ -102,19 +98,11 @@ def get_header_ansi(version: str = __version__) -> str:
 
 
 def draw_header(version: str = __version__) -> None:
-    """
-    Очищает экран и отрисовывает главный логотип JAWL со статусом агента.
-    """
-
     clear_screen()
     console.print(_build_header_panel(version))
 
 
 def launch_in_new_window(arg: str) -> None:
-    """
-    Запускает jawl.py с определенным аргументом в новом окне ОС терминала.
-    """
-
     script_path = ROOT_DIR / "jawl.py"
     cmd = [sys.executable, str(script_path), arg]
     system = platform.system()
@@ -139,24 +127,18 @@ def launch_in_new_window(arg: str) -> None:
                 if shutil.which(term):
                     subprocess.Popen([term] + args + cmd)
                     return
+                
+            print_error("Не удалось найти графический терминал. Открытие в текущем окне.")
+            import time
 
-                print_error(
-                    "Не удалось найти графический терминал (вероятно, это сервер без GUI). Открытие в текущем окне."
-                )
-                import time
-                time.sleep(1)
-                # Используем блокирующий call вместо фонового Popen
-                subprocess.call(cmd)
+            time.sleep(1)
+            subprocess.call(cmd)
 
     except Exception as e:
         print_error(f"Ошибка при открытии нового окна: {e}")
 
 
 def flush_input() -> None:
-    """
-    Кроссплатформенная очистка буфера ввода (stdin).
-    """
-
     try:
         if os.name == "nt":
             import msvcrt
@@ -172,7 +154,6 @@ def flush_input() -> None:
 
 
 def clear_screen() -> None:
-    """Очистка консоли под любую ОС."""
     os.system("cls" if os.name == "nt" else "clear")
 
 

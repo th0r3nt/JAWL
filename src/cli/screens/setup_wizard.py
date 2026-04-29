@@ -9,7 +9,7 @@ from dotenv import dotenv_values
 import questionary
 from ruamel.yaml import YAML
 
-from src.cli.widgets.ui import console, draw_header, get_custom_style, print_error, print_info
+from src.cli.widgets.ui import console, draw_header, get_custom_style, print_error, print_info, set_window_title
 
 ROOT_DIR = Path(__file__).resolve().parent.parent.parent.parent
 CONFIG_FILE = ROOT_DIR / "config" / "interfaces.yaml"
@@ -77,7 +77,12 @@ def _toggle_interface(data: dict, path_keys: list[str]) -> None:
 
 
 def setup_wizard_screen() -> None:
-    """Главный цикл экрана Мастера настройки."""
+    """
+    Главный цикл экрана Мастера настройки.
+    """
+
+    set_window_title("JAWL - Мастер настройки")
+
     if not _ensure_config_exists():
         console.print("\n[dim]Нажмите Enter для возврата.[/dim]")
         input()

@@ -61,10 +61,11 @@ class MetaClient:
         """
 
         access_levels_desc = (
-            "  - 0/SAFE: Базовые настройки.\n"
-            "  - 1/CONFIGURATOR: Управление памятью и продвинутые настройки конфигурации.\n"
-            "  - 2/ARCHITECT: Управление системой и интерфейсами.\n"
-            "  - 3/CREATOR: Регистрация кастомных скриптов как нативных навыков."
+            "Существующие уровни доступа: \n"
+            "- 0/SAFE: Базовые настройки.\n"
+            "- 1/CONFIGURATOR: Управление памятью и продвинутые настройки конфигурации.\n"
+            "- 2/ARCHITECT: Управление системой и интерфейсами.\n"
+            "- 3/CREATOR: Регистрация кастомных скриптов как нативных навыков."
         )
 
         models_str = (
@@ -77,7 +78,7 @@ class MetaClient:
 
         return (
             f"### META [ON]\n"
-            f"* Access Level: {self.access_level} / 3\n{access_levels_desc}\n"
+            f"* Access Level: {self.access_level} (текущий уровень) \n{access_levels_desc}\n"
             f"* Custom Skills: {custom_status}\n"
             f"* Available LLM models: [{models_str}]"
         )

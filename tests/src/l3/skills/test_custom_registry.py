@@ -27,20 +27,20 @@ def test_custom_registry_register_and_unregister(custom_registry):
     assert "Custom.test_skill" in registry._REGISTRY
 
     # Проверяем метапрограммирование сигнатуры
-    func = registry._REGISTRY["Custom.test_skill"]["func"]
-    
+    skill_data = registry._REGISTRY["Custom.test_skill"]
+    func = skill_data["func"]
+
     sig = inspect.signature(func)
     assert "arg1" in sig.parameters
 
-    # Проверяем документацию
-    assert any("Custom.test_skill" in doc for doc in registry._CUSTOM_SKILL_DOCS)
-    assert any("Тестовый навык" in doc for doc in registry._CUSTOM_SKILL_DOCS)
+    # Проверяем документацию внутри _REGISTRY
+    assert "Custom.test_skill" in skill_data["doc_string"]
+    assert "Тестовый навык" in skill_data["doc_string"]
 
     # 2. Удаление
     success_del, _ = custom_registry.unregister_skill("Custom.test_skill")
     assert success_del is True
     assert "Custom.test_skill" not in registry._REGISTRY
-    assert not any("Custom.test_skill" in doc for doc in registry._CUSTOM_SKILL_DOCS)
 
 
 def test_custom_registry_load_persistence(custom_registry):

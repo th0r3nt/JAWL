@@ -1,4 +1,5 @@
 import uuid
+import ast
 from datetime import datetime
 from typing import Optional, TYPE_CHECKING, Any, Literal
 from sqlalchemy import select, delete, func
@@ -11,7 +12,6 @@ from src.l1_databases.sql.tables import TaskTable
 if TYPE_CHECKING:
     from src.l1_databases.sql.db import SQLDB
 
-# Тэги, которые агент может использовать для ведения своих рабочих заметок/задач
 ALLOWED_TAGS = [
     "priority:critical",
     "priority:high",
@@ -48,7 +48,21 @@ class SQLTasks:
         if not tags:
             return True, "", []
 
-        clean_tags = [str(t) for t in tags]
+        # Защита от галлюцинаций LLM (когда она присылает строку "[tag1, tag2]")
+        if isinstance(tags, str):
+            tags = tags.strip()
+            if tags.startswith("[") and tags.endswith("]"):
+                try:
+                    tags = ast.literal_eval(tags)
+                except Exception:
+                    tags = [t.strip().strip("'\"") for t in tags[1:-1].split(",")]
+            else:
+                tags = [tags]
+
+        if not isinstance(tags, list):
+            return False, "Ошибка: Теги должны быть массивом (списком) строк.", []
+
+        clean_tags = [str(t).strip() for t in tags if str(t).strip()]
         for tag in clean_tags:
             if tag not in ALLOWED_TAGS:
                 return (
@@ -68,16 +82,7 @@ class SQLTasks:
         subtasks: Optional[list[dict[str, Any]]] = None,
         due_date_str: Optional[str] = None,
     ) -> SkillResult:
-        """
-        Создает новую задачу.
-        - tags: Массив разрешенных тегов (см. контекст).
-        - dependencies: Массив ID задач, которые нужно выполнить до этой.
-        - subtasks: Массив словарей [{"title": "сделать X", "is_done": false}].
-        - due_date_str: Дедлайн в формате 'YYYY-MM-DD HH:MM'.
-        """
-
         task_id = str(uuid.uuid4())[:8]
-
         if tags is None:
             tags = []
 
@@ -141,11 +146,6 @@ class SQLTasks:
         due_date_str: Optional[str] = None,
         context: Optional[str] = None,
     ) -> SkillResult:
-        """
-        Обновляет поля задачи. Передавай только те аргументы, которые нужно изменить.
-        Внимание: для обновления subtasks нужно передать весь обновленный массив subtasks.
-        """
-
         if status and status not in STATUS_EMOJIS.keys():
             return SkillResult.fail(
                 f"Недопустимый статус. Варианты: {', '.join(STATUS_EMOJIS.keys())}"
@@ -197,10 +197,9 @@ class SQLTasks:
                     tz = get_timezone(self.tz_offset)
                     dt = datetime.strptime(due_date_str, "%Y-%m-%d %H:%M").replace(tzinfo=tz)
                     task.due_date = dt.timestamp()
+
                 except ValueError:
-                    return SkillResult.fail(
-                        "Ошибка: Неверный формат due_date_str. Используйте 'YYYY-MM-DD HH:MM'."
-                    )
+                    return SkillResult.fail("Ошибка: Неверный формат due_date_str.")
 
             await session.commit()
 
@@ -210,12 +209,9 @@ class SQLTasks:
 
     @skill()
     async def delete_task(self, task_id: str) -> SkillResult:
-        """Полностью удаляет задачу из БД."""
-
         async with self.db.session_factory() as session:
             result = await session.execute(delete(TaskTable).where(TaskTable.id == task_id))
             await session.commit()
-
             if result.rowcount == 0:
                 return SkillResult.fail(f"Задача с ID {task_id} не найдена.")
 
@@ -224,8 +220,6 @@ class SQLTasks:
         return SkillResult.ok(msg)
 
     async def get_context_block(self, **kwargs) -> str:
-        """Провайдер контекста для ContextRegistry."""
-
         async with self.db.session_factory() as session:
             result = await session.execute(select(TaskTable))
             tasks = result.scalars().all()
@@ -233,9 +227,7 @@ class SQLTasks:
         if not tasks:
             return f"## TASKS\nMax tasks allowed: {self.max_tasks}\nAllowed tags: {', '.join(ALLOWED_TAGS)}\n\nСписок задач пуст."
 
-        # Собираем статусы всех задач для проверки зависимостей
         task_statuses = {t.id: t.status for t in tasks}
-
         lines = [
             "## TASKS",
             f"Max tasks allowed: {self.max_tasks}",
@@ -251,7 +243,6 @@ class SQLTasks:
 
             tags_str = f"[{', '.join(t.tags)}]" if t.tags else "None"
             lines.append(f"* Tags: {tags_str}")
-
             deadline = (
                 format_timestamp(t.due_date, self.tz_offset, "%Y-%m-%d %H:%M")
                 if t.due_date
@@ -259,32 +250,32 @@ class SQLTasks:
             )
             lines.append(f"* Deadline: {deadline}")
 
-            # Проверка зависимостей
             if not t.dependencies:
                 lines.append("* Dependencies: None")
+
             else:
                 deps_info = []
+
                 for dep_id in t.dependencies:
                     d_stat = task_statuses.get(dep_id, "unknown")
                     if d_stat not in ("done", "cancelled", "unknown"):
-                        deps_info.append(
-                            f"`{dep_id}` (⛔ Блокирует выполнение. Сперва необходимо завершить её)"
-                        )
+                        deps_info.append(f"`{dep_id}` (⛔ Блокирует)")
                     else:
                         deps_info.append(f"`{dep_id}` (✓ {d_stat})")
+
                 lines.append(f"* Dependencies: {', '.join(deps_info)}")
 
-            # Сабтаски
             if not t.subtasks:
                 lines.append("* Subtasks: None")
+
             else:
                 lines.append("* Subtasks:")
+
                 for sub in t.subtasks:
                     mark = "x" if sub.get("is_done") else " "
-                    sub_title = sub.get("title", "unknown")
-                    lines.append(f"  [{mark}] {sub_title}")
+                    lines.append(f"  [{mark}] {sub.get('title', 'unknown')}")
 
             lines.append(f"* Context: {t.context if t.context else 'Пусто'}")
-            lines.append("")  # Разделитель
+            lines.append("")
 
         return "\n".join(lines).strip()

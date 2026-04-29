@@ -6,6 +6,7 @@ import subprocess
 from pathlib import Path
 import psutil
 import asyncio
+import tempfile
 from telethon import TelegramClient
 from dotenv import dotenv_values
 import questionary
@@ -279,25 +280,21 @@ def start_agent_screen() -> None:
 
     # Если это чистый первый старт - тормозим процесс и даем юзеру время
     if configs_created or prompts_created or env_modified:
-        print("\n") # Разделитель
+        print("\n")  # Разделитель
         print_info(" [Первичная инициализация завершена]")
-        print("\n") # Разделитель
+        print("\n")  # Разделитель
 
-        print_info(
-            " Были созданы базовые файлы конфигурации."
-        )
-        
+        print_info(" Были созданы базовые файлы конфигурации.")
+
         print_info(
             " Обязательно зайдите в config/interfaces.yaml и настройте под себя возможности агента."
         )
-        print_info(
-            " По умолчанию большинство интерфейсов отключено в целях безопасности."
-        )
+        print_info(" По умолчанию большинство интерфейсов отключено в целях безопасности.")
         print_info(
             " Также проверьте config/settings.yaml для настройки параметров модели, БД и лимитов."
         )
 
-        print("\n") # Разделитель
+        print("\n")  # Разделитель
 
         print_info(" Были созданы файлы личности агента и/или .env.")
 
@@ -330,42 +327,44 @@ def start_agent_screen() -> None:
         kwargs["start_new_session"] = True
 
     try:
-        # Создаем файл для перехвата критических ошибок уровня Python (Traceback)
-        crash_log_path = ROOT_DIR / "logs" / "startup_error.log"
-        crash_log_path.parent.mkdir(parents=True, exist_ok=True)
+        # Умный перехват ошибок: пишем stderr во временный файл
+        temp_err = tempfile.NamedTemporaryFile(delete=False, suffix=".log")
 
-        with open(crash_log_path, "w", encoding="utf-8") as err_file:
-            process = subprocess.Popen(
-                [sys.executable, str(MAIN_SCRIPT)],
-                stdout=subprocess.DEVNULL,
-                stderr=err_file,  # Перенаправляем stderr в файл, а не в DEVNULL
-                cwd=str(ROOT_DIR),
-                env=env,
-                **kwargs,
-            )
+        process = subprocess.Popen(
+            [sys.executable, str(MAIN_SCRIPT)],
+            stdout=subprocess.DEVNULL,
+            stderr=temp_err,
+            cwd=str(ROOT_DIR),
+            env=env,
+            **kwargs,
+        )
 
         PID_FILE.write_text(str(process.pid))
-
-        # Увеличиваем Health Check, чтобы дать время на запуск тяжелых БД при старте
         time.sleep(5)
 
         if process.poll() is not None:
-            # Процесс умер
             if PID_FILE.exists():
                 PID_FILE.unlink()
-
             print_error("Агент завершился с ошибкой сразу после старта.")
 
-            # Читаем и выводим реальную причину падения
-            if crash_log_path.exists():
-                error_output = crash_log_path.read_text(encoding="utf-8").strip()
-                if error_output:
-                    print_info("Детали критической ошибки (Traceback):")
-                    print(f"\n{error_output}\n")
-                else:
-                    print_info(
-                        " Проверьте основной лог (logs/system.log) для получения деталей."
-                    )
+            temp_err.close()
+            with open(temp_err.name, "r", encoding="utf-8", errors="replace") as f:
+                error_output = f.read().strip()
+
+            try:
+                os.unlink(temp_err.name)
+            except Exception:
+                pass
+
+            if error_output:
+                crash_log_path = ROOT_DIR / "logs" / "startup_error.log"
+                crash_log_path.parent.mkdir(parents=True, exist_ok=True)
+                crash_log_path.write_text(error_output, encoding="utf-8")
+
+                print_info("Детали критической ошибки (Traceback):")
+                print(f"\n{error_output}\n")
+            else:
+                print_info(" Проверьте основной лог (logs/system.log) для получения деталей.")
 
             wait_for_enter()
             return
@@ -381,7 +380,9 @@ def start_agent_screen() -> None:
 
 
 def stop_agent_screen() -> None:
-    """Экран остановки агента."""
+    """
+    Экран остановки агента.
+    """
 
     if not _is_agent_running():
         print_info(" Агент в данный момент не запущен.")
@@ -395,10 +396,8 @@ def stop_agent_screen() -> None:
         process = psutil.Process(pid)
 
         print_info(" Отправка сигнала на плавное завершение (Graceful Shutdown).")
-        # Создаем флаг-файл, агент его увидит и начнет сворачиваться
         STOP_FILE.touch(exist_ok=True)
 
-        # Ждем до 15 секунд, пока агент корректно закроет БД и завершится
         timeout = 15
         is_dead = False
 
@@ -417,7 +416,6 @@ def stop_agent_screen() -> None:
             process.kill()
             print_success("Процесс агента выслежен и убит.")
 
-        # Убираем за собой мусор
         if PID_FILE.exists():
             PID_FILE.unlink()
         if STOP_FILE.exists():
