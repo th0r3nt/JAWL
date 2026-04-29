@@ -25,9 +25,9 @@ def test_aiogram_state_init():
 
 def test_host_os_state_init():
     state = HostOSState()
-    assert state.uptime == ""
-    assert state.sandbox_files == ""
-    assert state.telemetry == ""
+    assert state.uptime == "Неизвестно."
+    assert state.sandbox_files == "Неизвестно."
+    assert state.telemetry == "Нет доступной телеметрии."
 
 
 def test_calendar_state_init():

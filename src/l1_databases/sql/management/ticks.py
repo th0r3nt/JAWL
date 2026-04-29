@@ -171,8 +171,8 @@ class SQLTicks:
                 f"#### [Tick] {time_str}\n"
                 f"{step_str}"
                 f"*Thoughts*: '{thoughts_str}'\n\n"
-                f"*Actions*:\n{actions_str}\n"
+                f"*Actions*:\n{actions_str}\n\n"
                 f"*Result*:\n```\n{res_str}\n```"
             )
 
-        return "## RECENT TICKS\n" + "\n\n".join(blocks)
+        return "## RECENT TICKS\n" + "\n\n\n".join(blocks)

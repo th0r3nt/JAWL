@@ -186,7 +186,7 @@ async def execute_skill(actions: list[ActionCall]) -> str:
 
     report = []
     for i, res in enumerate(results):
-        report.append(f"\n+ Action [{actions[i].tool_name}]: {res.message}")
+        report.append(f"\n* Action [{actions[i].tool_name}]: {res.message}")
 
     return "\n".join(report)
 

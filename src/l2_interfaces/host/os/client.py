@@ -306,7 +306,7 @@ class HostOSClient:
                             lang = "python"
 
                         ws_lines.append(
-                            f"\n\n#### --- Вкладка: {display_path} ---\n```{lang}\n{content}\n```"
+                            f"\n\n#### Вкладка: {display_path} \n```{lang}\n{content}\n```"
                         )
                     else:
                         self.state.opened_workspace_files.discard(rel_path)
@@ -319,9 +319,9 @@ class HostOSClient:
 
         recent_changes_block = ""
         if self.state.recent_file_changes:
-            rc_lines = ["\n"]
+            rc_lines = [""]
             rc_lines.extend(self.state.recent_file_changes)
-            recent_changes_block = "\n" + "\n".join(rc_lines) + "\n"
+            recent_changes_block = "" + "\n\n".join(rc_lines) + "\n"
 
         # ===============================================
         # Финальная сборка
