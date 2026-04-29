@@ -228,12 +228,12 @@ class HostOSClient:
         """Копирует библиотеку framework_api для скриптов агента в песочницу."""
 
         api_path = self.sandbox_dir / "framework_api.py"
-        template_path = self.framework_dir / "src" / "utils" / "templates" / "framework_api_template.py"
+        template_path = self.framework_dir / "src" / "utils" / "templates" / "framework_api.py"
 
         if template_path.exists():
             shutil.copy2(template_path, api_path)
         else:
-            system_logger.warning("[Host OS] Шаблон framework_api_template.py не найден.")
+            system_logger.warning("[Host OS] Шаблон framework_api.py не найден.")
 
     def get_daemons_registry(self) -> dict:
         try:

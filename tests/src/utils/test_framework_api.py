@@ -1,10 +1,10 @@
 import json
 from unittest.mock import patch
-import src.utils.framework_api_template as api
+import src.utils.templates.framework_api as api
 
 
 def test_framework_api_send_event(tmp_path):
-    with patch("src.utils.framework_api_template.Path") as mock_path:
+    with patch("src.utils.templates.framework_api.Path") as mock_path:
         mock_path.return_value.parent = tmp_path
 
         api.send_event("Критическая ошибка", {"module": "test"})
@@ -16,7 +16,7 @@ def test_framework_api_send_event(tmp_path):
 
 
 def test_framework_api_update_dashboard(tmp_path):
-    with patch("src.utils.framework_api_template.Path") as mock_path:
+    with patch("src.utils.templates.framework_api.Path") as mock_path:
         mock_path.return_value.parent = tmp_path
 
         api.update_dashboard("Weather", "Sunny")

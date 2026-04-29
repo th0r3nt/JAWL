@@ -362,11 +362,11 @@ class HostOSExecution:
             wrapper_path = tmp_dir / f"rpc_wrapper_{wrapper_id}.py"
 
             template_path = (
-                self.host_os.framework_dir / "src" / "utils" / "rpc_wrapper_template.py"
+                self.host_os.framework_dir / "src" / "utils" / "templates" / "rpc_wrapper.py"
             )
             if not template_path.exists():
                 return SkillResult.fail(
-                    "Системная ошибка: Шаблон RPC-обертки не найден (src/utils/rpc_wrapper_template.py)."
+                    "Системная ошибка: Шаблон RPC-обертки не найден (src/utils/templates/rpc_wrapper.py)."
                 )
 
             wrapper_code = template_path.read_text(encoding="utf-8")
