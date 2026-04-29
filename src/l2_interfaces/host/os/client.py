@@ -341,7 +341,7 @@ class HostOSClient:
 * Active Daemons:
 {self.state.active_daemons}
 
-* Current Access Level: {self.access_level.value}/{self.access_level.name}
+* Current Access Level: {self.access_level.value}/{self.access_level.name} (текущий уровень доступа)
 {access_levels_desc}
 
 * Framework Directory:

@@ -1,4 +1,3 @@
-# Файл: src/l2_interfaces/host/os/skills/execution.py
 import asyncio
 import sys
 import os
@@ -48,6 +47,32 @@ class HostOSExecution:
         except (psutil.NoSuchProcess, psutil.AccessDenied):
             pass
 
+    def _build_isolated_env(self) -> dict:
+        """
+        Собирает изолированное окружение (env) для запуска скриптов.
+        Гарантирует, что скрипт увидит и корень фреймворка (src), и корень песочницы (framework_api).
+        """
+
+        env = os.environ.copy()
+        env["PYTHONUNBUFFERED"] = "1"
+        env["PYTHONIOENCODING"] = "utf-8"
+
+        fw_dir = str(self.host_os.framework_dir.resolve())
+        sb_dir = str(self.host_os.sandbox_dir.resolve())
+
+        # Добавляем обе директории
+        paths_to_add = [fw_dir, sb_dir]
+
+        # Подклеиваем старый PYTHONPATH, если он был (без дубликатов)
+        current_pythonpath = env.get("PYTHONPATH", "")
+        if current_pythonpath:
+            for p in current_pythonpath.split(os.pathsep):
+                if p and p not in paths_to_add:
+                    paths_to_add.append(p)
+
+        env["PYTHONPATH"] = os.pathsep.join(paths_to_add)
+        return env
+
     @skill()
     @require_access(HostOSAccessLevel.OBSERVER)
     async def execute_script(self, filepath: str) -> SkillResult:
@@ -71,12 +96,8 @@ class HostOSExecution:
             if not safe_path.is_file():
                 return SkillResult.fail(f"Ошибка: Файл скрипта не найден ({safe_path.name}).")
 
-            # Формируем изолированное окружение с фиксом кодировок и буферизации
-            env = os.environ.copy()
-            env["PYTHONUNBUFFERED"] = "1"
-            env["PYTHONIOENCODING"] = "utf-8"
-            env["PYTHONPATH"] = str(self.host_os.framework_dir.resolve())
-
+            # Формируем изолированное окружение
+            env = self._build_isolated_env()
             ext = safe_path.suffix.lower()
 
             if ext == ".py":
@@ -251,10 +272,7 @@ class HostOSExecution:
             log_file = open(log_path, "a", encoding="utf-8")
 
             # Формируем изолированное окружение
-            env = os.environ.copy()
-            env["PYTHONUNBUFFERED"] = "1"
-            env["PYTHONIOENCODING"] = "utf-8"
-            env["PYTHONPATH"] = str(self.host_os.framework_dir.resolve())
+            env = self._build_isolated_env()
 
             kwargs = {}
             if sys.platform == "win32":
@@ -373,16 +391,16 @@ class HostOSExecution:
             wrapper_path.write_text(wrapper_code, encoding="utf-8")
 
             # Формируем изолированное окружение
-            env = os.environ.copy()
-            env["PYTHONUNBUFFERED"] = "1"
-            env["PYTHONIOENCODING"] = "utf-8"
-            env["PYTHONPATH"] = str(self.host_os.framework_dir.resolve())
+            env = self._build_isolated_env()
 
             process = await asyncio.create_subprocess_exec(
                 sys.executable,
                 str(wrapper_path),
                 str(safe_path),
                 func_name,
+                str(
+                    self.host_os.sandbox_dir.resolve()
+                ),  # Передаем корень песочницы для резолва путей
                 stdin=asyncio.subprocess.PIPE,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
@@ -410,7 +428,7 @@ class HostOSExecution:
             out_str = stdout.decode("utf-8", errors="replace").strip()
             err_str = stderr.decode("utf-8", errors="replace").strip()
 
-            rpc_prefix = "---JAWL_RPC_RESULT---"
+            rpc_prefix = "---RPC_RESULT---"
             if rpc_prefix in out_str:
                 parts = out_str.split(rpc_prefix)
                 script_stdout = parts[0].strip()

@@ -9,7 +9,7 @@ class VisionSkills:
         self.client = client
 
     @skill()
-    async def look_at_media(self, filepath: str) -> SkillResult:
+    async def look_at_image(self, filepath: str) -> SkillResult:
         """Смотрит на изображение (небходимо передать локальный путь к файлу) и помещает его в контекст для анализа на следующем шаге."""
 
         try:

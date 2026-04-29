@@ -6,7 +6,7 @@ from src.utils.dtime import get_now_formatted, seconds_to_duration_str
 
 from src.l2_interfaces.host.os.client import HostOSClient
 
-from src.l3_agent.skills.registry import SkillResult, skill
+from src.l3_agent.skills.registry import SkillResult
 
 
 class HostOSSystem:
@@ -35,7 +35,7 @@ class HostOSSystem:
             free_ram_gb = round(mem.available / (1024**3), 1)
 
             report = (
-                f"Системная телеметрия ОС ({self.host_os.state.os_info}):\n"
+                f"- OS: {self.host_os.state.os_info}\n"
                 f"- Модель CPU: {self.host_os.state.cpu_name}\n"
                 f"- Загрузка CPU: {cpu_usage}%\n"
                 f"- Использование RAM: {mem.percent}% (Свободно: {free_ram_gb} GB / {total_ram_gb} GB)\n"
@@ -47,7 +47,6 @@ class HostOSSystem:
         except Exception as e:
             return SkillResult.fail(f"Ошибка при получении телеметрии: {e}")
 
-    @skill()
     async def list_top_processes(self) -> SkillResult:
         """
         Показывает процессы, потребляющие больше всего оперативной памяти.
