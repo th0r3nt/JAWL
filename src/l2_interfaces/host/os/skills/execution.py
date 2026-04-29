@@ -59,9 +59,10 @@ class HostOSExecution:
 
         fw_dir = str(self.host_os.framework_dir.resolve())
         sb_dir = str(self.host_os.sandbox_dir.resolve())
+        sys_dir = str(self.host_os.system_dir.resolve())
 
-        # Добавляем обе директории
-        paths_to_add = [fw_dir, sb_dir]
+        # Добавляем все директории, чтобы 'import framework_api' работало как и раньше
+        paths_to_add = [fw_dir, sb_dir, sys_dir]
 
         # Подклеиваем старый PYTHONPATH, если он был (без дубликатов)
         current_pythonpath = env.get("PYTHONPATH", "")
@@ -265,7 +266,7 @@ class HostOSExecution:
                 )
 
             safe_name = "".join(c if c.isalnum() else "_" for c in name)
-            logs_dir = self.host_os.sandbox_dir / "logs"
+            logs_dir = self.host_os.system_dir / "logs"
             logs_dir.mkdir(exist_ok=True)
 
             log_path = logs_dir / f"daemon_{safe_name}.log"
@@ -303,9 +304,10 @@ class HostOSExecution:
             self.host_os.set_daemons_registry(registry)
 
             system_logger.info(f"[Host OS] Запущен фоновый демон '{name}' (PID: {pid})")
+
             return SkillResult.ok(
                 f"Демон '{name}' успешно запущен (PID: {pid}).\n"
-                f"Логи перенаправлены в файл: sandbox/logs/{log_path.name}\n"
+                f"Логи перенаправлены в файл: sandbox/_system/logs/{log_path.name}\n"
                 f"Теперь можно отслеживать его статус в контексте Host OS."
             )
 
@@ -373,7 +375,7 @@ class HostOSExecution:
                     f"Ошибка: Файл не найден или это не .py скрипт ({safe_path.name})."
                 )
 
-            tmp_dir = self.host_os.sandbox_dir / ".tmp"
+            tmp_dir = self.host_os.system_dir / ".tmp"
             tmp_dir.mkdir(exist_ok=True)
 
             wrapper_id = str(uuid.uuid4())[:8]

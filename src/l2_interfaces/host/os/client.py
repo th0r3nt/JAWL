@@ -38,10 +38,12 @@ class HostOSClient:
 
         self.framework_dir = Path(base_dir).resolve()
         self.sandbox_dir = self.framework_dir / "sandbox"
-        self.download_dir = self.sandbox_dir / "download"
-        self.events_dir = self.sandbox_dir / ".jawl_events"
+        self.system_dir = self.sandbox_dir / "_system"
+        self.download_dir = self.system_dir / "download"
+        self.events_dir = self.system_dir / ".jawl_events"
 
         self.sandbox_dir.mkdir(parents=True, exist_ok=True)
+        self.system_dir.mkdir(parents=True, exist_ok=True)
         self.download_dir.mkdir(parents=True, exist_ok=True)
         self.events_dir.mkdir(parents=True, exist_ok=True)
 
@@ -150,13 +152,15 @@ class HostOSClient:
             raise PermissionError(
                 f"SYSTEM DENIED: Доступ к файлам конфигурации ({resolved_path.name}) запрещен."
             )
-        
-        # Защита святого Грааля (системного API песочницы)
-        if is_write and resolved_path == (self.sandbox_dir / "framework_api.py").resolve():
-            raise PermissionError(
-                "SYSTEM DENIED: Файл 'framework_api.py' является критическим системным мостом (API). Его изменение, перемещение или удаление запрещено на аппаратном уровне."
-            )
 
+        # Защита системной папки песочницы (запрет записи, кроме папки загрузок)
+        if is_write and resolved_path.is_relative_to(self.system_dir):
+            if not resolved_path.is_relative_to(self.download_dir):
+                raise PermissionError(
+                    "SYSTEM DENIED: Папка 'sandbox/_system/' является системной и защищенной. "
+                    "Её нельзя изменять, удалять или создавать в ней скрипты/файлы "
+                    "(исключение: чтение и запись разрешены в sandbox/_system/download/)."
+                )
 
         # Сначала проверяем базовые права уровня доступа
         if self.access_level == HostOSAccessLevel.ROOT:
@@ -227,7 +231,7 @@ class HostOSClient:
     def _ensure_sandbox_api(self):
         """Копирует библиотеку framework_api для скриптов агента в песочницу."""
 
-        api_path = self.sandbox_dir / "framework_api.py"
+        api_path = self.system_dir / "framework_api.py"
         template_path = self.framework_dir / "src" / "utils" / "templates" / "framework_api.py"
 
         if template_path.exists():
@@ -273,9 +277,7 @@ class HostOSClient:
             max_tabs = self.config.workspace_max_opened_files
             current_tabs = len(self.state.opened_workspace_files)
 
-            ws_lines = [
-                f"Открытые файлы ({current_tabs}/{max_tabs}):"
-            ]
+            ws_lines = [f"Открытые файлы ({current_tabs}/{max_tabs}):"]
 
             for rel_path in list(self.state.opened_workspace_files):
                 try:
@@ -293,7 +295,7 @@ class HostOSClient:
                         if len(content) > limit:
                             content = (
                                 content[:limit]
-                                + f"\n... [Файл слишком большой, обрезан (больше {limit} символов). Для полного содержания - использовать соответствующий навык]"
+                                + f"\n...[Файл слишком большой, обрезан (больше {limit} символов). Для полного содержания - использовать соответствующий навык]"
                             )
 
                         ext = full_path.suffix.lower().strip(".")
@@ -356,7 +358,8 @@ class HostOSClient:
 * Workspace:
 {workspace_block}
 
-[Напоминание] Внутри sandbox/ находится файл 'framework_api.py'. 
+[Напоминание] Папка sandbox/_system/ является системной и не подлежит изменению.
+Внутри неё также находится файл 'framework_api.py'. 
 Этот файл позволяет взаимодействовать с пробуждениями и контекстом агента.
 Если нужна более подробная информация - рекомендуется прочитать файл.
 """.strip()

@@ -110,10 +110,32 @@ class WebBrowserConfig(BaseModel):
     )
 
 
+class WebHooksConfig(BaseModel):
+    enabled: bool = False
+    host: str = "127.0.0.1"
+    port: int = 8080
+    history_limit: int = 20
+    preview_max_chars: int = 200  # Максимальная длина превью для системного промпта
+
+
+class RSSFeedConfig(BaseModel):
+    name: str
+    url: str
+
+
+class WebRSSConfig(BaseModel):
+    enabled: bool = False
+    polling_interval_sec: int = 3600  # Раз в час по умолчанию
+    recent_limit: int = 5
+    feeds: list[RSSFeedConfig] = Field(default_factory=list)
+
+
 class WebConfig(BaseModel):
     search: WebSearchConfig = Field(default_factory=WebSearchConfig)
     http: WebHTTPConfig = Field(default_factory=WebHTTPConfig)
     browser: WebBrowserConfig = Field(default_factory=WebBrowserConfig)
+    hooks: WebHooksConfig = Field(default_factory=WebHooksConfig)
+    rss: WebRSSConfig = Field(default_factory=WebRSSConfig)
 
 
 class MetaConfig(BaseModel):

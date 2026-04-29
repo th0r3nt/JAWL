@@ -1,6 +1,8 @@
 from email.header import decode_header
 import re
 
+from src.utils._tools import clean_html
+
 
 def decode_mime_header(header_value: str) -> str:
     """Нормально декодирует MIME-заголовки (=?UTF-8?B?...)."""
@@ -19,7 +21,6 @@ def decode_mime_header(header_value: str) -> str:
     return "".join(decoded_parts)
 
 
-# TODO: перенести в src/utils/ и улучшить метод
 def strip_html_tags(text: str) -> str:
     """Суровый и дешевый способ вырезать HTML-теги для экономии контекста."""
     clean = re.compile("<.*?>")
@@ -69,6 +70,6 @@ def extract_text_from_email(msg) -> str:
         return "\n".join(text_parts).strip()
     elif html_parts:
         raw_html = "\n".join(html_parts)
-        return strip_html_tags(raw_html)
+        return clean_html(raw_html)
 
     return "[Пустое сообщение или неподдерживаемый формат]"

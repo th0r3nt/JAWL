@@ -47,9 +47,10 @@ async def test_desktop_take_screenshot(mock_grab, os_client):
     assert "screen.png" in res.message
     mock_image.save.assert_called_once()
 
-    # Проверяем, что файл действительно сохранился в sandbox/download/
+    # Проверяем, что файл действительно сохранился в sandbox/_system/download/
     saved_path = mock_image.save.call_args[0][0]
     assert "download" in str(saved_path)
+    assert "system" in str(saved_path)
     assert "screen.png" in str(saved_path)
 
 

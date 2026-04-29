@@ -12,6 +12,8 @@ from src.l2_interfaces.telegram.aiogram.bootstrap import setup_aiogram
 from src.l2_interfaces.web.search.bootstrap import setup_web_search
 from src.l2_interfaces.web.http.bootstrap import setup_web_http
 from src.l2_interfaces.web.browser.bootstrap import setup_web_browser
+from src.l2_interfaces.web.hooks.bootstrap import setup_web_hooks
+from src.l2_interfaces.web.rss.bootstrap import setup_web_rss
 from src.l2_interfaces.multimodality.bootstrap import setup_multimodality
 from src.l2_interfaces.calendar.bootstrap import setup_calendar
 from src.l2_interfaces.github.bootstrap import setup_github
@@ -99,7 +101,7 @@ def initialize_l2_interfaces(system: "System", env_vars: Dict[str, str | None]) 
     # GITHUB
     # ================================================================
 
-    if getattr(config, "github", None) and config.github.enabled:
+    if config.github.enabled:
         components.extend(
             setup_github(
                 system=system,
@@ -115,7 +117,7 @@ def initialize_l2_interfaces(system: "System", env_vars: Dict[str, str | None]) 
     # EMAIL
     # ================================================================
 
-    if getattr(config, "email", None) and config.email.enabled:
+    if config.email.enabled:
         from src.l2_interfaces.email.bootstrap import setup_email
 
         components.extend(
@@ -156,7 +158,7 @@ def initialize_l2_interfaces(system: "System", env_vars: Dict[str, str | None]) 
     # WEB BROWSER
     # ================================================================
 
-    if getattr(config.web, "browser", None) and config.web.browser.enabled:
+    if config.web.browser.enabled:
         components.extend(setup_web_browser(system))
     else:
         system.context_registry.register_provider(
@@ -164,10 +166,34 @@ def initialize_l2_interfaces(system: "System", env_vars: Dict[str, str | None]) 
         )
 
     # ================================================================
+    # WEB HOOKS
+    # ================================================================
+
+    if config.web.hooks.enabled:
+        components.extend(
+            setup_web_hooks(system=system, secret_token=env_vars.get("WEBHOOK_SECRET"))
+        )
+    else:
+        system.context_registry.register_provider(
+            "web hooks", make_off_provider("WEB HOOKS"), ContextSection.INTERFACES
+        )
+
+    # ================================================================
+    # WEB RSS
+    # ================================================================
+
+    if config.web.rss.enabled:
+        components.extend(setup_web_rss(system))
+    else:
+        system.context_registry.register_provider(
+            "web rss", make_off_provider("WEB RSS"), ContextSection.INTERFACES
+        )
+
+    # ================================================================
     # META
     # ================================================================
 
-    if getattr(config, "meta", None) and config.meta.enabled:
+    if config.meta.enabled:
         components.extend(setup_meta(system))
     else:
         # Кастомный провайдер для Meta, чтобы показывать статус скиллов даже в OFF режиме
@@ -187,7 +213,7 @@ def initialize_l2_interfaces(system: "System", env_vars: Dict[str, str | None]) 
     # MULTIMODALITY
     # ================================================================
 
-    if getattr(config, "multimodality", None) and config.multimodality.enabled:
+    if config.multimodality.enabled:
         components.extend(setup_multimodality(system))
     else:
         system.context_registry.register_provider(
@@ -198,7 +224,7 @@ def initialize_l2_interfaces(system: "System", env_vars: Dict[str, str | None]) 
     # CALENDAR
     # ================================================================
 
-    if getattr(config, "calendar", None) and config.calendar.enabled:
+    if config.calendar.enabled:
         components.extend(setup_calendar(system))
     else:
         system.context_registry.register_provider(

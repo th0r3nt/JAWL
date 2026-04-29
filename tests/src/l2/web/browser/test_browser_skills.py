@@ -97,10 +97,11 @@ async def test_browser_take_screenshot(
     mock_file = tmp_path / "screen.png"
     mock_validate.return_value = mock_file
 
-    # Имитируем, что Playwright реально создал файл-картинку, 
+    # Имитируем, что Playwright реально создал файл-картинку,
     # чтобы Pillow мог ее открыть и нарисовать сетку
     async def mock_screenshot(*args, **kwargs):
         from PIL import Image
+
         Image.new("RGB", (200, 200), color="white").save(mock_file)
 
     page_mock.screenshot = AsyncMock(side_effect=mock_screenshot)
@@ -125,3 +126,50 @@ async def test_browser_extract_text(extract_skills, mock_playwright):
     assert res.is_success is True
     assert "Clean extracted text" in res.message
     page_mock.evaluate.assert_called_once_with("document.body.innerText")
+
+
+@pytest.mark.asyncio
+async def test_browser_type_text(interact_skills, mock_playwright):
+    _, _, _, page_mock = mock_playwright
+    interact_skills.client.page = page_mock
+    interact_skills.client.ensure_browser = AsyncMock()
+    interact_skills.client.update_state_view = AsyncMock()
+
+    page_mock.keyboard.type = AsyncMock()
+
+    res = await interact_skills.type_text("Hello GPT")
+
+    assert res.is_success is True
+    page_mock.keyboard.type.assert_called_once_with("Hello GPT")
+
+
+@pytest.mark.asyncio
+async def test_browser_click_coordinates(interact_skills, mock_playwright):
+    _, _, _, page_mock = mock_playwright
+    interact_skills.client.page = page_mock
+    interact_skills.client.ensure_browser = AsyncMock()
+    interact_skills.client.update_state_view = AsyncMock()
+
+    page_mock.evaluate = AsyncMock(return_value=100)  # Имитируем возврат вычисленных координат
+    page_mock.mouse.click = AsyncMock()
+
+    res = await interact_skills.click_coordinates(x=200, y=300)
+
+    assert res.is_success is True
+    page_mock.mouse.click.assert_called_once_with(100, 100)
+
+
+@pytest.mark.asyncio
+async def test_browser_hover_coordinates(interact_skills, mock_playwright):
+    _, _, _, page_mock = mock_playwright
+    interact_skills.client.page = page_mock
+    interact_skills.client.ensure_browser = AsyncMock()
+    interact_skills.client.update_state_view = AsyncMock()
+
+    page_mock.evaluate = AsyncMock(return_value=50)
+    page_mock.mouse.move = AsyncMock()
+
+    res = await interact_skills.hover_coordinates(x=50, y=50)
+
+    assert res.is_success is True
+    page_mock.mouse.move.assert_called_once_with(50, 50)

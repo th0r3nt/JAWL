@@ -32,10 +32,12 @@ from src.l0_state.interfaces.state import (
     WebSearchState,
     WebHTTPState,
     WebBrowserState,
+    WebHooksState,
+    WebRSSState,
     CalendarState,
     GithubState,
     EmailState,
-    CustomDashboardState
+    CustomDashboardState,
 )
 
 # ==========================================
@@ -69,6 +71,7 @@ from src.l3_agent.heartbeat import Heartbeat
 
 from src.l3_agent.skills.registry import register_instance, clear_registry
 from src.l3_agent.skills.schema import ACTION_SCHEMA
+
 
 class System:
     """
@@ -151,6 +154,16 @@ class System:
 
         # WEB BROWSER
         self.web_browser_state = WebBrowserState()
+
+        # WEB HOOKS
+        self.web_hooks_state = WebHooksState(
+            history_limit=self.interfaces_config.web.hooks.history_limit
+        )
+
+        # WEB RSS
+        self.web_rss_state = WebRSSState(
+            recent_limit=self.interfaces_config.web.rss.recent_limit
+        )
 
         # CALENDAR
         self.calendar_state = CalendarState()
@@ -269,6 +282,8 @@ class System:
         email_password: Optional[str] = None,
         # Web Search
         tavily_api_key: Optional[str] = None,
+        # Web Hooks
+        webhook_secret: Optional[str] = None,
     ):
         """Читает конфиг, поднимает нужные интерфейсы и регистрирует их скиллы."""
 
@@ -287,6 +302,8 @@ class System:
             "EMAIL_PASSWORD": email_password,
             # Web Search
             "TAVILY_API_KEY": tavily_api_key,
+            # Web Hooks
+            "WEBHOOK_SECRET": webhook_secret,
         }
 
         # Вся магия сборки интерфейсов скрыта здесь
@@ -305,7 +322,7 @@ class System:
             drives_enabled=self.sys_cfg.sql.drives.enabled,
             tasks_enabled=self.sys_cfg.sql.tasks.enabled,
             traits_enabled=self.sys_cfg.sql.personality_traits.enabled,
-            mental_states_enabled=self.sys_cfg.sql.mental_states.enabled
+            mental_states_enabled=self.sys_cfg.sql.mental_states.enabled,
         )
 
         # Поднимаем RAG-провайдер и регистрируем его
@@ -323,9 +340,9 @@ class System:
 
         # Регистрируем провайдер кастомных дашбордов
         self.context_registry.register_provider(
-            "custom_dashboard", 
-            self.dashboard_state.get_context_block, 
-            section=ContextSection.INTERFACES
+            "custom_dashboard",
+            self.dashboard_state.get_context_block,
+            section=ContextSection.INTERFACES,
         )
 
         # Инициализируем тонкий ContextBuilder
@@ -468,6 +485,8 @@ class System:
         email_password: Optional[str] = None,
         # Web Search
         tavily_api_key: Optional[str] = None,
+        # Web Hooks
+        webhook_secret: Optional[str] = None,
     ) -> int:
         """Запуск системы."""
 
@@ -500,6 +519,8 @@ class System:
                 email_password=email_password,
                 # Web Search
                 tavily_api_key=tavily_api_key,
+                # Web Hooks
+                webhook_secret=webhook_secret,
             )
 
             # L3 AGENT
@@ -648,6 +669,8 @@ async def main() -> int:
         EMAIL_PASSWORD = os.getenv("EMAIL_PASSWORD", None)
         # Web Search
         TAVILY_API_KEY = os.getenv("TAVILY_API_KEY", None)
+        # Web Hooks
+        WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET", None)
 
         # Динамически собираем все ключи, которые начинаются с LLM_API_KEY_
         LLM_API_URL = os.getenv("LLM_API_URL", None)
@@ -672,6 +695,8 @@ async def main() -> int:
             email_password=EMAIL_PASSWORD,
             # Web Search
             tavily_api_key=TAVILY_API_KEY,
+            # Web Hook
+            webhook_sectet=WEBHOOK_SECRET,
         )
         return exit_code
 

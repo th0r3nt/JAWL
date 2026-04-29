@@ -147,6 +147,28 @@ class Events:
     )
 
     # ============================================
+    # WEB HOOKS
+    # ============================================
+
+    WEBHOOK_MESSAGE_INCOMING = EventConfig(
+        name="WEBHOOK_MESSAGE_INCOMING",
+        description="Поступил входящий HTTP Webhook от внешнего сервиса.",
+        level=EventLevel.HIGH, # Будит агента с высоким приоритетом
+        requires_attention=True,
+    )
+
+    # ============================================
+    # WEB RSS
+    # ============================================
+
+    RSS_NEW_ENTRY = EventConfig(
+        name="RSS_NEW_ENTRY",
+        description="Новая публикация в отслеживаемой RSS-ленте.",
+        level=EventLevel.BACKGROUND,
+        requires_attention=False,
+    )
+
+    # ============================================
     # Host Terminal
     # ============================================
 

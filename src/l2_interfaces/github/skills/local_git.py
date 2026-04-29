@@ -61,10 +61,7 @@ class GithubLocalGit:
         """
 
         try:
-            if "/" not in dest_folder and "\\" not in dest_folder:
-                dest_folder = f"download/{dest_folder}"
-
-            # Используем независимый гейткипер из утилит
+            # Убрано принудительное перенаправление в 'download/'
             safe_path = validate_sandbox_path(dest_folder)
 
             if safe_path.exists() and any(safe_path.iterdir()):

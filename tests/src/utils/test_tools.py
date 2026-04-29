@@ -5,8 +5,8 @@ from src.utils._tools import (
     validate_sandbox_path,
     truncate_text,
     parse_int_or_str,
+     clean_html
 )
-
 
 def test_format_size():
     assert format_size(0) == "0 B"
@@ -48,3 +48,32 @@ def test_validate_sandbox_path():
     # 3. Path Traversal атака агента (попытка выйти из песочницы)
     with pytest.raises(PermissionError, match="Доступ запрещен"):
         validate_sandbox_path("../secret.env")
+
+def test_clean_html():
+    """Тест: утилита мощно вырезает всю HTML-ересь и декодирует сущности."""
+    raw_html = """
+    <html>
+        <head>
+            <style>body { color: red; }</style>
+            <script>alert('hack');</script>
+        </head>
+        <body>
+            <!-- Это секретный комментарий -->
+            <h1>Заголовок &amp; Текст</h1>
+            <p>Какой-то текст с&nbsp;пробелами и <br/> переносами.</p>
+        </body>
+    </html>
+    """
+    clean = clean_html(raw_html)
+    
+    # Стили, скрипты и комменты должны исчезнуть
+    assert "color: red" not in clean
+    assert "alert('hack')" not in clean
+    assert "секретный комментарий" not in clean
+    
+    # Сущности должны раскодироваться
+    assert "Заголовок & Текст" in clean
+    assert "с пробелами" in clean
+    
+    # Лишние пробелы должны схлопнуться
+    assert clean == "Заголовок & Текст Какой-то текст с пробелами и переносами."

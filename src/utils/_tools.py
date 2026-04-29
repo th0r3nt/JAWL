@@ -1,6 +1,8 @@
 import psutil
 from pathlib import Path
 from typing import Union
+import re
+import html
 
 
 def format_size(size_bytes: int) -> str:
@@ -18,7 +20,6 @@ def format_size(size_bytes: int) -> str:
             return f"{size:.1f} {unit}"
         size /= 1024
     return f"{size:.1f} {units[-1]}"
-
 
 
 def validate_sandbox_path(filepath: str | Path) -> Path:
@@ -92,3 +93,32 @@ def is_agent_running() -> bool:
             except Exception:
                 pass
         return False
+
+
+def clean_html(raw_html: str) -> str:
+    """
+    Мощная и быстрая очистка текста от HTML-мусора.
+    Вырезает скрипты, стили, комментарии, HTML-теги и декодирует сущности (&amp; -> &).
+    """
+
+    if not raw_html:
+        return ""
+
+    # 1. Удаляем скрипты и стили вместе с их содержимым (игнорируя регистр и переносы строк)
+    text = re.sub(
+        r"<(script|style)[^>]*>.*?</\1>", " ", raw_html, flags=re.IGNORECASE | re.DOTALL
+    )
+
+    # 2. Удаляем HTML комментарии
+    text = re.sub(r"<!--.*?-->", " ", text, flags=re.DOTALL)
+
+    # 3. Удаляем все остальные теги
+    text = re.sub(r"<[^>]+>", " ", text)
+
+    # 4. Декодируем HTML-сущности (&quot;, &amp;, &#39;, &nbsp; и т.д.)
+    text = html.unescape(text)
+
+    # 5. Схлопываем множественные пробелы и переносы в один пробел для плотности контекста
+    text = re.sub(r"\s+", " ", text).strip()
+
+    return text
