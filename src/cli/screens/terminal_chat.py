@@ -1,5 +1,6 @@
 import asyncio
 import json
+import datetime
 from pathlib import Path
 
 import questionary
@@ -58,11 +59,17 @@ async def _chat_loop(port: int, history_file: Path, agent_name: str):
             for msg in history[-15:]:
                 sender = msg.get("sender")
                 text = msg.get("text", "")
+                time_str = msg.get("time", "")
+
+                time_prefix = f"<style fg='gray'>[{time_str}]</style> " if time_str else ""
+
                 if sender == "User":
-                    print_formatted_text(HTML(f"<ansigreen><b>Вы:</b></ansigreen> {text}"))
+                    print_formatted_text(
+                        HTML(f"{time_prefix}<ansigreen><b>Вы:</b></ansigreen> {text}")
+                    )
                 else:
                     print_formatted_text(
-                        HTML(f"\n<ansimagenta><b>{sender}:</b></ansimagenta>")
+                        HTML(f"\n{time_prefix}<ansimagenta><b>{sender}:</b></ansimagenta>")
                     )
                     console.print(Markdown(text))
             print_formatted_text(HTML("\n<style fg='gray'>--- Конец истории ---</style>\n"))
@@ -82,15 +89,19 @@ async def _chat_loop(port: int, history_file: Path, agent_name: str):
                 if not raw_text:
                     continue
 
+                time_str = ""
                 try:
                     payload = json.loads(raw_text)
                     message_text = payload.get("text", "")
+                    time_str = payload.get("time", "")
                 except json.JSONDecodeError:
                     message_text = raw_text
 
+                time_prefix = f"<style fg='gray'>[{time_str}]</style> " if time_str else ""
+
                 with patch_stdout():
                     print_formatted_text(
-                        HTML(f"\n<ansimagenta><b>{agent_name}:</b></ansimagenta>")
+                        HTML(f"\n{time_prefix}<ansimagenta><b>{agent_name}:</b></ansimagenta>")
                     )
                     console.print(Markdown(message_text))
                     print("")
@@ -113,9 +124,14 @@ async def _chat_loop(port: int, history_file: Path, agent_name: str):
 
     try:
         while True:
+            # Отображаем текущее локальное время рядом с инпутом
+            now_str = datetime.datetime.now().strftime("%H:%M")
+
             with patch_stdout():
                 user_input = await session.prompt_async(
-                    HTML("<ansigreen><b>Вы:</b></ansigreen> ")
+                    HTML(
+                        f"<style fg='gray'>[{now_str}]</style> <ansigreen><b>Вы:</b></ansigreen> "
+                    )
                 )
 
             text = user_input.strip()

@@ -2,7 +2,7 @@ identity:
   agent_name: Agent # Имя вашего агента
 
 llm:
-  model: unknown # Можно поставить любую
+  main_model: unknown # Можно поставить любую
   available_models: # Список моделей, которые агент может ставить по вашей просьбе
     - claude-opus-4.7
     - claude-opus-4.6
@@ -11,7 +11,7 @@ llm:
     - gemma-4-31b-it
   # ...можно добавить свои, главное - убедитесь, что llm api url и ключи правильно настроены
 
-  is_multimodal: false # Поставьте true, если основная модель (model:) мультимодальна
+  is_multimodal: false # Поставьте true, если основная модель (main_model) мультимодальна
   temperature: 1.0
   max_react_steps: 15
 
@@ -102,3 +102,9 @@ system:
 
       max_reflections_history: 3   # Сколько последних записей о действиях хранить для контекста мотиваций
       max_custom_drives: 5         # Лимит на создание кастомных мотиваций
+
+  # Система делегирования задач (Субагенты)
+  swarm:
+    enabled: false
+    subagent_model: unknown # Рекомендуется поставить дешевую и быструю модель (напр. gemini-3.1-flash-lite-preview)
+    max_concurrent_workers: 3 # Защита от API Rate Limits (макс. количество одновременно работающих субагентов)

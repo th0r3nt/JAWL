@@ -8,7 +8,7 @@ async def test_terminal_record_message_and_history(terminal_client):
     """Тест: Сообщения корректно сохраняются в стейт и записываются в JSON."""
 
     # Эмулируем входящее сообщение
-    terminal_client._record_message("User", "Привет, агент", "12:00")
+    terminal_client._record_message("User", "Привет, агент", "2026-04-29 12:00")
 
     # Проверяем L0 State
     assert len(terminal_client.state.recent_messages) == 1

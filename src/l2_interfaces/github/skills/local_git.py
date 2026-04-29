@@ -2,10 +2,11 @@ import asyncio
 from pathlib import Path
 
 from src.l2_interfaces.github.client import GithubClient
-from src.l3_agent.skills.registry import SkillResult, skill
 from src.utils.logger import system_logger
 from src.utils._tools import truncate_text, validate_sandbox_path
 
+from src.l3_agent.skills.registry import SkillResult, skill
+from src.l3_agent.swarm.roles import Subagents
 
 class GithubLocalGit:
     """Навыки для локальной работы с Git (Клонирование, Коммиты, Пуши) внутри песочницы."""
@@ -51,7 +52,7 @@ class GithubLocalGit:
             await process.wait()
             raise TimeoutError("Таймаут выполнения команды git (> 60 сек).")
 
-    @skill()
+    @skill(swarm_roles=[Subagents.CODER])
     async def git_clone_repository(
         self, owner: str, repo: str, dest_folder: str
     ) -> SkillResult:
@@ -104,7 +105,7 @@ class GithubLocalGit:
         except Exception as e:
             return SkillResult.fail(f"Ошибка при клонировании: {e}")
 
-    @skill()
+    @skill(swarm_roles=[Subagents.CODER])
     async def git_checkout_branch(
         self, repo_folder: str, branch_name: str, create_new: bool = False
     ) -> SkillResult:

@@ -6,7 +6,6 @@ import subprocess
 from pathlib import Path
 import psutil
 import asyncio
-import tempfile
 from telethon import TelegramClient
 from dotenv import dotenv_values
 import questionary
@@ -50,15 +49,14 @@ def _check_and_setup_env() -> tuple[bool, bool]:
     Проверяет наличие файла .env и базовых ключей.
     Возвращает: (Успех_проверки, Были_ли_созданы_или_изменены_файлы)
     """
+
     was_modified = False
 
     if not ENV_FILE.exists():
         if ENV_EXAMPLE.exists():
-            # Автовосстановление кодировки при копировании
             try:
                 with open(ENV_EXAMPLE, "r", encoding="utf-8-sig") as f:
                     content = f.read()
-
             except UnicodeDecodeError:
                 with open(ENV_EXAMPLE, "r", encoding="cp1251") as f:
                     content = f.read()
@@ -67,27 +65,25 @@ def _check_and_setup_env() -> tuple[bool, bool]:
                 f.write(content)
             print_info(" Создан базовый файл .env из .env.example")
             was_modified = True
-
         else:
             print_error("Не найден ни .env, ни .env.example.")
             return False, False
 
-    # Магия защиты от блокнота Windows
     try:
         with open(ENV_FILE, "r", encoding="utf-8-sig") as f:
             env_content = f.readlines()
+
     except UnicodeDecodeError:
         with open(ENV_FILE, "r", encoding="cp1251") as f:
             env_content = f.readlines()
+
         with open(ENV_FILE, "w", encoding="utf-8") as f:
             f.writelines(env_content)
 
-    # Проверяем, заполнен ли LLM_API_KEY_1
     key_found = False
     for line in env_content:
         line_stripped = line.strip()
         if line_stripped.startswith("LLM_API_KEY_1="):
-            # Проверяем, что после равно есть хоть что-то кроме кавычек
             val = line_stripped.split("=", 1)[1].strip("\"' ")
             if len(val) > 0:
                 key_found = True
@@ -95,12 +91,11 @@ def _check_and_setup_env() -> tuple[bool, bool]:
 
     if not key_found:
         print_info(" Похоже, вы еще не настроили подключение к LLM.")
-
         api_url = questionary.text(
             "Введите Base URL для LLM (например, ссылку для Gemini или локальной модели).\nОставьте пустым для стандартного OpenAI API:"
         ).ask()
 
-        if api_url is None:  # Юзер нажал Ctrl+C
+        if api_url is None:
             return False, False
 
         api_key = questionary.text("Введите ваш LLM API Key (Обязательно):").ask()
@@ -130,18 +125,13 @@ def _check_and_setup_env() -> tuple[bool, bool]:
 
 
 def _check_and_setup_prompts() -> bool:
-    """
-    Проверяет наличие файлов промпта личности.
-    Если их нет, создает из .example.md. Возвращает True, если файлы были созданы.
-    """
-
+    """Проверяет наличие файлов промпта личности. Если их нет, создает из .example.md."""
     if not PROMPTS_DIR.exists():
         PROMPTS_DIR.mkdir(parents=True, exist_ok=True)
 
     created_any = False
 
     for example_file in PROMPTS_DIR.rglob("*.example.md"):
-        # Формируем имя без .example (например: SOUL.example.md -> SOUL.md)
         target_name = example_file.name.replace(".example.md", ".md")
         target_file = example_file.with_name(target_name)
 
@@ -154,12 +144,11 @@ def _check_and_setup_prompts() -> bool:
 
 
 def _validate_configs() -> bool:
-    """Предполетная проверка конфигураций. Отлавливает ошибки до старта процесса."""
-
+    """Предполетная проверка конфигураций."""
     try:
         load_config()
         return True
-
+    
     except ValidationError as e:
         print_error("Ошибка структуры конфигурации (yaml не совпадает со схемой):")
         for err in e.errors():
@@ -169,9 +158,8 @@ def _validate_configs() -> bool:
         print_info(
             "\n 💡 Подсказка: если вы обновили JAWL, удалите старые файлы settings.yaml и interfaces.yaml в папке config/, чтобы система пересоздала их из актуальных шаблонов."
         )
-
         return False
-
+    
     except Exception as e:
         print_error(f"Критическая ошибка при чтении настроек: {e}")
         return False
@@ -179,10 +167,8 @@ def _validate_configs() -> bool:
 
 def _telethon_auth_flow() -> bool:
     """Предполетная авторизация сессии Telethon, если она включена в конфиге."""
-
     settings, interfaces = load_config()
 
-    # Если интерфейс отключен, просто идем дальше
     if not interfaces.telegram.telethon.enabled:
         return True
 
@@ -190,12 +176,10 @@ def _telethon_auth_flow() -> bool:
     api_id = env_dict.get("TELETHON_API_ID")
     api_hash = env_dict.get("TELETHON_API_HASH")
 
-    # Если ключей нет в .env - просим ввести
     if not api_id or not api_hash:
         print_info(
             " Для работы Telethon требуются API_ID и API_HASH (можно получить на my.telegram.org)."
         )
-
         api_id_input = questionary.text("Введите TELETHON_API_ID:").ask()
         if not api_id_input:
             print_error("Запуск отменен: TELETHON_API_ID обязателен.")
@@ -206,7 +190,6 @@ def _telethon_auth_flow() -> bool:
             print_error("Запуск отменен: TELETHON_API_HASH обязателен.")
             return False
 
-        # Сохраняем введенные данные в .env
         with open(ENV_FILE, "a", encoding="utf-8") as f:
             f.write(f'\nTELETHON_API_ID="{api_id_input.strip()}"\n')
             f.write(f'TELETHON_API_HASH="{api_hash_input.strip()}"\n')
@@ -214,7 +197,6 @@ def _telethon_auth_flow() -> bool:
         api_id = api_id_input.strip()
         api_hash = api_hash_input.strip()
 
-    # Путь к сессии
     session_name = interfaces.telegram.telethon.session_name
     session_dir = (
         ROOT_DIR / "src" / "utils" / "local" / "data" / "interfaces" / "telegram" / "telethon"
@@ -222,7 +204,6 @@ def _telethon_auth_flow() -> bool:
     session_dir.mkdir(parents=True, exist_ok=True)
     session_path = session_dir / session_name
 
-    # Асинхронная обертка для мини-клиента
     async def _auth() -> bool:
         try:
             clean_api_id = int(api_id) if str(api_id).isdigit() else api_id
@@ -231,7 +212,6 @@ def _telethon_auth_flow() -> bool:
             await client.connect()
             if not await client.is_user_authorized():
                 print_info(" Сессия Telegram не найдена. Потребуется авторизация.")
-                # Вызываем встроенный механизм Telethon. Он сам спросит телефон, СМС и 2FA пароль в консоли
                 await client.start()
 
             me = await client.get_me()
@@ -247,30 +227,25 @@ def _telethon_auth_flow() -> bool:
             print_error(f"Ошибка при авторизации Telethon: {e}")
             return False
 
-    # Запускаем асинхронный флоу авторизации в синхронном CLI
     print_info(" Проверка сессии Telegram (Telethon)...")
     return asyncio.run(_auth())
 
 
 def start_agent_screen() -> None:
     """Экран запуска агента."""
-
     if _is_agent_running():
         print_error("Агент уже запущен. Если он завис, сначала остановите его.")
         wait_for_enter()
         return
 
-    # Запоминаем, существовали ли конфиги до их проверки (т.к. валидация их копирует)
     settings_existed = (ROOT_DIR / "config" / "settings.yaml").exists()
     interfaces_existed = (ROOT_DIR / "config" / "interfaces.yaml").exists()
 
-    # Предполетная проверка
     if not _validate_configs():
         wait_for_enter()
         return
 
     configs_created = not (settings_existed and interfaces_existed)
-
     prompts_created = _check_and_setup_prompts()
 
     env_success, env_modified = _check_and_setup_env()
@@ -278,14 +253,11 @@ def start_agent_screen() -> None:
         wait_for_enter()
         return
 
-    # Если это чистый первый старт - тормозим процесс и даем юзеру время
     if configs_created or prompts_created or env_modified:
-        print("\n")  # Разделитель
+        print("\n")
         print_info(" [Первичная инициализация завершена]")
-        print("\n")  # Разделитель
-
+        print("\n")
         print_info(" Были созданы базовые файлы конфигурации.")
-
         print_info(
             " Обязательно зайдите в config/interfaces.yaml и настройте под себя возможности агента."
         )
@@ -293,22 +265,15 @@ def start_agent_screen() -> None:
         print_info(
             " Также проверьте config/settings.yaml для настройки параметров модели, БД и лимитов."
         )
-
-        print("\n")  # Разделитель
-
+        print("\n")
         print_info(" Были созданы файлы личности агента и/или .env.")
-
         print_info(
             " Просмотрите src/l3_agent/prompt/personality/, чтобы настроить личность и характер агента."
-        )
-        print_info(
-            " [Опционально] По умолчанию в src/l3_agent/prompt/system/ уже лежат настроенные системные промпты. Можно настроить и эту папку, если вам нужны специфичные системные инструкции."
         )
         print_success("После финальной настройки выберите 'Запустить агента' в меню еще раз.")
         wait_for_enter()
         return
 
-    # Интерактивная авторизация Telethon (если включен)
     if not _telethon_auth_flow():
         wait_for_enter()
         return
@@ -320,51 +285,52 @@ def start_agent_screen() -> None:
     env["PYTHONPATH"] = str(ROOT_DIR)
     env["PYTHONIOENCODING"] = "utf-8"
 
-    kwargs = {}
+    # Гарантируем полное отсоединение от родительского процесса и консоли
+    kwargs = {"close_fds": True}
     if os.name == "nt":
-        kwargs["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP
+        # 0x08000000 = DETACHED_PROCESS - изолирует процесс от родительской консоли
+        kwargs["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP | 0x08000000
     else:
         kwargs["start_new_session"] = True
 
+    crash_log_path = ROOT_DIR / "logs" / "startup" /"startup_error.log"
+    crash_log_path.parent.mkdir(parents=True, exist_ok=True)
+
     try:
-        # Умный перехват ошибок: пишем stderr во временный файл
-        temp_err = tempfile.NamedTemporaryFile(delete=False, suffix=".log")
+        # Открываем реальный файл для логгирования фатальных крашей, избегая блокировок tempfile
+        f_err = open(crash_log_path, "w", encoding="utf-8")
 
-        process = subprocess.Popen(
-            [sys.executable, str(MAIN_SCRIPT)],
-            stdout=subprocess.DEVNULL,
-            stderr=temp_err,
-            cwd=str(ROOT_DIR),
-            env=env,
-            **kwargs,
-        )
+        try:
+            process = subprocess.Popen(
+                [sys.executable, str(MAIN_SCRIPT)],
+                stdout=subprocess.DEVNULL,
+                stderr=f_err,
+                cwd=str(ROOT_DIR),
+                env=env,
+                **kwargs,
+            )
+            PID_FILE.write_text(str(process.pid))
+            
+        finally:
+            # Родительский процесс закрывает свой хэндл, дочерний продолжает писать
+            f_err.close()
 
-        PID_FILE.write_text(str(process.pid))
+        # Даем агенту 5 секунд на старт
         time.sleep(5)
 
+        # Проверяем, не упал ли он
         if process.poll() is not None:
             if PID_FILE.exists():
                 PID_FILE.unlink()
             print_error("Агент завершился с ошибкой сразу после старта.")
 
-            temp_err.close()
-            with open(temp_err.name, "r", encoding="utf-8", errors="replace") as f:
-                error_output = f.read().strip()
-
-            try:
-                os.unlink(temp_err.name)
-            except Exception:
-                pass
+            error_output = crash_log_path.read_text(encoding="utf-8", errors="replace").strip()
 
             if error_output:
-                crash_log_path = ROOT_DIR / "logs" / "startup_error.log"
-                crash_log_path.parent.mkdir(parents=True, exist_ok=True)
-                crash_log_path.write_text(error_output, encoding="utf-8")
-
                 print_info("Детали критической ошибки (Traceback):")
                 print(f"\n{error_output}\n")
             else:
-                print_info(" Проверьте основной лог (logs/system.log) для получения деталей.")
+                print_info("Проверьте основной лог (logs/system.log) для получения деталей.")
 
             wait_for_enter()
             return
@@ -380,10 +346,7 @@ def start_agent_screen() -> None:
 
 
 def stop_agent_screen() -> None:
-    """
-    Экран остановки агента.
-    """
-
+    """Экран остановки агента."""
     if not _is_agent_running():
         print_info(" Агент в данный момент не запущен.")
         if PID_FILE.exists():

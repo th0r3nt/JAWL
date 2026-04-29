@@ -7,7 +7,7 @@ from src.utils._tools import truncate_text
 from src.l2_interfaces.web.search.client import WebSearchClient
 
 from src.l3_agent.skills.registry import skill, SkillResult
-
+from src.l3_agent.swarm.roles import Subagents
 
 class DeepResearch:
     """
@@ -19,7 +19,7 @@ class DeepResearch:
         self.searcher = searcher
         self.reader = reader
 
-    @skill()
+    @skill(swarm_roles=[Subagents.WEB_RESEARCHER])
     async def deep_research(self, queries: List[str]) -> SkillResult:
         """
         Проводит глубокое исследование по списку разных поисковых запросов (рекомендуется от 3 до 10).

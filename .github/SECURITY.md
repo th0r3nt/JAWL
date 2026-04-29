@@ -6,7 +6,7 @@ Currently, only the latest version of JAWL is actively supported with security u
 
 | Version | Supported          |
 | ------- | ------------------ |
-| >= 0.9.5| :white_check_mark: |
+| >= 0.9.4| :white_check_mark: |
 | < 0.9.3.1 | :x:                |
 
 ## Reporting a Vulnerability

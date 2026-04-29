@@ -27,8 +27,13 @@ class WebHooksClient:
             else "  Пока пусто."
         )
 
-        return (
-            f"### WEB HOOKS [ON]\n"
-            f"* Локальный сервер: http://{self.state.host}:{self.state.port}\n"
-            f"* Последние вебхуки:\n{hooks_str}"
-        )
+        return (f"""
+### WEB HOOKS [ON]
+* Сервер: http://{self.state.host}:{self.state.port}
+
+* Эндпоинт для входящих запросов: POST /webhook/{{source}} (где {{source}} - название сервиса-отправителя)
+* Авторизация: параметр '?token=' или HTTP-заголовок 'Authorization: Bearer '
+
+* Последние вебхуки:
+{hooks_str}
+""")

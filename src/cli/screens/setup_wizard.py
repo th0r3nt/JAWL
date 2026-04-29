@@ -9,7 +9,14 @@ from dotenv import dotenv_values
 import questionary
 from ruamel.yaml import YAML
 
-from src.cli.widgets.ui import console, draw_header, get_custom_style, print_error, print_info, set_window_title
+from src.cli.widgets.ui import (
+    console,
+    draw_header,
+    get_custom_style,
+    print_error,
+    print_info,
+    set_window_title,
+)
 
 ROOT_DIR = Path(__file__).resolve().parent.parent.parent.parent
 CONFIG_FILE = ROOT_DIR / "config" / "interfaces.yaml"
@@ -37,7 +44,6 @@ def _check_api_keys() -> tuple[bool, bool]:
     Проверяет наличие ключей в .env файле.
     Возвращает (telethon_ok, aiogram_ok).
     """
-
     if not ENV_FILE.exists():
         return False, False
 
@@ -91,7 +97,6 @@ def setup_wizard_screen() -> None:
     style = get_custom_style()
 
     # Карта маппинга: Title -> путь в YAML-структуре
-    # Это позволяет легко расширять меню, не переписывая логику
     interface_map = {
         "Host OS": ["host", "os", "enabled"],
         "Telegram Telethon": ["telegram", "telethon", "enabled"],
@@ -101,6 +106,8 @@ def setup_wizard_screen() -> None:
         "Web Search": ["web", "search", "enabled"],
         "Web HTTP": ["web", "http", "enabled"],
         "Web Browser": ["web", "browser", "enabled"],
+        "Web Hooks": ["web", "hooks", "enabled"],
+        "Web RSS": ["web", "rss", "enabled"],
         "Meta": ["meta", "enabled"],
         "Multimodality": ["multimodality", "enabled"],
         "Calendar": ["calendar", "enabled"],

@@ -9,8 +9,8 @@ async def test_terminal_events_loop(terminal_client, mock_bus):
     events = HostTerminalEvents(terminal_client, mock_bus)
     events._is_running = True
 
-    # Кладем сырое сообщение в асинхронную очередь клиента (как это делает TCP-сервер)
-    await terminal_client.incoming_queue.put("Выполни скрипт")
+    # Кладем сырое сообщение в асинхронную очередь клиента в виде кортежа (action, payload)
+    await terminal_client.incoming_queue.put(("_MESSAGE", "Выполни скрипт"))
 
     # Перехватываем вызов publish, чтобы остановить бесконечный цикл после 1 итерации
     async def fake_publish(*args, **kwargs):

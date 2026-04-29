@@ -11,7 +11,7 @@ from src.l0_state.interfaces.state import HostTerminalState
 class HostTerminalClient:
     """
     TCP-сервер локального терминала.
-    Управляет подключениями CLI-чата и историей сообщений.
+    Управляет подключениями CLI-чата и передачей сообщений.
     """
 
     def __init__(
@@ -41,7 +41,8 @@ class HostTerminalClient:
         self.server = None
         self.active_writers: set[asyncio.StreamWriter] = set()
 
-        # Очередь для передачи входящих сообщений в events.py
+        # Очередь для передачи входящих сообщений/сигналов в events.py
+        # Формат: (action_type, payload)
         self.incoming_queue = asyncio.Queue()
 
     async def start(self):
@@ -98,8 +99,11 @@ class HostTerminalClient:
 
         # Если пароль верный - пускаем
         self.active_writers.add(writer)
-        self.state.is_ui_connected = True
-        system_logger.info("[Host OS] CLI-чат подключен к терминалу.")
+
+        if not self.state.is_ui_connected:
+            self.state.is_ui_connected = True
+            system_logger.info("[Host OS] CLI-чат подключен к терминалу.")
+            await self.incoming_queue.put(("_CONNECTION_OPENED", ""))
 
         try:
             while True:
@@ -111,7 +115,7 @@ class HostTerminalClient:
                 if text:
                     time_str = get_now_formatted(self.timezone, "%H:%M")
                     self._record_message("User", text, time_str)
-                    await self.incoming_queue.put(text)
+                    await self.incoming_queue.put(("_MESSAGE", text))
 
         except asyncio.CancelledError:
             pass
@@ -121,9 +125,12 @@ class HostTerminalClient:
 
         finally:
             self.active_writers.discard(writer)
-            if not self.active_writers:
+
+            # Проверяем, не осталось ли еще активных сессий
+            if not self.active_writers and self.state.is_ui_connected:
                 self.state.is_ui_connected = False
                 system_logger.info("[Host OS] CLI-чат отключен от терминала.")
+                await self.incoming_queue.put(("_CONNECTION_CLOSED", ""))
 
             try:
                 writer.close()

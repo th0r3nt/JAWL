@@ -67,17 +67,25 @@ class WebBrowserClient:
                 except Exception as e:
                     # Если Playwright жалуется на отсутствие браузеров - качаем их сами
                     if "playwright install" in str(e):
-                        system_logger.info("[Web Browser] Бинарники Chromium не найдены. Начата автоматическая загрузка. (пару минут).")
-                        
+                        system_logger.info(
+                            "[Web Browser] Бинарники Chromium не найдены. Начата автоматическая загрузка. (пару минут)."
+                        )
+
                         proc = await asyncio.create_subprocess_exec(
-                            sys.executable, "-m", "playwright", "install", "chromium",
+                            sys.executable,
+                            "-m",
+                            "playwright",
+                            "install",
+                            "chromium",
                             stdout=asyncio.subprocess.PIPE,
-                            stderr=asyncio.subprocess.PIPE
+                            stderr=asyncio.subprocess.PIPE,
                         )
                         await proc.communicate()
-                        
-                        system_logger.info("[Web Browser] Загрузка Chromium завершена. Запуск браузера.")
-                        
+
+                        system_logger.info(
+                            "[Web Browser] Загрузка Chromium завершена. Запуск браузера."
+                        )
+
                         # Повторная попытка запуска после установки
                         self.browser = await self.playwright.chromium.launch(
                             headless=self.config.headless
@@ -87,7 +95,7 @@ class WebBrowserClient:
 
             # Настройка контекста
             context_kwargs = {
-                "viewport": {"width": 1280, "height": 800},
+                "viewport": {"width": 1920, "height": 1080},
                 "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
             }
 
@@ -97,7 +105,7 @@ class WebBrowserClient:
 
             self.context = await self.browser.new_context(**context_kwargs)
             self.page = await self.context.new_page()
-            
+
             # Устанавливаем дефолтный таймаут для всех действий (в мс)
             self.page.set_default_timeout(self.config.timeout_sec * 1000)
 
@@ -149,7 +157,7 @@ class WebBrowserClient:
             # Вместо него используется aria_snapshot, который идеально подходит для ИИ-агентов
             # и возвращает готовую легковесную YAML-структуру
             snapshot = await self.page.locator("body").aria_snapshot()
-            
+
             if snapshot:
                 # Защита от переполнения контекста (для гигантских страниц)
                 self.state.viewport = truncate_text(

@@ -4,10 +4,11 @@ from datetime import datetime, timedelta
 from typing import Optional, Literal
 
 from src.l2_interfaces.github.client import GithubClient
-from src.l3_agent.skills.registry import SkillResult, skill
 from src.utils.logger import system_logger
 from src.utils._tools import truncate_text, validate_sandbox_path, format_size
 
+from src.l3_agent.skills.registry import SkillResult, skill
+from src.l3_agent.swarm.roles import Subagents
 
 class GithubRepositories:
     """Навыки для работы с репозиториями и кодом."""
@@ -15,7 +16,7 @@ class GithubRepositories:
     def __init__(self, client: GithubClient):
         self.client = client
 
-    @skill()
+    @skill(swarm_roles=[Subagents.CODER])
     async def search_repositories(
         self,
         query: str,
@@ -61,7 +62,7 @@ class GithubRepositories:
         except Exception as e:
             return SkillResult.fail(f"Ошибка при поиске репозиториев: {e}")
 
-    @skill()
+    @skill(swarm_roles=[Subagents.CODER])
     async def get_trending_repositories(
         self,
         period: Optional[Literal["daily", "weekly", "monthly"]],
@@ -130,7 +131,7 @@ class GithubRepositories:
         except Exception as e:
             return SkillResult.fail(f"Ошибка при получении трендов: {e}")
 
-    @skill()
+    @skill(swarm_roles=[Subagents.CODER])
     async def get_repo_info(self, owner: str, repo: str) -> SkillResult:
         """
         Возвращает метаданные репозитория.
@@ -181,7 +182,7 @@ class GithubRepositories:
         except Exception as e:
             return SkillResult.fail(f"Ошибка при поиске кода: {e}")
 
-    @skill()
+    @skill(swarm_roles=[Subagents.CODER])
     async def read_file_content(
         self, owner: str, repo: str, path: str, ref: Optional[str] = None
     ) -> SkillResult:
@@ -212,7 +213,7 @@ class GithubRepositories:
         except Exception as e:
             return SkillResult.fail(f"Ошибка при чтении файла: {e}")
 
-    @skill()
+    @skill(swarm_roles=[Subagents.CODER])
     async def list_recent_commits(
         self, owner: str, repo: str, per_page: int = 10
     ) -> SkillResult:
@@ -242,7 +243,7 @@ class GithubRepositories:
         except Exception as e:
             return SkillResult.fail(f"Ошибка при получении коммитов: {e}")
 
-    @skill()
+    @skill(swarm_roles=[Subagents.CODER])
     async def download_repository(
         self, owner: str, repo: str, dest_filename: str, ref: Optional[str] = None
     ) -> SkillResult:
@@ -288,7 +289,7 @@ class GithubRepositories:
         except Exception as e:
             return SkillResult.fail(f"Ошибка при скачивании репозитория: {e}")
 
-    @skill()
+    @skill(swarm_roles=[Subagents.CODER])
     async def get_commit_details(self, owner: str, repo: str, commit_sha: str) -> SkillResult:
         """
         Возвращает детальную информацию о коммите, включая точные пути всех измененных файлов.
@@ -331,7 +332,7 @@ class GithubRepositories:
         except Exception as e:
             return SkillResult.fail(f"Ошибка при получении деталей коммита: {e}")
 
-    @skill()
+    @skill(swarm_roles=[Subagents.CODER])
     async def list_repo_directory(
         self, owner: str, repo: str, path: str = "", ref: Optional[str] = None
     ) -> SkillResult:
@@ -408,7 +409,7 @@ class GithubRepositories:
         except Exception as e:
             return SkillResult.fail(f"Ошибка при удалении звезды: {e}")
 
-    @skill()
+    @skill(swarm_roles=[Subagents.CODER])
     async def list_branches(self, owner: str, repo: str, per_page: int = 30) -> SkillResult:
         """
         Возвращает список веток репозитория.

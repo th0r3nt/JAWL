@@ -3,9 +3,11 @@ import trafilatura
 
 from src.utils.logger import system_logger
 from src.utils._tools import truncate_text
-from src.l2_interfaces.web.search.client import WebSearchClient
-from src.l3_agent.skills.registry import skill, SkillResult
 
+from src.l2_interfaces.web.search.client import WebSearchClient
+
+from src.l3_agent.skills.registry import skill, SkillResult
+from src.l3_agent.swarm.roles import Subagents
 
 class TrafilaturaReader:
     def __init__(self, client: WebSearchClient):
@@ -22,7 +24,7 @@ class TrafilaturaReader:
 
         return await asyncio.to_thread(_fetch)
 
-    @skill(name_override="read_webpage")
+    @skill(swarm_roles=[Subagents.WEB_RESEARCHER])
     async def read_webpage(self, url: str) -> SkillResult:
         """
         Читает текстовое содержимое веб-страницы по URL.

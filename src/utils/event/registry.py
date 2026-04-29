@@ -179,6 +179,20 @@ class Events:
         requires_attention=True,
     )
 
+    HOST_TERMINAL_OPENED = EventConfig(
+        name="HOST_TERMINAL_OPENED",
+        description="Окно терминала открыто.",
+        level=EventLevel.MEDIUM,
+        requires_attention=False,
+    )
+
+    HOST_TERMINAL_CLOSED = EventConfig(
+        name="HOST_TERMINAL_CLOSED",
+        description="Окно терминала закрыто.",
+        level=EventLevel.LOW,
+        requires_attention=False,
+    )
+
     # ============================================
     # Email
     # ============================================
@@ -226,6 +240,17 @@ class Events:
     SYSTEM_CALENDAR_ALARM = EventConfig(
         name="SYSTEM_CALENDAR_ALARM",
         description="Сработал таймер или регулярная задача из календаря.",  # TODO: в коде вообще используется поле description?
+        level=EventLevel.HIGH,
+        requires_attention=True,
+    )
+
+    # ============================================
+    # Swarm
+    # ============================================
+
+    SUBAGENT_TASK_COMPLETED = EventConfig(
+        name="SUBAGENT_TASK_COMPLETED",
+        description="Субагент закончил свою работу.",
         level=EventLevel.HIGH,
         requires_attention=True,
     )

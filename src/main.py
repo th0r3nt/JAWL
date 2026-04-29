@@ -113,7 +113,7 @@ class System:
 
         # AGENT STATE
         self.agent_state = AgentState(
-            llm_model=self.settings.llm.model,
+            llm_model=self.settings.llm.main_model,
             temperature=self.settings.llm.temperature,
             max_react_steps=self.settings.llm.max_react_steps,
             heartbeat_interval=self.settings.system.heartbeat_interval,
@@ -370,6 +370,26 @@ class System:
             accel_config=self.settings.system.event_acceleration,
             timezone=self.settings.system.timezone,
         )
+
+        # Инициализация Swarm
+        if self.sys_cfg.swarm.enabled:
+            from src.l3_agent.swarm.skills.report import SubagentReport
+            from src.l3_agent.swarm.spawn import SwarmManager
+            
+            # Навык отчета регистрируем глобально, он изолирован
+            report_skill = SubagentReport(
+                event_bus=self.event_bus, 
+                sandbox_dir=self.root_dir / "sandbox"
+            )
+            register_instance(report_skill)
+
+            swarm_manager = SwarmManager(
+                llm_client=self.llm_client,
+                swarm_config=self.sys_cfg.swarm,
+                root_dir=self.root_dir,
+                token_tracker=token_tracker
+            )
+            register_instance(swarm_manager)
 
         # Связываем шину событий с пульсом агента (мост между L2 и L3)
         self._bridge_events_to_heartbeat()
@@ -696,7 +716,7 @@ async def main() -> int:
             # Web Search
             tavily_api_key=TAVILY_API_KEY,
             # Web Hook
-            webhook_sectet=WEBHOOK_SECRET,
+            webhook_secret=WEBHOOK_SECRET,
         )
         return exit_code
 

@@ -7,9 +7,11 @@ from typing import Optional
 from src import __version__
 from src.utils.logger import system_logger
 from src.utils._tools import truncate_text, validate_sandbox_path
-from src.l3_agent.skills.registry import SkillResult, skill
+
 from src.l2_interfaces.web.http.client import WebHTTPClient
 
+from src.l3_agent.skills.registry import skill, SkillResult
+from src.l3_agent.swarm.roles import Subagents
 
 _ALLOWED_URL_SCHEMES = ("http", "https")
 
@@ -30,7 +32,7 @@ class WebHTTPRequests:
     def __init__(self, client: WebHTTPClient):
         self.client = client
 
-    @skill()
+    @skill(swarm_roles=[Subagents.WEB_RESEARCHER])
     async def http_request(
         self, url: str, method: str = "GET", headers: Optional[dict] = None
     ) -> SkillResult:

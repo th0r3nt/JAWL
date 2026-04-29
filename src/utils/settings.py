@@ -176,11 +176,12 @@ class IdentityConfig(BaseModel):
 
 class LLMConfig(BaseModel):
     model_config = ConfigDict(protected_namespaces=())
-    model: str = "unknown"
+    main_model: str = "unknown"
     available_models: list[str] = Field(default_factory=list)
     is_multimodal: bool = False
     temperature: float = 1.0
     max_react_steps: int = 15
+
 
 
 class LoggingConfig(BaseModel):
@@ -246,6 +247,12 @@ class SQLConfig(BaseModel):
     drives: DrivesConfig = Field(default_factory=DrivesConfig)
 
 
+class SwarmConfig(BaseModel):
+    enabled: bool = False
+    subagent_model: str = "unknown"
+    max_concurrent_workers: int = 3
+
+
 class SystemConfig(BaseModel):
     timezone: int = 0
     logging: LoggingConfig = Field(default_factory=LoggingConfig)
@@ -258,6 +265,7 @@ class SystemConfig(BaseModel):
     )
     context_depth: ContextDepthConfig = Field(default_factory=ContextDepthConfig)
 
+    swarm: SwarmConfig = Field(default_factory=SwarmConfig)
     sql: SQLConfig = Field(default_factory=SQLConfig)
 
 

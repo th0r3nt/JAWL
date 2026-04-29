@@ -4,9 +4,10 @@ import psutil
 from src.utils.logger import system_logger
 from src.utils.dtime import get_now_formatted, seconds_to_duration_str
 
-from src.l2_interfaces.host.os.client import HostOSClient
+from src.l2_interfaces.host.os.client import HostOSClient, HostOSAccessLevel
+from src.l2_interfaces.host.os.decorators import require_access
 
-from src.l3_agent.skills.registry import SkillResult
+from src.l3_agent.skills.registry import SkillResult, skill
 
 
 class HostOSSystem:
@@ -20,6 +21,8 @@ class HostOSSystem:
         # Инициализируем счетчик CPU, чтобы последующие вызовы возвращали адекватный %
         psutil.cpu_percent(interval=None)
 
+    @skill()
+    @require_access(HostOSAccessLevel.OBSERVER)
     async def get_telemetry(self) -> SkillResult:
         """
         Возвращает загрузку CPU, свободной RAM и аптайм системы.
@@ -47,6 +50,8 @@ class HostOSSystem:
         except Exception as e:
             return SkillResult.fail(f"Ошибка при получении телеметрии: {e}")
 
+    @skill()
+    @require_access(HostOSAccessLevel.OBSERVER)
     async def list_top_processes(self) -> SkillResult:
         """
         Показывает процессы, потребляющие больше всего оперативной памяти.
@@ -85,6 +90,8 @@ class HostOSSystem:
         except Exception as e:
             return SkillResult.fail(f"Ошибка при получении списка процессов: {e}")
 
+    @skill()
+    @require_access(HostOSAccessLevel.OBSERVER)
     async def get_uptime(self) -> SkillResult:
         """
         Возвращает время непрерывной работы хост-системы.
@@ -92,6 +99,8 @@ class HostOSSystem:
         uptime_str = seconds_to_duration_str(time.time() - psutil.boot_time())
         return SkillResult.ok(uptime_str)
 
+    @skill()
+    @require_access(HostOSAccessLevel.OBSERVER)
     async def get_datetime(self) -> SkillResult:
         """
         Возвращает текущую дату и время на сервере.

@@ -41,7 +41,7 @@ def set_window_title(title: str) -> None:
         import ctypes
 
         ctypes.windll.kernel32.SetConsoleTitleW(title)
-        
+
     else:
         sys.stdout.write(f"\033]0;{title}\007")
         sys.stdout.flush()
@@ -53,7 +53,8 @@ def _get_agent_status() -> dict:
         try:
             with open(SETTINGS_FILE, "r", encoding="utf-8") as f:
                 config = yaml.safe_load(f) or {}
-                status["model"] = config.get("llm", {}).get("model", "unknown")
+                # Обращаемся к ключу main_model (раньше был просто model)
+                status["model"] = config.get("llm", {}).get("main_model", "unknown")
                 status["interval"] = config.get("system", {}).get("heartbeat_interval", 0)
         except Exception:
             pass
@@ -64,7 +65,7 @@ def _build_header_panel(version: str) -> Panel:
     status = _get_agent_status()
     logo_text = Text(LOGO, style="bold cyan")
     subtitle_text = Text("Just A While Loop", style="bold cyan")
-    version_text = Text(f"{version}\n", style="dim cyan")
+    version_text = Text(f"v{version} (welcome subagents!)\n", style="dim cyan")
 
     status_text = Text()
     if status["is_running"]:
@@ -127,7 +128,7 @@ def launch_in_new_window(arg: str) -> None:
                 if shutil.which(term):
                     subprocess.Popen([term] + args + cmd)
                     return
-                
+
             print_error("Не удалось найти графический терминал. Открытие в текущем окне.")
             import time
 

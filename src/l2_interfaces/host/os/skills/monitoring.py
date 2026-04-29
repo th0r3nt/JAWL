@@ -1,4 +1,6 @@
-from src.l2_interfaces.host.os.client import HostOSClient
+from src.l2_interfaces.host.os.client import HostOSClient, HostOSAccessLevel
+from src.l2_interfaces.host.os.decorators import require_access
+
 from src.l2_interfaces.host.os.events import HostOSEvents
 
 from src.l3_agent.skills.registry import SkillResult, skill
@@ -13,6 +15,7 @@ class HostOSMonitoring:
         self.events = host_os_events
 
     @skill()
+    @require_access(HostOSAccessLevel.SANDBOX)
     async def track_directory(self, path: str) -> SkillResult:
         """
         Начинает отслеживание изменений в указанной директории.
@@ -39,6 +42,7 @@ class HostOSMonitoring:
             return SkillResult.fail(f"Ошибка при добавлении отслеживания: {e}")
 
     @skill()
+    @require_access(HostOSAccessLevel.SANDBOX)
     async def untrack_directory(self, path: str) -> SkillResult:
         """
         Прекращает отслеживание директории.
@@ -64,6 +68,7 @@ class HostOSMonitoring:
             return SkillResult.fail(f"Ошибка при удалении отслеживания: {e}")
 
     @skill()
+    @require_access(HostOSAccessLevel.SANDBOX)
     async def get_tracked_directories(self) -> SkillResult:
         """
         Возвращает список всех отслеживаемых директорий.

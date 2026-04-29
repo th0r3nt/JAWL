@@ -6,7 +6,7 @@ from src.l2_interfaces.host.terminal.client import HostTerminalClient
 
 
 class HostTerminalEvents:
-    """Фоновый воркер: перекладывает сообщения из очереди сокета в EventBus."""
+    """Фоновый воркер: перекладывает сообщения и события подключения из очереди сокета в EventBus."""
 
     def __init__(self, client: HostTerminalClient, event_bus: EventBus):
         self.client = client
@@ -29,13 +29,25 @@ class HostTerminalEvents:
     async def _loop(self):
         while self._is_running:
             try:
-                # Ждем сообщение из TCP-сервера
-                text = await self.client.incoming_queue.get()
+                # Ждем данные из TCP-сервера
+                action, payload = await self.client.incoming_queue.get()
 
-                # Публикуем событие, чтобы разбудить Heartbeat
-                await self.bus.publish(
-                    Events.HOST_TERMINAL_MESSAGE, sender_name="User", message=text
-                )
+                # Публикуем соответствующее событие
+                if action == "_CONNECTION_OPENED":
+                    await self.bus.publish(
+                        Events.HOST_TERMINAL_OPENED,
+                        message="Пользователь открыл терминал чата и смотрит в него.",
+                    )
+                elif action == "_CONNECTION_CLOSED":
+                    await self.bus.publish(
+                        Events.HOST_TERMINAL_CLOSED,
+                        message="Пользователь закрыл терминал чата.",
+                    )
+                elif action == "_MESSAGE":
+                    await self.bus.publish(
+                        Events.HOST_TERMINAL_MESSAGE, sender_name="User", message=payload
+                    )
+
             except asyncio.CancelledError:
                 break
             except Exception as e:

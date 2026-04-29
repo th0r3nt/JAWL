@@ -14,6 +14,7 @@ from src.utils._tools import truncate_text
 from src.l2_interfaces.host.os.client import HostOSClient, HostOSAccessLevel
 from src.l2_interfaces.host.os.decorators import require_access
 
+from src.l3_agent.swarm.roles import Subagents
 from src.l3_agent.skills.registry import SkillResult, skill
 
 
@@ -51,9 +52,17 @@ class HostOSExecution:
         """
         Собирает изолированное окружение (env) для запуска скриптов.
         Гарантирует, что скрипт увидит и корень фреймворка (src), и корень песочницы (framework_api).
+        Очищает окружение от системных секретов (чтобы хитрые агенты не достали их через os.environ).
         """
 
         env = os.environ.copy()
+        
+        # Скраббинг (удаление) секретов фреймворка из дочернего процесса
+        forbidden_substrings = ["TOKEN", "KEY", "SECRET", "PASSWORD", "HASH", "API_ID"]
+        for k in list(env.keys()):
+            if any(sub in k.upper() for sub in forbidden_substrings):
+                del env[k]
+
         env["PYTHONUNBUFFERED"] = "1"
         env["PYTHONIOENCODING"] = "utf-8"
 
@@ -74,7 +83,7 @@ class HostOSExecution:
         env["PYTHONPATH"] = os.pathsep.join(paths_to_add)
         return env
 
-    @skill()
+    @skill(swarm_roles=[Subagents.CODER])
     @require_access(HostOSAccessLevel.OBSERVER)
     async def execute_script(self, filepath: str) -> SkillResult:
         """
@@ -165,7 +174,7 @@ class HostOSExecution:
             system_logger.error(f"[Host OS] {err_msg}")
             return SkillResult.fail(err_msg)
 
-    @skill()
+    @skill(swarm_roles=[Subagents.CODER])
     @require_access(HostOSAccessLevel.ROOT)
     async def execute_shell_command(self, command: str) -> SkillResult:
         """

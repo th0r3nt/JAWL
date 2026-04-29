@@ -39,8 +39,11 @@ class ColorFormatter(logging.Formatter):
         "[Thoughts]": LogColors.MAGENTA,
         "[Agent Action]": LogColors.BRIGHT_GREEN,
         "[Agent Action Result]": LogColors.GRAY,
+        "[Swarm]": LogColors.YELLOW,
         # Скиллы/интерфейсы
         "[Skills]": LogColors.GRAY,
+        "[Subagent LLM]": LogColors.YELLOW,  # Обязательно выше чем [LLM], так как парсинг ищет подстроки по словарю
+        "[Subagent ReAct]": LogColors.YELLOW,
         "[LLM]": LogColors.BRIGHT_BLUE,
         "[Host OS]": LogColors.GREEN,
         "[Web]": LogColors.MAGENTA,

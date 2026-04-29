@@ -8,10 +8,11 @@ from typing import Union, List
 from src.utils.logger import system_logger
 from src.utils._tools import format_size
 
-from src.l2_interfaces.host.os.client import HostOSClient
+from src.l2_interfaces.host.os.client import HostOSClient, HostOSAccessLevel
+from src.l2_interfaces.host.os.decorators import require_access
 
 from src.l3_agent.skills.registry import SkillResult, skill
-
+from src.l3_agent.swarm.roles import Subagents
 
 class HostOSFiles:
     """
@@ -26,7 +27,8 @@ class HostOSFiles:
     # ЧТЕНИЕ ФАЙЛОВ
     # =================================================================================
 
-    @skill()
+    @skill(swarm_roles=[Subagents.CODER])
+    @require_access(HostOSAccessLevel.SANDBOX)
     async def read_file(
         self, filepath: str, read_from: Literal["head", "tail"] = "head"
     ) -> SkillResult:
@@ -94,7 +96,8 @@ class HostOSFiles:
         except Exception as e:
             return SkillResult.fail(f"Ошибка при чтении файла: {e}")
 
-    @skill()
+    @skill(swarm_roles=[Subagents.CODER])
+    @require_access(HostOSAccessLevel.SANDBOX)
     async def read_files_in_directory(
         self, path: str = ".", max_files: int = 10, recursive: bool = False
     ) -> SkillResult:
@@ -210,7 +213,8 @@ class HostOSFiles:
     # РЕДАКТИРОВАНИЕ ФАЙЛОВ
     # =================================================================================
 
-    @skill()
+    @skill(swarm_roles=[Subagents.CODER])
+    @require_access(HostOSAccessLevel.SANDBOX)
     async def write_file(
         self, filepath: str, content: str, description: str = None
     ) -> SkillResult:
@@ -257,7 +261,8 @@ class HostOSFiles:
         except Exception as e:
             return SkillResult.fail(f"Ошибка при перезаписи файла: {e}")
 
-    @skill()
+    @skill(swarm_roles=[Subagents.CODER])
+    @require_access(HostOSAccessLevel.SANDBOX)
     async def append_to_file(self, filepath: str, content: str) -> SkillResult:
         """
         Безопасно добавляет текст в конец существующего файла.
@@ -297,7 +302,8 @@ class HostOSFiles:
         except Exception as e:
             return SkillResult.fail(f"Ошибка при добавлении в файл: {e}")
 
-    @skill()
+    @skill(swarm_roles=[Subagents.CODER])
+    @require_access(HostOSAccessLevel.SANDBOX)
     async def delete_lines_matching(
         self, filepath: str, match_string: str, exact_match: bool = False
     ) -> SkillResult:
@@ -350,7 +356,8 @@ class HostOSFiles:
         except Exception as e:
             return SkillResult.fail(f"Ошибка при удалении строк: {e}")
 
-    @skill()
+    @skill(swarm_roles=[Subagents.CODER])
+    @require_access(HostOSAccessLevel.SANDBOX)
     async def patch_file(
         self, filepath: str, search_block: str, replace_block: str
     ) -> SkillResult:
@@ -412,6 +419,7 @@ class HostOSFiles:
     # =================================================================================
 
     @skill()
+    @require_access(HostOSAccessLevel.SANDBOX)
     async def open_file(self, filepath: str) -> SkillResult:
         """
         'Открывает' файл. Содержимое открытого файла всегда будет отображаться в системном промпте (вкладки редактора).
@@ -449,6 +457,7 @@ class HostOSFiles:
             return SkillResult.fail(f"Ошибка при открытии файла: {e}")
 
     @skill()
+    @require_access(HostOSAccessLevel.SANDBOX)
     async def close_file(self, filepath: str) -> SkillResult:
         """
         'Закрывает' файл, убирая его из системного промпта (вкладок редактора).
@@ -472,6 +481,7 @@ class HostOSFiles:
             return SkillResult.fail(f"Ошибка при закрытии файла: {e}")
 
     @skill()
+    @require_access(HostOSAccessLevel.SANDBOX)
     async def open_directory_workspace(
         self, path: str = ".", recursive: bool = False
     ) -> SkillResult:
@@ -589,10 +599,11 @@ class HostOSFiles:
     # ОСТАЛЬНЫЕ НАВЫКИ ФАЙЛОВОЙ СИСТЕМЫ
     # =================================================================================
 
-    @skill()
+    @skill(swarm_roles=[Subagents.CODER])
+    @require_access(HostOSAccessLevel.SANDBOX)
     async def list_directory(self, path: str = ".", max_depth: int = 1) -> SkillResult:
         """
-        Показывает содержимое директории в виде красивого дерева (иерархии).
+        Показывает содержимое директории.
         max_depth: насколько глубоко заглядывать во вложенные папки (0 - только текущая папка, 1 - на один уровень вглубь, и т.д.)
         """
         limit = self.host_os.config.file_list_limit
@@ -706,7 +717,8 @@ class HostOSFiles:
         except Exception as e:
             return SkillResult.fail(f"Ошибка при чтении директории: {e}")
 
-    @skill()
+    @skill(swarm_roles=[Subagents.CODER])
+    @require_access(HostOSAccessLevel.SANDBOX)
     async def search_files(self, pattern: str, path: str = ".") -> SkillResult:
         """Поиск файлов по маске (например, '*.py', 'log_*.txt') во вложенных папках."""
 
@@ -766,7 +778,8 @@ class HostOSFiles:
         except Exception as e:
             return SkillResult.fail(f"Ошибка при поиске файлов: {e}")
 
-    @skill()
+    @skill(swarm_roles=[Subagents.CODER])
+    @require_access(HostOSAccessLevel.SANDBOX)
     async def search_content_in_files(
         self,
         search_string: str,
@@ -878,6 +891,7 @@ class HostOSFiles:
             return SkillResult.fail(f"Ошибка при поиске текста: {e}")
 
     @skill()
+    @require_access(HostOSAccessLevel.SANDBOX)
     async def delete_file(self, filepath: str) -> SkillResult:
         """Удаляет указанный файл (не папки)."""
 
@@ -905,6 +919,7 @@ class HostOSFiles:
             return SkillResult.fail(f"Ошибка при удалении файла: {e}")
 
     @skill()
+    @require_access(HostOSAccessLevel.SANDBOX)
     async def delete_directory(self, path: str) -> SkillResult:
         """Удаляет указанную директорию вместе со всем её содержимым."""
 
@@ -938,7 +953,8 @@ class HostOSFiles:
         except Exception as e:
             return SkillResult.fail(f"Ошибка при удалении директории: {e}")
 
-    @skill()
+    @skill(swarm_roles=[Subagents.CODER])
+    @require_access(HostOSAccessLevel.SANDBOX)
     async def create_directories(self, paths: Union[str, List[str]]) -> SkillResult:
         """Создает одну или несколько директорий (папок)."""
 
@@ -981,6 +997,7 @@ class HostOSFiles:
         return SkillResult.ok(msg)
 
     @skill()
+    @require_access(HostOSAccessLevel.SANDBOX)
     async def move_or_rename(self, source_path: str, destination_path: str) -> SkillResult:
         """
         Перемещает/переименовывает файл/директорию.
@@ -1013,6 +1030,7 @@ class HostOSFiles:
             return SkillResult.fail(f"Ошибка при перемещении/переименовании: {e}")
 
     @skill()
+    @require_access(HostOSAccessLevel.SANDBOX)
     async def set_file_description(self, filepath: str, description: str) -> SkillResult:
         """
         Привязывает текстовое описание к любому локальному файлу.
@@ -1039,6 +1057,7 @@ class HostOSFiles:
             return SkillResult.fail(f"Ошибка при сохранении описания: {e}")
 
     @skill()
+    @require_access(HostOSAccessLevel.SANDBOX)
     async def extract_archive(self, archive_path: str, extract_to: str = ".") -> SkillResult:
         """
         Распаковывает архив (zip, tar, gz и др.).

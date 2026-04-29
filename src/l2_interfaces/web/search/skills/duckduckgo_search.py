@@ -3,9 +3,11 @@ from typing import Any
 from ddgs import DDGS # Важно: Импорт ddgs - единственно верный, иначе поиск к чертям сломается
 
 from src.utils.logger import system_logger
-from src.l3_agent.skills.registry import skill, SkillResult
+
 from src.l2_interfaces.web.search.client import WebSearchClient
 
+from src.l3_agent.skills.registry import skill, SkillResult
+from src.l3_agent.swarm.roles import Subagents
 
 class DuckDuckGoSearch:
     def __init__(self, client: WebSearchClient):
@@ -33,7 +35,7 @@ class DuckDuckGoSearch:
         system_logger.error(f"[Web] DDG Rate Limit исчерпан для запроса '{query}': {last_err}")
         raise last_err
 
-    @skill()
+    @skill(swarm_roles=[Subagents.WEB_RESEARCHER])
     async def search(self, query: str, max_results: int = 5) -> SkillResult:
         """
         Ищет информацию в интернете. Возвращает список ссылок и кратких сниппетов.

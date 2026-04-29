@@ -6,9 +6,11 @@ from src import __version__
 
 from src.utils.logger import system_logger
 from src.utils._tools import truncate_text
-from src.l2_interfaces.web.search.client import WebSearchClient
-from src.l3_agent.skills.registry import skill, SkillResult
 
+from src.l2_interfaces.web.search.client import WebSearchClient
+
+from src.l3_agent.skills.registry import skill, SkillResult
+from src.l3_agent.swarm.roles import Subagents
 
 class JinaReader:
     def __init__(self, client: WebSearchClient):
@@ -25,7 +27,7 @@ class JinaReader:
 
         return await asyncio.to_thread(_fetch)
 
-    @skill()
+    @skill(swarm_roles=[Subagents.WEB_RESEARCHER])
     async def read_webpage(self, url: str) -> SkillResult:
         """
         Читает текстовое содержимое веб-страницы по URL.

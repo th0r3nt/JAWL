@@ -1,5 +1,6 @@
 import time
 from pathlib import Path
+from collections import deque
 
 from rich.panel import Panel
 from rich.text import Text
@@ -69,6 +70,7 @@ def _colorize_log_line(line: str) -> Text:
 def logs_screen() -> None:
     """
     Экран потокового вывода логов в реальном времени.
+    Выводит последние 200 строк и переходит в режим tail -f.
     """
 
     set_window_title("JAWL - Системные логи")
@@ -92,23 +94,13 @@ def logs_screen() -> None:
 
     try:
         with open(LOG_FILE, "r", encoding="utf-8", errors="replace") as f:
-            f.seek(0, 2)
-
-            # Надежный способ отслеживать ротацию логов
-            last_size = LOG_FILE.stat().st_size if LOG_FILE.exists() else 0
-
-            # Прыгаем на 2000 байт назад
-            if last_size > 2000:
-                f.seek(last_size - 2000)
-                f.readline()
-            else:
-                f.seek(0)
-
-            # 1. Выводим предысторию
-            for line in f:
+            # 1. Выводим предысторию (последние 200 строк)
+            # deque работает на C, поэтому это супер быстро и не жрет память
+            for line in deque(f, maxlen=200):
                 console.print(_colorize_log_line(line))
 
             # 2. Режим tail -f
+            last_size = LOG_FILE.stat().st_size if LOG_FILE.exists() else 0
             while True:
                 line = f.readline()
                 if not line:

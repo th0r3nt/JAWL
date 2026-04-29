@@ -5,7 +5,8 @@ import psutil
 
 from src.utils.logger import system_logger
 
-from src.l2_interfaces.host.os.client import HostOSClient
+from src.l2_interfaces.host.os.client import HostOSClient, HostOSAccessLevel
+from src.l2_interfaces.host.os.decorators import require_access
 
 from src.l3_agent.skills.registry import SkillResult, skill
 
@@ -19,6 +20,7 @@ class HostOSNetwork:
         self.host_os = host_os_client
 
     @skill()
+    @require_access(HostOSAccessLevel.OBSERVER)
     async def ping_host(self, host: str, count: int = 4) -> SkillResult:
         """
         Проверяет доступность узла через ICMP Ping.
@@ -66,6 +68,7 @@ class HostOSNetwork:
             return SkillResult.fail(f"Ошибка выполнения ping: {e}")
 
     @skill()
+    @require_access(HostOSAccessLevel.OBSERVER)
     async def check_port(self, host: str, port: int, timeout: int = 3) -> SkillResult:
         """
         Проверяет доступность TCP-порта.
@@ -95,6 +98,7 @@ class HostOSNetwork:
             return SkillResult.fail(f"Ошибка при проверке порта {host}:{port}: {e}")
 
     @skill()
+    @require_access(HostOSAccessLevel.OBSERVER)
     async def list_active_connections(self, state: str = "LISTEN") -> SkillResult:
         """
         Показывает активные сетевые соединения на хосте.
@@ -126,6 +130,7 @@ class HostOSNetwork:
             return SkillResult.fail(f"Ошибка при получении соединений: {e}")
 
     @skill()
+    @require_access(HostOSAccessLevel.OBSERVER)
     async def resolve_dns(self, domain: str) -> SkillResult:
         """
         Возвращает IP-адреса, привязанные к домену.

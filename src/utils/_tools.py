@@ -122,3 +122,43 @@ def clean_html(raw_html: str) -> str:
     text = re.sub(r"\s+", " ", text).strip()
 
     return text
+
+
+def draw_image_grid(image_path: str | Path, step: int = 100):
+    """
+    Накладывает высококонтрастную координатную сетку на изображение.
+    Используется для мультимодального зрения агента.
+    """
+    
+    from PIL import Image, ImageDraw
+
+    with Image.open(image_path) as img:
+        # Создаем прозрачный слой для сетки
+        overlay = Image.new("RGBA", img.size, (255, 255, 255, 0))
+        draw = ImageDraw.Draw(overlay)
+        width, height = img.size
+
+        # Рисуем линии сетки
+        for x in range(0, width, step):
+            draw.line([(x, 0), (x, height)], fill=(255, 0, 0, 80), width=1)
+        for y in range(0, height, step):
+            draw.line([(0, y), (width, y)], fill=(255, 0, 0, 80), width=1)
+
+        # Рисуем координаты с белой подложкой для идеальной читаемости LLM
+        for x in range(0, width, step):
+            for y in range(0, height, step):
+                text = f"{x},{y}"
+                # Примерный расчет ширины текста (стандартный шрифт PIL ~ 6x10 px на символ)
+                text_w = len(text) * 6
+                text_h = 10
+
+                # Рисуем белую полупрозрачную подложку
+                draw.rectangle(
+                    [x + 2, y + 2, x + 4 + text_w, y + 4 + text_h], fill=(255, 255, 255, 220)
+                )
+                # Рисуем сам текст красным цветом
+                draw.text((x + 4, y + 2), text, fill=(255, 0, 0, 255))
+
+        # Склеиваем слои и сохраняем
+        combined = Image.alpha_composite(img.convert("RGBA"), overlay)
+        combined.convert("RGB").save(image_path)

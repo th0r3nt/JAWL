@@ -57,20 +57,20 @@ class TokenTracker:
         num_tokens += 3
         return num_tokens
 
-    def add_input_record(self, messages: List[Any]) -> None:
+    def add_input_record(self, messages: List[Any], log_prefix: str = "[LLM]") -> int:
         total_tokens = self.count_messages_tokens(messages)
         self.input_history.append({"total": total_tokens})
 
         # Плюсуем в счетчик текущего тика
         self._current_tick_in += total_tokens
-        system_logger.info(f"[LLM] Input tokens: {total_tokens}.")
+        system_logger.info(f"{log_prefix} Input tokens: {total_tokens}.")
 
         return total_tokens
 
-    def add_output_record(self, output_text: str) -> None:
+    def add_output_record(self, output_text: str, log_prefix: str = "[LLM]") -> None:
         output_tokens = self._approximate_tokens(output_text)
         self.output_history.append({"total": output_tokens})
 
         # Плюсуем в счетчик текущего тика
         self._current_tick_out += output_tokens
-        system_logger.info(f"[LLM] Output tokens: {output_tokens}.")
+        system_logger.info(f"{log_prefix} Output tokens: {output_tokens}.")

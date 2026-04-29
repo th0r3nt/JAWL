@@ -1,13 +1,15 @@
 import inspect
 import asyncio
 from dataclasses import dataclass
-from typing import Optional, Callable, Dict, Any, TypeVar
+from typing import Optional, Callable, Dict, Any, TypeVar, List
 
 from pydantic import create_model, BaseModel, ValidationError
 
 from src.utils.logger import system_logger
 from src.utils._tools import truncate_text
+
 from src.l3_agent.skills.schema import ActionCall
+from src.l3_agent.swarm.roles import SubagentRole
 
 
 @dataclass
@@ -24,7 +26,6 @@ class SkillResult:
         return cls(is_success=False, message=message)
 
 
-# Храним функцию, инстанс, Pydantic-схему и строку докстринга
 _REGISTRY: Dict[str, Dict[str, Any]] = {}
 
 
@@ -47,8 +48,6 @@ def _build_skill_name(
         return f"{instance.__class__.__name__}.{func.__name__}"
 
     segments = func.__module__.split(".")
-
-    # Очищаем ненужные пути, оставляя только 'Класс.имя_функции'
     useless = {"src", "l0_state", "l1_databases", "l2_interfaces", "skills", "l3_agent"}
     clean_segments = [s for s in segments if s not in useless]
 
@@ -56,10 +55,6 @@ def _build_skill_name(
 
 
 def _create_pydantic_guard(func: Callable, skill_name: str) -> type[BaseModel]:
-    """
-    Динамически генерирует Pydantic схему на основе сигнатуры функции.
-    """
-
     sig = inspect.signature(func)
     fields = {}
 
@@ -78,7 +73,11 @@ def _create_pydantic_guard(func: Callable, skill_name: str) -> type[BaseModel]:
 
 
 def _register_callable(
-    func: Callable, override: Optional[str] = None, instance: Optional[Any] = None
+    func: Callable,
+    override: Optional[str] = None,
+    instance: Optional[Any] = None,
+    swarm_roles: Optional[List[SubagentRole]] = None,
+    hidden: bool = False,
 ):
     skill_name = _build_skill_name(func, override, instance)
     sig = inspect.signature(func)
@@ -107,6 +106,8 @@ def _register_callable(
         "instance": instance,
         "doc_string": doc_str,
         "is_custom": False,
+        "swarm_roles": swarm_roles or [],
+        "hidden": hidden,
     }
     system_logger.info(f"[Skills] Зарегистрирован скилл: {skill_name}")
 
@@ -130,6 +131,8 @@ def register_custom_callable(func: Callable, skill_name: str, description: str, 
         "instance": None,
         "doc_string": doc_str,
         "is_custom": True,
+        "swarm_roles": [],
+        "hidden": False,
     }
     system_logger.info(f"[Skills] Зарегистрирован кастомный скилл: {skill_name}")
 
@@ -137,14 +140,20 @@ def register_custom_callable(func: Callable, skill_name: str, description: str, 
 F = TypeVar("F", bound=Callable[..., Any])
 
 
-def skill(name_override: Optional[str] = None) -> Callable[[F], F]:
+def skill(
+    name_override: Optional[str] = None,
+    swarm_roles: Optional[List[SubagentRole]] = None,
+    hidden: bool = False,
+) -> Callable[[F], F]:
     def decorator(func: F) -> F:
         sig = inspect.signature(func)
         if "self" in sig.parameters:
             setattr(func, "__is_skill__", True)
             setattr(func, "__skill_name_override__", name_override)
+            setattr(func, "__swarm_roles__", swarm_roles)
+            setattr(func, "__skill_hidden__", hidden)
             return func
-        _register_callable(func, name_override)
+        _register_callable(func, name_override, swarm_roles=swarm_roles, hidden=hidden)
         return func
 
     return decorator
@@ -155,17 +164,22 @@ def register_instance(instance: Any):
         method = getattr(instance, attr_name)
         if callable(method) and getattr(method, "__is_skill__", False):
             override = getattr(method, "__skill_name_override__", None)
-            _register_callable(method, override, instance)
+            swarm_roles = getattr(method, "__swarm_roles__", None)
+            hidden = getattr(method, "__skill_hidden__", False)
+            _register_callable(
+                method, override, instance, swarm_roles=swarm_roles, hidden=hidden
+            )
 
 
 def get_skills_library() -> str:
-    """Собирает Markdown с документацией навыков. Скрывает недоступные навыки."""
     active_docs = []
     custom_docs = []
 
-    # Сортируем ключи, чтобы скиллы шли по алфавиту (и группировались по классам)
     for skill_name in sorted(_REGISTRY.keys()):
         data = _REGISTRY[skill_name]
+
+        if data.get("hidden", False):
+            continue
 
         if data.get("is_custom"):
             custom_docs.append(data["doc_string"])
@@ -175,16 +189,14 @@ def get_skills_library() -> str:
         instance = data["instance"]
         doc = data["doc_string"]
 
-        # Динамическая фильтрация по правам доступа к ОС (Access Level)
         req_level = getattr(func, "__required_os_level__", None)
         if req_level is not None and instance is not None:
             host_os = getattr(instance, "host_os", None)
             if host_os is not None and host_os.access_level.value < req_level:
-                continue  # Скрываем скилл из промпта агента
+                continue
 
         active_docs.append(doc)
 
-    # Форматируем с пустыми строками между разными классами (для читаемости)
     formatted_docs = []
     last_prefix = ""
     for doc in active_docs:
@@ -246,7 +258,6 @@ async def call_skill(name: str, params: dict) -> SkillResult:
         system_logger.warning(f"[Guard] Отклонен вызов {name}: Ошибка типов.")
         return SkillResult.fail(err_msg)
 
-    # Выполнение бизнес-логики
     try:
         result = await func(**clean_kwargs)
         res_msg = truncate_text(

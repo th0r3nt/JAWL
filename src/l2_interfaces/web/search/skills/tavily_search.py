@@ -5,8 +5,11 @@ import urllib.error
 from typing import Any
 
 from src.utils.logger import system_logger
-from src.l3_agent.skills.registry import skill, SkillResult
+
 from src.l2_interfaces.web.search.client import WebSearchClient
+
+from src.l3_agent.skills.registry import skill, SkillResult
+from src.l3_agent.swarm.roles import Subagents
 
 
 class TavilySearch:
@@ -47,7 +50,7 @@ class TavilySearch:
 
         return await asyncio.to_thread(_do_search)
 
-    @skill()
+    @skill(swarm_roles=[Subagents.WEB_RESEARCHER])
     async def search(self, query: str, max_results: int = 5) -> SkillResult:
         """
         Ищет информацию в интернете. Возвращает список ссылок и кратких сниппетов.
@@ -64,6 +67,6 @@ class TavilySearch:
             system_logger.info(f"[Web] Выполнен поиск (Tavily) по запросу: '{query}'")
             self.client.state.add_history(f"Поиск Tavily: '{query}'")
             return SkillResult.ok("\n\n".join(formatted))
-        
+
         except Exception as e:
             return SkillResult.fail(f"Ошибка веб-поиска (Tavily): {e}")
