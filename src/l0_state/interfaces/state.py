@@ -147,19 +147,19 @@ class HostOSState:
         self.is_online = False
 
         # Статические данные (определяются 1 раз при старте)
-        self.os_info = ""  # Окно/Linux/Mac
-        self.cpu_name = ""
+        self.os_info = "Неизвестно."  # Окно/Linux/Mac
+        self.cpu_name = "Неизвестно."
         self.total_ram_gb = 0.0
 
         # Динамические данные
-        self.datetime = ""  # Время
-        self.uptime = ""  # Аптайм хост-пк
-        self.telemetry = ""  # CPU, ОЗУ, процессы
-        self.sandbox_files = ""  # Текущие файлы в Sandbox
-        self.framework_files = ""  # Дерево директории JAWL
+        self.datetime = "Неизвестно."  # Время
+        self.uptime = "Неизвестно."  # Аптайм хост-пк
+        self.telemetry = "Нет доступной телеметрии."  # CPU, ОЗУ, процессы
+        self.sandbox_files = "Неизвестно."  # Текущие файлы в Sandbox
+        self.framework_files = "Неизвестно."  # Дерево директории JAWL
         self.active_daemons = "Нет запущенных демонов."
 
-        self.polling_interval = ""
+        self.polling_interval = "Неизвестно."
 
         self.opened_workspace_files: set[str] = set()  # Файлы, открытые в "редакторе" агента
         self.recent_file_changes: list[str] = (

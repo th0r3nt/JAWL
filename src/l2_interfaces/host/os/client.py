@@ -255,10 +255,11 @@ class HostOSClient:
             framework_block = f"\n\n* JAWL Directory:\n{self.state.framework_files}"
 
         access_levels_desc = (
-            "  - 0/SANDBOX: Read/Write только внутри папки sandbox/.\n"
-            "  - 1/OBSERVER: Read для всего кода фреймворка, Write только в sandbox/.\n"
-            "  - 2/OPERATOR: Read/Write только внутри директории фреймворка JAWL.\n"
-            "  - 3/ROOT: Полный доступ. Read/Write всей системы и управление процессами."
+            "Существующие уровни доступа: \n"
+            "- 0/SANDBOX: Read/Write только внутри папки sandbox/.\n"
+            "- 1/OBSERVER: Read для всего кода фреймворка, Write только в sandbox/.\n"
+            "- 2/OPERATOR: Read/Write только внутри директории фреймворка JAWL.\n"
+            "- 3/ROOT: Полный доступ. Read/Write всей системы и управление процессами."
         )
 
         if self.deploy_manager.is_active:
@@ -273,7 +274,7 @@ class HostOSClient:
             current_tabs = len(self.state.opened_workspace_files)
 
             ws_lines = [
-                f"\n* [Вкладки редактора] - Открытые файлы ({current_tabs}/{max_tabs}):"
+                f"Открытые файлы ({current_tabs}/{max_tabs}):"
             ]
 
             for rel_path in list(self.state.opened_workspace_files):
@@ -305,7 +306,7 @@ class HostOSClient:
                             lang = "python"
 
                         ws_lines.append(
-                            f"--- Вкладка: {display_path} ---\n```{lang}\n{content}\n```"
+                            f"\n\n#### --- Вкладка: {display_path} ---\n```{lang}\n{content}\n```"
                         )
                     else:
                         self.state.opened_workspace_files.discard(rel_path)
@@ -318,41 +319,44 @@ class HostOSClient:
 
         recent_changes_block = ""
         if self.state.recent_file_changes:
-            rc_lines = ["\n* [Недавние изменения в коде]:"]
+            rc_lines = ["\n"]
             rc_lines.extend(self.state.recent_file_changes)
             recent_changes_block = "\n" + "\n".join(rc_lines) + "\n"
 
         # ===============================================
         # Финальная сборка
 
-        return f"""### HOST OS [ON]
-* OS: {self.state.os_info}
-* Current Access Level: {self.access_level.value}/{self.access_level.name}
-{access_levels_desc}
-* Polling interval: {self.state.polling_interval}
-* Datetime: {self.state.datetime}
-* Uptime: {self.state.uptime}
-* Network: \n{getattr(self.state, 'network', 'Неизвестно')}
+        return f"""
+### HOST OS [ON]
 
-{self.state.telemetry}
+* Current Datetime: {self.state.datetime}
+
+* OS: {self.state.os_info}
+* Uptime: {self.state.uptime}
+
+* Network: \n{getattr(self.state, 'network', 'Неизвестно')}
+* Telemetry: {self.state.telemetry}
+* Polling interval: {self.state.polling_interval}
 
 * Active Daemons:
 {self.state.active_daemons}
 
-* Sandbox Directory:
-{self.state.sandbox_files}
+* Current Access Level: {self.access_level.value}/{self.access_level.name}
+{access_levels_desc}
 
 * Framework Directory:
 {framework_block}
 
-* Workspace:
-{workspace_block}
+* Sandbox Directory:
+{self.state.sandbox_files}
 
 * Recent Changes in Files:
 {recent_changes_block}
 
-[Напоминание]: Внутри sandbox/ находится файл 'framework_api.py'. 
+* Workspace:
+{workspace_block}
+
+[Напоминание] Внутри sandbox/ находится файл 'framework_api.py'. 
 Этот файл позволяет взаимодействовать с пробуждениями и контекстом агента.
-Для более подробной информации рекомендуется прочитать файл.
-Удалять его не рекомендуется.
+Если нужна более подробная информация - рекомендуется прочитать файл.
 """.strip()

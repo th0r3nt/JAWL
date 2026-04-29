@@ -46,7 +46,7 @@ class TreeBuilder:
                 is_truncated_dir = item.is_dir() and current_depth >= max_depth
 
                 if is_sandbox:
-                    display_name = f"{item.name}/ [См. блок Sandbox Directory выше]"
+                    display_name = f"{item.name}/ [См. блок Sandbox Directory ниже]"
                     should_traverse = False
                 elif is_truncated_dir:
                     display_name = f"{item.name}/..."

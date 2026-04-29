@@ -186,7 +186,7 @@ async def execute_skill(actions: list[ActionCall]) -> str:
 
     report = []
     for i, res in enumerate(results):
-        report.append(f"Action [{actions[i].tool_name}]: {res.message}")
+        report.append(f"\n+ Action [{actions[i].tool_name}]: {res.message}")
 
     return "\n".join(report)
 
@@ -218,7 +218,7 @@ async def call_skill(name: str, params: dict) -> SkillResult:
             + "\n".join(errors)
             + "\nРекомендуется исправить типы данных и вызвать функцию снова."
         )
-        
+
         system_logger.warning(f"[Guard] Отклонен вызов {name}: Ошибка типов.")
         return SkillResult.fail(err_msg)
 

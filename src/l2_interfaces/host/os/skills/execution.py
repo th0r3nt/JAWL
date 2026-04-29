@@ -287,7 +287,7 @@ class HostOSExecution:
             system_logger.info(f"[Host OS] Запущен фоновый демон '{name}' (PID: {pid})")
             return SkillResult.ok(
                 f"Демон '{name}' успешно запущен (PID: {pid}).\n"
-                f"Логи перенаправлены в файл: sandbox/{log_path.name}\n"
+                f"Логи перенаправлены в файл: sandbox/logs/{log_path.name}\n"
                 f"Теперь можно отслеживать его статус в контексте Host OS."
             )
 

@@ -1,5 +1,5 @@
 identity:
-  agent_name: AgentName # Имя вашего агента
+  agent_name: Agent # Имя вашего агента
 
 llm:
   model: unknown # Можно поставить любую

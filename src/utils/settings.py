@@ -149,7 +149,7 @@ class InterfacesConfig(BaseModel):
 
 
 class IdentityConfig(BaseModel):
-    agent_name: str = "AgentName"
+    agent_name: str = "Agent"
 
 
 class LLMConfig(BaseModel):
