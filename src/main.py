@@ -323,6 +323,7 @@ class System:
             tasks_enabled=self.sys_cfg.sql.tasks.enabled,
             traits_enabled=self.sys_cfg.sql.personality_traits.enabled,
             mental_states_enabled=self.sys_cfg.sql.mental_states.enabled,
+            swarm_enabled=self.sys_cfg.swarm.enabled,
         )
 
         # Поднимаем RAG-провайдер и регистрируем его

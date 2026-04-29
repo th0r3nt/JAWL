@@ -15,6 +15,7 @@ class PromptBuilder:
         tasks_enabled: bool = False,
         traits_enabled: bool = False,
         mental_states_enabled: bool = False,
+        swarm_enabled: bool = False,
     ):
         self.prompt_dir = Path(prompt_dir)
 
@@ -26,6 +27,7 @@ class PromptBuilder:
         self.tasks_enabled = tasks_enabled
         self.traits_enabled = traits_enabled
         self.mental_states_enabled = mental_states_enabled
+        self.swarm_enabled = swarm_enabled
 
     def _gather_markdown(self, sub_folder: Literal["personality", "system", "custom"]) -> str:
         """
@@ -53,6 +55,9 @@ class PromptBuilder:
 
         if not self.mental_states_enabled:
             valid_files = [f for f in valid_files if f.name.upper() != "MENTAL_STATES.md"]
+
+        if not self.swarm_enabled:
+            valid_files = [f for f in valid_files if f.name.upper() != "SWARM.md"]
 
         def sort_key(path: Path):
             name = path.name.upper()
