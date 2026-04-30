@@ -8,6 +8,7 @@ from src.utils.logger import system_logger
 from src.utils._tools import truncate_text
 
 from src.l3_agent.skills.registry import skill, SkillResult
+from src.l3_agent.swarm.roles import Subagents
 
 if TYPE_CHECKING:
     from src.l1_databases.vector.db import VectorDB
@@ -44,7 +45,7 @@ class VectorKnowledge:
         self.similarity_threshold = similarity_threshold
         self.timezone = timezone
 
-    @skill()
+    @skill(swarm_roles=[Subagents.ARCHIVIST])
     async def save_knowledge(self, knowledge_text: str, tags: List[VectorTag]) -> SkillResult:
         """
         Сохраняет фрагмент знаний во базу данных информации.
@@ -77,7 +78,7 @@ class VectorKnowledge:
             system_logger.error(msg)
             return SkillResult.fail(msg)
 
-    @skill()
+    @skill(swarm_roles=[Subagents.ARCHIVIST])
     async def search_knowledge(
         self, query: str, limit: int = 5, tags_filter: Optional[List[VectorTag]] = None
     ) -> SkillResult:
@@ -157,7 +158,7 @@ class VectorKnowledge:
             system_logger.error(msg)
             return SkillResult.fail(msg)
 
-    @skill()
+    @skill(swarm_roles=[Subagents.ARCHIVIST])
     async def delete_knowledge(self, point_id: str) -> SkillResult:
         """Удаляет фрагмент знаний по ID."""
         try:
@@ -174,11 +175,11 @@ class VectorKnowledge:
             system_logger.error(msg)
             return SkillResult.fail(msg)
 
-    @skill()
+    @skill(swarm_roles=[Subagents.ARCHIVIST])
     async def get_all_knowledge(
-        self, limit: int = 10, tags_filter: Optional[List[VectorTag]] = None
+        self, limit: int = 50, tags_filter: Optional[List[VectorTag]] = None
     ) -> SkillResult:
-        """Получает последние n записей из базы знаний (без семантического поиска, с возможной фильтрацией по тегам)."""
+        """Получает последние n записей из базы знаний (с возможной фильтрацией по тегам)."""
         try:
             query_filter = None
             if tags_filter:

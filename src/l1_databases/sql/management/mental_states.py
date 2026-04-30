@@ -12,7 +12,7 @@ if TYPE_CHECKING:
     from src.l1_databases.sql.db import SQLDB
 
 from src.l3_agent.skills.registry import skill, SkillResult
-
+from src.l3_agent.swarm.roles import Subagents
 
 class SQLMentalStates:
     """CRUD для управления таблицей MentalState (состояния сущностей)."""
@@ -21,7 +21,7 @@ class SQLMentalStates:
         self.db = db
         self.max_entities = max_entities
 
-    @skill()
+    @skill(swarm_roles=[Subagents.ARCHIVIST])
     async def create_mental_state(
         self,
         name: str,
@@ -70,6 +70,7 @@ class SQLMentalStates:
         system_logger.debug(f"[SQL DB] {msg}")
         return SkillResult.ok(msg)
 
+    @skill(swarm_roles=[Subagents.ARCHIVIST])
     async def get_mental_states(self) -> SkillResult:
         """Возвращает список всех текущих отслеживаемых сущностей (MentalState)."""
 
@@ -110,7 +111,7 @@ class SQLMentalStates:
 
         return SkillResult.ok("\n".join(lines).strip())
 
-    @skill()
+    @skill(swarm_roles=[Subagents.ARCHIVIST])
     async def update_mental_state(
         self,
         state_id: str,
@@ -160,7 +161,7 @@ class SQLMentalStates:
         system_logger.debug(f"[SQL DB] {msg}")
         return SkillResult.ok(msg)
 
-    @skill()
+    @skill(swarm_roles=[Subagents.ARCHIVIST])
     async def delete_mental_state(self, state_id: str) -> SkillResult:
         """Удаляет сущность из MentalState, если о ней больше не нужно помнить."""
 

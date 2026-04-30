@@ -143,3 +143,25 @@ async def test_os_files_patch_file(os_client):
     res_fail = await files.patch_file("script.py", "return a * b", "return a / b")
     assert res_fail.is_success is False
     assert "не найден" in res_fail.message
+
+
+@pytest.mark.asyncio
+async def test_os_files_read_files_in_directory_char_limit(os_client):
+    """Тест: Массовое чтение папки жестко прерывается при достижении лимита по токенам/символам."""
+    files = HostOSFiles(os_client)
+
+    # Ставим жесткий лимит в 10 символов. Метод умножает его на 2 (итого 20 символов на всю папку).
+    os_client.config.file_read_max_chars = 10
+
+    # Создаем 3 файла по 10 символов (итого 30 символов)
+    (os_client.sandbox_dir / "f1.txt").write_text("1234567890", encoding="utf-8")
+    (os_client.sandbox_dir / "f2.txt").write_text("1234567890", encoding="utf-8")
+    (os_client.sandbox_dir / "f3.txt").write_text("1234567890", encoding="utf-8")
+
+    res = await files.read_files_in_directory(".", max_files=10)
+
+    assert res.is_success is True
+    # Проверяем, что сработал аварийный тормоз
+    assert "Достигнут глобальный лимит символов" in res.message
+    # Третий файл банально не влезет в лимит 20 символов
+    assert "f3.txt" not in res.message

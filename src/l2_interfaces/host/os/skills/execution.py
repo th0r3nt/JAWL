@@ -83,7 +83,7 @@ class HostOSExecution:
         env["PYTHONPATH"] = os.pathsep.join(paths_to_add)
         return env
 
-    @skill(swarm_roles=[Subagents.CODER])
+    @skill(swarm_roles=[Subagents.CODER, Subagents.QA_ENGINEER])
     @require_access(HostOSAccessLevel.OBSERVER)
     async def execute_script(self, filepath: str) -> SkillResult:
         """
@@ -174,7 +174,7 @@ class HostOSExecution:
             system_logger.error(f"[Host OS] {err_msg}")
             return SkillResult.fail(err_msg)
 
-    @skill(swarm_roles=[Subagents.CODER])
+    @skill(swarm_roles=[Subagents.CODER, Subagents.QA_ENGINEER])
     @require_access(HostOSAccessLevel.ROOT)
     async def execute_shell_command(self, command: str) -> SkillResult:
         """

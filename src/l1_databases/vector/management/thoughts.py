@@ -8,6 +8,7 @@ from src.utils.logger import system_logger
 from src.utils._tools import truncate_text
 
 from src.l3_agent.skills.registry import skill, SkillResult
+from src.l3_agent.swarm.roles import Subagents
 
 if TYPE_CHECKING:
     from src.l1_databases.vector.db import VectorDB
@@ -43,7 +44,7 @@ class VectorThoughts:
         self.similarity_threshold = similarity_threshold
         self.timezone = timezone
 
-    @skill()
+    @skill(swarm_roles=[Subagents.ARCHIVIST])
     async def save_thought(self, thought_text: str, tags: List[VectorTag]) -> SkillResult:
         """
         Сохраняет мысль или логический вывод во внутреннюю память.
@@ -73,7 +74,7 @@ class VectorThoughts:
             system_logger.error(msg)
             return SkillResult.fail(msg)
 
-    @skill()
+    @skill(swarm_roles=[Subagents.ARCHIVIST])
     async def search_thoughts(
         self, query: str, limit: int = 5, tags_filter: Optional[List[VectorTag]] = None
     ) -> SkillResult:
@@ -151,7 +152,7 @@ class VectorThoughts:
             system_logger.error(msg)
             return SkillResult.fail(msg)
 
-    @skill()
+    @skill(swarm_roles=[Subagents.ARCHIVIST])
     async def delete_thought(self, point_id: str) -> SkillResult:
         """Удаляет мысль из базы данных по ID."""
         try:
@@ -168,9 +169,9 @@ class VectorThoughts:
             system_logger.error(msg)
             return SkillResult.fail(msg)
 
-    @skill()
+    @skill(swarm_roles=[Subagents.ARCHIVIST])
     async def get_all_thoughts(
-        self, limit: int = 10, tags_filter: Optional[List[VectorTag]] = None
+        self, limit: int = 50, tags_filter: Optional[List[VectorTag]] = None
     ) -> SkillResult:
         """Получает последние n мыслей из базы данных."""
         try:

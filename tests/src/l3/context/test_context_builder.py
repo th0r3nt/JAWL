@@ -53,3 +53,19 @@ async def test_context_registry_resilience():
     assert "good" in results
     assert results["good"] == "Успешный блок"
     assert "bad" not in results
+
+def test_context_builder_format_single_event_proactive():
+    """Тест: Сборщик контекста подставляет проактивный промпт только если включен тумблер."""
+    agent_state = AgentState()
+    builder = ContextBuilder(agent_state, ContextRegistry())
+
+    # Proactive OFF (по умолчанию)
+    agent_state.proactive_guidance = False
+    res_off = builder._format_single_event("HEARTBEAT", {})
+    assert "Рекомендуется проактивное выполнение действий" not in res_off
+
+    # Proactive ON
+    agent_state.proactive_guidance = True
+    res_on = builder._format_single_event("HEARTBEAT", {})
+    assert "Рекомендуется проактивное выполнение действий" in res_on
+    assert "Векторы активности могут включать" in res_on

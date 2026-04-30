@@ -145,6 +145,14 @@ def skill(
     swarm_roles: Optional[List[SubagentRole]] = None,
     hidden: bool = False,
 ) -> Callable[[F], F]:
+    """
+    Декоратор, который автоматически регистрирует новый навык для агента.
+    Берет dockstring, аргументы и их типы, формируя контекстный блок 'function(arg1: type, arg2: type, ...) - dockstring'.
+
+    name_override: переопределение название функции (по умолчанию берется Класс.имя_функции).
+    swarm_roles: перечисление субагентов, которые могут использовать этот навык.
+    hidden: если True - главный агент не будет видеть этот навык.
+    """
     def decorator(func: F) -> F:
         sig = inspect.signature(func)
         if "self" in sig.parameters:

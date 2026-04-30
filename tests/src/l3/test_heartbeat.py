@@ -109,7 +109,6 @@ async def test_heartbeat_loop_event_driven(mock_react_loop, mock_accel_config):
 
     await hb.start()
 
-    # Проверяем через ANY, так как в памяти сна будет строка с динамическим временем [HH:MM:SS]
     from unittest.mock import ANY
 
     mock_react_loop.run.assert_called_once_with(
@@ -134,3 +133,32 @@ def test_heartbeat_update_config(mock_react_loop, mock_accel_config):
     # Меняем continuous_cycle
     hb.update_config("continuous_cycle", True)
     assert hb.continuous_cycle is True
+
+
+def test_heartbeat_priority_overwriting(mock_react_loop, mock_accel_config):
+    """Тест: Heartbeat корректно обновляет причину пробуждения в зависимости от приоритета события."""
+    hb = Heartbeat(
+        mock_react_loop,
+        heartbeat_interval=60,
+        continuous_cycle=False,
+        accel_config=mock_accel_config,
+        timezone=3,
+    )
+    # Ставим очень маленькое оставшееся время сна (0.015 сек), чтобы любое событие
+    # при умножении на множитель давало < 0.01 и вызывало экстренное пробуждение.
+    hb._next_tick_time = time.time() + 0.015
+
+    # 1. Прилетает MEDIUM событие (0.015 * 0.6 = 0.009 <= 0.01). Триггерит экстренное пробуждение.
+    hb.answer_to_event(EventLevel.MEDIUM, "MEDIUM_EVENT")
+    assert hb._wake_level == EventLevel.MEDIUM.value
+    assert hb._wake_reason == "MEDIUM_EVENT"
+
+    # 2. Во время сна прилетает CRITICAL (множитель 0.0, он важнее, должен перезаписать причину)
+    hb.answer_to_event(EventLevel.CRITICAL, "CRITICAL_EVENT")
+    assert hb._wake_level == EventLevel.CRITICAL.value
+    assert hb._wake_reason == "CRITICAL_EVENT"
+
+    # 3. Следом прилетает фоновый спам LOW (НЕ должен переписать важную причину, т.к. 20 < 50)
+    hb.answer_to_event(EventLevel.LOW, "LOW_EVENT")
+    assert hb._wake_level == EventLevel.CRITICAL.value
+    assert hb._wake_reason == "CRITICAL_EVENT"

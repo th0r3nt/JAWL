@@ -14,23 +14,35 @@ class Subagents:
     CODER = SubagentRole(
         id="coder",
         name="Software Engineer",
-        description="Субагент, которому можно делегировать задачи по написанию скриптов, рефакторингу, дебагу и работе с файловой системой или локальными Git-репозиториями.",
+        description="Вызывать для делегирования задач по написанию скриптов, рефакторингу, дебагу и работе с файловой системой или локальными Git-репозиториями.",
         prompt_file="CODER.md",
     )
 
     WEB_RESEARCHER = SubagentRole(
         id="web_researcher",
         name="OSINT Analyst",
-        description="Вызывай его для параллельного глубокого поиска информации в интернете, чтения статей, парсинга данных и фактчекинга.",
+        description="Вызывать для параллельного глубокого поиска информации в интернете, чтения статей, парсинга данных и фактчекинга.",
         prompt_file="WEB_SEARCHER.md",
+    )
+
+    ARCHIVIST = SubagentRole(
+        id="archivist",
+        name="Database Archivist",
+        description="Вызывать для ревизии и очистки твоей памяти. Умеет читать Vector DB, удалять старый мусор и консолидировать факты.",
+        prompt_file="ARCHIVIST.md",
+    )
+
+    QA_ENGINEER = SubagentRole(
+        id="qa_engineer",
+        name="QA Engineer",
+        description="Вызывать для написания unit-тестов и проверки твоего кода на прочность. Он найдет краевые случаи и вернет список багов.",
+        prompt_file="QA_ENGINEER.md",
     )
 
     @classmethod
     def all(cls) -> list[SubagentRole]:
         """Возвращает список всех зарегистрированных ролей."""
-        return [
-            v for k, v in vars(cls).items() if isinstance(v, SubagentRole)
-        ]  # Ну и заклинание...
+        return [v for k, v in vars(cls).items() if isinstance(v, SubagentRole)]
 
     @classmethod
     def get_by_id(cls, role_id: str) -> SubagentRole | None:
