@@ -24,7 +24,7 @@ system:
   vector_db:
     similarity_threshold: 0.65
 
-    # Подробнее: docs/yaml/vector_db_models.md
+    # Подробнее: docs/yaml/vector_db_models.md 
     embedding_model: "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
     vector_size: 384
     auto_rag_top_k: 1
