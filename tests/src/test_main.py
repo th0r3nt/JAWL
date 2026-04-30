@@ -157,3 +157,105 @@ async def test_system_shutdown_and_reboot_events(mock_configs):
 
     assert system._exit_code == 0
     system.heartbeat.stop.assert_called_once()
+
+
+@pytest.mark.asyncio
+@patch("src.main.SQLManager")
+@patch("src.main.VectorManager")
+@patch("src.main.Heartbeat")
+@patch("src.main.ReactLoop")
+async def test_system_subagent_llm_fallback(
+    mock_react, mock_hb, mock_vector, mock_sql, mock_configs
+):
+    """Тест: Если SUB_ ключи не переданы, субагенты используют основной LLM клиент."""
+    settings, interfaces = mock_configs
+    bus = EventBus()
+    system = System(event_bus=bus, settings_config=settings, interfaces_config=interfaces)
+
+    # Инициализируем L0 State, чтобы появились agent_state, telethon_state и т.д.
+    system.setup_l0_state()
+    system.sys_cfg = settings.system
+
+    # Изолируем БД
+    system.sql = mock_sql.return_value
+    system.vector = mock_vector.return_value
+
+    system.setup_l3_agent(llm_api_url="http://main", llm_api_keys=["main_key"])
+
+    assert system.llm_client is not None
+    assert system.sub_llm_client is system.llm_client  # Ссылаются на один и тот же объект
+    assert system.sub_llm_client.api_url == "http://main"
+
+
+@pytest.mark.asyncio
+@patch("src.main.SQLManager")
+@patch("src.main.VectorManager")
+@patch("src.main.Heartbeat")
+@patch("src.main.ReactLoop")
+async def test_system_subagent_dedicated_llm(
+    mock_react, mock_hb, mock_vector, mock_sql, mock_configs
+):
+    """Тест: Если SUB_ ключи переданы, создаются два независимых клиента."""
+    settings, interfaces = mock_configs
+    bus = EventBus()
+    system = System(event_bus=bus, settings_config=settings, interfaces_config=interfaces)
+
+    # ФИКС 2: Инициализируем L0 State
+    system.setup_l0_state()
+    system.sys_cfg = settings.system
+
+    # Изолируем БД
+    system.sql = mock_sql.return_value
+    system.vector = mock_vector.return_value
+
+    system.setup_l3_agent(
+        llm_api_url="http://main",
+        llm_api_keys=["main_key"],
+        sub_llm_api_url="http://sub",
+        sub_llm_api_keys=["sub_key_1", "sub_key_2"],
+    )
+
+    assert system.llm_client is not None
+    assert system.sub_llm_client is not None
+    assert system.sub_llm_client is not system.llm_client  # Это разные объекты
+
+    assert system.llm_client.api_url == "http://main"
+    assert system.sub_llm_client.api_url == "http://sub"
+    assert system.sub_llm_client.rotator.keys == ["sub_key_1", "sub_key_2"]
+
+
+@pytest.mark.asyncio
+async def test_system_stop_closes_all_llm_clients(mock_configs):
+    """Тест: При остановке закрываются обе сессии, если они разные."""
+    settings, interfaces = mock_configs
+    bus = EventBus()
+    system = System(event_bus=bus, settings_config=settings, interfaces_config=interfaces)
+
+    mock_main_llm = AsyncMock()
+    mock_sub_llm = AsyncMock()
+
+    system.llm_client = mock_main_llm
+    system.sub_llm_client = mock_sub_llm
+
+    await system.stop()
+
+    mock_main_llm.close.assert_awaited_once()
+    mock_sub_llm.close.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_system_stop_shared_llm_client_closes_once(mock_configs):
+    """Тест: При остановке общий клиент закрывается только один раз."""
+    settings, interfaces = mock_configs
+    bus = EventBus()
+    system = System(event_bus=bus, settings_config=settings, interfaces_config=interfaces)
+
+    mock_llm = AsyncMock()
+
+    system.llm_client = mock_llm
+    system.sub_llm_client = mock_llm  # Тот же самый объект
+
+    await system.stop()
+
+    # Должен быть вызван только один раз, чтобы избежать падений aiohttp/httpx
+    mock_llm.close.assert_awaited_once()

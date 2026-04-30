@@ -83,7 +83,8 @@ def _check_and_setup_env() -> tuple[bool, bool]:
     key_found = False
     for line in env_content:
         line_stripped = line.strip()
-        if line_stripped.startswith("LLM_API_KEY_1="):
+        # Ищем любой ключ, начинающийся на LLM_API_KEY_
+        if line_stripped.startswith("LLM_API_KEY_") and "=" in line_stripped:
             val = line_stripped.split("=", 1)[1].strip("\"' ")
             if len(val) > 0:
                 key_found = True

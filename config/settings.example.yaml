@@ -2,109 +2,82 @@ identity:
   agent_name: Agent # Имя вашего агента
 
 llm:
-  main_model: unknown # Можно поставить любую
+  main_model: unknown # Добавьте свою LLM модель
   available_models: # Список моделей, которые агент может ставить по вашей просьбе
     - claude-opus-4.7
     - claude-opus-4.6
     - gemini-3.1-pro-preview
     - gemini-3-flash-preview
-    - gemma-4-31b-it
   # ...можно добавить свои, главное - убедитесь, что llm api url и ключи правильно настроены
 
-  is_multimodal: false # Поставьте true, если основная модель (main_model) мультимодальна
+  is_multimodal: false # Поставьте true, если основная модель мультимодальна
   temperature: 1.0
   max_react_steps: 15
 
 system:
-  timezone: 0  # Смещение от UTC в часах (например, 3 для МСК)
+  timezone: 0 # Смещение от UTC в часах (например, 3 для МСК)
 
   logging:
-    max_file_size_mb: 5.0 # Лимит размера файла логов (в мегабайтах), после которого он будет очищен
-    backup_count: 1       # Сколько прошлых копий логов хранить (1 = system.log.1). 0 - просто стирать
+    max_file_size_mb: 5.0
+    backup_count: 1
 
   vector_db:
-    # Порог схожести информации при поиске в векторной базе данных
-    similarity_threshold: 0.65 # Косинусное расстояние: 1.0 - абсолютное совпадение, а 0.0 - полное отсутствие связи
+    similarity_threshold: 0.65
 
-    # Локальная модель для генерации эмбеддингов (поддерживаются любые модели FastEmbed). 
-    # Важно: при смене модели обязательно измените vector_size под её размерность и удалите папку базы (src/utils/local/data/vector_db), чтобы она пересоздалась с новым размером векторов
-    embedding_model: "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2" # Можно поставить любую
+    # Подробнее: docs/yaml/vector_db_models.md
+    embedding_model: "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
     vector_size: 384
-    auto_rag_top_k: 1 # Поиск по векторной базе данных на основе контекста агента. Больше значение = больше запросов = потенциально больше задержка
-    auto_rag_max_query_chars: 200 # Макс. длина запроса к базе, после которой он будет разбит на несколько частей
-
-    # Рекомендуемые эмбеддинг модели:
-    # "intfloat/multilingual-e5-large" (vector_size: 1024, ~2.2 ГБ, рекомендуется similarity_threshold: 0.85) - самая мощная, но работает медленнее
-    # "sentence-transformers/paraphrase-multilingual-mpnet-base-v2" (vector_size: 768, ~1.0 ГБ, similarity_threshold: 0.75) - баланс
-    # "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2" (vector_size: 384, ~300 МБ, similarity_threshold: 0.65) - оптимизированный вариант
+    auto_rag_top_k: 1
+    auto_rag_max_query_chars: 200
     
-  # Интервал между циклами (в секундах)
   heartbeat_interval: 600
+  continuous_cycle: false # Если true, агент будет работать вообще без пауз
+  proactive_guidance: false # Доп. системные инструкции с рекомендацией к проактивности
 
-  # Непрерывный цикл. Если true, агент будет работать без пауз
-  # Важно: это может очень быстро сжечь ваши квоты в LLM API
-  continuous_cycle: false
-
-  # Если true - в промпт агента будут добавляться дополнительные системные инструкции с рекомендацией к проактивности
-  proactive_guidance: false # Полезно, если вы хотите сделать агента более проактивным
-
-  # Настройки сокращения времени сна (Heartbeat) при входящих событиях разного уровня (CRITICAL, HIGH, MEDIUM, LOW, BACKGROUND)
+  # Подробнее: docs/yaml/event_acceleration.md
   event_acceleration:
-    critical_multiplier: 0.0 # Если 0.0 - вызывает сразу и прерывает текущий цикл
-    high_multiplier: 0.2     # При входящем событии уровня HIGH - умножает остаток сна на 0.2 (сокращает на 80%)
+    critical_multiplier: 0.0
+    high_multiplier: 0.2
     medium_multiplier: 0.6
     low_multiplier: 0.7
     background_multiplier: 0.8
 
+  # Подробнее: docs/yaml/context.md
   context_depth:
-    ticks: 15 # Общее количество последних тиков агента в контексте (Tick = Наблюдение > Мысли > Действие > Результат)
-
-    # Детальные тики
-    detailed_ticks: 3 # Сколько тиков выводить подробно (важно в сложных агентстких сценариях)
-    # thoughts (мысли) выводятся в полном формате
-    tick_action_max_chars: 10000 # Лимит контекста на 1 действие, вызванное агентом в одном детальном тике
-    tick_result_max_chars: 20000 # Лимит контекста на 1 результат вызванной функции в одном детальном тике
-
-    # Старые тики
+    ticks: 15
+    detailed_ticks: 3
+    tick_action_max_chars: 10000
+    tick_result_max_chars: 20000
     tick_thoughts_short_max_chars: 1000
     tick_action_short_max_chars: 100 
     tick_result_short_max_chars: 500
 
-  # Когнитивные SQL-модули
   sql:
-
-    # Агент может ставить для себя долгосрочные задачи и вести рабочие заметки
-    tasks:
-      enabled: true # Если false - агент не будет знать о существовании этого модуля = экономится контекст
+    # Задачи для выполнения
+    tasks: 
+      enabled: true
       max_tasks: 10
 
-    # Исходя из своей истории действий, агент может кастомно добавлять/менять свои черты личности для оптимизации взаимодействий с чем-либо
+    # Динамичные черты личности
     personality_traits:
       enabled: true
-      max_traits: 10 # Макс. добавленных черт личности
+      max_traits: 10
 
-    # Агент может хранить сущности (объекты и субъекты - например, знакомых людей или проекты) в своей памяти
+    # Сущности (объекты/субъекты) в памяти
     mental_states:
       enabled: true
-      max_entities: 10 # Макс. количество сущностей, которые может запомнить агент
+      max_entities: 10
 
-    # Система внутренней мотивации
-    # Делится на Фундаментальные (постоянные) и Кастомные (те, что созданы агентом)
-    # Мотивации могут быть в показателе от 0% дефицита мотивации (всё в порядке) до 100% дефицита (караул, крыша горит)
-    # Позволяют валидировать действия агента в определенный вектор: 
-    # например, фундаментальная мотивация "Любопытство" заставит агента узнавать полезную информацию для поставленных задач, а не сидеть сложа руки между своими циклами
+    # Подробнее: docs/yaml/drives.md
     drives:
       enabled: true
+      decay_rate: 10.0
+      decay_interval_sec: 900
+      max_reflections_history: 3
+      max_custom_drives: 5
 
-      decay_rate: 10.0             # На сколько процентов увеличивается дефицит за 1 интервал
-      decay_interval_sec: 900      # Длительность интервала в секундах (900 = 15 минут)
-      # decay_interval_sec: 900 и decay_rate: 10.0 = каждые полторы минуты дефицит плавно тикает на +1%
-
-      max_reflections_history: 3   # Сколько последних записей о действиях хранить для контекста мотиваций
-      max_custom_drives: 5         # Лимит на создание кастомных мотиваций
-
-  # Система делегирования задач (Субагенты)
+  # Система делегирования задач для субагентов
   swarm:
     enabled: false
-    subagent_model: unknown # Рекомендуется поставить дешевую и быструю модель (напр. gemini-3.1-flash-lite-preview)
-    max_concurrent_workers: 3 # Защита от API Rate Limits (макс. количество одновременно работающих субагентов)
+    subagent_model: unknown # Рекомендуется поставить дешевую и быструю модель
+    max_concurrent_workers: 3

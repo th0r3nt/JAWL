@@ -5,8 +5,10 @@ from pathlib import Path
 
 from src.utils.logger import system_logger
 from src.utils.settings import SwarmConfig
-from src.l3_agent.llm.client import LLMClient
 from src.utils.token_tracker import TokenTracker
+
+from src.l3_agent.llm.client import LLMClient
+
 from src.l3_agent.skills.registry import skill, SkillResult, _REGISTRY
 
 from src.l3_agent.swarm.roles import Subagents, SubagentRole

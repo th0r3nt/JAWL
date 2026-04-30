@@ -113,7 +113,7 @@ class HostTerminalClient:
 
                 text = data.decode("utf-8").strip()
                 if text:
-                    time_str = get_now_formatted(self.timezone, "%H:%M")
+                    time_str = get_now_formatted(self.timezone, "%Y-%m-%d %H:%M:%S")
                     self._record_message("User", text, time_str)
                     await self.incoming_queue.put(("_MESSAGE", text))
 
@@ -121,7 +121,7 @@ class HostTerminalClient:
             pass
 
         except Exception as e:
-            system_logger.error(f"[Host OS] Ошибка соединения терминала: {e}")
+            system_logger.warning(f"[Host OS] Ошибка соединения терминала: {e}")
 
         finally:
             self.active_writers.discard(writer)
@@ -143,7 +143,7 @@ class HostTerminalClient:
         Отправка сообщения от агента во все подключенные консоли.
         """
 
-        time_str = get_now_formatted(self.timezone, "%H:%M")
+        time_str = get_now_formatted(self.timezone, "%Y-%m-%d %H:%M:%S")
         self._record_message(self.agent_name, text, time_str)
 
         if not self.active_writers:
@@ -162,7 +162,7 @@ class HostTerminalClient:
 
     def _record_message(self, sender: str, text: str, time_str: str = ""):
         if not time_str:
-            time_str = get_now_formatted(self.timezone, "%H:%M")
+            time_str = get_now_formatted(self.timezone, "%Y-%m-%d %H:%M:%S")
 
         self.state.add_message(sender, text, time_str)
 

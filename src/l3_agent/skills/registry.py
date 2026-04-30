@@ -11,7 +11,6 @@ from src.utils._tools import truncate_text
 from src.l3_agent.skills.schema import ActionCall
 from src.l3_agent.swarm.roles import SubagentRole
 
-
 @dataclass
 class SkillResult:
     is_success: bool
@@ -153,6 +152,7 @@ def skill(
     swarm_roles: перечисление субагентов, которые могут использовать этот навык.
     hidden: если True - главный агент не будет видеть этот навык.
     """
+
     def decorator(func: F) -> F:
         sig = inspect.signature(func)
         if "self" in sig.parameters:

@@ -1,6 +1,5 @@
 import asyncio
 import json
-import datetime
 from pathlib import Path
 
 import questionary
@@ -124,14 +123,10 @@ async def _chat_loop(port: int, history_file: Path, agent_name: str):
 
     try:
         while True:
-            # Отображаем текущее локальное время рядом с инпутом
-            now_str = datetime.datetime.now().strftime("%H:%M")
 
             with patch_stdout():
                 user_input = await session.prompt_async(
-                    HTML(
-                        f"<style fg='gray'>[{now_str}]</style> <ansigreen><b>Вы:</b></ansigreen> "
-                    )
+                    HTML("<ansigreen><b>Вы:</b></ansigreen> ")
                 )
 
             text = user_input.strip()

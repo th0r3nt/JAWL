@@ -72,6 +72,9 @@ from src.l3_agent.heartbeat import Heartbeat
 from src.l3_agent.skills.registry import register_instance, clear_registry
 from src.l3_agent.skills.schema import ACTION_SCHEMA
 
+from src.l3_agent.swarm.skills.report import SubagentReport
+from src.l3_agent.swarm.spawn import SwarmManager
+
 
 class System:
     """
@@ -310,12 +313,32 @@ class System:
         components = initialize_l2_interfaces(self, env_vars)
         self._lifecycle_components.extend(components)
 
-    def setup_l3_agent(self, llm_api_url: str, llm_api_keys: list[str]):
-        """Сборка мозга агента."""
+    def setup_l3_agent(
+        self,
+        llm_api_url: str,
+        llm_api_keys: list[str],
+        sub_llm_api_url: Optional[str] = None,
+        sub_llm_api_keys: Optional[list[str]] = None,
+    ):
+        """
+        Сборка мозга агента.
+        """
+
         system_logger.info("[System] Инициализация L3 Agent.")
 
+        # Main LLM Client
         rotator = APIKeyRotator(keys=llm_api_keys)
         self.llm_client = LLMClient(api_url=llm_api_url, api_keys_rotator=rotator)
+
+        # Subagent LLM Client
+        if sub_llm_api_keys:
+            system_logger.info("[System] Обнаружены выделенные ключи для субагентов (Swarm).")
+            sub_rotator = APIKeyRotator(keys=sub_llm_api_keys)
+            self.sub_llm_client = LLMClient(
+                api_url=sub_llm_api_url or "", api_keys_rotator=sub_rotator
+            )
+        else:
+            self.sub_llm_client = self.llm_client
 
         prompt_builder = PromptBuilder(
             prompt_dir=self.root_dir / "src" / "l3_agent" / "prompt",
@@ -374,21 +397,18 @@ class System:
 
         # Инициализация Swarm
         if self.sys_cfg.swarm.enabled:
-            from src.l3_agent.swarm.skills.report import SubagentReport
-            from src.l3_agent.swarm.spawn import SwarmManager
-            
+
             # Навык отчета регистрируем глобально, он изолирован
             report_skill = SubagentReport(
-                event_bus=self.event_bus, 
-                sandbox_dir=self.root_dir / "sandbox"
+                event_bus=self.event_bus, sandbox_dir=self.root_dir / "sandbox"
             )
             register_instance(report_skill)
 
             swarm_manager = SwarmManager(
-                llm_client=self.llm_client,
+                llm_client=self.sub_llm_client,  # ВАЖНО: передаем суб-клиент
                 swarm_config=self.sys_cfg.swarm,
                 root_dir=self.root_dir,
-                token_tracker=token_tracker
+                token_tracker=token_tracker,
             )
             register_instance(swarm_manager)
 
@@ -492,8 +512,12 @@ class System:
 
     async def run(
         self,
+        # Main LLM
         llm_api_url: str,
         llm_api_keys: list[str],
+        # Subagent LLM
+        sub_llm_api_url: Optional[str] = None,
+        sub_llm_api_keys: Optional[list[str]] = None,
         # Telethon
         telethon_api_id: Optional[str] = None,
         telethon_api_hash: Optional[str] = None,
@@ -545,7 +569,14 @@ class System:
             )
 
             # L3 AGENT
-            self.setup_l3_agent(llm_api_url=llm_api_url, llm_api_keys=llm_api_keys)
+            self.setup_l3_agent(
+                # Main LLM
+                llm_api_url=llm_api_url,
+                llm_api_keys=llm_api_keys,
+                # Subagent LLM
+                sub_llm_api_url=sub_llm_api_url,
+                sub_llm_api_keys=sub_llm_api_keys,
+            )
 
             # Запуск компонентов
             started_components = []
@@ -617,7 +648,10 @@ class System:
             pass
 
     async def stop(self) -> None:
-        """Остановка и очистка ресурсов."""
+        """
+        Остановка и очистка ресурсов.
+        """
+
         system_logger.info("[System] Инициирована остановка JAWL.")
         await self.event_bus.publish(Events.SYSTEM_CORE_STOP, status="offline")
 
@@ -641,6 +675,10 @@ class System:
             await self.event_bus.stop()
         if self.llm_client:
             await self.llm_client.close()
+
+        # Закрываем сессии субагентов, только если это отдельный клиент
+        if hasattr(self, "sub_llm_client") and self.sub_llm_client is not self.llm_client:
+            await self.sub_llm_client.close()
 
         system_logger.info("[System] Остановка завершена. Процесс выслежен и жестоко убит.")
 
@@ -701,9 +739,21 @@ async def main() -> int:
             if k.startswith("LLM_API_KEY_") and v.strip()
         ]
 
+        # Собираем ключи субагентов (если есть)
+        SUB_LLM_API_URL = os.getenv("SUB_LLM_API_URL", None)
+        SUB_LLM_API_KEYS = [
+            v
+            for k, v in sorted(os.environ.items())
+            if k.startswith("SUB_LLM_API_KEY_") and v.strip()
+        ]
+
         exit_code = await system.run(
+            # Main LLM
             llm_api_url=LLM_API_URL,
             llm_api_keys=LLM_API_KEYS,
+            # Subagents LLM
+            sub_llm_api_url=SUB_LLM_API_URL,
+            sub_llm_api_keys=SUB_LLM_API_KEYS,
             # Telethon
             telethon_api_id=TELETHON_API_ID,
             telethon_api_hash=TELETHON_API_HASH,
