@@ -15,7 +15,7 @@ from src.utils.settings import SettingsConfig, InterfacesConfig
 
 
 @pytest.fixture
-def mock_system() -> System:
+def mock_system(tmp_path: Path) -> System:
     """Создает мок главной системы для передачи в билдер."""
     sys_mock = MagicMock(spec=System)
 
@@ -29,9 +29,9 @@ def mock_system() -> System:
     sys_mock.settings.system.heartbeat_interval = 60
     sys_mock.settings.llm.main_model = "test-model"
 
-    # Мокаем пути
-    sys_mock.root_dir = Path("/mock/root")
-    sys_mock.local_data_dir = Path("/mock/root/data")
+    # ИСПРАВЛЕНИЕ: Используем безопасную временную директорию от pytest вместо "/mock/root"
+    sys_mock.root_dir = tmp_path / "mock_root"
+    sys_mock.local_data_dir = sys_mock.root_dir / "data"
 
     # Мокаем реестры
     sys_mock.event_bus = MagicMock()
