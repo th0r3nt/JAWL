@@ -1,8 +1,17 @@
+"""
+Центральный клиент взаимодействия агента с операционной системой хоста.
+
+Выступает в роли Гейткипера (Gatekeeper): перехватывает все обращения к файловой системе,
+резолвит пути и жестко блокирует атаки типа Path Traversal (выход за пределы директории)
+на основе выданного Access Level. Управляет рабочим пространством (Workspace) агента.
+"""
+
 import sys
 import json
 from enum import IntEnum
 from pathlib import Path
 import shutil
+from typing import Union, Dict, Any
 
 from src.utils.logger import system_logger
 from src.utils.settings import HostOSConfig
@@ -12,6 +21,10 @@ from src.l2_interfaces.host.os.deploy_manager import HostOSDeployManager
 
 
 class HostOSAccessLevel(IntEnum):
+    """
+    Уровни доступа агента к хост-системе (RBAC).
+    """
+
     SANDBOX = 0  # Read/Write только внутри sandbox/
     OBSERVER = 1  # Read фреймворка, Write в sandbox/
     OPERATOR = 2  # Read/Write только внутри директории фреймворка JAWL
@@ -19,9 +32,24 @@ class HostOSAccessLevel(IntEnum):
 
 
 class HostOSClient:
+    """Менеджер операционной системы и Гейткипер путей."""
+
     def __init__(
-        self, base_dir: Path | str, config: HostOSConfig, state: HostOSState, timezone: int
-    ):
+        self,
+        base_dir: Union[Path, str],
+        config: HostOSConfig,
+        state: HostOSState,
+        timezone: int,
+    ) -> None:
+        """
+        Инициализирует клиент ОС и подготавливает системные папки.
+
+        Args:
+            base_dir: Путь к корню фреймворка.
+            config: Конфигурация интерфейса ОС.
+            state: L0 стейт (приборная панель агента).
+            timezone: Смещение часового пояса.
+        """
         self.config = config
         self.state = state
         self.timezone = timezone
@@ -91,11 +119,24 @@ class HostOSClient:
             self.framework_dir, max_retries=self.config.deploy_max_retries
         )
 
-    def validate_path(self, target_path: str | Path, is_write: bool = False) -> Path:
+    def validate_path(self, target_path: Union[str, Path], is_write: bool = False) -> Path:
         """
-        Умный гейткипер. Парсит пути так, как их видит агент в дереве контекста,
-        и проверяет права доступа.
+        Умный маршрутизатор и гейткипер.
+        Переводит относительные пути агента в абсолютные физические адреса ОС.
+        Проверяет права (Read/Write) согласно текущему HostOSAccessLevel (SANDBOX, OBSERVER, OPERATOR, ROOT).
+        Защищает файлы конфигурации (.env) и системные директории от случайного или намеренного удаления агентом.
+
+        Args:
+            target_path: Запрошенный агентом путь (например, 'sandbox/test.py' или '../main.py').
+            is_write: Является ли операция деструктивной (запись/удаление).
+
+        Returns:
+            Физический, очищенный и разрешенный абсолютный путь (Path).
+
+        Raises:
+            PermissionError: Если агент сует свой нос туда, куда ему не положено по уровню доступа.
         """
+
         path_str = str(target_path).replace("\\", "/").strip()
         path_obj = Path(path_str)
 
@@ -200,9 +241,8 @@ class HostOSClient:
 
         return resolved_path
 
-    def get_file_metadata(self) -> dict:
-        """Читает реестр описаний файлов."""
-
+    def get_file_metadata(self) -> Dict[str, str]:
+        """Читает реестр описаний файлов (Метаданные, оставленные агентом)."""
         try:
             with open(self.metadata_file, "r", encoding="utf-8") as f:
                 return json.load(f)
@@ -211,26 +251,21 @@ class HostOSClient:
 
     def set_file_metadata(self, rel_path: str, description: str) -> None:
         """Сохраняет описание для конкретного файла."""
-
         data = self.get_file_metadata()
         data[rel_path] = description
         with open(self.metadata_file, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, indent=4)
 
     def remove_file_metadata(self, rel_path: str) -> None:
-        """
-        Удаляет описание файла из реестра, если оно существует.
-        """
-
+        """Удаляет описание файла из реестра, если оно существует."""
         data = self.get_file_metadata()
         if rel_path in data:
             del data[rel_path]
             with open(self.metadata_file, "w", encoding="utf-8") as f:
                 json.dump(data, f, ensure_ascii=False, indent=4)
 
-    def _ensure_sandbox_api(self):
-        """Копирует библиотеку framework_api для скриптов агента в песочницу."""
-
+    def _ensure_sandbox_api(self) -> None:
+        """Копирует библиотеку `framework_api` из темплейтов в песочницу для скриптов агента."""
         api_path = self.system_dir / "framework_api.py"
         template_path = self.framework_dir / "src" / "utils" / "templates" / "framework_api.py"
 
@@ -239,18 +274,24 @@ class HostOSClient:
         else:
             system_logger.warning("[Host OS] Шаблон framework_api.py не найден.")
 
-    def get_daemons_registry(self) -> dict:
+    def get_daemons_registry(self) -> Dict[str, Any]:
+        """Возвращает информацию о запущенных фоновых скриптах."""
         try:
             with open(self.daemons_file, "r", encoding="utf-8") as f:
                 return json.load(f)
         except Exception:
             return {}
 
-    def set_daemons_registry(self, data: dict) -> None:
+    def set_daemons_registry(self, data: Dict[str, Any]) -> None:
+        """Обновляет информацию о фоновых скриптах."""
         with open(self.daemons_file, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, indent=4)
 
-    async def get_context_block(self, **kwargs) -> str:
+    async def get_context_block(self, **kwargs: Any) -> str:
+        """
+        Провайдер контекста для ContextRegistry.
+        Отдает отформатированный блок телеметрии, файловой системы и воркспейса.
+        """
         if not self.state.is_online:
             return "### HOST OS [OFF]\nИнтерфейс отключен."
 

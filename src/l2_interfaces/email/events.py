@@ -1,5 +1,14 @@
+"""
+Фоновый поллер почтового ящика (IMAP).
+
+Регулярно опрашивает сервер на наличие новых непрочитанных писем.
+Генерирует событие 'EMAIL_INCOMING' в EventBus для пробуждения агента.
+"""
+
 import asyncio
 import email
+from typing import List, Dict, Optional
+
 from src.utils.logger import system_logger
 from src.utils.event.bus import EventBus
 from src.utils.event.registry import Events
@@ -14,17 +23,28 @@ class EmailEvents:
 
     def __init__(
         self, client: EmailClient, state: EmailState, event_bus: EventBus, interval_sec: int
-    ):
+    ) -> None:
+        """
+        Инициализирует поллер почты.
+
+        Args:
+            client: Экземпляр EmailClient.
+            state: Объект состояния интерфейса.
+            event_bus: Глобальная шина событий.
+            interval_sec: Интервал между запросами к IMAP.
+        """
         self.client = client
         self.state = state
         self.bus = event_bus
         self.interval = interval_sec
         self._is_running = False
-        self._polling_task = None
+        self._polling_task: Optional[asyncio.Task] = None
 
-        self._seen_uids = set()
+        # Хранит UIDs уже обработанных (просмотренных поллером) писем
+        self._seen_uids: set[str] = set()
 
     async def start(self) -> None:
+        """Запускает цикл фонового мониторинга."""
         if not self.client.state.is_online or self._is_running:
             return
 
@@ -33,12 +53,19 @@ class EmailEvents:
         system_logger.info("[Email] Фоновый поллинг новых писем запущен.")
 
     async def stop(self) -> None:
+        """Останавливает цикл."""
         self._is_running = False
         if self._polling_task:
             self._polling_task.cancel()
             self._polling_task = None
 
-    def _check_new_emails(self):
+    def _check_new_emails(self) -> List[Dict[str, str]]:
+        """
+        Подключается к IMAP и ищет сообщения с флагом UNSEEN.
+
+        Returns:
+            Список словарей с метаданными о новых письмах.
+        """
         try:
             with self.client.imap_connection() as mail:
                 # Ищем непрочитанные
@@ -73,7 +100,8 @@ class EmailEvents:
             system_logger.error(f"[Email] Ошибка при проверке почты: {e}")
             return []
 
-    async def _loop(self):
+    async def _loop(self) -> None:
+        """Главный цикл опроса почты."""
         while self._is_running:
             try:
                 new_emails = await asyncio.to_thread(self._check_new_emails)

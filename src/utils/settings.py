@@ -246,11 +246,20 @@ class SQLConfig(BaseModel):
     mental_states: MentalStatesConfig = Field(default_factory=MentalStatesConfig)
     drives: DrivesConfig = Field(default_factory=DrivesConfig)
 
+class SwarmContextDepthConfig(BaseModel):
+    max_steps: int = 20
+    detailed_steps: int = 5
+    action_max_chars: int = 10000
+    result_max_chars: int = 20000
+    thoughts_short_max_chars: int = 2000
+    action_short_max_chars: int = 500
+    result_short_max_chars: int = 1000
 
 class SwarmConfig(BaseModel):
     enabled: bool = False
     subagent_model: str = "unknown"
     max_concurrent_workers: int = 3
+    context_depth: SwarmContextDepthConfig = Field(default_factory=SwarmContextDepthConfig)
 
 
 class SystemConfig(BaseModel):

@@ -1,3 +1,10 @@
+"""
+Глобальные служебные инструменты и утилиты фреймворка JAWL.
+
+Содержит функции для форматирования размеров, очистки HTML-контента, валидации
+путей песочницы (Gatekeeper) и работы с процессами агента.
+"""
+
 import psutil
 from pathlib import Path
 from typing import Union
@@ -6,8 +13,16 @@ import html
 
 
 def format_size(size_bytes: int) -> str:
-    """Переводит байты в человекочитаемый формат (B, KB, MB, GB, TB, PB)."""
+    """
+    Конвертирует размер из байтов в человекочитаемый формат (B, KB, MB, GB, TB, PB).
 
+    Args:
+        size_bytes (int): Размер файла в байтах.
+
+    Returns:
+        str: Отформатированная строка с подходящей единицей измерения.
+    """
+    
     if size_bytes < 0:
         return f"-{format_size(-size_bytes)}"
 
@@ -25,8 +40,18 @@ def format_size(size_bytes: int) -> str:
 def validate_sandbox_path(filepath: str | Path) -> Path:
     """
     Гейткипер песочницы: разрешает работу с файлами строго внутри папки sandbox/.
-    Защищает от Path Traversal атак (выхода за пределы директории).
+    Защищает от Path Traversal атак (выхода за пределы директории через '../').
+
+    Args:
+        filepath (str | Path): Относительный или абсолютный путь, запрошенный агентом.
+
+    Returns:
+        Path: Физический, очищенный и разрешенный абсолютный путь.
+
+    Raises:
+        PermissionError: Если запрошенный путь пытается выйти за пределы sandbox/.
     """
+
     sandbox_dir = (Path.cwd() / "sandbox").resolve()
     sandbox_dir.mkdir(parents=True, exist_ok=True)
 
@@ -44,7 +69,17 @@ def validate_sandbox_path(filepath: str | Path) -> Path:
 
 
 def parse_int_or_str(value: Union[int, str]) -> Union[int, str]:
-    """Утилитный метод для преобразования строковых ID Telegram в числа."""
+    """
+    Утилитный метод для преобразования строковых ID (например, Telegram) в числа.
+    Если строку невозможно конвертировать в int (например, это @username), возвращает очищенную строку.
+
+    Args:
+        value (Union[int, str]): Исходное значение ID.
+
+    Returns:
+        Union[int, str]: Числовой ID или строковый юзернейм.
+    """
+
     try:
         return int(value)
     except ValueError:
@@ -56,7 +91,17 @@ def truncate_text(
     max_chars: int,
     suffix: str = "\n... [Вывод обрезан. Превышен лимит символов]",
 ) -> str:
-    """Универсальная защита контекста от переполнения огромными текстами."""
+    """
+    Универсальная защита контекста агента от переполнения гигантскими текстами.
+
+    Args:
+        text (str): Исходный длинный текст.
+        max_chars (int): Максимально допустимое количество символов.
+        suffix (str, optional): Строка, которая будет добавлена в конец при обрезке.
+
+    Returns:
+        str: Оригинальный или усеченный текст с суффиксом.
+    """
 
     if len(text) > max_chars:
         return text[:max_chars] + suffix
@@ -64,17 +109,36 @@ def truncate_text(
 
 
 def get_project_root() -> Path:
-    """Гарантированно возвращает абсолютный путь к корню проекта JAWL."""
+    """
+    Вычисляет и гарантированно возвращает абсолютный путь к корню проекта JAWL.
+
+    Returns:
+        Path: Абсолютный путь директории фреймворка.
+    """
+
     return Path(__file__).resolve().parent.parent.parent
 
 
 def get_pid_file_path() -> Path:
-    """Единый путь к PID-файлу для всех модулей."""
+    """
+    Возвращает единый путь к PID-файлу для всех модулей системы.
+
+    Returns:
+        Path: Путь к файлу agent.pid.
+    """
+
     return get_project_root() / "src" / "utils" / "local" / "data" / "agent.pid"
 
 
 def is_agent_running() -> bool:
-    """Проверяет, работает ли агент на самом деле (логика перенесена из screens)."""
+    """
+    Проверяет, работает ли процесс агента на самом деле.
+    Исключает ложные срабатывания (когда PID-файл остался после краша системы).
+
+    Returns:
+        bool: True, если агент запущен и это процесс Python. False в противном случае.
+    """
+
     pid_file = get_pid_file_path()
     if not pid_file.exists():
         return False
@@ -97,8 +161,14 @@ def is_agent_running() -> bool:
 
 def clean_html(raw_html: str) -> str:
     """
-    Мощная и быстрая очистка текста от HTML-мусора.
-    Вырезает скрипты, стили, комментарии, HTML-теги и декодирует сущности (&amp; -> &).
+    Выполняет мощную и быструю очистку текста от HTML-мусора для экономии токенов LLM.
+    Вырезает <script>, <style>, комментарии, теги и декодирует HTML-сущности.
+
+    Args:
+        raw_html (str): Сырая строка с HTML-разметкой.
+
+    Returns:
+        str: Чистый текст, готовый для внедрения в промпт агента.
     """
 
     if not raw_html:
@@ -124,12 +194,17 @@ def clean_html(raw_html: str) -> str:
     return text
 
 
-def draw_image_grid(image_path: str | Path, step: int = 100):
+def draw_image_grid(image_path: str | Path, step: int = 100) -> None:
     """
-    Накладывает высококонтрастную координатную сетку на изображение.
-    Используется для мультимодального зрения агента.
+    Накладывает высококонтрастную полупрозрачную координатную сетку на изображение.
+    Используется навыком take_screenshot для точного визуального позиционирования
+    элементов мультимодальными моделями (Vision LLM).
+
+    Args:
+        image_path (str | Path): Путь к изображению, которое нужно модифицировать.
+        step (int, optional): Шаг сетки в пикселях. По умолчанию 100.
     """
-    
+
     from PIL import Image, ImageDraw
 
     with Image.open(image_path) as img:

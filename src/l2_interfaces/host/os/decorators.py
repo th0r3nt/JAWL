@@ -1,16 +1,32 @@
+"""
+Guard-декораторы для проверки прав доступа.
+Защищают системные вызовы на уровне методов, предотвращая выполнение
+опасных функций, если у агента недостаточно прав.
+"""
+
 from functools import wraps
+from typing import Callable, Any
+
 from src.l3_agent.skills.registry import SkillResult
 from src.l2_interfaces.host.os.client import HostOSAccessLevel
 
 
-def require_access(level: HostOSAccessLevel):
+def require_access(level: HostOSAccessLevel) -> Callable[..., Any]:
     """
-    Guard-декоратор для проверки уровня доступа к ОС.
+    Guard-декоратор для проверки уровня доступа к ОС (Role-Based Access Control).
+
+    Args:
+        level: Минимальный требуемый уровень доступа для выполнения функции.
+               Например, HostOSAccessLevel.OPERATOR.
+
+    Returns:
+        Обёртка-декоратор. Если прав не хватает, функция не выполняется
+        и возвращается SkillResult.fail с подробным объяснением.
     """
 
-    def decorator(func):
+    def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
         @wraps(func)
-        async def wrapper(self, *args, **kwargs):
+        async def wrapper(self: Any, *args: Any, **kwargs: Any) -> SkillResult:
             client = getattr(self, "host_os", None)
             if not client:
                 return SkillResult.fail("[Guard] Внутренняя ошибка: не найден HostOSClient.")
@@ -22,7 +38,8 @@ def require_access(level: HostOSAccessLevel):
                 )
             return await func(self, *args, **kwargs)
 
-        # Сохраняем требуемый уровень доступа для динамической фильтрации в системном промпте
+        # Сохраняем требуемый уровень доступа в атрибутах функции
+        # Это используется в get_skills_library() для динамического скрытия недоступных навыков из промпта
         wrapper.__required_os_level__ = level.value
         return wrapper
 

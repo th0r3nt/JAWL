@@ -1,4 +1,12 @@
+"""
+Навыки модерации и управления участниками чатов (Telethon).
+
+Позволяют блокировать (Blacklist), мутить (Read-Only) и выкидывать
+пользователей (Kick) из администрируемых агентом групп и каналов.
+"""
+
 import datetime
+from typing import Optional
 from telethon import utils
 from telethon.tl.functions.contacts import BlockRequest, UnblockRequest, GetBlockedRequest
 from telethon.tl.types import ChannelParticipantsKicked
@@ -6,25 +14,26 @@ from telethon.tl.types import ChannelParticipantsKicked
 from src.l2_interfaces.telegram.telethon.client import TelethonClient
 from src.l3_agent.skills.registry import SkillResult, skill
 from src.utils.logger import system_logger
-from typing import Optional
 
 
 class TelethonModeration:
-    """
-    Навыки для блокировки, разблокировки, мута и кика пользователей.
-    """
+    """Инструментарий карательных мер администратора."""
 
-    def __init__(self, tg_client: TelethonClient):
+    def __init__(self, tg_client: TelethonClient) -> None:
         self.tg_client = tg_client
 
     @skill()
     async def ban_user(self, user_id: int, chat_id: Optional[int] = None) -> SkillResult:
         """
-        Банит пользователя (исключает навсегда без возможности вернуться).
-        - Если chat_id НЕ передан: добавляет юзера в глобальный черный список аккаунта.
-        - Если chat_id передан: банит юзера в указанной группе/канале (если есть права).
-        """
+        Банит пользователя.
+        
+        - Если chat_id НЕ передан: добавляет юзера в глобальный личный черный список (ЛС).
+        - Если chat_id передан: исключает юзера из указанной группы/канала навсегда.
 
+        Args:
+            user_id: Числовой ID нарушителя.
+            chat_id: ID группы (если бан локальный).
+        """
         try:
             client = self.tg_client.client()
             target_user = int(user_id)
@@ -51,10 +60,9 @@ class TelethonModeration:
     async def unban_user(self, user_id: int, chat_id: Optional[int] = None) -> SkillResult:
         """
         Разблокирует пользователя (снимает мут или бан).
-        - Если chat_id НЕ передан: удаляет юзера из глобального ЧС.
-        - Если chat_id передан: разбанивает юзера в группе (снимает ограничения).
+        - Если chat_id НЕ передан: удаляет юзера из глобального ЧС (ЛС).
+        - Если chat_id передан: разбанивает юзера в группе (снимает все ограничения прав).
         """
-
         try:
             client = self.tg_client.client()
             target_user = int(user_id)
@@ -80,9 +88,9 @@ class TelethonModeration:
     @skill()
     async def kick_user(self, user_id: int, chat_id: int) -> SkillResult:
         """
-        Выгоняет пользователя из группы (Kick).
+        Просто выгоняет пользователя из группы (Kick).
+        В отличие от бана, юзер сможет вернуться по ссылке в любой момент.
         """
-
         try:
             client = self.tg_client.client()
             target_user = int(user_id)
@@ -104,10 +112,13 @@ class TelethonModeration:
         self, user_id: int, chat_id: int, duration_minutes: int = 0
     ) -> SkillResult:
         """
-        Запрещает пользователю писать сообщения в группе (Read-Only).
-        duration_minutes: длительность мута в минутах. Если 0 - мут навсегда.
-        """
+        Выдает "Мут" — запрещает пользователю писать сообщения в группе (Read-Only режим).
 
+        Args:
+            user_id: Кого мутим.
+            chat_id: В каком чате.
+            duration_minutes: Длительность в минутах. Если 0 - навсегда.
+        """
         try:
             client = self.tg_client.client()
             target_user = int(user_id)
@@ -139,8 +150,11 @@ class TelethonModeration:
     async def get_banned_users(
         self, limit: int = 50, chat_id: Optional[int] = None
     ) -> SkillResult:
-        """Возвращает список заблокированных пользователей."""
-
+        """
+        Возвращает список заблокированных пользователей.
+        Если chat_id передан 0 возвращает черный список чата (kicked),
+        если не передан - глобальный ЧС аккаунта.
+        """
         try:
             client = self.tg_client.client()
             banned_list = []

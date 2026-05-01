@@ -1,3 +1,10 @@
+"""
+Инициализатор локального интерфейса терминала (Host Terminal).
+
+Собирает TCP-сервер, который будет принимать подключения от CLI пользователя,
+и регистрирует мост (Events) между сервером и EventBus агента.
+"""
+
 from typing import List, Any, TYPE_CHECKING
 from src.utils.logger import system_logger
 from src.l3_agent.skills.registry import register_instance
@@ -12,9 +19,18 @@ if TYPE_CHECKING:
 
 
 def setup_host_terminal(system: "System") -> List[Any]:
+    """
+    Инициализирует интерфейс локального терминала.
+
+    Args:
+        system (System): Главный DI-контейнер фреймворка.
+
+    Returns:
+        List[Any]: Компоненты жизненного цикла (client, events).
+    """
+    
     config = system.interfaces_config.host.terminal
 
-    # Инициализируем клиент
     client = HostTerminalClient(
         state=system.terminal_state,
         config=config,
@@ -23,20 +39,18 @@ def setup_host_terminal(system: "System") -> List[Any]:
         timezone=system.settings.system.timezone,
     )
 
-    # Инициализируем фоновый воркер
     events = HostTerminalEvents(client=client, event_bus=system.event_bus)
 
-    # Регистрируем навык для агента
+    # Регистрируем навык отправки сообщений в терминал
     register_instance(HostTerminalMessages(client))
 
-    # Регистрируем блок в системный промпт
+    # Регистрируем блок истории сообщений в системный промпт
     system.context_registry.register_provider(
         name="host terminal",
         provider_func=client.get_context_block,
         section=ContextSection.INTERFACES,
     )
 
-    system_logger.info("[Host Terminal] Bнтерфейс загружен.")
+    system_logger.info("[Host Terminal] Интерфейс загружен.")
 
-    # Возвращаем компоненты с жизненным циклом start()/stop()
     return [client, events]

@@ -1,6 +1,15 @@
+"""
+Локальный TCP-сервер терминала (CLI-интерфейс пользователя).
+
+Обеспечивает двунаправленную связь между интерфейсом командной строки (UI)
+и шиной событий (EventBus) агента. Защищен механизмом Handshake,
+игнорирующим порт-сканеры ОС и IDE (которые любят стучаться во все открытые сокеты).
+"""
+
 import asyncio
 import json
 from pathlib import Path
+from typing import Any, Optional
 
 from src.utils.logger import system_logger
 from src.utils.dtime import get_now_formatted
@@ -21,7 +30,17 @@ class HostTerminalClient:
         data_dir: Path,
         agent_name: str,
         timezone: int,
-    ):
+    ) -> None:
+        """
+        Инициализирует TCP-сервер терминала.
+
+        Args:
+            state: L0 стейт терминала.
+            config: Конфигурация.
+            data_dir: Корневая директория локальных данных JAWL.
+            agent_name: Имя агента для отображения в UI.
+            timezone: Смещение часового пояса.
+        """
         self.state = state
         self.config = config
         self.agent_name = agent_name
@@ -38,14 +57,15 @@ class HostTerminalClient:
 
         self.history_file.parent.mkdir(parents=True, exist_ok=True)
 
-        self.server = None
+        self.server: Optional[asyncio.AbstractServer] = None
         self.active_writers: set[asyncio.StreamWriter] = set()
 
         # Очередь для передачи входящих сообщений/сигналов в events.py
         # Формат: (action_type, payload)
-        self.incoming_queue = asyncio.Queue()
+        self.incoming_queue: asyncio.Queue[tuple[str, str]] = asyncio.Queue()
 
-    async def start(self):
+    async def start(self) -> None:
+        """Запускает TCP сервер и сохраняет выданный ОС порт в файл для UI."""
         self._load_history()
 
         # ОС сама выдаст свободный порт
@@ -60,7 +80,8 @@ class HostTerminalClient:
 
         system_logger.info(f"[Host OS] Терминал-сервер запущен ({self.host}:{actual_port})")
 
-    async def stop(self):
+    async def stop(self) -> None:
+        """Штатно закрывает все активные сокеты."""
         self.state.is_online = False
 
         # Удаляем файл порта за ненадобностью
@@ -80,9 +101,13 @@ class HostTerminalClient:
 
         system_logger.info("[Host OS] Терминал-сервер остановлен.")
 
-    async def _handle_client(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
+    async def _handle_client(
+        self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter
+    ) -> None:
         """
-        Обработка нового подключения от CLI с защитой от сканеров портов (IDE Auto-Forwarding).
+        Корутина обработки нового TCP-соединения.
+        Ожидает пароль 'JAWL_HANDSHAKE' (защита от мусорного трафика) и транслирует
+        входящие текстовые потоки в очередь для обработки модулем Events.
         """
 
         try:
@@ -138,9 +163,13 @@ class HostTerminalClient:
             except Exception:
                 pass
 
-    async def broadcast_message(self, text: str):
+    async def broadcast_message(self, text: str) -> None:
         """
-        Отправка сообщения от агента во все подключенные консоли.
+        Асинхронная рассылка сообщения от агента во все активные TCP-сессии (открытые консоли).
+        Пакует текст в JSON с отметкой времени для парсинга на стороне CLI-виджетов.
+
+        Args:
+            text: Текст сообщения агента (поддерживает Markdown).
         """
 
         time_str = get_now_formatted(self.timezone, "%Y-%m-%d %H:%M:%S")
@@ -160,7 +189,8 @@ class HostTerminalClient:
             except Exception:
                 self.active_writers.discard(writer)
 
-    def _record_message(self, sender: str, text: str, time_str: str = ""):
+    def _record_message(self, sender: str, text: str, time_str: str = "") -> None:
+        """Пишет сообщение в L0 State и физический файл истории."""
         if not time_str:
             time_str = get_now_formatted(self.timezone, "%Y-%m-%d %H:%M:%S")
 
@@ -184,17 +214,16 @@ class HostTerminalClient:
         except Exception:
             return []
 
-    def _load_history(self):
+    def _load_history(self) -> None:
         """
-        Подтягивает контекст при старте.
+        Подтягивает историю контекста из файла при рестарте сервера.
         """
-
         history = self._read_history_file()
         recent = history[-self.config.context_limit :]
         for msg in recent:
             self.state.add_message(msg["sender"], msg["text"], msg.get("time", ""))
 
-    async def get_context_block(self, **kwargs) -> str:
+    async def get_context_block(self, **kwargs: Any) -> str:
         if not self.state.is_online:
             return "### HOST TERMINAL [OFF]\nИнтерфейс отключен."
 

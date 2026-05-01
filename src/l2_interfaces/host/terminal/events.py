@@ -1,3 +1,9 @@
+"""
+Оркестратор событий терминала.
+Выступает мостом (Consumer) между внутренней асинхронной очередью TCP-сервера 
+и глобальной шиной событий (EventBus).
+"""
+
 import asyncio
 from src.utils.logger import system_logger
 from src.utils.event.bus import EventBus

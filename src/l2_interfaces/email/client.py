@@ -1,8 +1,17 @@
+"""
+Stateful-клиент электронной почты (Email).
+
+Управляет соединениями IMAP/SMTP. Использует Context Managers для кратковременного
+поднятия сессий, защищая систему от таймаутов (socket drop) при длительном простое.
+Имеет механизм жесткой обрезки (truncate) для защиты агента от спам-рассылок.
+"""
+
 import imaplib
 import smtplib
 import email
 from contextlib import contextmanager
 import asyncio
+from typing import Iterator, Any
 
 from src.utils.logger import system_logger
 from src.l0_state.interfaces.state import EmailState
@@ -11,8 +20,8 @@ from src.l2_interfaces.email.utils import decode_mime_header
 
 class EmailClient:
     """
-    Stateful-клиент для работы с почтой.
-    Умный автовыбор серверов. Не держит постоянных соединений во избежание таймаутов.
+    Менеджер соединений с почтовыми серверами.
+    Обеспечивает умный автовыбор провайдера (Gmail, Yandex, Mail.ru и др.).
     """
 
     PROVIDERS = {
@@ -33,18 +42,28 @@ class EmailClient:
         },
     }
 
-    def __init__(self, state: EmailState, account: str, password: str):
+    def __init__(self, state: EmailState, account: str, password: str) -> None:
+        """
+        Инициализирует клиент.
+
+        Args:
+            state: L0 стейт (приборная панель).
+            account: Логин почты (адрес).
+            password: App Password (пароль приложения с 2FA).
+        """
+        
         self.state = state
         self.account = account.strip()
         self.password = password.strip()
 
-        self.imap_server = None
-        self.smtp_server = None
-        self.smtp_tls = False
+        self.imap_server: str = ""
+        self.smtp_server: str = ""
+        self.smtp_tls: bool = False
 
     async def start(self) -> None:
         """
-        Определяет сервера и проверяет авторизацию.
+        Определяет сервера по домену почты и выполняет тестовый коннект.
+        В случае успеха помечает интерфейс как Online.
         """
 
         domain = self.account.split("@")[-1].lower() if "@" in self.account else ""
@@ -56,9 +75,9 @@ class EmailClient:
             )
             return
 
-        self.imap_server = provider["imap"]
-        self.smtp_server = provider["smtp"]
-        self.smtp_tls = provider.get("smtp_tls", False)
+        self.imap_server = str(provider["imap"])
+        self.smtp_server = str(provider["smtp"])
+        self.smtp_tls = bool(provider.get("smtp_tls", False))
 
         try:
             # Тестовый коннект
@@ -77,12 +96,16 @@ class EmailClient:
             system_logger.error(f"[Email] Ошибка авторизации {self.account}: {e}")
 
     async def stop(self) -> None:
+        """Останавливает клиент (сессии IMAP/SMTP закрываются сами в context managers)."""
         self.state.is_online = False
 
     @contextmanager
-    def imap_connection(self):
+    def imap_connection(self) -> Iterator[imaplib.IMAP4_SSL]:
         """
         Контекстный менеджер для безопасной работы с IMAP (открыл-сделал-закрыл).
+
+        Yields:
+            Подключенный и авторизованный инстанс IMAP4_SSL.
         """
 
         mail = imaplib.IMAP4_SSL(self.imap_server)
@@ -98,9 +121,12 @@ class EmailClient:
             mail.logout()
 
     @contextmanager
-    def smtp_connection(self):
+    def smtp_connection(self) -> Iterator[Any]:
         """
         Контекстный менеджер для безопасной работы с SMTP.
+
+        Yields:
+            Подключенный и авторизованный инстанс SMTP или SMTP_SSL.
         """
 
         port = 587 if self.smtp_tls else 465
@@ -119,8 +145,11 @@ class EmailClient:
 
     def update_state_view(self) -> None:
         """
-        Быстро подтягивает последние заголовки для L0 State (без загрузки тел писем).
+        Легковесный метод обновления дашборда почты.
+        Скачивает исключительно заголовки (Subject, From, Date) последних N писем, игнорируя тела.
+        Гарантирует минимальный расход трафика и токенов агента.
         """
+
         if not self.state.is_online:
             return
 
@@ -133,7 +162,7 @@ class EmailClient:
 
                 uids = messages[0].split()
                 total_emails = len(uids)  # Считаем общее количество писем
-                
+
                 if not uids:
                     self.state.mailbox_preview = "Ящик пуст."
                     return
@@ -160,17 +189,21 @@ class EmailClient:
 
                 # Собираем итоговый текст
                 preview_text = "\n".join(lines)
-                
+
                 if total_emails > self.state.recent_limit:
                     hidden = total_emails - self.state.recent_limit
-                    preview_text += f"\n\n...и еще {hidden} писем скрыто для экономии контекста."
-                
+                    preview_text += (
+                        f"\n\n...и еще {hidden} писем скрыто для экономии контекста."
+                    )
+
                 self.state.mailbox_preview = preview_text
 
         except Exception as e:
             system_logger.error(f"[Email] Ошибка обновления дашборда: {e}")
 
-    async def get_context_block(self, **kwargs) -> str:
+    async def get_context_block(self, **kwargs: Any) -> str:
+        """Формирует Markdown-блок для приборной панели агента."""
+
         if not self.state.is_online:
             return "### EMAIL [OFF] \nИнтерфейс отключен."
 

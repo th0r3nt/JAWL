@@ -1,5 +1,14 @@
+"""
+Фоновый HTTP-сервер на базе aiohttp (Webhook Receiver).
+
+Слушает выделенный локальный порт и перехватывает POST/GET запросы от внешних интеграций
+(GitHub Actions, Stripe, Smart Home), пробрасывая их полезную нагрузку (JSON) в EventBus
+агента. Защищен механизмом валидации токена.
+"""
+
 import json
 import uuid
+from typing import Optional
 from aiohttp import web
 
 from src.utils.logger import system_logger
@@ -18,7 +27,7 @@ class WebHooksEvents:
 
     def __init__(
         self, client: WebHooksClient, state: WebHooksState, event_bus: EventBus, timezone: int
-    ):
+    ) -> None:
         self.client = client
         self.state = state
         self.bus = event_bus
@@ -30,13 +39,12 @@ class WebHooksEvents:
         self.app.router.add_post("/webhook/{source}", self.handle_webhook)
         self.app.router.add_get("/webhook/{source}", self.handle_webhook)  # На всякий случай
 
-        self.runner = None
+        self.runner: Optional[web.AppRunner] = None
 
     async def start(self) -> None:
         """
-        Запускает вебхук.
+        Запускает вебхук сервер.
         """
-
         if self.state.is_online:
             return
 
@@ -56,7 +64,7 @@ class WebHooksEvents:
             system_logger.info(
                 f"[Web Hooks] Сервер запущен на http://{self.client.config.host}:{self.client.config.port}"
             )
-            
+
         except Exception as e:
             system_logger.error(f"[Web Hooks] Ошибка запуска сервера: {e}")
 
@@ -67,9 +75,8 @@ class WebHooksEvents:
 
     async def stop(self) -> None:
         """
-        Останавливает вебхук.
+        Останавливает вебхук сервер.
         """
-
         self.state.is_online = False
         if self.runner:
             await self.runner.cleanup()
@@ -77,9 +84,16 @@ class WebHooksEvents:
 
     async def handle_webhook(self, request: web.Request) -> web.Response:
         """
-        Обработчик входящих запросов.
-        """
+        Универсальный эндпоинт-воронка.
+        Валидирует токен (Query или Bearer), парсит тело (JSON или Text) и генерирует
+        событие WEBHOOK_MESSAGE_INCOMING для экстренного пробуждения Heartbeat'а.
 
+        Args:
+            request: Входящий HTTP-запрос (aiohttp).
+
+        Returns:
+            web.Response: 200 OK или 401 Unauthorized.
+        """
         # Валидация токена
         token = request.query.get("token")
         if not token:

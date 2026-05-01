@@ -1,3 +1,8 @@
+"""
+Навыки для взаимодействия с Telegram-опросами (Polls).
+"""
+
+from typing import List
 from telethon.tl.types import InputMediaPoll, Poll, PollAnswer, TextWithEntities
 from telethon.tl.functions.messages import SendVoteRequest
 
@@ -7,19 +12,23 @@ from src.utils.logger import system_logger
 
 
 class TelethonPolls:
-    """
-    Навыки агента для взаимодействия с опросами (создание, чтение результатов, голосование, закрытие).
-    """
+    """Группа навыков для создания, чтения и голосования в опросах."""
 
-    def __init__(self, tg_client: TelethonClient):
+    def __init__(self, tg_client: TelethonClient) -> None:
         self.tg_client = tg_client
 
     @skill()
     async def create_poll(
-        self, chat_id: int, question: str, options: list[str]
+        self, chat_id: int, question: str, options: List[str]
     ) -> SkillResult:
-        """Создает новый опрос в указанном чате."""
+        """
+        Создает новый опрос (голосование) в указанном чате.
 
+        Args:
+            chat_id: ID чата.
+            question: Текст вопроса.
+            options: Массив вариантов ответа (от 2 до 10 штук).
+        """
         if len(options) < 2 or len(options) > 10:
             return SkillResult.fail(
                 "Ошибка: Количество вариантов ответа должно быть от 2 до 10."
@@ -28,7 +37,7 @@ class TelethonPolls:
         try:
             client = self.tg_client.client()
 
-            # Оборачиваем текст ответов в TextWithEntities
+            # Форматируем ответы в нативные MTProto-структуры
             answers = [
                 PollAnswer(
                     text=TextWithEntities(text=opt, entities=[]), option=str(i).encode("utf-8")
@@ -36,7 +45,6 @@ class TelethonPolls:
                 for i, opt in enumerate(options)
             ]
 
-            # Оборачиваем вопрос в TextWithEntities
             poll = Poll(
                 id=0,
                 question=TextWithEntities(text=question, entities=[]),
@@ -45,17 +53,23 @@ class TelethonPolls:
 
             msg = await client.send_message(int(chat_id), file=InputMediaPoll(poll=poll))
 
-            system_logger.info(f"[Telegram Telethon] Создан опрос '{question}' в чате {chat_id}")
+            system_logger.info(
+                f"[Telegram Telethon] Создан опрос '{question}' в чате {chat_id}"
+            )
             return SkillResult.ok(f"Опрос успешно создан. ID сообщения: {msg.id}")
 
         except Exception as e:
-            msg = f"Ошибка при создании опроса: {e}"
-            return SkillResult.fail(msg)
+            return SkillResult.fail(f"Ошибка при создании опроса: {e}")
 
     @skill()
     async def get_poll_results(self, chat_id: int, message_id: int) -> SkillResult:
-        """Возвращает текущие результаты опроса (варианты ответов и количество голосов)."""
+        """
+        Читает текущую статистику опроса (варианты ответов и распределение голосов).
 
+        Args:
+            chat_id: ID чата.
+            message_id: ID сообщения с опросом.
+        """
         try:
             client = self.tg_client.client()
             msg = await client.get_messages(int(chat_id), ids=int(message_id))
@@ -71,10 +85,9 @@ class TelethonPolls:
             total_voters = results.total_voters if results else 0
             lines = [f"Опрос: {poll.question}", f"👥 Всего голосов: {total_voters}\n"]
 
-            # Сопоставляем ответы с результатами
             if results and results.results:
                 for answer in poll.answers:
-                    # Ищем статистику конкретного ответа (сравниваем bytes)
+                    # Ищем статистику конкретного ответа (сравниваем байтовые хеши)
                     res = next((r for r in results.results if r.option == answer.option), None)
                     voters = res.voters if res else 0
                     lines.append(f"- {answer.text}: {voters} голосов")
@@ -86,12 +99,17 @@ class TelethonPolls:
 
     @skill()
     async def vote_in_poll(
-        self, chat_id: int, message_id: int, option_indices: list[int]
+        self, chat_id: int, message_id: int, option_indices: List[int]
     ) -> SkillResult:
         """
-        Голосует в опросе.
-        option_indices - массив индексов вариантов ответов (начиная с 0).
+        Отдает голос агента в чужом или своем опросе.
+
+        Args:
+            chat_id: ID чата.
+            message_id: ID опроса.
+            option_indices: Массив индексов ответов (начиная с 0), за которые вы голосуете.
         """
+
         try:
             client = self.tg_client.client()
             msg = await client.get_messages(int(chat_id), ids=int(message_id))
@@ -104,7 +122,6 @@ class TelethonPolls:
             if msg.poll.poll.closed:
                 return SkillResult.fail("Ошибка: Опрос уже закрыт, голосование невозможно.")
 
-            # Формируем байтовые значения выбранных ответов
             options_to_vote = []
             for idx in option_indices:
                 idx = int(idx)
@@ -113,7 +130,6 @@ class TelethonPolls:
                 else:
                     return SkillResult.fail(f"Ошибка: Несуществующий индекс ответа ({idx}).")
 
-            # Отправляем голос
             await client(
                 SendVoteRequest(
                     peer=await client.get_input_entity(int(chat_id)),
@@ -122,16 +138,20 @@ class TelethonPolls:
                 )
             )
 
-            system_logger.info(f"[Telegram Telethon] Оставлен голос в опросе {message_id} (чат {chat_id})")
+            system_logger.info(
+                f"[Telegram Telethon] Оставлен голос в опросе {message_id} (чат {chat_id})"
+            )
             return SkillResult.ok("Голос успешно учтен.")
 
         except Exception as e:
-            msg = f"Ошибка при голосовании: {e}"
-            return SkillResult.fail(msg)
+            return SkillResult.fail(f"Ошибка при голосовании: {e}")
 
     @skill()
     async def close_poll(self, chat_id: int, message_id: int) -> SkillResult:
-        """Закрывает опрос (останавливает голосование)."""
+        """
+        Закрывает (останавливает) созданный опрос, запрещая дальнейшее голосование.
+        """
+        
         try:
             client = self.tg_client.client()
             msg = await client.get_messages(int(chat_id), ids=int(message_id))
@@ -144,7 +164,6 @@ class TelethonPolls:
             if msg.poll.poll.closed:
                 return SkillResult.ok("Опрос уже был закрыт ранее.")
 
-            # Закрываем опрос через редактирование (стандартный метод в Telethon)
             poll = msg.poll.poll
             poll.closed = True
 
@@ -152,7 +171,9 @@ class TelethonPolls:
                 int(chat_id), int(message_id), file=InputMediaPoll(poll=poll)
             )
 
-            system_logger.info(f"[Telegram Telethon] Опрос {message_id} закрыт (чат {chat_id})")
+            system_logger.info(
+                f"[Telegram Telethon] Опрос {message_id} закрыт (чат {chat_id})"
+            )
             return SkillResult.ok("Опрос успешно закрыт.")
 
         except Exception as e:

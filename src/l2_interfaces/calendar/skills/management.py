@@ -1,3 +1,10 @@
+"""
+Навыки агента для манипуляции собственным графиком (Календарем).
+
+Позволяют агенту устанавливать разовые будильники, интервальные проверки
+или регулярные фоновые задачи, обеспечивая механизм отложенной проактивности.
+"""
+
 import uuid
 import time
 from datetime import datetime, timedelta
@@ -12,7 +19,7 @@ from src.l3_agent.skills.registry import skill, SkillResult
 class CalendarManagement:
     """Навыки управления локальным календарем (будильники и таймеры)."""
 
-    def __init__(self, client: CalendarClient):
+    def __init__(self, client: CalendarClient) -> None:
         self.client = client
         self.tz = get_timezone(self.client.timezone)
 
@@ -20,9 +27,11 @@ class CalendarManagement:
     async def add_one_time_alarm(self, title: str, datetime_str: str) -> SkillResult:
         """
         Создает разовый будильник.
-        datetime_str должен быть в формате 'YYYY-MM-DD HH:MM' (например, '2024-05-15 15:30').
-        """
 
+        Args:
+            title: Название или причина будильника.
+            datetime_str: Время в формате 'YYYY-MM-DD HH:MM' (например, '2024-05-15 15:30').
+        """
         try:
             # Парсим строку с учетом часового пояса системы
             dt = datetime.strptime(datetime_str, "%Y-%m-%d %H:%M").replace(tzinfo=self.tz)
@@ -52,11 +61,11 @@ class CalendarManagement:
     async def add_interval_alarm(self, title: str, interval_minutes: int) -> SkillResult:
         """
         Создает регулярный таймер, который будет срабатывать каждые N минут начиная от текущего момента.
-        Например: 2880 мин. = каждые два дня.
+
+        Args:
+            title: Причина пробуждения (что нужно проверить).
+            interval_minutes: Интервал в минутах (например, 2880 = каждые два дня).
         """
-
-        # TODO: удобно?
-
         if interval_minutes < 1:
             return SkillResult.fail("Ошибка: Интервал должен быть не менее 1 минуты.")
 
@@ -87,13 +96,13 @@ class CalendarManagement:
         self, title: str, time_str: str, interval_days: int = 1
     ) -> SkillResult:
         """
-        Создает повторяющийся будильник на конкретное время дня.
-        time_str: формат 'HH:MM' (например '09:00').
-        interval_days: раз в сколько дней повторять (1 = каждый день, 7 = раз в неделю).
+        Создает будильник, который будет будить агента в конкретное время суток с заданным шагом в днях.
+
+        Args:
+            title: Причина пробуждения (что нужно сделать).
+            time_str: Время в формате 'HH:MM'.
+            interval_days: Частота в днях (1 = каждый день, 7 = раз в неделю).
         """
-
-        # TODO: даже я путаюсь в этой логике повторения, надо упростить для агента
-
         if interval_days < 1:
             return SkillResult.fail("Ошибка: interval_days должен быть >= 1.")
 
@@ -131,7 +140,7 @@ class CalendarManagement:
 
         except ValueError:
             return SkillResult.fail("Ошибка: Неверный формат времени. Используйте 'HH:MM'.")
-        
+
         except Exception as e:
             return SkillResult.fail(f"Ошибка при создании повторяющегося таймера: {e}")
 
@@ -148,10 +157,8 @@ class CalendarManagement:
             dt_str = format_timestamp(ev["trigger_at"], self.client.timezone)
             if ev["type"] == "interval":
                 meta = f"Интервал: {ev.get('interval_minutes')} мин."
-
             elif ev["type"] == "recurring":
                 meta = f"Каждые {ev.get('interval_days')} дн. в {ev.get('time_str')}"
-
             else:
                 meta = "Разовый"
 
@@ -163,7 +170,12 @@ class CalendarManagement:
 
     @skill()
     async def delete_alarm(self, alarm_id: str) -> SkillResult:
-        """Удаляет существующий будильник или таймер по его ID."""
+        """
+        Удаляет существующий будильник или таймер по его ID.
+
+        Args:
+            alarm_id: Уникальный ID таймера (или его первые 8 символов).
+        """
         
         events = self.client.get_all_events()
 

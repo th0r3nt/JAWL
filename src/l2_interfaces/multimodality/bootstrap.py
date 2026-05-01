@@ -1,3 +1,10 @@
+"""
+Инициализатор интерфейса компьютерного зрения (Multimodality).
+
+Внедряет в ядро навык инъекции изображений (`look_at_image`). Если основная LLM
+не поддерживает зрение, интерфейс принудительно выключается для предотвращения ошибок API.
+"""
+
 from typing import List, Any, TYPE_CHECKING
 
 from src.utils.logger import system_logger
@@ -7,15 +14,22 @@ from src.l2_interfaces.multimodality.client import MultimodalityClient
 from src.l2_interfaces.multimodality.skills.vision import VisionSkills
 
 from src.l3_agent.skills.registry import register_instance
-from src.l3_agent.context.registry import ContextSection 
+from src.l3_agent.context.registry import ContextSection
 
 if TYPE_CHECKING:
     from src.main import System
 
 
 def setup_multimodality(system: "System") -> List[Any]:
-    """Инициализирует интерфейс Multimodality."""
+    """
+    Инициализирует интерфейс мультимодальности.
 
+    Args:
+        system (System): Главный DI-контейнер фреймворка.
+
+    Returns:
+        List[Any]: Пустой список.
+    """
     if not getattr(system.settings.llm, "is_multimodal", False):
         system_logger.warning(
             "[Multimodality] Интерфейс включен (multimodality: true), но модель "
@@ -33,14 +47,14 @@ def setup_multimodality(system: "System") -> List[Any]:
 
     client = MultimodalityClient(host_os_client=host_os_client)
 
-    # Регистрируем навыки
     register_instance(VisionSkills(client))
 
-    # Регистрируем стейт интерфейса в контексте
     client.is_online = True
     system.context_registry.register_provider(
-            name="multimodality", provider_func=client.get_context_block, section=ContextSection.INTERFACES
-        )
+        name="multimodality",
+        provider_func=client.get_context_block,
+        section=ContextSection.INTERFACES,
+    )
 
     system_logger.info("[Multimodality] Интерфейс загружен. Агент прозрел.")
 

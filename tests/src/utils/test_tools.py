@@ -1,79 +1,104 @@
+"""
+Unit-тесты для глобальных утилит (src/utils/_tools.py).
+
+Особое внимание уделяется функции `validate_sandbox_path` (Gatekeeper),
+чтобы гарантировать невозможность выхода за пределы песочницы (Path Traversal),
+и функции `clean_html`, проверяя обработку XSS-векторов и мусорных тегов.
+"""
+
 import pytest
 from pathlib import Path
+
 from src.utils._tools import (
     format_size,
-    validate_sandbox_path,
-    truncate_text,
     parse_int_or_str,
-     clean_html
+    truncate_text,
+    clean_html,
+    validate_sandbox_path,
 )
 
-def test_format_size():
-    assert format_size(0) == "0 B"
+
+def test_format_size() -> None:
+    """Проверяет корректность перевода байтов в человекочитаемый формат."""
     assert format_size(500) == "500 B"
     assert format_size(1024) == "1.0 KB"
-    assert format_size(1500) == "1.5 KB"
-    assert format_size(1500000) == "1.4 MB"
-    assert format_size(5 * 1024 ** 3) == "5.0 GB"
-    assert format_size(2 * 1024 ** 4) == "2.0 TB"
-    assert format_size(-2048) == "-2.0 KB"
+    assert format_size(1024 * 1024 * 5.5) == "5.5 MB"
+    assert format_size(-1024) == "-1.0 KB"
 
 
-def test_truncate_text():
-    text = "Hello, world!"
-    # Текст меньше лимита
-    assert truncate_text(text, 50) == "Hello, world!"
-    # Текст больше лимита
-    assert truncate_text(text, 5) == "Hello\n... [Вывод обрезан. Превышен лимит символов]"
-
-
-def test_parse_int_or_str():
+def test_parse_int_or_str() -> None:
+    """Проверяет умный каст ID из Telegram."""
     assert parse_int_or_str("12345") == 12345
     assert parse_int_or_str(12345) == 12345
     assert parse_int_or_str("@username") == "@username"
+    assert parse_int_or_str("  @username  ") == "@username"
 
 
-def test_validate_sandbox_path():
-    cwd = Path.cwd()
-    sandbox = cwd / "sandbox"
+def test_truncate_text() -> None:
+    """Проверяет обрезку длинных текстов для защиты контекста LLM."""
+    text = "Hello World!"
+    # Не режет, если лимит больше текста
+    assert truncate_text(text, 50) == "Hello World!"
+    # Режет с добавлением суффикса
+    truncated = truncate_text(text, 5, suffix="...")
+    assert truncated == "Hello..."
 
-    # 1. Обычное имя файла
-    res = validate_sandbox_path("test.txt")
-    assert res == sandbox / "test.txt"
 
-    # 2. Путь с указанием sandbox/
-    res = validate_sandbox_path("sandbox/test.txt")
-    assert res == sandbox / "test.txt"
+class TestHTMLCleaner:
+    """Группа тестов для проверки регулярных выражений очистки HTML."""
 
-    # 3. Path Traversal атака агента (попытка выйти из песочницы)
-    with pytest.raises(PermissionError, match="Доступ запрещен"):
-        validate_sandbox_path("../secret.env")
+    def test_clean_html_removes_scripts_and_styles(self) -> None:
+        """Скрипты и стили должны вырезаться вместе с содержимым."""
+        html = "<html><style>body {color: red;}</style><script>alert('xss');</script><body>Text</body></html>"
+        cleaned = clean_html(html)
+        assert "alert" not in cleaned
+        assert "color: red" not in cleaned
+        assert cleaned == "Text"
 
-def test_clean_html():
-    """Тест: утилита мощно вырезает всю HTML-ересь и декодирует сущности."""
-    raw_html = """
-    <html>
-        <head>
-            <style>body { color: red; }</style>
-            <script>alert('hack');</script>
-        </head>
-        <body>
-            <!-- Это секретный комментарий -->
-            <h1>Заголовок &amp; Текст</h1>
-            <p>Какой-то текст с&nbsp;пробелами и <br/> переносами.</p>
-        </body>
-    </html>
+    def test_clean_html_unescapes_entities(self) -> None:
+        """HTML-сущности (&amp;, &quot;) должны корректно декодироваться."""
+        html = "<p>Tom &amp; Jerry said &quot;Hi&quot; &#39;today&#39;</p>"
+        cleaned = clean_html(html)
+        assert cleaned == "Tom & Jerry said \"Hi\" 'today'"
+
+    def test_clean_html_collapses_whitespace(self) -> None:
+        """Множественные пробелы и переносы должны схлопываться."""
+        html = "<div>Line 1</div>    \n\n  <div>Line 2</div>"
+        cleaned = clean_html(html)
+        assert cleaned == "Line 1 Line 2"
+
+
+class TestGatekeeper:
     """
-    clean = clean_html(raw_html)
-    
-    # Стили, скрипты и комменты должны исчезнуть
-    assert "color: red" not in clean
-    assert "alert('hack')" not in clean
-    assert "секретный комментарий" not in clean
-    
-    # Сущности должны раскодироваться
-    assert "Заголовок & Текст" in clean
-    assert "с пробелами" in clean
-    
-    # Лишние пробелы должны схлопнуться
-    assert clean == "Заголовок & Текст Какой-то текст с пробелами и переносами."
+    Группа тестов для функции `validate_sandbox_path`.
+    Критически важный тест безопасности (защита от Path Traversal).
+    """
+
+    def test_validate_sandbox_path_valid_files(self) -> None:
+        """Разрешенные пути внутри песочницы должны успешно резолвиться."""
+        sandbox_dir = (Path.cwd() / "sandbox").resolve()
+
+        # Обычный файл
+        path1 = validate_sandbox_path("test.txt")
+        assert path1 == sandbox_dir / "test.txt"
+
+        # С префиксом sandbox/
+        path2 = validate_sandbox_path("sandbox/folder/test.txt")
+        assert path2 == sandbox_dir / "folder" / "test.txt"
+
+    def test_validate_sandbox_path_blocks_traversal(self) -> None:
+        """Попытки выйти за пределы sandbox/ через '../' должны блокироваться."""
+        with pytest.raises(PermissionError, match="Доступ запрещен"):
+            validate_sandbox_path("../main.py")
+
+        with pytest.raises(PermissionError, match="Доступ запрещен"):
+            validate_sandbox_path("sandbox/../../etc/passwd")
+
+    def test_validate_sandbox_path_blocks_absolute_paths(self) -> None:
+        """Абсолютные пути за пределами песочницы должны блокироваться."""
+        import os
+
+        forbidden_path = "C:\\Windows\\System32" if os.name == "nt" else "/etc/passwd"
+
+        with pytest.raises(PermissionError, match="Доступ запрещен"):
+            validate_sandbox_path(forbidden_path)

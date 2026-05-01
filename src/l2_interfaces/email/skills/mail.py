@@ -1,6 +1,14 @@
+"""
+Навыки агента для взаимодействия с электронной почтой.
+
+Позволяют агенту читать инбокс, отправлять письма и безвозвратно удалять мусор.
+Включают встроенную защиту от огромных писем-рассылок (обрезка через truncate_text).
+"""
+
 import asyncio
 import email
 from email.message import EmailMessage
+from typing import Tuple
 
 from src.utils.logger import system_logger
 from src.utils._tools import truncate_text
@@ -13,16 +21,20 @@ from src.l3_agent.skills.registry import SkillResult, skill
 class EmailSkills:
     """Навыки для чтения, отправки и удаления писем."""
 
-    def __init__(self, client: EmailClient):
+    def __init__(self, client: EmailClient) -> None:
         self.client = client
 
     @skill()
     async def read_email(self, uid: int) -> SkillResult:
         """
-        Читает полное содержимое конкретного письма по его UID.
+        Скачивает и читает полное содержимое письма по его уникальному идентификатору (UID).
+        Автоматически конвертирует HTML-письма в чистый текст.
+
+        Args:
+            uid: Идентификатор письма (берется из списка 'Recent Inbox' на приборной панели).
         """
 
-        def _read():
+        def _read() -> Tuple[bool, str]:
             with self.client.imap_connection() as mail:
                 status, msg_data = mail.uid("fetch", str(uid).encode(), "(RFC822)")
                 if status != "OK" or not msg_data[0]:
@@ -37,7 +49,7 @@ class EmailSkills:
 
                 body = extract_text_from_email(msg)
 
-                # Защита от гигантских рассылок
+                # Защита от гигантских рассылок и писем с вложениями
                 body = truncate_text(body, 15000)
 
                 report = f"От: {sender}\nДата: {date}\nТема: {subject}\n\n{body}"
@@ -48,19 +60,24 @@ class EmailSkills:
             if success:
                 system_logger.info(f"[Email] Прочитано письмо UID: {uid}")
                 return SkillResult.ok(text)
-            
+
             return SkillResult.fail(text)
-        
+
         except Exception as e:
             return SkillResult.fail(f"Ошибка при чтении письма: {e}")
 
     @skill()
     async def send_email(self, to_email: str, subject: str, body: str) -> SkillResult:
         """
-        Отправляет текстовое письмо на указанный адрес.
+        Отправляет текстовое письмо на указанный электронный адрес.
+
+        Args:
+            to_email: Адрес получателя (например, 'user@gmail.com').
+            subject: Тема письма.
+            body: Основной текст письма.
         """
 
-        def _send():
+        def _send() -> None:
             msg = EmailMessage()
             msg.set_content(body)
             msg["Subject"] = subject
@@ -73,17 +90,20 @@ class EmailSkills:
         try:
             await asyncio.to_thread(_send)
             return SkillResult.ok(f"Письмо успешно отправлено на {to_email}.")
-        
+
         except Exception as e:
             return SkillResult.fail(f"Ошибка при отправке письма: {e}")
 
     @skill()
     async def delete_email(self, uid: int) -> SkillResult:
         """
-        Безвозвратно удаляет письмо по его UID.
+        Безвозвратно удаляет письмо из почтового ящика по его UID.
+
+        Args:
+            uid: Идентификатор удаляемого письма.
         """
 
-        def _delete():
+        def _delete() -> None:
             with self.client.imap_connection() as mail:
                 # Ставим флаг "Удалено"
                 mail.uid("STORE", str(uid).encode(), "+FLAGS", "(\\Deleted)")
@@ -96,6 +116,6 @@ class EmailSkills:
             await asyncio.to_thread(self.client.update_state_view)
 
             return SkillResult.ok("Письмо успешно удалено.")
-        
+
         except Exception as e:
             return SkillResult.fail(f"Ошибка при удалении письма: {e}")

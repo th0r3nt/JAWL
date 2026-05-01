@@ -1,27 +1,35 @@
 """
-Универсальная схема для вызова инструментов агентом.
-Заставляет LLM генерировать 'thoughts' перед массивом 'actions',
-обеспечивая механизм Chain-of-Thought (CoT).
+Универсальная Pydantic схема для вызова инструментов агентом.
+
+Определяет JSON Schema, которую ожидает OpenAI API (или совместимые).
+Заставляет LLM генерировать 'thoughts' ДО массива 'actions', что обеспечивает
+аппаратную реализацию механизма Chain-of-Thought (CoT). Модель сначала "думает", а потом "действует".
 """
 
-from typing import Any
+from typing import Any, Dict, List
 from pydantic import BaseModel, Field
 
 
 class ActionCall(BaseModel):
-    """Типизированная модель вызова одного инструмента."""
+    """
+    Типизированная модель вызова одного инструмента.
+    """
 
     tool_name: str
-    parameters: dict[str, Any] = Field(default_factory=dict)
+    parameters: Dict[str, Any] = Field(default_factory=dict)
 
 
 class AgentResponse(BaseModel):
-    """Типизированная схема полного ответа LLM."""
+    """
+    Типизированная схема полного ответа LLM.
+    Содержит внутренний монолог и массив параллельных действий.
+    """
 
     thoughts: str
-    actions: list[ActionCall] = Field(default_factory=list)
+    actions: List[ActionCall] = Field(default_factory=list)
 
 
+# Константа, которая отправляется в параметр 'tools' API языковой модели
 ACTION_SCHEMA = [
     {
         "type": "function",

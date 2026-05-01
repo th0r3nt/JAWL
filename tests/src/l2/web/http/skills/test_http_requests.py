@@ -16,7 +16,7 @@ async def test_network_http_request_truncation(mock_urlopen, http_client):
     mock_response.__enter__.return_value = mock_response
     mock_urlopen.return_value = mock_response
 
-    res = await skills.http_request("http://fake.url")
+    res = await skills.request("http://fake.url")
 
     assert res.is_success is True
     assert "Статус: 200" in res.message
@@ -40,9 +40,9 @@ async def test_network_http_request_truncation(mock_urlopen, http_client):
 )
 @patch("src.l2_interfaces.web.http.skills.requests.urllib.request.urlopen")
 async def test_http_request_blocks_non_http_schemes(mock_urlopen, http_client, url):
-    """Гард: http_request не должен открывать ничего кроме http(s)."""
+    """Гард: request не должен открывать ничего кроме http(s)."""
     skills = WebHTTPRequests(http_client)
-    res = await skills.http_request(url)
+    res = await skills.request(url)
 
     assert res.is_success is False
     assert "Запрещённая схема" in res.message

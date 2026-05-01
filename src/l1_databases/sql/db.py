@@ -1,3 +1,10 @@
+"""
+Модуль инициализации реляционной базы данных (SQLite).
+
+Низкоуровневая обертка для асинхронного взаимодействия с SQLite.
+Управляет пулом соединений (SQLAlchemy AsyncEngine) и фабрикой сессий для всего слоя L1.
+"""
+
 import os
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 
@@ -7,11 +14,18 @@ from src.utils.logger import system_logger
 
 class SQLDB:
     """
-    Асинхронный класс инициализации SQLite.
-    Управляет пулом соединений и сессиями.
+    Асинхронный менеджер инициализации SQLite.
+    Отвечает за создание таблиц, управление пулом соединений и выдачу сессий.
     """
 
-    def __init__(self, db_path: str):
+    def __init__(self, db_path: str) -> None:
+        """
+        Инициализирует движок базы данных и фабрику сессий.
+
+        Args:
+            db_path: Абсолютный или относительный путь к файлу .db, либо ':memory:' для работы в ОЗУ.
+        """
+
         # Если это не in-memory база, убеждаемся, что папка существует
         if db_path != ":memory:":
             dir_name = os.path.dirname(db_path)
@@ -25,8 +39,15 @@ class SQLDB:
             bind=self.engine, class_=AsyncSession, expire_on_commit=False
         )
 
-    async def connect(self):
-        """Создает таблицы, если их нет, и подготавливает БД к работе."""
+    async def connect(self) -> None:
+        """
+        Создает физическое подключение к SQLite и генерирует схему таблиц, если они отсутствуют.
+        Должно вызываться строго один раз при старте жизненного цикла системы.
+
+        Raises:
+            Exception: В случае нехватки прав доступа к директории или конфликта блокировок.
+        """
+
         try:
             async with self.engine.begin() as conn:
                 await conn.run_sync(Base.metadata.create_all)
@@ -36,8 +57,12 @@ class SQLDB:
             system_logger.error(f"[SQL DB] Критическая ошибка при запуске базы данных: {e}")
             raise e
 
-    async def disconnect(self):
-        """Корректно закрывает соединения при остановке системы."""
+    async def disconnect(self) -> None:
+        """
+        Безопасно уничтожает пул соединений (Engine) и сбрасывает незакрытые транзакции.
+        Предотвращает утечки дескрипторов (SQLite Database is locked) при перезагрузке системы.
+        """
+
         if self.engine:
             await self.engine.dispose()
             system_logger.info("[SQL DB] Подключение к базе данных закрыто.")

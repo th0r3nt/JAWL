@@ -1,3 +1,10 @@
+"""
+Инициализатор интерфейса Web RSS.
+
+Оркестрирует фоновый парсинг новостных и технических лент
+с последующим уведомлением агента через EventBus при выходе новых статей.
+"""
+
 from typing import List, Any, TYPE_CHECKING
 from src.utils.logger import system_logger
 
@@ -15,8 +22,14 @@ if TYPE_CHECKING:
 def setup_web_rss(system: "System") -> List[Any]:
     """
     Инициализирует интерфейс Web RSS.
-    """
 
+    Args:
+        system (System): Главный DI-контейнер фреймворка.
+
+    Returns:
+        List[Any]: Фоновые задачи поллинга (events).
+    """
+    
     config = system.interfaces_config.web.rss
 
     client = WebRSSClient(state=system.web_rss_state, config=config)

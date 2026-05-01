@@ -1,21 +1,23 @@
 identity:
   agent_name: Agent # Имя вашего агента
 
+# Подробнее: docs/yaml/settings/llm.md
 llm:
   main_model: unknown # Добавьте свою LLM модель
-  available_models: # Список моделей, которые агент может ставить по вашей просьбе
+  available_models:
     - claude-opus-4.7
     - claude-opus-4.6
     - gemini-3.1-pro-preview
     - gemini-3-flash-preview
   # ...можно добавить свои, главное - убедитесь, что llm api url и ключи правильно настроены
 
-  is_multimodal: false # Поставьте true, если основная модель мультимодальна
+  is_multimodal: false
   temperature: 1.0
   max_react_steps: 15
 
 system:
-  timezone: 0 # Смещение от UTC в часах (например, 3 для МСК)
+  # Смещение от UTC в часах (например, 3 для МСК)
+  timezone: 0
 
   logging:
     max_file_size_mb: 5.0
@@ -24,17 +26,18 @@ system:
   vector_db:
     similarity_threshold: 0.65
 
-    # Подробнее: docs/yaml/vector_db_models.md 
+    # Подробнее: docs/yaml/settings/vector_db.md 
     embedding_model: "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
     vector_size: 384
     auto_rag_top_k: 1
     auto_rag_max_query_chars: 200
     
+  # Подробнее: docs/yaml/settings/heartbeat.md
   heartbeat_interval: 600
-  continuous_cycle: false # Если true, агент будет работать вообще без пауз
-  proactive_guidance: false # Доп. системные инструкции с рекомендацией к проактивности
+  continuous_cycle: false
+  proactive_guidance: false
 
-  # Подробнее: docs/yaml/event_acceleration.md
+  # Подробнее: docs/yaml/settings/event_acceleration.md
   event_acceleration:
     critical_multiplier: 0.0
     high_multiplier: 0.2
@@ -42,7 +45,7 @@ system:
     low_multiplier: 0.7
     background_multiplier: 0.8
 
-  # Подробнее: docs/yaml/context.md
+  # Подробнее: docs/yaml/settings/context.md
   context_depth:
     ticks: 15
     detailed_ticks: 3
@@ -52,23 +55,21 @@ system:
     tick_action_short_max_chars: 100 
     tick_result_short_max_chars: 500
 
+  # Подробнее: docs/yaml/settings/sql_db.md
   sql:
-    # Задачи для выполнения
     tasks: 
       enabled: true
       max_tasks: 10
 
-    # Динамичные черты личности
     personality_traits:
       enabled: true
       max_traits: 10
 
-    # Сущности (объекты/субъекты) в памяти
     mental_states:
       enabled: true
       max_entities: 10
 
-    # Подробнее: docs/yaml/drives.md
+    # Подробнее: docs/yaml/settings/drives.md
     drives:
       enabled: true
       decay_rate: 10.0
@@ -76,8 +77,17 @@ system:
       max_reflections_history: 3
       max_custom_drives: 5
 
-  # Система делегирования задач для субагентов
+  # Подробнее: docs/subagents.md
   swarm:
-    enabled: false
-    subagent_model: unknown # Рекомендуется поставить дешевую и быструю модель
+    enabled: true
+    subagent_model: unknown
     max_concurrent_workers: 3
+    
+    context_depth:
+      max_steps: 20
+      detailed_steps: 5
+      action_max_chars: 10000
+      result_max_chars: 20000
+      thoughts_short_max_chars: 2000
+      action_short_max_chars: 500
+      result_short_max_chars: 1000

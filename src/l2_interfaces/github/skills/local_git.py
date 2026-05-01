@@ -1,5 +1,11 @@
+"""
+Навыки агента для локальной работы с системой контроля версий (Git).
+Все команды выполняются в изолированных подпроцессах строго внутри директории `sandbox/`.
+"""
+
 import asyncio
 from pathlib import Path
+from typing import Tuple
 
 from src.l2_interfaces.github.client import GithubClient
 from src.utils.logger import system_logger
@@ -8,26 +14,30 @@ from src.utils._tools import truncate_text, validate_sandbox_path
 from src.l3_agent.skills.registry import SkillResult, skill
 from src.l3_agent.swarm.roles import Subagents
 
+
 class GithubLocalGit:
     """Навыки для локальной работы с Git (Клонирование, Коммиты, Пуши) внутри песочницы."""
 
-    def __init__(self, github_client: GithubClient):
+    def __init__(self, github_client: GithubClient) -> None:
         self.github = github_client
 
     def _mask_token(self, text: str) -> str:
-        """
-        Скрывает токен из логов и вывода консоли.
-        """
-
+        """Скрывает токен из логов и вывода консоли."""
         if self.github.token:
             return text.replace(self.github.token, "***")
         return text
 
-    async def _run_git_command(self, cwd: Path, *args: str) -> tuple[int, str, str]:
+    async def _run_git_command(self, cwd: Path, *args: str) -> Tuple[int, str, str]:
         """
         Безопасный запуск git команд в подпроцессе.
-        """
 
+        Args:
+            cwd: Рабочая директория (в песочнице).
+            args: Аргументы команды git.
+
+        Returns:
+            Кортеж: (Код_возврата, STDOUT, STDERR).
+        """
         try:
             process = await asyncio.create_subprocess_exec(
                 "git",
@@ -57,12 +67,15 @@ class GithubLocalGit:
         self, owner: str, repo: str, dest_folder: str
     ) -> SkillResult:
         """
-        Клонирует Git-репозиторий в песочницу (sandbox/).
-        Сохраняет .git директорию для коммитов.
-        """
+        Клонирует удаленный репозиторий в локальную песочницу с сохранением директории `.git`.
+        Позволяет вносить изменения и отправлять коммиты.
 
+        Args:
+            owner: Владелец репозитория.
+            repo: Имя репозитория.
+            dest_folder: Имя целевой папки внутри `sandbox/`.
+        """
         try:
-            # Убрано принудительное перенаправление в 'download/'
             safe_path = validate_sandbox_path(dest_folder)
 
             if safe_path.exists() and any(safe_path.iterdir()):
@@ -111,9 +124,12 @@ class GithubLocalGit:
     ) -> SkillResult:
         """
         Переключает локальный репозиторий на другую ветку.
-        Если create_new=True, создаст новую ветку от текущей.
-        """
 
+        Args:
+            repo_folder: Папка в песочнице, где лежит клонированный репо.
+            branch_name: Название ветки.
+            create_new: Если True, создаст новую ветку от текущей.
+        """
         try:
             safe_path = validate_sandbox_path(repo_folder)
             if not (safe_path / ".git").exists():
@@ -134,14 +150,18 @@ class GithubLocalGit:
         except Exception as e:
             return SkillResult.fail(f"Ошибка git checkout: {e}")
 
-    @skill()
+    @skill(swarm_roles=[Subagents.CODER])
     async def git_commit_and_push(
         self, repo_folder: str, commit_message: str, branch_name: str
     ) -> SkillResult:
         """
         Индексирует все изменения, создает коммит и пушит в origin.
-        """
 
+        Args:
+            repo_folder: Папка в песочнице с репозиторием.
+            commit_message: Описание коммита.
+            branch_name: Имя ветки, в которую нужно сделать пуш.
+        """
         if not self.github.token:
             return SkillResult.fail(
                 "Ошибка: Для выполнения 'git push' необходим GITHUB_TOKEN."

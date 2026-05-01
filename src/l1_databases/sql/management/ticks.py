@@ -1,7 +1,15 @@
+"""
+Сборщик и форматировщик истории действий агента (Ticks).
+
+Логирует каждый шаг ReAct-цикла и отвечает за умную компрессию старых шагов
+в системном промпте (оставляя N последних шагов подробными, а остальные ужимая
+по количеству символов для экономии контекста).
+"""
+
 import re
 import json
 import uuid
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, List
 from sqlalchemy import select, desc
 
 from src.utils.logger import system_logger
@@ -28,7 +36,21 @@ class SQLTicks:
         action_short_max_chars: int = 300,
         result_short_max_chars: int = 300,
         tz_offset: int = 0,
-    ):
+    ) -> None:
+        """
+        Инициализирует контроллер тиков и задает жесткие лимиты на размер контекста.
+
+        Args:
+            db: Подключение к SQLite.
+            limit: Максимальное количество тиков (шагов), отображаемых в промпте.
+            detailed_ticks: Сколько самых свежих тиков выводить в детальном виде (без обрезки).
+            action_max_chars: Лимит символов для свежих действий.
+            result_max_chars: Лимит символов для свежих результатов.
+            thoughts_short_max_chars: Лимит символов для сжатых мыслей.
+            action_short_max_chars: Лимит символов для сжатых действий.
+            result_short_max_chars: Лимит символов для сжатых результатов.
+            tz_offset: Смещение временной зоны.
+        """
         self.db = db
         self.ticks_limit = limit
         self.detailed_ticks = detailed_ticks
@@ -45,6 +67,18 @@ class SQLTicks:
     async def save_tick(
         self, thoughts: str, actions: list[dict[str, Any]], results: dict[str, Any]
     ) -> str:
+        """
+        Сохраняет единичный такт работы агента в базу данных.
+
+        Args:
+            thoughts: Внутренний монолог и логика агента.
+            actions: Массив вызванных инструментов и их параметров.
+            results: Ответы от инструментов или текст Traceback/ошибок.
+
+        Returns:
+            Сгенерированный UUID сохраненного тика.
+        """
+
         tick_id = str(uuid.uuid4())
 
         async with self.db.session_factory() as session:
@@ -57,8 +91,16 @@ class SQLTicks:
         system_logger.debug(f"[SQL DB] Тик сохранен (ID: {tick_id[:8]}).")
         return tick_id
 
-    async def get_ticks(self, limit: int = 5) -> list[TickTable]:
-        """Возвращает последние N тиков из базы данных."""
+    async def get_ticks(self, limit: int = 5) -> List[TickTable]:
+        """
+        Возвращает последние N тиков из базы данных в хронологическом порядке.
+
+        Args:
+            limit: Сколько записей извлечь.
+
+        Returns:
+            Список объектов TickTable.
+        """
 
         async with self.db.session_factory() as session:
             stmt = select(TickTable).order_by(desc(TickTable.created_at)).limit(limit)
@@ -67,9 +109,14 @@ class SQLTicks:
             ticks = result.scalars().all()
             return list(reversed(ticks))
 
-    async def get_context_block(self, **kwargs) -> str:
+    async def get_context_block(self, **kwargs: Any) -> str:
         """
-        Отдает отформатированный блок контекста для агента.
+        Извлекает последние N тиков из базы и динамически сжимает их объем.
+        Последние 'detailed_ticks' отдаются почти полностью, остальные жестко обрезаются
+        до 'short_max_chars' для предотвращения переполнения контекстного окна LLM.
+
+        Returns:
+            Готовый Markdown блок 'RECENT TICKS' для инъекции в промпт.
         """
 
         ticks = await self.get_ticks(limit=self.ticks_limit)

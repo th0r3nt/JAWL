@@ -1,5 +1,12 @@
+"""
+CRUD-контроллер для управления внутренними потребностями (Drives) агента.
+
+Реализует математическую модель роста дефицита от 0% до 100% с течением времени.
+Позволяет агенту проактивно выполнять задачи в моменты "скуки".
+"""
+
 import uuid
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 from datetime import datetime, timezone, timedelta
 from sqlalchemy import select, func
 
@@ -23,7 +30,18 @@ class SQLDrives:
         max_history: int = 3,
         max_custom: int = 5,
         tz_offset: int = 0,
-    ):
+    ) -> None:
+        """
+        Инициализирует контроллер мотиваторов.
+
+        Args:
+            db: Подключение к SQLite.
+            decay_rate: Процент роста дефицита за один интервал.
+            decay_interval_sec: Интервал обновления дефицита (в секундах).
+            max_history: Лимит хранимых рефлексий на один драйв.
+            max_custom: Максимальное количество кастомных (созданных агентом) драйвов.
+            tz_offset: Смещение временной зоны.
+        """
         self.db = db
         self.decay_rate = decay_rate
         self.decay_interval_sec = decay_interval_sec
@@ -31,8 +49,12 @@ class SQLDrives:
         self.max_custom = max_custom
         self.tz_offset = tz_offset
 
-    async def bootstrap_fundamental_drives(self):
-        """Проверяет и создает базовые (фундаментальные) мотиваторы при запуске."""
+    async def bootstrap_fundamental_drives(self) -> None:
+        """
+        Проверяет наличие базовых (system-level) мотиваторов: Curiosity, Social, Mastery.
+        Если они отсутствуют (например, при первом запуске), создает их в базе данных.
+        Базовые драйвы не подлежат удалению агентом.
+        """
 
         fundamental_drives = [
             {
@@ -72,13 +94,12 @@ class SQLDrives:
         self, drive_name: str, amount: int, reflection_summary: str
     ) -> SkillResult:
         """
-        Снижает показатель дефицита мотиватора на указанную величину.
-        amount: от 1 до 100 (на сколько процентов закрыта потребность).
-        reflection_summary: описание того, как именно была удовлетворена мотивация.
+        Снижает дефицит указанного мотиватора (Имитирует "насыщение" потребности).
 
-        Маловажные действия: рекомендуется 5-15.
-        Средние действия: 15-30.
-        Важные, сложные действия: 30-60.
+        Args:
+            drive_name: Точное имя мотиватора.
+            amount: На сколько процентов снизить дефицит (от 1 до 100).
+            reflection_summary: Обоснование, как именно проделанная работа закрыла эту потребность.
         """
 
         amount = max(1, min(100, amount))
@@ -128,7 +149,14 @@ class SQLDrives:
     async def create_custom_drive(
         self, name: str, description: str, decay_rate: float = 2.5
     ) -> SkillResult:
-        """Создает новую кастомную потребность/мотивацию."""
+        """
+        Создает новую кастомную потребность (мотиватор) агента.
+
+        Args:
+            name: Короткое имя новой потребности.
+            description: Развернутое описание того, в каких случаях она должна удовлетворяться.
+            decay_rate: На сколько процентов растет дефицит за 1 интервал.
+        """
 
         async with self.db.session_factory() as session:
             count_res = await session.execute(
@@ -156,7 +184,12 @@ class SQLDrives:
 
     @skill()
     async def delete_custom_drive(self, drive_name: str) -> SkillResult:
-        """Удаляет созданную кастомную потребность."""
+        """
+        Удаляет пользовательский мотиватор из базы данных.
+
+        Args:
+            drive_name: Имя удаляемой потребности.
+        """
 
         async with self.db.session_factory() as session:
             result = await session.execute(select(DriveTable))
@@ -178,8 +211,14 @@ class SQLDrives:
         system_logger.debug(f"[SQL DB] Удален кастомный драйв '{drive_name}'.")
         return SkillResult.ok(f"Драйв '{drive_name}' удален.")
 
-    async def get_context_block(self, **kwargs) -> str:
-        """Считает дефицит на лету и отдает блок контекста."""
+    async def get_context_block(self, **kwargs: Any) -> str:
+        """
+        Динамически вычисляет текущий дефицит всех драйвов на основе прошедшего времени
+        и формирует Markdown-блок для инъекции в системный промпт (ContextRegistry).
+
+        Returns:
+            Отформатированная Markdown строка со статусом драйвов.
+        """
 
         async with self.db.session_factory() as session:
             result = await session.execute(select(DriveTable))
@@ -209,16 +248,12 @@ class SQLDrives:
 
             if deficit_int >= 90:
                 status = "(Критический дефицит: приоритетная задача)"
-
             elif deficit_int >= 70:
                 status = "(Высокий: требует внимания)"
-
             elif deficit_int >= 50:
                 status = "(Растет: рекомендуется запланировать действия)"
-
             elif deficit_int >= 30:
                 status = "(Лёгкий дефицит: не критично)"
-
             else:
                 status = "(В норме: потребность удовлетворена)"
 
@@ -232,7 +267,9 @@ class SQLDrives:
                 for ref in d.recent_reflections:
                     # Жестко режем длинные рефлексии
                     limit = 500
-                    short_ref = ref if len(ref) <= limit else ref[:limit] + "... [Обрезано системой]"
+                    short_ref = (
+                        ref if len(ref) <= limit else ref[:limit] + "... [Обрезано системой]"
+                    )
                     lines.append(f"  - {short_ref}")
             else:
                 lines.append("* История удовлетворения: Пусто")

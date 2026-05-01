@@ -1,8 +1,17 @@
+"""
+Stateful-менеджер Headless-браузера (Playwright).
+
+Обеспечивает "ленивую" (Lazy) инициализацию процесса Chromium, чтобы не тратить ОЗУ,
+если агент ничего не ищет. Управляет состоянием хранилища (Cookie, Local Storage)
+для обхода повторной авторизации на сайтах. Конвертирует DOM в легкий Markdown (AOM).
+"""
+
 import time
 import sys
 import asyncio
 from pathlib import Path
-from playwright.async_api import async_playwright, Browser, BrowserContext, Page
+from typing import Any, Optional
+from playwright.async_api import async_playwright, Browser, BrowserContext, Page, Playwright
 
 from src.utils.logger import system_logger
 from src.utils._tools import truncate_text
@@ -13,10 +22,21 @@ from src.l0_state.interfaces.state import WebBrowserState
 class WebBrowserClient:
     """
     Stateful клиент для управления Playwright.
-    Поддерживает ленивую загрузку (стартует только при первом запросе) и сохранение сессий (куки).
+    Поддерживает ленивую загрузку и сохранение сессий (куки).
     """
 
-    def __init__(self, state: WebBrowserState, config: WebBrowserConfig, data_dir: Path):
+    def __init__(
+        self, state: WebBrowserState, config: WebBrowserConfig, data_dir: Path
+    ) -> None:
+        """
+        Инициализирует менеджер браузера.
+
+        Args:
+            state: L0 стейт (приборная панель).
+            config: Конфигурация браузера (headless, timeouts).
+            data_dir: Корневая директория локальных данных.
+        """
+
         self.state = state
         self.config = config
 
@@ -24,34 +44,36 @@ class WebBrowserClient:
         self.state_file = self.profile_dir / "storage_state.json"
         self.profile_dir.mkdir(parents=True, exist_ok=True)
 
-        self.playwright = None
-        self.browser: Browser | None = None
-        self.context: BrowserContext | None = None
-        self.page: Page | None = None
+        self.playwright: Optional[Playwright] = None
+        self.browser: Optional[Browser] = None
+        self.context: Optional[BrowserContext] = None
+        self.page: Optional[Page] = None
 
-        self.last_activity_time = time.time()
+        self.last_activity_time: float = time.time()
         self._lock = asyncio.Lock()
 
-    async def start(self):
+    async def start(self) -> None:
+        """Вызывается при старте системы (браузер физически не запускается до первого обращения)."""
         self.state.is_online = True
         system_logger.info("[Web Browser] Интерфейс готов.")
 
-    async def stop(self):
+    async def stop(self) -> None:
+        """Штатно закрывает браузер при остановке системы."""
         await self.close_browser()
         self.state.is_online = False
 
-    def touch(self):
+    def touch(self) -> None:
         """
         Обновляет таймер активности для защиты от Watchdog'а.
         """
-
         self.last_activity_time = time.time()
 
-    async def ensure_browser(self):
+    async def ensure_browser(self) -> None:
         """
-        Гарантирует, что браузер запущен. Автоматически скачивает Chromium при первом запуске, если он не установлен.
+        Гарантирует, что браузер запущен. Автоматически скачивает Chromium при
+        первом запуске, если бинарники отсутствуют на хосте.
         """
-
+        
         async with self._lock:
             if self.page and not self.page.is_closed():
                 return
@@ -68,7 +90,7 @@ class WebBrowserClient:
                     # Если Playwright жалуется на отсутствие браузеров - качаем их сами
                     if "playwright install" in str(e):
                         system_logger.info(
-                            "[Web Browser] Бинарники Chromium не найдены. Начата автоматическая загрузка. (пару минут)."
+                            "[Web Browser] Бинарники Chromium не найдены. Начата автоматическая загрузка (займет пару минут)."
                         )
 
                         proc = await asyncio.create_subprocess_exec(
@@ -111,19 +133,13 @@ class WebBrowserClient:
 
             system_logger.info("[Web Browser] Запущен процесс Chromium.")
 
-    async def save_session(self):
-        """
-        Сохраняет куки и Local Storage на диск.
-        """
-
+    async def save_session(self) -> None:
+        """Сохраняет куки и Local Storage на диск (в state_file)."""
         if self.context:
             await self.context.storage_state(path=str(self.state_file))
 
-    async def close_browser(self):
-        """
-        Штатно закрывает браузер и освобождает ОЗУ.
-        """
-
+    async def close_browser(self) -> None:
+        """Штатно закрывает браузер и освобождает ОЗУ."""
         async with self._lock:
             if self.context:
                 await self.save_session()
@@ -138,11 +154,12 @@ class WebBrowserClient:
             self.state.is_open = False
             self.state.viewport = "Браузер закрыт."
 
-    async def update_state_view(self):
+    async def update_state_view(self) -> None:
         """
-        Обновляет L0 State: URL, Title и парсит дерево элементов страницы (AOM).
+        Конвертирует DOM-дерево текущей веб-страницы в плоскую AOM (Accessibility Object Model)
+        YAML-структуру (через aria_snapshot). Вырезает визуальный мусор,
+        оставляя агенту только текст и кликабельные (интерактивные) элементы.
         """
-
         if not self.page or self.page.is_closed():
             self.state.is_open = False
             self.state.viewport = "Браузер закрыт."
@@ -153,9 +170,7 @@ class WebBrowserClient:
         self.state.page_title = await self.page.title()
 
         try:
-            # В новых версиях Playwright (>=1.49) page.accessibility удален
-            # Вместо него используется aria_snapshot, который идеально подходит для ИИ-агентов
-            # и возвращает готовую легковесную YAML-структуру
+            # aria_snapshot идеально подходит для ИИ-агентов (возвращает легкий YAML)
             snapshot = await self.page.locator("body").aria_snapshot()
 
             if snapshot:
@@ -172,43 +187,8 @@ class WebBrowserClient:
         except Exception as e:
             self.state.viewport = f"Ошибка построения дерева элементов: {e}"
 
-    def _flatten_aom(self, node: dict, depth: int = 0) -> list[str]:
-        """
-        Рекурсивно превращает JSON AOM в плоский Markdown-подобный список.
-        """
-
-        lines = []
-        role = node.get("role", "")
-        name = node.get("name", "")
-        value = node.get("value", "")
-
-        # Игнорируем бесполезный визуальный мусор, оставляем контент и интерактив
-        ignore_roles = {"generic", "WebArea", "presentation", "none"}
-
-        if role and role not in ignore_roles:
-            indent = "  " * min(depth, 5)  # Ограничиваем отступы
-            text = f"{indent}- [{role}]"
-            if name:
-                text += f" '{name}'"
-            if value:
-                text += f" (Значение: {value})"
-
-            # Помечаем интерактивные элементы, чтобы LLM понимала, куда можно кликать
-            if role in ("link", "button", "textbox", "searchbox", "checkbox", "combobox"):
-                text += " *интерактивный*"
-
-            lines.append(text)
-
-        for child in node.get("children", []):
-            lines.extend(self._flatten_aom(child, depth + 1))
-
-        return lines
-
-    async def get_context_block(self, **kwargs) -> str:
-        """
-        Провайдер контекста для агента.
-        """
-
+    async def get_context_block(self, **kwargs: Any) -> str:
+        """Провайдер контекста для агента."""
         if not self.state.is_online:
             return "### WEB BROWSER [OFF]\nИнтерфейс отключен."
 

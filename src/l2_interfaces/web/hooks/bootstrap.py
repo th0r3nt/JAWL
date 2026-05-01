@@ -1,4 +1,12 @@
-from typing import List, Any, TYPE_CHECKING
+"""
+Инициализатор интерфейса Web Hooks.
+
+Поднимает локальный aiohttp сервер для приема внешних HTTP запросов
+(интеграции GitHub Actions, Stripe, Smart Home и др.) и регистрирует
+навыки для чтения payload'а внутри агента.
+"""
+
+from typing import List, Any, TYPE_CHECKING, Optional
 from src.utils.logger import system_logger
 
 from src.l2_interfaces.web.hooks.client import WebHooksClient
@@ -12,9 +20,17 @@ if TYPE_CHECKING:
     from src.main import System
 
 
-def setup_web_hooks(system: "System", secret_token: str | None) -> List[Any]:
-    """Инициализирует интерфейс Web Hooks."""
+def setup_web_hooks(system: "System", secret_token: Optional[str]) -> List[Any]:
+    """
+    Инициализирует интерфейс Web Hooks.
 
+    Args:
+        system (System): Главный DI-контейнер фреймворка.
+        secret_token (Optional[str]): Секретный токен авторизации (WEBHOOK_SECRET из .env).
+
+    Returns:
+        List[Any]: Компоненты жизненного цикла (events - aiohttp сервер).
+    """
     if not secret_token:
         system_logger.error(
             "[Web Hooks] WEBHOOK_SECRET не задан в .env. Интерфейс принудительно отключен."
@@ -34,10 +50,8 @@ def setup_web_hooks(system: "System", secret_token: str | None) -> List[Any]:
         timezone=system.settings.system.timezone,
     )
 
-    # Регистрируем навыки для агента
     register_instance(WebHooksSkills(client))
 
-    # Регистрируем блок в системный промпт
     system.context_registry.register_provider(
         name="web hooks",
         provider_func=client.get_context_block,
@@ -46,5 +60,4 @@ def setup_web_hooks(system: "System", secret_token: str | None) -> List[Any]:
 
     system_logger.info("[Web Hooks] Интерфейс загружен.")
 
-    # events содержит aiohttp сервер со своими методами start() и stop()
     return [events]

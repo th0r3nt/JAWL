@@ -1,20 +1,16 @@
 host:
-
+  # Подробнее: docs/yaml/interfaces/host_os.md
   os:
     enabled: false
     desktop_interactions: false
 
-    # Уровень прав доступа агента к хост-машине (0 - SANDBOX, 1 - OBSERVER, 2 - OPERATOR, 3 - ROOT).
-    # Подробнее про уровни доступа и безопасность: см. docs/yaml/access_levels.md
     access_level: 0
     env_access: false 
 
-    # Механизм самомодификации и Copy-on-Write бекапов. См. docs/yaml/access_levels.md
     require_deploy_sessions: true 
     deploy_max_retries: 5 
 
     framework_tree_depth: 1
-
     monitoring_interval_sec: 30
     execution_timeout_sec: 60 
 
@@ -23,7 +19,7 @@ host:
     top_processes_limit: 10
     file_diff_max_chars: 300 
 
-    workspace_max_opened_files: 15
+    workspace_max_opened_files: 15 
     recent_file_changes_limit: 5 
     workspace_max_file_chars: 10000 
 
@@ -34,7 +30,7 @@ host:
 
 
 telegram:
-  # Userbot
+  # Подробнее: docs/yaml/interfaces/telegram/telethon.md
   telethon:
     enabled: false
     session_name: "agent_telethon"
@@ -42,12 +38,13 @@ telegram:
     private_chat_history_limit: 2
     incoming_history_limit: 8
 
-  # Классический Bot
+  # Подробнее: docs/yaml/interfaces/telegram/aiogram.md
   aiogram:
     enabled: false
     recent_chats_limit: 20
 
 
+# Подробнее: docs/yaml/interfaces/github.md
 github:
   enabled: false
   agent_account: false
@@ -56,6 +53,7 @@ github:
   polling_interval_sec: 120
 
 
+# Подробнее: docs/yaml/interfaces/email.md
 email:
   enabled: false
   polling_interval_sec: 60
@@ -63,11 +61,13 @@ email:
 
 
 web:
+  # Подробнее: docs/yaml/interfaces/web/http.md
   http:
     enabled: false
     request_timeout_sec: 15
     max_response_chars: 10000
 
+  # Подробнее: docs/yaml/interfaces/web/search.md
   search:
     enabled: false
     search_engine: "duckduckgo" # "duckduckgo", "tavily"
@@ -75,19 +75,21 @@ web:
     request_timeout_sec: 15
     max_page_chars: 10000
 
+    # Подробнее: docs/yaml/interfaces/web/deep_research.md
     deep_research:
       max_queries: 10
       max_results_per_query: 5
       max_pages_to_read: 15
       total_max_chars: 30000
 
+  # Подробнее: docs/yaml/interfaces/web/browser.md
   browser:
     enabled: false
     headless: true
     timeout_sec: 30
     idle_timeout_sec: 900
 
-  # Подробнее: см. docs/yaml/webhooks_setup.md
+  # Подробнее: docs/yaml/interfaces/web/hooks.md
   hooks:
     enabled: false
     host: "127.0.0.1"
@@ -95,29 +97,28 @@ web:
     history_limit: 20
     preview_max_chars: 200
 
+  # Подробнее: docs/yaml/interfaces/web/rss.md
   rss:
     enabled: false
     polling_interval_sec: 3600
     recent_limit: 5
 
-    # Подробнее: docs/yaml/rss_feeds.md
     feeds:
       - name: "Habr"
         url: "https://habr.com/ru/rss/all/all/"
 
-
+# Подробнее: docs/yaml/interfaces/meta.md
 meta:
   enabled: false
 
-  # Подробнее: docs/yaml/access_levels.md
   access_level: 0
   custom_skills_enabled: true
 
-
+# Подробнее: docs/yaml/interfaces/multimodality.md
 multimodality:
   enabled: false
 
-
+# Подробнее: docs/yaml/interfaces/calendar.md
 calendar:
   enabled: false
   polling_interval_sec: 60

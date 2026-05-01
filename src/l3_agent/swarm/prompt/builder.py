@@ -1,3 +1,10 @@
+"""
+Сборщик системного промпта для субагентов.
+
+Конкатенирует базовые правила системы Swarm, инструкцию к вызову JSON-функций
+и узкоспециализированное описание конкретной роли (например, CODER.md) в единый текст.
+"""
+
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -11,7 +18,14 @@ class SwarmPromptBuilder:
     Комбинирует специфичную роль, инструкции субагента и общие правила вызова функций.
     """
 
-    def __init__(self, root_dir: Path):
+    def __init__(self, root_dir: Path) -> None:
+        """
+        Инициализирует пути к файлам промптов роя.
+
+        Args:
+            root_dir: Корень проекта JAWL.
+        """
+
         self.swarm_prompt_dir = root_dir / "src" / "l3_agent" / "swarm" / "prompt"
         self.roles_dir = self.swarm_prompt_dir / "roles"
 
@@ -21,6 +35,15 @@ class SwarmPromptBuilder:
     def build(self, role: "SubagentRole") -> str:
         """
         Собирает итоговый системный промпт для конкретной роли субагента.
+
+        Args:
+            role: Объект роли (содержит ссылку на .md файл).
+
+        Returns:
+            Конкатенированная строка Markdown с инструкциями.
+
+        Raises:
+            FileNotFoundError: Если системные файлы промптов удалены или повреждены.
         """
 
         # Описание конкретной роли (берем имя файла из объекта)

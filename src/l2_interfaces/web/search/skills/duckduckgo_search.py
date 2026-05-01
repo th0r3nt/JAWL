@@ -1,23 +1,32 @@
+"""
+Поисковый движок DuckDuckGo (Стратегия).
+Бесплатный, но подвержен rate limits со стороны Cloudflare.
+Оснащен семафором для ограничения параллельных потоков и ретраями (Exponential Backoff).
+"""
+
 import asyncio
-from typing import Any
-from ddgs import DDGS # Важно: Импорт ddgs - единственно верный, иначе поиск к чертям сломается
+from typing import Any, List, Dict
+from ddgs import DDGS  # Важно: Импорт ddgs - единственно верный, иначе поиск сломается
 
 from src.utils.logger import system_logger
-
 from src.l2_interfaces.web.search.client import WebSearchClient
-
 from src.l3_agent.skills.registry import skill, SkillResult
 from src.l3_agent.swarm.roles import Subagents
 
+
 class DuckDuckGoSearch:
-    def __init__(self, client: WebSearchClient):
+    """Движок поиска ссылок через DuckDuckGo."""
+
+    def __init__(self, client: WebSearchClient) -> None:
         self.client = client
         # Глобальный ограничитель: Cloudflare (DDG) банит за мощные параллельные запросы.
         # Семафор гарантирует, что даже при DeepResearch мы не делаем больше 2-х запросов одновременно.
         self._semaphore = asyncio.Semaphore(2)
 
-    async def search_raw(self, query: str, max_results: int = 5) -> list[dict[str, Any]]:
-        def _do_search():
+    async def search_raw(self, query: str, max_results: int = 5) -> List[Dict[str, Any]]:
+        """Внутренний метод для сырого поиска (используется DeepResearch)."""
+
+        def _do_search() -> List[Dict[str, Any]]:
             with DDGS() as ddgs:
                 return list(ddgs.text(query, max_results=max_results))
 
@@ -38,9 +47,13 @@ class DuckDuckGoSearch:
     @skill(swarm_roles=[Subagents.WEB_RESEARCHER])
     async def search(self, query: str, max_results: int = 5) -> SkillResult:
         """
-        Ищет информацию в интернете. Возвращает список ссылок и кратких сниппетов.
-        """
+        Ищет информацию в интернете (через DuckDuckGo).
+        Возвращает список ссылок и кратких текстовых сниппетов.
 
+        Args:
+            query: Текст запроса.
+            max_results: Лимит возвращаемых ссылок.
+        """
         try:
             results = await self.search_raw(query, max_results)
             if not results:

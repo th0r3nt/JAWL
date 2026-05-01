@@ -1,8 +1,17 @@
+"""
+Менеджер безопасной самомодификации фреймворка (Deploy Sessions).
+
+Реализует механизм Copy-on-Write (CoW). Позволяет агенту изменять собственный
+исходный код (Access Level >= 2), защищая систему от фатальных ошибок синтаксиса
+посредством прогона тестов и автоматического отката (Rollback).
+"""
+
 import sys
 import os
 import shutil
 import asyncio
 from pathlib import Path
+from typing import Tuple
 
 from src import __version__
 
@@ -10,9 +19,18 @@ from src.utils.logger import system_logger
 
 
 class HostOSDeployManager:
-    """Управляет деплой-сессиями, бэкапами (Copy-on-Write) и проверками тестов."""
+    """
+    Управляет деплой-сессиями, бэкапами (Copy-on-Write) и проверками тестов.
+    """
 
-    def __init__(self, framework_dir: Path, max_retries: int = 5):
+    def __init__(self, framework_dir: Path, max_retries: int = 5) -> None:
+        """
+        Инициализирует менеджер деплоя.
+
+        Args:
+            framework_dir: Корень фреймворка.
+            max_retries: Количество попыток пройти тесты до автоматического отката.
+        """
         self.framework_dir = framework_dir
         self.backup_dir = framework_dir / "src" / "utils" / "local" / "data" / "deploy_backup"
         self.active_flag = self.backup_dir / ".deploy_active"
@@ -26,7 +44,13 @@ class HostOSDeployManager:
         if self.active_flag.exists():
             self.is_active = True
 
-    def start_session(self) -> tuple[bool, str]:
+    def start_session(self) -> Tuple[bool, str]:
+        """
+        Открывает сессию самомодификации.
+
+        Returns:
+            Tuple[Успех, Сообщение].
+        """
         if self.is_active:
             return False, "Деплой-сессия уже активна."
 
@@ -38,7 +62,9 @@ class HostOSDeployManager:
         if not self.manifest_file.exists():
             self.manifest_file.touch()
 
-        system_logger.info(f"[Deploy] Деплой-сессия успешно инициализирована (JAWL v{__version__}).")
+        system_logger.info(
+            f"[Deploy] Деплой-сессия успешно инициализирована (JAWL v{__version__})."
+        )
         return (
             True,
             f"Деплой-сессия начата. У вас есть {self.max_retries} попытки на прохождение тестов при коммите.",
@@ -46,7 +72,12 @@ class HostOSDeployManager:
 
     def backup_file(self, filepath: Path) -> None:
         """
-        Сохраняет оригинал файла перед первой перезаписью (Copy-on-Write).
+        Сохраняет оригинальный файл во временную директорию (Copy-on-Write)
+        перед его первой перезаписью в рамках сессии.
+        Если файл создается с нуля — фиксирует его в манифесте для последующего удаления при откате.
+
+        Args:
+            filepath: Абсолютный путь к файлу, который агент собирается изменить.
         """
 
         if not self.is_active:
@@ -69,9 +100,14 @@ class HostOSDeployManager:
                 f.write(f"{rel_path}\n")
             system_logger.debug(f"[Deploy] Новый файл добавлен в манифест: {rel_path}")
 
-    async def commit_session(self) -> tuple[bool, str]:
+    async def commit_session(self) -> Tuple[bool, str]:
         """
-        Запускает проверки. Если падают - снимает попытку. Если ок - очищает бекапы.
+        Закрывает деплой-сессию и фиксирует изменения.
+        Автоматически запускает синтаксический анализатор (compileall) и тесты (pytest).
+        При падении тестов списывает одну попытку. Если попытки исчерпаны — вызывает rollback_session().
+
+        Returns:
+            Tuple[Успешность коммита, Подробный текстовый отчет или Traceback ошибки].
         """
 
         if not self.is_active:
@@ -127,7 +163,7 @@ class HostOSDeployManager:
             "Тесты пройдены. Код зафиксирован, деплой-сессия закрыта. Необходимо инициировать reboot_system() для применения изменений.",
         )
 
-    def _handle_failure(self, error_report: str) -> tuple[bool, str]:
+    def _handle_failure(self, error_report: str) -> Tuple[bool, str]:
         """
         Обрабатывает ошибку тестов, уменьшая количество попыток.
         """
@@ -146,9 +182,9 @@ class HostOSDeployManager:
             msg = f"Ошибка деплоя. \n{error_report} \n\nПопытки исчерпаны. Все изменения в коде фреймворка были автоматически удалены. Деплой-сессия закрыта."
             return False, msg
 
-    def rollback_session(self) -> tuple[bool, str]:
+    def rollback_session(self) -> Tuple[bool, str]:
         """
-        Откатывает состояние фреймворка до начала текущей деплой-сессии.
+        Откатывает состояние фреймворка до начала текущей деплой-сессии (Rollback).
         """
         if not self.is_active:
             return False, "Нет активной деплой-сессии."
@@ -179,6 +215,7 @@ class HostOSDeployManager:
             "Откат успешно выполнен. Системные файлы восстановлены до состояния начала сессии.",
         )
 
-    def _cleanup(self):
+    def _cleanup(self) -> None:
+        """Удаляет директорию с бэкапами и флаги."""
         shutil.rmtree(self.backup_dir, ignore_errors=True)
         self.is_active = False

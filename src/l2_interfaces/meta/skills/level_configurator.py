@@ -1,3 +1,10 @@
+"""
+Навыки Meta уровня 1 (CONFIGURATOR).
+
+Позволяют агенту изменять настройки собственного "мозга": глубину памяти
+(лимиты контекста и БД) и ритм авто-пробуждений (Heartbeat).
+"""
+
 from pathlib import Path
 from typing import Literal
 
@@ -7,9 +14,9 @@ from src.utils.event.registry import Events
 
 
 class MetaConfigurator:
-    """Уровень 1 (CONFIGURATOR). Управление базами данных, контекстом и собственными промптами."""
+    """Уровень 1 (CONFIGURATOR). Управление базами данных, контекстом и промптами."""
 
-    def __init__(self, meta_client: MetaClient, root_dir: Path):
+    def __init__(self, meta_client: MetaClient, root_dir: Path) -> None:
         self.client = meta_client
         self.custom_prompts_dir = root_dir / "src" / "l3_agent" / "prompt" / "custom"
         self.custom_prompts_dir.mkdir(parents=True, exist_ok=True)
@@ -17,9 +24,11 @@ class MetaConfigurator:
     @skill()
     async def change_heartbeat_interval(self, interval_sec: int) -> SkillResult:
         """
-        [1/CONFIGURATOR] Изменяет Heartbeat интервал между пробуждениями агента (в секундах).
-        """
+        Изменяет Heartbeat интервал между пробуждениями агента.
 
+        Args:
+            interval_sec: Время ожидания в секундах.
+        """
         success = await self.client.update_yaml(
             self.client.settings_path, ["system", "heartbeat_interval"], interval_sec
         )
@@ -35,9 +44,11 @@ class MetaConfigurator:
     @skill()
     async def change_max_react_steps(self, steps: int) -> SkillResult:
         """
-        [1/CONFIGURATOR] Изменяет максимальное количество шагов в одном цикле ReAct.
-        """
+        Изменяет максимальное количество шагов в одном цикле ReAct.
 
+        Args:
+            steps: Число итераций (Мысль -> Действие).
+        """
         success = await self.client.update_yaml(
             self.client.settings_path, ["llm", "max_react_steps"], steps
         )
@@ -54,7 +65,11 @@ class MetaConfigurator:
         new_limit: int,
     ) -> SkillResult:
         """
-        [1/CONFIGURATOR] Изменяет лимиты для различных SQL-модулей памяти.
+        Изменяет лимиты для различных SQL-модулей памяти.
+
+        Args:
+            database: Название модуля БД.
+            new_limit: Максимальное количество записей для хранения.
         """
 
         db_keys_map = {
@@ -65,6 +80,9 @@ class MetaConfigurator:
         }
 
         path_keys = db_keys_map.get(database)
+        if not path_keys:
+            return SkillResult.fail("Неверное имя базы данных.")
+
         success = await self.client.update_yaml(
             self.client.settings_path, path_keys, new_limit
         )
@@ -82,9 +100,12 @@ class MetaConfigurator:
     @skill()
     async def change_context_depth(self, total_ticks: int, detailed_ticks: int) -> SkillResult:
         """
-        [1/CONFIGURATOR] Меняет глубину памяти о последних действиях (сколько тиков помнить).
-        total_ticks: общее количество.
-        detailed_ticks: количество последних n тиков, контекст которых хранить детально.
+        Динамически изменяет "окно внимания" (глубину памяти логов) агента.
+        Обновляет YAML и применяет лимиты на лету через EventBus.
+
+        Args:
+            total_ticks: Общее количество шагов (Ticks), хранимых в промпте.
+            detailed_ticks: Количество последних шагов, которые не подвергаются жесткому сжатию.
         """
 
         if detailed_ticks > total_ticks:

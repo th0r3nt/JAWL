@@ -1,4 +1,12 @@
-from typing import List, Any, Dict, TYPE_CHECKING
+"""
+Главный инициализатор слоя интерфейсов (L2).
+
+Оркестрирует запуск всех системных модулей (Host, Web, Telegram, Github и др.)
+на основе конфигурации `interfaces.yaml`. Если интерфейс аппаратно отключен,
+модуль регистрирует заглушку (OFF Provider), чтобы агент видел это в своем промпте.
+"""
+
+from typing import List, Any, Dict, Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from src.main import System
@@ -24,23 +32,41 @@ from src.l2_interfaces.github.bootstrap import setup_github
 from src.l3_agent.context.registry import ContextSection
 
 
-def make_off_provider(name: str):
-    """Создает заглушку-провайдер контекста для аппаратно отключенных интерфейсов."""
+def make_off_provider(name: str) -> Any:
+    """
+    Создает заглушку-провайдер контекста для аппаратно отключенных интерфейсов.
+    Агент будет видеть этот статус и понимать, что инструмент недоступен.
 
-    async def provider(**kwargs) -> str:
+    Args:
+        name: Человекочитаемое имя интерфейса (например 'HOST OS').
+
+    Returns:
+        Асинхронная функция-провайдер контекста.
+    """
+
+    async def provider(**kwargs: Any) -> str:
         return f"### {name} [OFF]\nИнтерфейс отключен."
 
     return provider
 
 
-def initialize_l2_interfaces(system: "System", env_vars: Dict[str, str | None]) -> List[Any]:
+def initialize_l2_interfaces(
+    system: "System", env_vars: Dict[str, Optional[str]]
+) -> List[Any]:
     """
     Оркестрирует запуск L2 интерфейсов. Читает yaml-конфиг и дергает нужные бутстрапы.
-    Возвращает список компонентов (lifecycle_components), у которых есть start() и stop().
+    Возвращает список компонентов (lifecycle_components), у которых есть жизненный цикл (start/stop).
+
+    Args:
+        system: Главный DI-контейнер системы.
+        env_vars: Словарь с секретными токенами из .env файла.
+
+    Returns:
+        Список инициализированных компонентов для Event Loop.
     """
 
     config = system.interfaces_config
-    components = []
+    components: List[Any] = []
 
     # ================================================================
     # HOST OS
@@ -197,7 +223,7 @@ def initialize_l2_interfaces(system: "System", env_vars: Dict[str, str | None]) 
         components.extend(setup_meta(system))
     else:
         # Кастомный провайдер для Meta, чтобы показывать статус скиллов даже в OFF режиме
-        async def meta_off_provider(**kwargs) -> str:
+        async def meta_off_provider(**kwargs: Any) -> str:
             custom_status = (
                 "включены (но интерфейс отключен)"
                 if config.meta.custom_skills_enabled

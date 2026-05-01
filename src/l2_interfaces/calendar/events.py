@@ -1,5 +1,14 @@
+"""
+Фоновый хронометрист (Watchdog времени).
+
+Сравнивает текущий UNIX-timestamp с запланированными задачами. При совпадении —
+генерирует системное событие в EventBus, экстренно прерывая сон агента
+и передавая ему суть сработавшего будильника.
+"""
+
 import time
 import asyncio
+from typing import Optional
 
 from src.utils.logger import system_logger
 from src.utils.event.bus import EventBus
@@ -21,18 +30,26 @@ class CalendarEvents:
         state: CalendarState,
         event_bus: EventBus,
         polling_interval: int,
-    ):
+    ) -> None:
+        """
+        Инициализирует хронометриста.
+
+        Args:
+            client: Экземпляр CalendarClient.
+            state: L0 стейт (приборная панель).
+            event_bus: Глобальная шина событий.
+            polling_interval: Как часто проверять таймеры (в секундах).
+        """
         self.client = client
         self.state = state
         self.bus = event_bus
         self.polling_interval = polling_interval
 
-        self._is_running = False
-        self._polling_task: asyncio.Task | None = None
+        self._is_running: bool = False
+        self._polling_task: Optional[asyncio.Task] = None
 
     async def start(self) -> None:
         """Запускает фоновый поллинг событий календаря."""
-        
         if self._is_running:
             return
 
@@ -45,7 +62,6 @@ class CalendarEvents:
 
     async def stop(self) -> None:
         """Останавливает фоновый поллинг событий календаря."""
-
         self._is_running = False
         if self._polling_task:
             self._polling_task.cancel()
@@ -54,9 +70,8 @@ class CalendarEvents:
         self.client.state.is_online = False
         system_logger.info("[Calendar] Фоновый мониторинг времени остановлен.")
 
-    async def _loop(self):
+    async def _loop(self) -> None:
         """Бесконечный цикл проверки таймеров."""
-
         while self._is_running:
             try:
                 now = time.time()

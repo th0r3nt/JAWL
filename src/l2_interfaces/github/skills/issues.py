@@ -1,4 +1,5 @@
 import urllib.parse
+from typing import Literal, Optional
 
 from src.l2_interfaces.github.client import GithubClient
 from src.l3_agent.skills.registry import SkillResult, skill
@@ -14,10 +15,10 @@ class GithubIssues:
 
     @skill()
     async def list_issues(
-        self, owner: str, repo: str, state: str = "open", per_page: int = 10
+        self, owner: str, repo: str, state: Optional[Literal["open", "closed", "all"]] = "all", per_page: int = 10
     ) -> SkillResult:
         """
-        Возвращает список issues репозитория (state: open/closed/all).
+        Возвращает список issues репозитория.
         """
 
         try:

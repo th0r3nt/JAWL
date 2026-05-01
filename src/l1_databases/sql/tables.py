@@ -1,3 +1,10 @@
+"""
+Декларативное описание схем реляционных таблиц (SQLAlchemy ORM).
+
+Определяет структуру всех сущностей долговременной структурированной
+памяти агента (Задачи, Логи, Черты личности, Состояния и Мотиваторы).
+"""
+
 from datetime import datetime, timezone
 from typing import Optional, Any
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
@@ -11,7 +18,10 @@ class Base(DeclarativeBase):
 
 
 class TaskTable(Base):
-    """Таблица долгосрочных задач (Tasks v2)."""
+    """
+    Таблица долгосрочных задач (Tasks).
+    Используется для декомпозиции глобальных целей агента.
+    """
 
     __tablename__ = "tasks"
 
@@ -26,7 +36,7 @@ class TaskTable(Base):
     tags: Mapped[list[str]] = mapped_column(JSON, default=list)
     dependencies: Mapped[list[str]] = mapped_column(
         JSON, default=list
-    )  # Массив ID других задач
+    )  # Массив ID других задач, блокирующих эту
     subtasks: Mapped[list[dict[str, Any]]] = mapped_column(
         JSON, default=list
     )  # [{"title": "...", "is_done": false}]
@@ -38,7 +48,7 @@ class TaskTable(Base):
 class TickTable(Base):
     """
     Таблица тиков (логов) агента.
-    1 тик = мысль + массив действий + результат выполнения действий.
+    1 тик = Итерация цикла (Мысли + Массив действий + Результат выполнения).
     """
 
     __tablename__ = "ticks"
@@ -56,19 +66,25 @@ class TickTable(Base):
 
 
 class PersonalityTraitTable(Base):
-    """Таблица приобретенных черт личности агента."""
+    """
+    Таблица приобретенных черт личности агента.
+    Позволяет агенту динамически адаптироваться под пользователя.
+    """
 
     __tablename__ = "personality_traits"
 
     id: Mapped[str] = mapped_column(primary_key=True)
     name: Mapped[str]  # Название черты
     description: Mapped[str]  # Описание черты
-    reason: Mapped[Optional[str]]  # Причина добавления
-    context: Mapped[Optional[str]]  # Контекст (в каких ситуациях применять)
+    reason: Mapped[Optional[str]]  # Причина добавления (контекст формирования)
+    context: Mapped[Optional[str]]  # В каких ситуациях применять
 
 
 class MentalStateTable(Base):
-    """Таблица для отслеживания состояний важных сущностей (Mental State)."""
+    """
+    Таблица для отслеживания состояний важных сущностей (Mental State).
+    Аналог CRM-системы агента для отслеживания статусов серверов, людей или процессов.
+    """
 
     __tablename__ = "mental_states"
 
@@ -77,7 +93,7 @@ class MentalStateTable(Base):
     tier: Mapped[str]  # high, medium, low, background
     category: Mapped[str]  # subject, object
 
-    # Автоматическое обновление времени при любых изменениях
+    # Автоматическое обновление времени при любых изменениях (onupdate)
     updated_at: Mapped[datetime] = mapped_column(
         default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc)
     )
@@ -89,20 +105,23 @@ class MentalStateTable(Base):
 
 
 class DriveTable(Base):
-    """Таблица внутренних мотиваторов агента (Drives)."""
+    """
+    Таблица внутренних мотиваторов агента (Drives).
+    Обеспечивает математическую модель проактивности при отсутствии команд от пользователя.
+    """
 
     __tablename__ = "drives"
 
     id: Mapped[str] = mapped_column(primary_key=True)
     name: Mapped[str]
-    type: Mapped[str]  # "fundamental" (постоянные) или "custom" (созданные самим агентом)
+    type: Mapped[str]  # "fundamental" (системные) или "custom" (созданные самим агентом)
     description: Mapped[str]
-    decay_rate: Mapped[float]  # Скорость роста дефицита (% в час)
+    decay_rate: Mapped[float]  # Скорость роста дефицита (% в интервал)
 
     # Время последнего удовлетворения мотивации (UTC)
     last_satisfied_at: Mapped[datetime] = mapped_column(
         default=lambda: datetime.now(timezone.utc)
     )
 
-    # Хранит список строк (последние рефлексии агента)
+    # Хранит список строк (последние текстовые рефлексии агента)
     recent_reflections: Mapped[list[str]] = mapped_column(JSON, default=list)

@@ -1,3 +1,10 @@
+"""
+Инициализатор интерфейса Календаря (Calendar).
+
+Оркестрирует создание клиента для работы с JSON-файлом таймеров,
+запуск фонового хронометриста (Watchdog) и регистрацию навыков управления временем.
+"""
+
 from typing import List, Any, TYPE_CHECKING
 
 from src.utils.logger import system_logger
@@ -14,8 +21,16 @@ if TYPE_CHECKING:
 
 
 def setup_calendar(system: "System") -> List[Any]:
-    """Инициализирует интерфейс Календаря."""
+    """
+    Инициализирует интерфейс Календаря и интегрирует его в систему.
 
+    Args:
+        system (System): Главный DI-контейнер фреймворка.
+
+    Returns:
+        List[Any]: Список компонентов с жизненным циклом (events),
+                   которые будут запущены в основном цикле.
+    """
     config = system.interfaces_config.calendar
 
     # Берем готовый стейт прямо из DI-контейнера

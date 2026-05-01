@@ -1,8 +1,15 @@
+"""
+Навыки для отправки низкоуровневых HTTP/REST запросов.
+
+Используются для взаимодействия с внешними JSON/API сервисами
+и прямого скачивания файлов без накладных расходов полноценного браузера.
+"""
+
 import asyncio
 import urllib.parse
 import urllib.request
 import urllib.error
-from typing import Optional
+from typing import Optional, Tuple
 
 from src import __version__
 from src.utils.logger import system_logger
@@ -17,6 +24,7 @@ _ALLOWED_URL_SCHEMES = ("http", "https")
 
 
 def _ensure_http_scheme(url: str) -> Optional[str]:
+    """Проверяет безопасность протокола (блокирует попытки загрузить file://)."""
     scheme = urllib.parse.urlparse(url).scheme.lower()
     if scheme not in _ALLOWED_URL_SCHEMES:
         return (
@@ -29,24 +37,29 @@ def _ensure_http_scheme(url: str) -> Optional[str]:
 class WebHTTPRequests:
     """Навыки для отправки сырых HTTP-запросов и скачивания файлов."""
 
-    def __init__(self, client: WebHTTPClient):
+    def __init__(self, client: WebHTTPClient) -> None:
         self.client = client
 
     @skill(swarm_roles=[Subagents.WEB_RESEARCHER])
-    async def http_request(
+    async def request(
         self, url: str, method: str = "GET", headers: Optional[dict] = None
     ) -> SkillResult:
         """
-        Отправляет HTTP-запрос и возвращает ответ.
-        """
+        Совершает сырой HTTP запрос к указанному эндпоинту (полезно для REST API).
 
+        Args:
+            url: Адрес запроса (разрешены http:// и https://).
+            method: HTTP метод (GET, POST и т.д.).
+            headers: Словарь кастомных HTTP-заголовков.
+        """
+        
         limit = self.client.config.max_response_chars
 
         scheme_error = _ensure_http_scheme(url)
         if scheme_error:
             return SkillResult.fail(scheme_error)
 
-        def _make_request():
+        def _make_request() -> Tuple[int, str]:
             req_headers = headers or {"User-Agent": f"JAWL-Agent/{__version__}"}
             req = urllib.request.Request(url, method=method.upper(), headers=req_headers)
 
@@ -78,8 +91,12 @@ class WebHTTPRequests:
     @skill()
     async def download_file(self, url: str, dest_filename: str) -> SkillResult:
         """
-        Скачивает файл из сети на диск. 
-        Сохраняет строго в песочницу (sandbox/download/).
+        Скачивает файл из сети на диск.
+        Сохраняет в песочницу (sandbox/download/).
+
+        Args:
+            url: Прямая ссылка на файл.
+            dest_filename: Имя, под которым файл будет сохранен локально.
         """
 
         try:
@@ -94,7 +111,7 @@ class WebHTTPRequests:
             safe_path = validate_sandbox_path(dest_filename)
             safe_path.parent.mkdir(parents=True, exist_ok=True)
 
-            def _download():
+            def _download() -> None:
                 req = urllib.request.Request(
                     url, headers={"User-Agent": f"JAWL-Agent/{__version__}"}
                 )
@@ -113,6 +130,6 @@ class WebHTTPRequests:
 
         except PermissionError as e:
             return SkillResult.fail(str(e))
-        
+
         except Exception as e:
             return SkillResult.fail(f"Ошибка при скачивании файла: {e}")

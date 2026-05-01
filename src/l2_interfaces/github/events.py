@@ -1,8 +1,16 @@
+"""
+Фоновый поллер GitHub.
+
+Мониторит уведомления (Mentions/Reviews) и активность в отслеживаемых репозиториях (Watchers).
+Использует внутренний кэш ID событий для обхода проблемы 'GitHub Eventual Consistency'
+(задержки появления логов в API).
+"""
+
 import asyncio
 import json
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Dict
 
 from src.utils.logger import system_logger
 from src.utils.event.bus import EventBus
@@ -25,7 +33,17 @@ class GithubEvents:
         event_bus: EventBus,
         data_dir: Path,
         timezone: int = 0,
-    ):
+    ) -> None:
+        """
+        Инициализирует поллер.
+
+        Args:
+            client: Экземпляр GithubClient.
+            state: Объект состояния интерфейса.
+            event_bus: Глобальная шина событий.
+            data_dir: Путь к хранилищу локальных данных (для персистентности Watchers).
+            timezone: Смещение часового пояса.
+        """
         self.client = client
         self.state = state
         self.bus = event_bus
@@ -39,10 +57,11 @@ class GithubEvents:
         self._persistence_file.parent.mkdir(parents=True, exist_ok=True)
 
         # Кэш просмотренных событий для обхода проблемы GitHub Eventual Consistency
-        self._seen_event_ids = {}
-        self._initialized_repos = set()
+        self._seen_event_ids: Dict[str, bool] = {}
+        self._initialized_repos: set[str] = set()
 
     async def start(self) -> None:
+        """Запускает фоновый цикл проверки обновлений."""
         if self._is_running:
             return
 
@@ -52,6 +71,7 @@ class GithubEvents:
         system_logger.info("[Github] Фоновый поллинг запущен.")
 
     async def stop(self) -> None:
+        """Останавливает цикл проверки."""
         self._is_running = False
         if self._polling_task:
             self._polling_task.cancel()
@@ -62,7 +82,8 @@ class GithubEvents:
     # PERSISTENCE (Сохранение на диск)
     # ==========================================================
 
-    def _load_persisted_repos(self):
+    def _load_persisted_repos(self) -> None:
+        """Загружает список отслеживаемых репозиториев из JSON."""
         if not self._persistence_file.exists():
             return
         try:
@@ -73,7 +94,8 @@ class GithubEvents:
         except Exception as e:
             system_logger.warning(f"[Github] Ошибка чтения tracked_repos.json: {e}")
 
-    def save_persisted_repos(self):
+    def save_persisted_repos(self) -> None:
+        """Сохраняет текущий список отслеживаемых репозиториев (с ватермарками)."""
         try:
             with open(self._persistence_file, "w", encoding="utf-8") as f:
                 json.dump(self.state.tracked_repos, f, indent=4)
@@ -81,6 +103,7 @@ class GithubEvents:
             system_logger.error(f"[Github] Ошибка сохранения tracked_repos.json: {e}")
 
     def _format_gh_time(self, iso_str: str) -> str:
+        """Форматирует ISO строку времени от GitHub в читаемый вид."""
         if not iso_str:
             return ""
         try:
@@ -93,7 +116,8 @@ class GithubEvents:
     # POLLING LOOP
     # ==========================================================
 
-    async def _loop(self):
+    async def _loop(self) -> None:
+        """Главный цикл опроса GitHub API."""
         while self._is_running:
             try:
                 if self.client.config.agent_account and self.client.token:
@@ -109,7 +133,8 @@ class GithubEvents:
 
             await asyncio.sleep(self.client.config.polling_interval_sec)
 
-    async def _poll_account_state(self):
+    async def _poll_account_state(self) -> None:
+        """Обновляет состояние профиля агента и проверяет непрочитанные уведомления."""
         try:
             repos_data = await self.client.request(
                 "GET", "/user/repos", params={"sort": "updated", "per_page": 5}
@@ -147,7 +172,8 @@ class GithubEvents:
         except Exception as e:
             system_logger.debug(f"[Github] Ошибка фонового обновления профиля: {e}")
 
-    async def _poll_watched_repos(self):
+    async def _poll_watched_repos(self) -> None:
+        """Мониторит список отслеживаемых репозиториев и генерирует системные события."""
         modified = False
 
         for repo_name, last_event_id in list(self.state.tracked_repos.items()):
@@ -231,6 +257,7 @@ class GithubEvents:
             self.save_persisted_repos()
 
     def _parse_github_event(self, event: dict) -> Optional[str]:
+        """Парсит сырое событие GitHub в человекочитаемую строку."""
         event_type = event.get("type")
         actor = event.get("actor", {}).get("login", "Unknown")
         repo = event.get("repo", {}).get("name", "Unknown")

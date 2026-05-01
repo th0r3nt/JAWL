@@ -1,3 +1,9 @@
+"""
+Навыки для выполнения вычислительных операций: запуск скриптов, демонов и сырых shell-команд.
+Наиболее критичный модуль с точки зрения безопасности. Содержит логику "очистки" переменных
+окружения от токенов перед спавном подпроцессов.
+"""
+
 import asyncio
 import sys
 import os
@@ -83,11 +89,16 @@ class HostOSExecution:
         env["PYTHONPATH"] = os.pathsep.join(paths_to_add)
         return env
 
-    @skill(swarm_roles=[Subagents.CODER, Subagents.QA_ENGINEER])
+    @skill(swarm_roles=[Subagents.CODER, Subagents.QA_ENGINEER, Subagents.SYSADMIN])
     @require_access(HostOSAccessLevel.OBSERVER)
     async def execute_script(self, filepath: str) -> SkillResult:
         """
-        [1/OBSERVER] Запускает скрипт (.py, .sh, .bat, .js).
+        Запускает скрипт (.py, .sh, .bat, .js) в изолированном окружении.
+        Автоматически перехватывает STDOUT и STDERR. При превышении execution_timeout_sec 
+        жестко убивает всё дерево порожденных процессов (включая зомби).
+
+        Args:
+            filepath: Относительный или абсолютный путь к скрипту.
         """
 
         timeout = self.host_os.config.execution_timeout_sec
@@ -174,7 +185,7 @@ class HostOSExecution:
             system_logger.error(f"[Host OS] {err_msg}")
             return SkillResult.fail(err_msg)
 
-    @skill(swarm_roles=[Subagents.CODER, Subagents.QA_ENGINEER])
+    @skill(swarm_roles=[Subagents.CODER, Subagents.QA_ENGINEER, Subagents.SYSADMIN])
     @require_access(HostOSAccessLevel.ROOT)
     async def execute_shell_command(self, command: str) -> SkillResult:
         """
@@ -222,7 +233,7 @@ class HostOSExecution:
         except Exception as e:
             return SkillResult.fail(f"Ошибка выполнения shell-команды: {e}")
 
-    @skill()
+    @skill(swarm_roles=[Subagents.SYSADMIN])
     @require_access(HostOSAccessLevel.ROOT)
     async def kill_process(self, pid: int) -> SkillResult:
         """
@@ -256,7 +267,7 @@ class HostOSExecution:
         except Exception as e:
             return SkillResult.fail(f"Ошибка при попытке завершить процесс: {e}")
 
-    @skill()
+    @skill(swarm_roles=[Subagents.SYSADMIN])
     @require_access(HostOSAccessLevel.OBSERVER)
     async def start_daemon(self, filepath: str, name: str, description: str) -> SkillResult:
         """
@@ -325,7 +336,7 @@ class HostOSExecution:
         except Exception as e:
             return SkillResult.fail(f"Ошибка при запуске демона: {e}")
 
-    @skill()
+    @skill(swarm_roles=[Subagents.SYSADMIN])
     @require_access(HostOSAccessLevel.OBSERVER)
     async def stop_daemon(self, pid: int) -> SkillResult:
         """
@@ -369,8 +380,15 @@ class HostOSExecution:
         self, filepath: str, func_name: str, kwargs: dict = None
     ) -> SkillResult:
         """
-        [1/OBSERVER] Вызов функции из Python-скрипта в песочнице (RPC).
+        Изолированный RPC-вызов. Позволяет инамически запустить конкретную функцию 
+        внутри Python-скрипта в песочнице, передать ей аргументы и получить ответ.
+
+        Args:
+            filepath: Путь к .py скрипту.
+            func_name: Имя вызываемой функции внутри скрипта.
+            kwargs: Словарь именованных аргументов для передачи в функцию.
         """
+
         if not isinstance(kwargs, dict):
             kwargs = {}
 

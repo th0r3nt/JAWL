@@ -1,3 +1,7 @@
+"""
+Навыки для взаимодействия с GitHub Pull Requests.
+"""
+
 from src.l2_interfaces.github.client import GithubClient
 from src.l3_agent.skills.registry import SkillResult, skill
 from src.utils._tools import truncate_text
@@ -45,8 +49,12 @@ class GithubPullRequests:
         self, owner: str, repo: str, pull_number: int
     ) -> SkillResult:
         """
-        Читает изменения (Diff) в Pull Request.
-        Возвращает добавленные и удаленные строки кода.
+        Запрашивает Diff (добавленные/удаленные строки) конкретного Pull Request'а.
+        
+        Args:
+            owner: Владелец репозитория.
+            repo: Название репозитория.
+            pull_number: Номер PR.
         """
 
         try:
@@ -80,8 +88,10 @@ class GithubPullRequests:
     ) -> SkillResult:
         """
         [Требует Agent Account] Создает новый Pull Request.
-        - head: ветка, из которой переносим изменения.
-        - base: ветка, куда вливаем изменения.
+
+        Args:
+            head: ветка, из которой переносим изменения.
+            base: ветка, куда вливаем изменения.
         """
 
         if not self.client.config.agent_account:

@@ -1,23 +1,32 @@
+"""
+Движок чтения страниц Jina (Стратегия).
+Отлично справляется с обходом капч и антифрод-систем, возвращая чистый Markdown.
+"""
+
 import asyncio
 import urllib.request
 import urllib.error
+from typing import Optional
 
 from src import __version__
-
 from src.utils.logger import system_logger
 from src.utils._tools import truncate_text
 
 from src.l2_interfaces.web.search.client import WebSearchClient
-
 from src.l3_agent.skills.registry import skill, SkillResult
 from src.l3_agent.swarm.roles import Subagents
 
+
 class JinaReader:
-    def __init__(self, client: WebSearchClient):
+    """Парсер содержимого веб-страниц через API r.jina.ai."""
+
+    def __init__(self, client: WebSearchClient) -> None:
         self.client = client
 
-    async def read_raw(self, url: str) -> str | None:
-        def _fetch():
+    async def read_raw(self, url: str) -> Optional[str]:
+        """Внутренний метод для чтения текста (используется DeepResearch)."""
+
+        def _fetch() -> str:
             req_url = f"https://r.jina.ai/{url}"
             req = urllib.request.Request(req_url)
             req.add_header("User-Agent", f"JAWL-Agent/{__version__}")
@@ -30,9 +39,11 @@ class JinaReader:
     @skill(swarm_roles=[Subagents.WEB_RESEARCHER])
     async def read_webpage(self, url: str) -> SkillResult:
         """
-        Читает текстовое содержимое веб-страницы по URL.
-        """
+        Читает текстовое содержимое веб-страницы по указанному URL (возвращает чистый Markdown).
 
+        Args:
+            url: Ссылка на страницу.
+        """
         try:
             text = await self.read_raw(url)
             if not text:
@@ -55,6 +66,6 @@ class JinaReader:
 
         except urllib.error.HTTPError as e:
             return SkillResult.fail(f"Ошибка HTTP при чтении {url}: {e.code} {e.reason}")
-        
+
         except Exception as e:
             return SkillResult.fail(f"Ошибка парсинга страницы (Jina): {e}")

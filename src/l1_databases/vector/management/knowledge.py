@@ -1,3 +1,10 @@
+"""
+CRUD-контроллер для коллекции 'knowledge' (База знаний).
+
+Хранит долгосрочные, объективные факты из внешнего мира (документация, прочитанные статьи, лор).
+Поддерживает поиск по схожести (similarity search) с жесткой фильтрацией по тегам.
+"""
+
 import time
 import uuid
 from typing import TYPE_CHECKING, Any, Literal, List, Optional
@@ -13,6 +20,7 @@ from src.l3_agent.swarm.roles import Subagents
 if TYPE_CHECKING:
     from src.l1_databases.vector.db import VectorDB
     from src.l1_databases.vector.embedding import EmbeddingModel
+    from src.l1_databases.vector.collections import VectorCollection
 
 # Жестко заданный список тегов для классификации
 VectorTag = Literal[
@@ -31,14 +39,26 @@ VectorTag = Literal[
 
 
 class VectorKnowledge:
+    """Интерфейс агента к базе объективных знаний."""
+
     def __init__(
         self,
         db: "VectorDB",
         embedding_model: "EmbeddingModel",
-        collection: str = "knowledge",
+        collection: "VectorCollection",
         similarity_threshold: float = 0.65,
         timezone: int = 0,
-    ):
+    ) -> None:
+        """
+        Инициализирует контроллер знаний.
+
+        Args:
+            db: Подключение к Qdrant.
+            embedding_model: Синтезатор векторов FastEmbed.
+            collection: Ссылка на коллекцию.
+            similarity_threshold: Порог косинусного сходства (Cosine Distance).
+            timezone: Смещение часового пояса.
+        """
         self.db = db
         self.collection = collection
         self.embedding_model = embedding_model
@@ -48,9 +68,13 @@ class VectorKnowledge:
     @skill(swarm_roles=[Subagents.ARCHIVIST])
     async def save_knowledge(self, knowledge_text: str, tags: List[VectorTag]) -> SkillResult:
         """
-        Сохраняет фрагмент знаний во базу данных информации.
-        Теги обязательны для структурирования информации.
+        Векторизует и сохраняет фрагмент знаний в базу.
+
+        Args:
+            knowledge_text: Текстовый блок информации для запоминания.
+            tags: Строгий список тегов для будущей жесткой фильтрации при RAG.
         """
+
         if not tags:
             return SkillResult.fail("Ошибка: Необходимо указать хотя бы один тег из списка.")
 
@@ -83,9 +107,14 @@ class VectorKnowledge:
         self, query: str, limit: int = 5, tags_filter: Optional[List[VectorTag]] = None
     ) -> SkillResult:
         """
-        Семантический поиск информации из базы знаний.
-        tags_filter: Опциональный массив тегов. Если передан, найдет только те записи, которые содержат все указанные теги.
+        Выполняет семантический поиск по сохраненным знаниям.
+
+        Args:
+            query: Текстовый запрос (будет конвертирован в вектор).
+            limit: Максимальное количество возвращаемых релевантных узлов.
+            tags_filter: Опциональный фильтр. Отсекает факты, не содержащие ВСЕ указанные теги.
         """
+
         try:
             query_str = str(query)
             query_vector = await self.embedding_model.get_embedding(query_str)
@@ -160,7 +189,12 @@ class VectorKnowledge:
 
     @skill(swarm_roles=[Subagents.ARCHIVIST])
     async def delete_knowledge(self, point_id: str) -> SkillResult:
-        """Удаляет фрагмент знаний по ID."""
+        """
+        Безвозвратно удаляет фрагмент знаний по его ID.
+
+        Args:
+            point_id: Идентификатор узла (возвращается при поиске).
+        """
         try:
             await self.db.client.delete(
                 collection_name=self.collection.name,
@@ -179,7 +213,14 @@ class VectorKnowledge:
     async def get_all_knowledge(
         self, limit: int = 50, tags_filter: Optional[List[VectorTag]] = None
     ) -> SkillResult:
-        """Получает последние n записей из базы знаний (с возможной фильтрацией по тегам)."""
+        """
+        Получает последние N записей из базы знаний (с возможной фильтрацией по тегам).
+        Используется субагентами (ARCHIVIST) для масштабной ревизии памяти.
+
+        Args:
+            limit: Сколько записей извлечь.
+            tags_filter: Опциональный массив тегов.
+        """
         try:
             query_filter = None
             if tags_filter:

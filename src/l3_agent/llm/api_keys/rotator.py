@@ -1,3 +1,11 @@
+"""
+Модуль управления API ключами для языковых моделей.
+
+Отвечает за бесперебойную работу агента (High Availability) путем
+автоматической ротации ключей при исчерпании Rate Limits (429 HTTP)
+или блокировке невалидных ключей (401 HTTP).
+"""
+
 import time
 from typing import List, Dict
 from src.utils.logger import system_logger
@@ -9,7 +17,17 @@ class APIKeyRotator:
     Отслеживает мертвые ключи и временные кулдауны (Rate Limits).
     """
 
-    def __init__(self, keys: List[str]):
+    def __init__(self, keys: List[str]) -> None:
+        """
+        Инициализирует ротатор с пулом ключей.
+
+        Args:
+            keys: Список сырых API ключей из .env.
+
+        Raises:
+            ValueError: Если список ключей пуст.
+        """
+        
         if not keys:
             system_logger.error("[System] Передан пустой список ключей для LLM.")
             raise ValueError("LLM API keys not found. Check your .env file.")
@@ -24,6 +42,18 @@ class APIKeyRotator:
         )
 
     def get_next_key(self) -> str:
+        """
+        Извлекает следующий доступный ключ (Round-Robin), обходя те,
+        что находятся в состоянии кулдауна (Rate Limit).
+
+        Returns:
+            Строка с API ключом.
+
+        Raises:
+            ValueError: Если список ключей абсолютно пуст (все забанены).
+            RuntimeError: Если все ключи находятся во временном кулдауне.
+        """
+
         if not self.keys:
             raise ValueError("Список API ключей пуст (или все были забанены).")
 
@@ -45,8 +75,14 @@ class APIKeyRotator:
             f"Все API ключи исчерпали лимиты. Необходимо подождать {wait_time} сек."
         )
 
-    def ban_key(self, key: str):
-        """Удаляет ключ из ротации навсегда (например, при HTTP 401)."""
+    def ban_key(self, key: str) -> None:
+        """
+        Удаляет ключ из ротации навсегда (например, при HTTP 401).
+
+        Args:
+            key: Невалидный API ключ.
+        """
+
         if key in self.keys:
             self.keys.remove(key)
             if key in self._cooldowns:
@@ -59,8 +95,15 @@ class APIKeyRotator:
             if self.keys:
                 self._current_index = self._current_index % len(self.keys)
 
-    def cooldown_key(self, key: str, seconds: int = 60):
-        """Временно блокирует ключ."""
+    def cooldown_key(self, key: str, seconds: int = 60) -> None:
+        """
+        Временно блокирует ключ для использования (HTTP 429).
+
+        Args:
+            key: API ключ, поймавший лимит.
+            seconds: На сколько секунд заморозить использование ключа.
+        """
+
         if key in self.keys:
             self._cooldowns[key] = time.time() + seconds
             masked = key[:6] + "***" if len(key) > 6 else "***"
@@ -71,4 +114,7 @@ class APIKeyRotator:
             )
 
     def total_keys(self) -> int:
+        """
+        Возвращает общее количество валидных ключей в пуле.
+        """
         return len(self.keys)

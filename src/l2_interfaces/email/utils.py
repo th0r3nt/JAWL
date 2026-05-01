@@ -1,11 +1,27 @@
+"""
+Утилиты для парсинга электронной почты.
+
+Скрывают в себе боль работы с кодировками MIME, вложенными Multipart-сущностями
+и HTML-мусором, возвращая агенту чистый и понятный текст.
+"""
+
 from email.header import decode_header
+import email.message
 import re
 
 from src.utils._tools import clean_html
 
 
 def decode_mime_header(header_value: str) -> str:
-    """Нормально декодирует MIME-заголовки (=?UTF-8?B?...)."""
+    """
+    Нормально декодирует MIME-заголовки (например '=?UTF-8?B?...?=').
+
+    Args:
+        header_value: Сырая строка заголовка из IMAP.
+
+    Returns:
+        Человекочитаемая строка.
+    """
     if not header_value:
         return "Unknown"
 
@@ -17,7 +33,7 @@ def decode_mime_header(header_value: str) -> str:
             except LookupError:
                 decoded_parts.append(part.decode("utf-8", errors="replace"))
         else:
-            decoded_parts.append(part)
+            decoded_parts.append(str(part))
     return "".join(decoded_parts)
 
 
@@ -27,8 +43,18 @@ def strip_html_tags(text: str) -> str:
     return re.sub(clean, " ", text).strip()
 
 
-def extract_text_from_email(msg) -> str:
-    """Вытаскивает чистый текст из лапши MIME-частей."""
+def extract_text_from_email(msg: email.message.Message) -> str:
+    """
+    Вытаскивает чистый текст из лапши MIME-частей (Multipart писем).
+    Отдает приоритет 'text/plain', но если есть только HTML — вырезает из него теги
+    с помощью утилиты clean_html.
+
+    Args:
+        msg: Объект письма email.message.Message.
+
+    Returns:
+        Очищенный от HTML текст письма.
+    """
     text_parts = []
     html_parts = []
 

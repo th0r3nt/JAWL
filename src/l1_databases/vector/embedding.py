@@ -1,3 +1,11 @@
+"""
+Векторный синтезатор (Embedding Model Wrapper).
+
+Обертка над библиотекой FastEmbed (ONNX).
+Отвечает за генерацию числовых векторов (эмбеддингов) из текста
+исключительно локально на CPU хост-машины, что экономит деньги и гарантирует приватность.
+"""
+
 import os
 import shutil
 import asyncio
@@ -13,7 +21,19 @@ class EmbeddingModel:
     Имеет встроенный механизм восстановления при повреждении кэша.
     """
 
-    def __init__(self, model_path: str, model_name: str = "intfloat/multilingual-e5-small"):
+    def __init__(
+        self, model_path: str, model_name: str = "intfloat/multilingual-e5-small"
+    ) -> None:
+        """
+        Инициализирует и скачивает (при необходимости) ONNX-модель.
+        Содержит встроенный Fallback: при повреждении файлов модели автоматически сносит кэш
+        и скачивает веса заново.
+
+        Args:
+            model_path: Директория для хранения весов модели.
+            model_name: Идентификатор модели в репозитории FastEmbed.
+        """
+
         os.makedirs(model_path, exist_ok=True)
 
         self.model_path = model_path
@@ -46,9 +66,20 @@ class EmbeddingModel:
 
     async def get_embedding(self, text: str) -> list[float]:
         """
-        Асинхронная обертка для генерации вектора.
-        Используем asyncio.to_thread, чтобы синхронный FastEmbed не заблокировал event_loop агента.
+        Синтезирует эмбеддинг для переданного текста.
+        Выполняется в отдельном потоке (asyncio.to_thread), чтобы тяжелые вычисления
+        ONNXRuntime не блокировали асинхронный Event Loop ядра агента.
+
+        Args:
+            text: Входящий текст для векторизации.
+
+        Returns:
+            Сгенерированный тензор чисел (List of floats).
+
+        Raises:
+            RuntimeError: Если модель не была успешно загружена.
         """
+
         if not self.model:
             raise RuntimeError("Ошибка: модель не инициализирована.")
 

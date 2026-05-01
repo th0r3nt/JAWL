@@ -1,3 +1,10 @@
+"""
+Инструментарий для глубокого парсинга сложных MTProto-сообщений (Telethon).
+
+Преобразует объекты Message, содержащие медиа, реплаи, форварды, кнопки и
+реакции, в "плоские" и понятные для LLM текстовые строки.
+"""
+
 from typing import Optional, Tuple, Any
 from telethon import utils
 
@@ -6,10 +13,20 @@ from src.utils._tools import truncate_text
 
 
 class TelethonMessageParser:
-    """Утилита для глубокого парсинга сообщений Telethon (реакции, реплаи, медиа, кнопки)."""
+    """Утилита для парсинга сообщений Telethon."""
 
     @staticmethod
     async def get_sender_name(msg: Any) -> str:
+        """
+        Вычисляет и форматирует имя отправителя сообщения.
+        Учитывает анонимных администраторов в каналах/группах и удаленные аккаунты.
+
+        Args:
+            msg (Any): Объект Message Telethon.
+
+        Returns:
+            str: Человекочитаемое имя или 'Unknown'.
+        """
         sender = msg.sender
         if not sender:
             try:
@@ -18,7 +35,7 @@ class TelethonMessageParser:
             except Exception:
                 pass
 
-        # Если отправитель всё еще None, проверяем: возможно это анонимный админ (отправитель = сам чат)
+        # Обработка анонимных админов (отправитель = сам чат)
         if not sender and (msg.is_group or msg.is_channel):
             chat = msg.chat
             if not chat:
@@ -44,8 +61,17 @@ class TelethonMessageParser:
 
     @staticmethod
     def determine_reply(msg: Any, topic_id: Optional[int]) -> Tuple[bool, Optional[int]]:
-        """Определяет, является ли сообщение reply (ответом на другое сообщение)."""
+        """
+        Определяет, является ли сообщение ответом (реплаем), игнорируя системные
+        связи внутри топиков (forum topics).
 
+        Args:
+            msg (Any): Сообщение Telethon.
+            topic_id (Optional[int]): ID топика форума.
+
+        Returns:
+            Tuple[bool, Optional[int]]: (Является_ли_реплаем, ID_оригинального_сообщения)
+        """
         if not msg.reply_to:
             return False, None
 
@@ -68,8 +94,7 @@ class TelethonMessageParser:
 
     @staticmethod
     def parse_media(msg: Any) -> str:
-        """Определяет, какое именно медиа отправлено в сообщении."""
-
+        """Возвращает текстовый тег медиа-вложения (если есть)."""
         if msg.action:
             return "[Системное сообщение]"
 
@@ -102,17 +127,15 @@ class TelethonMessageParser:
 
     @staticmethod
     async def parse_forward(msg: Any) -> str:
-        """Определяет, является ли сообщение пересланным."""
-
+        """Формирует подпись, если сообщение было переслано (Forwarded)."""
         if not getattr(msg, "fwd_from", None):
             return ""
 
         fwd_sender = None
         try:
-            # Пытаемся получить полную сущность (чтобы вытащить ID и нормальное имя)
             fwd_sender = await msg.get_forward_sender()
         except Exception:
-            pass  # Юзер не в кэше Telethon, игнорируем и идем к фоллбэкам
+            pass
 
         if fwd_sender:
             name = utils.get_display_name(fwd_sender)
@@ -120,7 +143,6 @@ class TelethonMessageParser:
             id_str = f" (ID: {fwd_id})" if fwd_id else ""
             return f"\n  ↳[Переслано от: {name}{id_str}]"
 
-        # Фолбэки на случай, если получить сущность не удалось
         if getattr(msg.fwd_from, "from_name", None):
             return f"\n  ↳[Переслано от: {msg.fwd_from.from_name} (Скрытый аккаунт)]"
 
@@ -137,8 +159,7 @@ class TelethonMessageParser:
     async def parse_reply(
         client: Any, target_entity: Any, is_reply: bool, reply_id: Optional[int]
     ) -> str:
-        """Определяет ID сообщения и username отправителя."""
-
+        """Парсит автора и ID сообщения, на которое был дан ответ."""
         if not is_reply or not reply_id:
             return ""
 
@@ -153,23 +174,19 @@ class TelethonMessageParser:
                 )
             elif orig_msg and orig_msg.sender_id:
                 orig_sender = f"Unknown (ID: {orig_msg.sender_id})"
-
             else:
                 orig_sender = "Unknown"
             return f"\n  ↳ (В ответ на сообщение ID {reply_id} от {orig_sender})"
-
         except Exception:
             return f"\n  ↳ (В ответ на сообщение ID {reply_id})"
 
     @staticmethod
     async def parse_reactions(client: Any, msg: Any) -> str:
-        """Определяет, есть ли реакции на сообщения."""
-
+        """Парсит эмодзи-реакции под сообщением."""
         if not getattr(msg, "reactions", None):
             return ""
 
         r_list = []
-
         if getattr(msg.reactions, "recent_reactions", None):
             for r in msg.reactions.recent_reactions:
                 emo = getattr(r.reaction, "emoticon", "[CustomEmoji]")
@@ -189,8 +206,7 @@ class TelethonMessageParser:
 
     @staticmethod
     def parse_buttons(msg: Any) -> str:
-        """Определяет, есть ли inline кнопки под сообщением бота."""
-
+        """Парсит текст Inline-кнопок."""
         if not getattr(msg, "buttons", None):
             return ""
         btn_texts = [f"[{btn.text}]" for row in msg.buttons for btn in row if btn.text]
@@ -207,8 +223,10 @@ class TelethonMessageParser:
         read_outbox_max_id: int = 0,
         truncate_text_flag: bool = False,
     ) -> str:
-        """Собирает полное, мощно отформатированное сообщение."""
-
+        """
+        Финальная сборка: объединяет все сущности в плоский Markdown текст,
+        идеально приспособленный для чтения языковой моделью.
+        """
         read_status = ""
         if msg.out:
             read_status = " [Прочитано]" if msg.id <= read_outbox_max_id else " [Не прочитано]"
@@ -233,7 +251,6 @@ class TelethonMessageParser:
         time_str = format_datetime(msg.date, timezone, fmt="%Y-%m-%d %H:%M")
 
         topic_str = ""
-        # Если мы читаем весь чат целиком (topic_id не передан принудительно) и сообщение из топика
         if (
             not topic_id
             and getattr(msg, "reply_to", None)

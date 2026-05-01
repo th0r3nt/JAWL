@@ -1,3 +1,11 @@
+"""
+Модуль динамической сборки контекста (User Prompt).
+
+Отвечает за иерархическую конкатенацию всех данных из приборной панели (L0 State)
+в единый Markdown-блок. Обеспечивает правильную приоритезацию информации
+(чтобы важные данные всегда были на виду у механизма Attention LLM).
+"""
+
 from typing import Any, Dict, List
 from src.l0_state.agent.state import AgentState
 from src.l3_agent.context.registry import ContextRegistry, ContextSection
@@ -6,15 +14,22 @@ from src.l3_agent.skills.registry import get_skills_library
 
 class ContextBuilder:
     """
-    Сборщик контекста. Берет данные из реестра и выстраивает их в строгой иерархии
-    для оптимальной работы механизма внимания LLM.
+    Сборщик контекста. Берет данные из реестра (ContextRegistry) и выстраивает
+    их в строгой иерархии для оптимальной работы механизма внимания LLM.
     """
 
     def __init__(
         self,
         agent_state: AgentState,
         registry: ContextRegistry,
-    ):
+    ) -> None:
+        """
+        Инициализирует сборщик и автоматически регистрирует обязательные системные блоки.
+
+        Args:
+            agent_state: Объект состояния агента (L0).
+            registry: Глобальный реестр всех провайдеров контекста.
+        """
         self.agent_state = agent_state
         self.registry = registry
 
@@ -29,7 +44,17 @@ class ContextBuilder:
     async def build(
         self, event_name: str, payload: Dict[str, Any], missed_events: List[Dict[str, Any]]
     ) -> str:
-        """Собирает итоговый контекст для агента в строгом порядке."""
+        """
+        Собирает итоговый контекст (User Message) для агента в строгом порядке.
+
+        Args:
+            event_name: Имя главного события, разбудившего агента.
+            payload: Данные главного события.
+            missed_events: Массив логов фоновых событий.
+
+        Returns:
+            Отформатированная строка контекста для LLM.
+        """
 
         blocks = await self.registry.gather_all(
             event_name=event_name,
@@ -46,9 +71,10 @@ class ContextBuilder:
     # СЛУЖЕБНЫЕ МЕТОДЫ
     # =================================================================
 
-    async def _skills_provider(self, **kwargs) -> str:
-        """Возвращает отформатированный блок контекста доступных скиллов для агента."""
-
+    async def _skills_provider(self, **kwargs: Any) -> str:
+        """
+        Возвращает отформатированный блок контекста доступных скиллов для агента.
+        """
         return f"## SKILLS\n{get_skills_library()}"
 
     async def _heartbeat_provider(
@@ -56,10 +82,11 @@ class ContextBuilder:
         event_name: str,
         payload: Dict[str, Any],
         missed_events: List[Dict[str, Any]],
-        **kwargs,
+        **kwargs: Any,
     ) -> str:
         """
-        Возвращает отформатированный блок контекста текущего Heartbeat.
+        Возвращает отформатированный блок контекста текущего Heartbeat (триггер пробуждения).
+        Инжектит проактивные установки, если они включены.
         """
 
         local_event_name = event_name
@@ -128,7 +155,9 @@ class ContextBuilder:
     def _build_answer_to_event_reason(
         self, event_name: str, payload: Dict[str, Any], missed_events: List[Dict[str, Any]]
     ) -> str:
-        """Возвращает отформатированный блок контекста фоновых событий для агента."""
+        """
+        Служебный метод, возвращающий отформатированный блок контекста фоновых событий для агента.
+        """
 
         payload_lines = [f"{k}: {v}" for k, v in payload.items()]
         payload_str = (
@@ -138,7 +167,7 @@ class ContextBuilder:
         main_trigger = f"{event_name}\n{payload_str}"
 
         if missed_events:
-            events_log = "\n".join(missed_events)
+            events_log = "\n".join(str(e) for e in missed_events)
             return f"{main_trigger}\n\nEvent Log:\n{events_log}"
 
         return main_trigger
@@ -150,7 +179,18 @@ class ContextBuilder:
         event_time: str = None,
         level: str = None,
     ) -> str:
-        """Вспомогательный метод для красивого Markdown-оформления события."""
+        """
+        Вспомогательный метод для красивого Markdown-оформления одного события.
+
+        Args:
+            event_name: Имя события.
+            payload: Данные события.
+            event_time: Время (если есть).
+            level: Уровень важности (CRITICAL, HIGH, etc.).
+
+        Returns:
+            Отформатированный Markdown-блок.
+        """
 
         proactive_prompt = """
 [SYSTEM]

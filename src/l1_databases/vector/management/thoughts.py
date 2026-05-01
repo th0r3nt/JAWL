@@ -1,3 +1,9 @@
+"""
+CRUD-контроллер для коллекции 'thoughts' (База мыслей).
+
+Хранит субъективные логические выводы, рефлексию и внутренние паттерны поведения агента.
+"""
+
 import time
 import uuid
 from typing import TYPE_CHECKING, Any, Literal, List, Optional
@@ -13,6 +19,7 @@ from src.l3_agent.swarm.roles import Subagents
 if TYPE_CHECKING:
     from src.l1_databases.vector.db import VectorDB
     from src.l1_databases.vector.embedding import EmbeddingModel
+    from src.l1_databases.vector.collections import VectorCollection
 
 VectorTag = Literal[
     # Домены мыслей
@@ -30,14 +37,26 @@ VectorTag = Literal[
 
 
 class VectorThoughts:
+    """Интерфейс агента к базе субъективных мыслей."""
+
     def __init__(
         self,
         db: "VectorDB",
         embedding_model: "EmbeddingModel",
-        collection: str = "thoughts",
+        collection: "VectorCollection",
         similarity_threshold: float = 0.65,
         timezone: int = 0,
-    ):
+    ) -> None:
+        """
+        Инициализирует контроллер мыслей.
+
+        Args:
+            db: Подключение к Qdrant.
+            embedding_model: Синтезатор векторов FastEmbed.
+            collection: Ссылка на коллекцию.
+            similarity_threshold: Порог косинусного сходства (Cosine Distance).
+            timezone: Смещение часового пояса.
+        """
         self.db = db
         self.collection = collection
         self.embedding_model = embedding_model
@@ -47,9 +66,13 @@ class VectorThoughts:
     @skill(swarm_roles=[Subagents.ARCHIVIST])
     async def save_thought(self, thought_text: str, tags: List[VectorTag]) -> SkillResult:
         """
-        Сохраняет мысль или логический вывод во внутреннюю память.
-        Теги обязательны. Укажите подходящие теги для классификации мысли.
+        Векторизует и сохраняет мысль или логический паттерн во внутреннюю память.
+
+        Args:
+            thought_text: Текст рефлексии или вывода.
+            tags: Строгий классификатор (например, 'type:concept', 'domain:self').
         """
+
         if not tags:
             return SkillResult.fail("Ошибка: Необходимо указать хотя бы один тег из списка.")
 
@@ -80,7 +103,11 @@ class VectorThoughts:
     ) -> SkillResult:
         """
         Семантический поиск мыслей из базы данных.
-        tags_filter: Опциональный массив тегов. Если передан, найдет только те записи, которые содержат ВСЕ указанные теги.
+
+        Args:
+            query: Текстовый запрос (будет конвертирован в вектор).
+            limit: Максимальное количество возвращаемых релевантных узлов.
+            tags_filter: Опциональный массив тегов. Если передан, найдет только те записи, которые содержат ВСЕ указанные теги.
         """
         try:
             query_str = str(query)
@@ -154,7 +181,12 @@ class VectorThoughts:
 
     @skill(swarm_roles=[Subagents.ARCHIVIST])
     async def delete_thought(self, point_id: str) -> SkillResult:
-        """Удаляет мысль из базы данных по ID."""
+        """
+        Безвозвратно удаляет мысль из базы данных по ID.
+
+        Args:
+            point_id: Идентификатор удаляемого узла.
+        """
         try:
             await self.db.client.delete(
                 collection_name=self.collection.name,
@@ -173,7 +205,14 @@ class VectorThoughts:
     async def get_all_thoughts(
         self, limit: int = 50, tags_filter: Optional[List[VectorTag]] = None
     ) -> SkillResult:
-        """Получает последние n мыслей из базы данных."""
+        """
+        Получает последние N мыслей из базы данных.
+        Используется субагентами (ARCHIVIST) для ревизии памяти.
+
+        Args:
+            limit: Количество извлекаемых мыслей.
+            tags_filter: Опциональный массив тегов.
+        """
         try:
             query_filter = None
             if tags_filter:

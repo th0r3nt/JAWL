@@ -1,3 +1,11 @@
+"""
+Реестр провайдеров контекста (DI контейнер для L0 State).
+
+Обеспечивает слабую связность слоев (Loose Coupling). Интерфейсы (L2) просто регистрируют
+в нем свои методы (провайдеры), а Контекстный Билдер (L3) асинхронно опрашивает их всех
+в строго определенном порядке, заданном через `ContextSection`.
+"""
+
 import asyncio
 from enum import IntEnum
 from typing import Callable, Awaitable, Any, Dict, List
@@ -8,7 +16,7 @@ from src.utils.logger import system_logger
 class ContextSection(IntEnum):
     """
     Определяет строгий порядок следования блоков в системном промпте.
-    Чем меньше число, тем выше блок в иерархии.
+    Чем меньше число, тем выше блок в иерархии (важнее для LLM).
     """
 
     # Личность и внутреннее состояние
@@ -33,12 +41,23 @@ class ContextSection(IntEnum):
 
 
 class ContextRegistry:
-    def __init__(self):
+    """Глобальный реестр функций-провайдеров контекста."""
+
+    def __init__(self) -> None:
         self._providers: Dict[str, Dict[str, Any]] = {}
 
     def register_provider(
         self, name: str, provider_func: Callable[..., Awaitable[str]], section: ContextSection
-    ):
+    ) -> None:
+        """
+        Регистрирует асинхронную функцию, которая будет отдавать Markdown-блок.
+
+        Args:
+            name: Уникальное имя провайдера (например, "host_os").
+            provider_func: Ссылка на метод (корутину).
+            section: Позиция в иерархии (ContextSection).
+        """
+        
         self._providers[name] = {"func": provider_func, "section": section}
         system_logger.debug(
             f"[System] Зарегистрирован провайдер контекста: {name} (Секция: {section.name})"
@@ -49,11 +68,19 @@ class ContextRegistry:
         event_name: str,
         payload: Dict[str, Any],
         missed_events: List[Dict[str, Any]],
-        agent_state,
+        agent_state: Any,
     ) -> Dict[str, str]:
         """
-        Проходится по всем провайдерам контекста и дергает их функции,
-        которые возвращают отформатированные Markdown-блоки для контекста.
+        Асинхронно опрашивает всех провайдеров и возвращает их ответы, отсортированные по приоритету.
+
+        Args:
+            event_name: Имя события-триггера.
+            payload: Данные события.
+            missed_events: Пропущенные фоновые события.
+            agent_state: Инстанс AgentState.
+
+        Returns:
+            Словарь, где ключ - имя провайдера, значение - Markdown строка.
         """
 
         if not self._providers:

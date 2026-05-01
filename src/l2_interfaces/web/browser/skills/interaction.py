@@ -1,3 +1,8 @@
+"""
+Навыки физического воздействия на загруженную веб-страницу в браузере.
+Позволяют кликать, печатать и наводить курсор (в том числе по абсолютным пиксельным координатам).
+"""
+
 from src.l3_agent.skills.registry import skill, SkillResult
 from src.l2_interfaces.web.browser.client import WebBrowserClient
 
@@ -13,9 +18,11 @@ class BrowserInteraction:
     @skill()
     async def click(self, role: str, name: str) -> SkillResult:
         """
-        Кликает по интерактивному элементу.
-        Аргументы `role` и `name` следует брать исключительно из блока 'Видимые элементы (AOM)' в контексте.
-        Например: role="link", name="Log in"
+        Выполняет симуляцию клика по элементу на основе его ARIA-роли.
+        
+        Args:
+            role: ARIA-роль элемента (например, 'link', 'button').
+            name: Внутреннее имя или текст элемента.
         """
 
         try:

@@ -1,16 +1,29 @@
+"""
+Навыки Meta уровня 0 (SAFE).
+
+Базовые, самые безопасные настройки системы.
+Позволяют агенту изменять свою рабочую модель LLM (переключать личности/провайдеров)
+и настраивать уровень креативности (Temperature).
+"""
+
 from src.l2_interfaces.meta.client import MetaClient
 from src.l3_agent.skills.registry import SkillResult, skill
 
 
 class MetaSafe:
-    """Уровень 0 (SAFE). Самые безопасные настройки системы."""
+    """Уровень 0 (SAFE). Базовые настройки системы."""
 
-    def __init__(self, meta_client: MetaClient):
+    def __init__(self, meta_client: MetaClient) -> None:
         self.client = meta_client
 
     @skill()
     async def change_model(self, model_name: str) -> SkillResult:
-        """[0/SAFE] Изменяет используемую LLM модель."""
+        """
+        Изменяет текущую используемую LLM модель агента.
+
+        Args:
+            model_name: Название модели (должно быть в списке Available LLM models).
+        """
 
         if self.client.available_models and model_name not in self.client.available_models:
             return SkillResult.fail(
@@ -18,7 +31,7 @@ class MetaSafe:
             )
 
         success = await self.client.update_yaml(
-            self.client.settings_path, ["llm", "model"], model_name
+            self.client.settings_path, ["llm", "main_model"], model_name
         )
         if not success:
             return SkillResult.fail("Ошибка при сохранении файла конфигурации.")
@@ -28,8 +41,12 @@ class MetaSafe:
 
     @skill()
     async def add_available_model(self, model_name: str) -> SkillResult:
-        """[0/SAFE] Добавляет новую LLM модель в список доступных (available_models)."""
+        """
+        Добавляет новую LLM модель в список доступных.
 
+        Args:
+            model_name: Строковый идентификатор новой модели.
+        """
         if model_name in self.client.available_models:
             return SkillResult.ok(f"Модель '{model_name}' уже есть в списке доступных.")
 
@@ -47,7 +64,12 @@ class MetaSafe:
 
     @skill()
     async def remove_available_model(self, model_name: str) -> SkillResult:
-        """[0/SAFE] Удаляет LLM модель из списка доступных (available_models)."""
+        """
+        Удаляет LLM модель из списка доступных.
+
+        Args:
+            model_name: Идентификатор удаляемой модели.
+        """
 
         if model_name not in self.client.available_models:
             return SkillResult.fail(f"Ошибка: Модели '{model_name}' нет в списке.")
@@ -70,8 +92,13 @@ class MetaSafe:
 
     @skill()
     async def change_temperature(self, temperature: float) -> SkillResult:
-        """[0/SAFE] Изменяет temperature языковой модели (от 0.0 до 1.0)."""
+        """
+        Изменяет параметр temperature языковой модели (влияет на креативность).
 
+        Args:
+            temperature: Значение от 0.0 до 2.0.
+        """
+        
         if not 0.0 <= temperature <= 2.0:
             return SkillResult.fail("Температура должна быть в пределах от 0.0 до 2.0.")
 

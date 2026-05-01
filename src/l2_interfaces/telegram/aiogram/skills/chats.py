@@ -1,18 +1,28 @@
+"""
+Навыки бота для чтения списков чатов и их метаданных (Aiogram).
+
+Внимание: ограничены спецификой Bot API. Бот не имеет доступа к глобальному списку
+своих диалогов, поэтому он может "видеть" только те чаты, с которыми взаимодействовал
+после старта системы (MRU-кэш).
+"""
+
 from src.l0_state.interfaces.state import AiogramState
 from src.l2_interfaces.telegram.aiogram.client import AiogramClient
 
 from src.l3_agent.skills.registry import SkillResult, skill
-from src.utils.logger import system_logger
 
 
 class AiogramChats:
-    """
-    Навыки бота для работы со списком чатов.
-    Ограничены спецификой Bot API: бот не может читать историю сообщений,
-    если не сохранял их сам.
-    """
+    """Навыки для взаимодействия со списком активных чатов."""
 
-    def __init__(self, aiogram_client: AiogramClient, state: AiogramState):
+    def __init__(self, aiogram_client: AiogramClient, state: AiogramState) -> None:
+        """
+        Инициализирует скиллы.
+
+        Args:
+            aiogram_client (AiogramClient): Клиент Aiogram.
+            state (AiogramState): Состояние интерфейса с кэшем диалогов.
+        """
         self.client = aiogram_client
         self.state = state
 
@@ -20,7 +30,10 @@ class AiogramChats:
     async def get_chats(self, limit: int = 10) -> SkillResult:
         """
         Возвращает список последних чатов, с которыми бот взаимодействовал.
-        Боты не могут получить полный список всех диалогов из API Telegram.
+        (Bot API не позволяет получить полный список всех диалогов аккаунта).
+
+        Args:
+            limit (int): Максимальное количество чатов для возврата.
         """
         try:
             if not self.state._chats_cache:
@@ -32,13 +45,15 @@ class AiogramChats:
             return SkillResult.ok("\n".join(lines))
 
         except Exception as e:
-            msg = f"Ошибка при получении списка чатов (Aiogram): {e}"
-            return SkillResult.fail(msg)
+            return SkillResult.fail(f"Ошибка при получении списка чатов (Aiogram): {e}")
 
     @skill()
     async def get_chat_info(self, chat_id: int) -> SkillResult:
         """
-        Получает информацию о конкретном чате (описание, кол-во участников).
+        Получает подробную метаинформацию о конкретном чате (описание, кол-во участников).
+
+        Args:
+            chat_id (int): Уникальный числовой идентификатор чата.
         """
         try:
             bot = self.client.bot()
@@ -62,12 +77,12 @@ class AiogramChats:
 
         except ValueError:
             return SkillResult.fail(f"Ошибка: Некорректный ID чата ({chat_id}).")
-        except Exception as e:
-            msg = f"Ошибка при получении информации о чате {chat_id} (Aiogram): {e}"
 
+        except Exception as e:
             if "chat not found" in str(e).lower():
                 return SkillResult.fail(
-                    "Бот не нашел этот чат. Возможно, его удалили или заблокировали бота."
+                    "Бот не нашел этот чат. Возможно, его удалили или пользователя заблокировали."
                 )
-
-            return SkillResult.fail(msg)
+            return SkillResult.fail(
+                f"Ошибка при получении информации о чате {chat_id} (Aiogram): {e}"
+            )

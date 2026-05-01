@@ -1,3 +1,12 @@
+"""
+Статлесс ReAct-цикл для субагентов (SubagentLoop).
+
+В отличие от главного ReactLoop, цикл субагентов облегчен: он не пишет
+данные в SQLite базу (Ticks), а держит всю историю в локальной памяти (переменной)
+строго до момента завершения задачи. Оснащен "Anti-Laziness Guard" - защитой,
+не позволяющей субагенту прервать цикл без отправки отчета.
+"""
+
 import json
 import re
 import asyncio
@@ -33,7 +42,23 @@ class SubagentLoop:
         allowed_skills: List[str],
         token_tracker: TokenTracker,
         max_steps: int = 15,
-    ):
+    ) -> None:
+        """
+        Инициализирует цикл субагента.
+
+        Args:
+            subagent_id: Уникальный ID запущенного процесса.
+            role: Назначенная роль (профессия).
+            task_description: Первичная задача от Оркестратора.
+            llm_client: Клиент языковой модели (возможно, с другими API ключами).
+            model_name: Имя модели (обычно дешевая и быстрая, типа Flash Lite).
+            prompt_builder: Сборщик системного промпта.
+            context_builder: Сборщик локального контекста.
+            allowed_skills: Доступные навыки (ограниченные RBAC).
+            token_tracker: Утилита для учета расходов токенов.
+            max_steps: Лимит шагов до принудительного убийства процесса (Timeout).
+        """
+        
         self.subagent_id = subagent_id
         self.role = role
         self.task_description = task_description
@@ -52,7 +77,10 @@ class SubagentLoop:
         self.report_submitted = False
 
     async def run(self) -> None:
-        """Главный оркестратор ReAct цикла субагента."""
+        """
+        Главный оркестратор ReAct цикла субагента.
+        Крутит цикл "Запрос к LLM -> Парсинг -> Выполнение", пока задача не завершится.
+        """
         system_logger.info(f"[Swarm] Запуск субагента {self.role.id}_{self.subagent_id}.")
         prompt = self.prompt_builder.build(self.role)
 
@@ -87,8 +115,9 @@ class SubagentLoop:
                 step += 1
                 continue
 
-            thoughts = parsed_response.thoughts
-            actions = parsed_response.actions
+            # Игнорируем ошибки тайп-хинта Pydantic (parsed_response точно AgentResponse здесь)
+            thoughts = parsed_response.thoughts  # type: ignore
+            actions = parsed_response.actions  # type: ignore
 
             # Если нет действий
             if not actions:
@@ -133,7 +162,6 @@ class SubagentLoop:
         """
         Собирает контекст и обновляет счетчик входящих токенов.
         """
-
         context = self.context_builder.build(
             self.subagent_id, self.task_description, self.history
         )
@@ -167,14 +195,13 @@ class SubagentLoop:
         """
         Обрабатывает запросы к LLM, ротацию ключей и Rate Limits.
         """
-
         for attempt in range(3):
             try:
                 session = self.llm.get_session()
                 response = await session.chat.completions.create(
                     model=self.model_name,
                     messages=messages,
-                    tools=ACTION_SCHEMA,
+                    tools=ACTION_SCHEMA,  # type: ignore
                     temperature=0.7,
                 )
                 msg_obj = response.choices[0].message
@@ -207,9 +234,8 @@ class SubagentLoop:
         self, raw_answer: str
     ) -> Tuple[Optional[AgentResponse], Optional[str]]:
         """
-        Парсит ответ от LLM.
+        Парсит ответ от LLM. Защищает от невалидного JSON.
         """
-
         clean_answer = raw_answer.strip()
 
         # Срезаем Markdown-обертку, если LLM прислала json текстом
@@ -219,7 +245,7 @@ class SubagentLoop:
                 clean_answer = match.group(0)
 
         if not clean_answer.startswith("{"):
-            return clean_answer, "System Error: Invalid JSON format. Use tool_calls."
+            return None, "System Error: Invalid JSON format. Use tool_calls."
 
         try:
             parsed = AgentResponse.model_validate_json(clean_answer)
@@ -230,9 +256,8 @@ class SubagentLoop:
 
     async def _execute_and_log_actions(self, thoughts: str, actions: List[ActionCall]) -> None:
         """
-        Выполняет запрошенные инструменты и сохраняет результаты в историю субагента.
+        Выполняет запрошенные инструменты, применяет RBAC и сохраняет результаты в историю субагента.
         """
-
         results = []
         actions_log = []
 

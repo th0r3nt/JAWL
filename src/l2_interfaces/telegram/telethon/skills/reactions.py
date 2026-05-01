@@ -1,3 +1,7 @@
+"""
+Навыки агента для проставления или снятия эмодзи-реакций (Telethon).
+"""
+
 from telethon.tl.functions.messages import SendReactionRequest
 from telethon.tl.types import ReactionEmoji
 
@@ -7,23 +11,25 @@ from src.utils.logger import system_logger
 
 
 class TelethonReactions:
-    """
-    Навыки агента для управления эмодзи-реакциями на сообщения.
-    """
+    """Группа навыков управления реакциями на сообщения."""
 
-    def __init__(self, tg_client: TelethonClient):
+    def __init__(self, tg_client: TelethonClient) -> None:
         self.tg_client = tg_client
 
     @skill()
     async def set_reaction(self, chat_id: int, message_id: int, reaction: str) -> SkillResult:
         """
-        Ставит эмодзи-реакцию на указанное сообщение.
-        Если реакция уже стоит, она будет заменена на новую.
+        Ставит эмодзи-реакцию (например, '👍', '🔥', '❤') на указанное сообщение.
+        Если ваша реакция уже стоит, она будет заменена на новую.
+
+        Args:
+            chat_id: ID чата.
+            message_id: ID сообщения.
+            reaction: Эмодзи-символ.
         """
         try:
             client = self.tg_client.client()
 
-            # Используем сырой API-вызов Telegram
             await client(
                 SendReactionRequest(
                     peer=int(chat_id),
@@ -48,17 +54,19 @@ class TelethonReactions:
     @skill()
     async def remove_reaction(self, chat_id: int, message_id: int) -> SkillResult:
         """
-        Убирает вашу текущую реакцию с сообщения (если она была установлена).
+        Убирает вашу текущую реакцию с сообщения.
         """
         try:
             client = self.tg_client.client()
 
-            # Пустой список снимает все установленные пользователем реакции
+            # Пустой массив [] снимает все установленные пользователем реакции
             await client(
                 SendReactionRequest(peer=int(chat_id), msg_id=int(message_id), reaction=[])
             )
 
-            system_logger.info(f"[Telegram Telethon] Реакция снята с сообщения {message_id} в чате {chat_id}")
+            system_logger.info(
+                f"[Telegram Telethon] Реакция снята с сообщения {message_id} в чате {chat_id}"
+            )
             return SkillResult.ok("Реакция успешно удалена.")
 
         except Exception as e:

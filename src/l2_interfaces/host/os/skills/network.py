@@ -1,3 +1,8 @@
+"""
+Навыки сетевой диагностики (ICMP, TCP).
+Используются главным агентом и субагентами (SYSADMIN) для проверки доступности узлов и мониторинга сокетов.
+"""
+
 import asyncio
 import platform
 import socket
@@ -9,7 +14,7 @@ from src.l2_interfaces.host.os.client import HostOSClient, HostOSAccessLevel
 from src.l2_interfaces.host.os.decorators import require_access
 
 from src.l3_agent.skills.registry import SkillResult, skill
-
+from src.l3_agent.swarm.roles import Subagents
 
 class HostOSNetwork:
     """
@@ -19,7 +24,7 @@ class HostOSNetwork:
     def __init__(self, host_os_client: HostOSClient):
         self.host_os = host_os_client
 
-    @skill()
+    @skill(swarm_roles=[Subagents.SYSADMIN])
     @require_access(HostOSAccessLevel.OBSERVER)
     async def ping_host(self, host: str, count: int = 4) -> SkillResult:
         """
@@ -67,7 +72,7 @@ class HostOSNetwork:
         except Exception as e:
             return SkillResult.fail(f"Ошибка выполнения ping: {e}")
 
-    @skill()
+    @skill(swarm_roles=[Subagents.SYSADMIN])
     @require_access(HostOSAccessLevel.OBSERVER)
     async def check_port(self, host: str, port: int, timeout: int = 3) -> SkillResult:
         """
@@ -97,7 +102,7 @@ class HostOSNetwork:
         except Exception as e:
             return SkillResult.fail(f"Ошибка при проверке порта {host}:{port}: {e}")
 
-    @skill()
+    @skill(swarm_roles=[Subagents.SYSADMIN])
     @require_access(HostOSAccessLevel.OBSERVER)
     async def list_active_connections(self, state: str = "LISTEN") -> SkillResult:
         """
@@ -129,7 +134,7 @@ class HostOSNetwork:
         except Exception as e:
             return SkillResult.fail(f"Ошибка при получении соединений: {e}")
 
-    @skill()
+    @skill(swarm_roles=[Subagents.SYSADMIN])
     @require_access(HostOSAccessLevel.OBSERVER)
     async def resolve_dns(self, domain: str) -> SkillResult:
         """

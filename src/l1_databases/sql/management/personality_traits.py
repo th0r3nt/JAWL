@@ -1,5 +1,12 @@
+"""
+CRUD-контроллер таблицы Personality Traits (Черты личности).
+
+Позволяет агенту динамически адаптироваться под пользователя: сохранять
+паттерны поведения, предпочитаемые форматы ответов и индивидуальные правила.
+"""
+
 import uuid
-from typing import Optional, TYPE_CHECKING
+from typing import Optional, TYPE_CHECKING, Any
 from sqlalchemy import select, delete, func
 
 from src.l3_agent.skills.registry import skill, SkillResult
@@ -13,7 +20,14 @@ if TYPE_CHECKING:
 class SQLPersonalityTraits:
     """CRUD для управления приобретенными чертами характера агента."""
 
-    def __init__(self, db: "SQLDB", max_traits: int = 10):
+    def __init__(self, db: "SQLDB", max_traits: int = 10) -> None:
+        """
+        Инициализирует контроллер черт личности.
+
+        Args:
+            db: Подключение к SQLite.
+            max_traits: Максимальное количество хранимых черт в памяти.
+        """
         self.db = db
         self.max_traits = max_traits
 
@@ -25,7 +39,15 @@ class SQLPersonalityTraits:
         reason: Optional[str] = None,
         context: Optional[str] = None,
     ) -> SkillResult:
-        """Добавляет новую приобретенную черту личности."""
+        """
+        Добавляет новую приобретенную черту характера.
+
+        Args:
+            name: Короткое название черты.
+            description: В чем именно она заключается (само правило).
+            reason: Событие, повлекшее формирование этой черты (зачем это нужно).
+            context: Ситуации, в которых её следует применять (триггеры).
+        """
 
         trait_id = str(uuid.uuid4())[:8]
 
@@ -48,7 +70,9 @@ class SQLPersonalityTraits:
         return SkillResult.ok(msg)
 
     async def get_traits(self) -> SkillResult:
-        """Возвращает список всех текущих приобретенных черт личности."""
+        """
+        Возвращает список всех текущих приобретенных черт личности агента.
+        """
 
         async with self.db.session_factory() as session:
             result = await session.execute(select(PersonalityTraitTable))
@@ -71,7 +95,12 @@ class SQLPersonalityTraits:
 
     @skill()
     async def remove_trait(self, trait_id: str) -> SkillResult:
-        """Удаляет черту личности по ID, если она больше не актуальна."""
+        """
+        Удаляет черту личности по ID, если она больше не актуальна.
+
+        Args:
+            trait_id: ID удаляемой черты.
+        """
         async with self.db.session_factory() as session:
             result = await session.execute(
                 delete(PersonalityTraitTable).where(PersonalityTraitTable.id == trait_id)
@@ -85,11 +114,11 @@ class SQLPersonalityTraits:
         system_logger.info(f"[SQL DB] {msg}")
         return SkillResult.ok(msg)
 
-    async def get_context_block(self, **kwargs) -> str:
+    async def get_context_block(self, **kwargs: Any) -> str:
         """
         Провайдер контекста для ContextRegistry.
         Отдает отформатированный блок для контекста агента.
         """
-        
+
         res = await self.get_traits()
         return f"## PERSONALITY TRAITS\nMax traits allowed: {self.max_traits}\n\n{res.message}"

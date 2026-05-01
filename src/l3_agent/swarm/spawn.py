@@ -1,3 +1,11 @@
+"""
+Навык-оркестратор (Swarm Manager).
+
+Предоставляет главному агенту инструмент (скилл) `spawn_subagent`, через который
+он может делегировать объемные задачи. Управляет пулом (семафором) запущенных воркеров
+для защиты от перегрузки сети и Rate Limits (HTTP 429).
+"""
+
 import asyncio
 import uuid
 import traceback
@@ -18,24 +26,36 @@ from src.l3_agent.swarm.loop import SubagentLoop
 
 
 class SwarmManager:
+    """Менеджер подсистемы роя (Субагентов). Контролирует спавн и пулы воркеров."""
+
     def __init__(
         self,
         llm_client: LLMClient,
         swarm_config: SwarmConfig,
         root_dir: Path,
         token_tracker: TokenTracker,
-    ):
+    ) -> None:
+        """
+        Инициализирует менеджер роя.
+
+        Args:
+            llm_client: Выделенный клиент языковой модели для субагентов (часто с более дешевой моделью).
+            swarm_config: Конфигурация подсистемы.
+            root_dir: Корень проекта JAWL.
+            token_tracker: Отслеживатель токенов.
+        """
+
         self.llm = llm_client
         self.config = swarm_config
         self.tracker = token_tracker
 
         self.prompt_builder = SwarmPromptBuilder(root_dir)
         self.semaphore = asyncio.Semaphore(self.config.max_concurrent_workers)
-        self.active_tasks = set()
+        self.active_tasks: set[asyncio.Task] = set()
 
         # Динамически собираем доступные роли и их навыки из реестра (OCP)
-        self.role_skills = {}
-        self.active_roles = {}  # role_id -> SubagentRole
+        self.role_skills: dict[str, list[str]] = {}
+        self.active_roles: dict[str, SubagentRole] = {}  # role_id -> SubagentRole
 
         for skill_name, data in _REGISTRY.items():
             for role_obj in data.get("swarm_roles", []):
@@ -49,7 +69,7 @@ class SwarmManager:
             "Делегирует сложную и объемную задачу автономному субагенту. "
             "Он будет работать в фоне параллельно вам и вернет подробный отчет после завершения. "
             "Рекомендовано использовать для делегирования рутины или любых других задач."
-        )
+        )  # Докстринг, который будет видеть LLM в навыке spawn_subagent
 
         if self.active_roles:
             roles_desc = ["Доступные роли в данный момент:"]
@@ -62,12 +82,20 @@ class SwarmManager:
 
         if hasattr(self.spawn_subagent, "__func__"):
             self.spawn_subagent.__func__.__doc__ = f"{base_doc}\n\n{roles_str}"
-
         else:
             self.spawn_subagent.__doc__ = f"{base_doc}\n\n{roles_str}"
 
     @skill()
     async def spawn_subagent(self, role: str, task_description: str) -> SkillResult:
+        """
+        Запускает фонового субагента для выполнения задачи.
+        Докстринг динамически переопределяется в __init__ (base_doc = ...), чтобы показать агенту активные роли.
+
+        Args:
+            role: ID роли субагента (например 'coder', 'web_researcher').
+            task_description: Детальное поручение.
+        """
+
         if not self.config.enabled:
             return SkillResult.fail(
                 "Ошибка: Подсистема Swarm отключена в настройках (settings.yaml)."
@@ -99,12 +127,19 @@ class SwarmManager:
 
     async def _run_subagent_task(
         self, subagent_id: str, role: SubagentRole, task_description: str
-    ):
+    ) -> None:
+        """
+        Фоновая корутина, контролирующая выполнение цикла субагента под защитой семафора.
+        """
+
         try:
             actual_skills = self.role_skills.get(role.id, [])
 
             async with self.semaphore:
-                context_builder = SwarmContextBuilder(role, actual_skills)
+                # Передаем конфигурацию в сборщик контекста
+                context_builder = SwarmContextBuilder(
+                    role=role, allowed_skills=actual_skills, config=self.config.context_depth
+                )
 
                 loop = SubagentLoop(
                     subagent_id=subagent_id,
@@ -116,7 +151,7 @@ class SwarmManager:
                     context_builder=context_builder,
                     allowed_skills=actual_skills,
                     token_tracker=self.tracker,
-                    max_steps=20,  # TODO: перенести в yaml
+                    max_steps=self.config.context_depth.max_steps,
                 )
 
                 await loop.run()

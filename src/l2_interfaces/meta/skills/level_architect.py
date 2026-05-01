@@ -1,3 +1,10 @@
+"""
+Навыки Meta уровня 2 (ARCHITECT).
+
+Управление системными интерфейсами и жизненным циклом.
+Позволяет агенту аппаратно отключать/включать компоненты JAWL и инициировать ребут.
+"""
+
 from typing import Literal
 
 from src.l2_interfaces.meta.client import MetaClient
@@ -9,7 +16,7 @@ from src.utils.logger import system_logger
 class MetaArchitect:
     """Уровень 2 (ARCHITECT). Управление жизненным циклом системы и интерфейсами."""
 
-    def __init__(self, meta_client: MetaClient):
+    def __init__(self, meta_client: MetaClient) -> None:
         self.client = meta_client
 
     @skill()
@@ -27,9 +34,12 @@ class MetaArchitect:
         state: bool,
     ) -> SkillResult:
         """
-        [2/ARCHITECT] Включает или выключает системные интерфейсы через конфигурационный файл.
-        """
+        Включает или выключает системные интерфейсы через YAML конфиг.
 
+        Args:
+            interface: Название целевого модуля (например 'github').
+            state: True (включить) или False (выключить).
+        """
         # Маппинг ключей из Literal на реальные пути в interfaces.yaml
         ifmap = {
             "host_os": ["host", "os", "enabled"],
@@ -77,9 +87,11 @@ class MetaArchitect:
     @skill()
     async def off_system(self, reason: str = "Без причины") -> SkillResult:
         """
-        [2/ARCHITECT] Завершает работу агента и полностью выключает систему.
-        """
+        Завершает работу агента и полностью выключает систему.
 
+        Args:
+            reason: Причина выключения (останется в логах).
+        """
         system_logger.info(f"[Meta] Запрошено выключение системы. Причина: {reason}")
         await self.client.bus.publish(Events.SYSTEM_SHUTDOWN_REQUESTED, reason=reason)
         return SkillResult.ok(
@@ -89,9 +101,11 @@ class MetaArchitect:
     @skill()
     async def reboot_system(self, reason: str = "Обновление конфигурации") -> SkillResult:
         """
-        [2/ARCHITECT] Выполняет полную перезагрузку системы.
-        """
+        Выполняет полную перезагрузку системы (полезно после изменения конфигов).
 
+        Args:
+            reason: Причина перезагрузки.
+        """
         system_logger.info(f"[Meta] Запрошена перезагрузка системы. Причина: {reason}")
         await self.client.bus.publish(Events.SYSTEM_REBOOT_REQUESTED, reason=reason)
         return SkillResult.ok(

@@ -1,3 +1,11 @@
+"""
+Клиент векторной базы данных Qdrant.
+
+Обеспечивает создание локальных In-Memory/On-Disk коллекций и защиту от
+повреждения данных. В случае изменения размерности вектора в конфигах
+система автоматически инициирует удаление старого кэша для предотвращения крашей.
+"""
+
 import shutil
 from pathlib import Path
 from typing import List
@@ -7,13 +15,33 @@ from src.utils.logger import system_logger
 
 
 class VectorDB:
-    def __init__(self, db_path: str, collections: List[str], vector_size: int):
+    """Менеджер подключения и структуры векторной базы Qdrant."""
+
+    def __init__(self, db_path: str, collections: List[str], vector_size: int) -> None:
+        """
+        Инициализирует пути и параметры для подключения к Qdrant.
+
+        Args:
+            db_path: Путь к директории хранения файлов базы данных.
+            collections: Список имен коллекций, которые должны быть созданы ('knowledge', 'thoughts').
+            vector_size: Размерность векторов (должна строго совпадать с используемой embedding-моделью).
+        """
+
         self.db_path = Path(db_path)
         self.client: AsyncQdrantClient | None = None
         self.collections = collections
         self.vector_size = vector_size
 
-    async def connect(self):
+    async def connect(self) -> None:
+        """
+        Устанавливает соединение с локальной БД Qdrant.
+        При первом запуске автоматически создает коллекции и Payload Index для тегов.
+        Если обнаружено фатальное повреждение кэша базы (например, из-за изменения vector_size) —
+        выполняет принудительный Hard Reset (удаляет директорию и создает чистую базу).
+
+        Raises:
+            Exception: Если базу невозможно прочитать или пересоздать.
+        """
         self.db_path.mkdir(parents=True, exist_ok=True)
 
         try:
@@ -61,7 +89,7 @@ class VectorDB:
 
         system_logger.info(f"[Vector DB] База данных инициализирована по пути: {self.db_path}")
 
-    async def disconnect(self):
+    async def disconnect(self) -> None:
         """Корректно закрывает базу данных при выключении системы."""
         if self.client:
             self.client = None

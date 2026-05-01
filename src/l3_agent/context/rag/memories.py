@@ -1,3 +1,11 @@
+"""
+Система автоматического семантического поиска воспоминаний (Auto-RAG).
+
+Анализирует входящие сообщения, системные триггеры и текущие мысли агента,
+извлекает из них ключевые векторы и "на лету" делает поиск по Векторной БД.
+Найденные факты и выводы инжектятся прямо в системный промпт (блок RELEVANT INFORMATION).
+"""
+
 import re
 import asyncio
 from typing import Dict, Any, List, TYPE_CHECKING
@@ -23,7 +31,19 @@ class RAGMemories:
         agent_state: "AgentState",
         auto_rag_top_k: int = 5,
         auto_rag_max_query_chars: int = 200,
-    ):
+    ) -> None:
+        """
+        Инициализирует Auto-RAG провайдер.
+
+        Args:
+            vector_knowledge: Контроллер базы знаний (факты).
+            vector_thoughts: Контроллер базы мыслей (логика).
+            telethon_state: Стейт Telegram (для извлечения имен собеседников).
+            agent_state: Состояние агента (для получения текущих мыслей).
+            auto_rag_top_k: Сколько лучших совпадений брать на один запрос.
+            auto_rag_max_query_chars: Лимит символов для одного куска запроса (защита от размытия эмбеддинга).
+        """
+        
         self.vector_knowledge = vector_knowledge
         self.vector_thoughts = vector_thoughts
         self.telethon_state = telethon_state
@@ -35,12 +55,18 @@ class RAGMemories:
         # Глобальный лимит: сколько МАКСИМУМ воспоминаний суммарно отдать в контекст
         self.global_limit = 10
 
-    def _split_into_queries(self, raw_text: str) -> list[str]:
+    def _split_into_queries(self, raw_text: str) -> List[str]:
         """
         Дробит длинный текст на короткие запросы (ориентируясь на предложения),
         чтобы избежать семантического размытия вектора.
-        """
 
+        Args:
+            raw_text: Входящий текст для поиска.
+
+        Returns:
+            Список строковых чанков, оптимизированных для Embedding-модели.
+        """
+        
         text = raw_text.strip()
         if not text:
             return []
@@ -78,11 +104,17 @@ class RAGMemories:
         self,
         payload: Dict[str, Any],
         missed_events: List[Dict[str, Any]],
-        **kwargs,
+        **kwargs: Any,
     ) -> str:
         """
         Мощный RAG поиск по текущим мыслям, действиям и результатам действий агента.
-        Возвращает отформатированный блок RELEVANT INFORMATION, если нашел связанные данные.
+
+        Args:
+            payload: Данные текущего события (сообщения).
+            missed_events: Лог фоновых событий.
+
+        Returns:
+            Отформатированный блок 'RELEVANT INFORMATION' или пустая строка, если ничего не найдено.
         """
 
         raw_queries = set()

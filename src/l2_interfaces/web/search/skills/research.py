@@ -1,3 +1,10 @@
+"""
+Модуль асинхронного OSINT-исследования (Deep Research).
+
+Оркестрирует параллельную работу поисковых движков (Tavily/DDG)
+и парсеров текста (Jina/Trafilatura) для массированного сбора фактов.
+"""
+
 import asyncio
 from typing import List, Any
 
@@ -9,12 +16,11 @@ from src.l2_interfaces.web.search.client import WebSearchClient
 from src.l3_agent.skills.registry import skill, SkillResult
 from src.l3_agent.swarm.roles import Subagents
 
-class DeepResearch:
-    """
-    Навыки для глубокого параллельного ресерча в интернете.
-    """
 
-    def __init__(self, client: WebSearchClient, searcher: Any, reader: Any):
+class DeepResearch:
+    """Навыки для глубокого параллельного ресерча в интернете."""
+
+    def __init__(self, client: WebSearchClient, searcher: Any, reader: Any) -> None:
         self.client = client
         self.searcher = searcher
         self.reader = reader
@@ -22,10 +28,13 @@ class DeepResearch:
     @skill(swarm_roles=[Subagents.WEB_RESEARCHER])
     async def deep_research(self, queries: List[str]) -> SkillResult:
         """
-        Проводит глубокое исследование по списку разных поисковых запросов (рекомендуется от 3 до 10).
-        Параллельно ищет информацию, отсекает дубликаты ссылок и читает текстовое содержимое уникальных веб-страниц.
-        """
+        Массированный параллельный сбор фактов.
+        Принимает массив поисковых запросов, параллельно гуглит их,
+        собирает уникальные ссылки, читает страницы и сшивает это в Markdown-отчет.
 
+        Args:
+            queries: Массив различных поисковых запросов (например: ["Claude 3 API", "Anthropic Claude 3 pricing"]).
+        """
         if not queries:
             return SkillResult.fail("Ошибка: Список запросов пуст.")
 
@@ -35,7 +44,7 @@ class DeepResearch:
         cfg = self.client.deep_research_config
 
         if len(queries) > cfg.max_queries:
-            # Ограничиваем количество параллельных запросов для стабильности DDGS
+            # Ограничиваем количество параллельных запросов для стабильности API
             queries = queries[: cfg.max_queries]
 
         try:

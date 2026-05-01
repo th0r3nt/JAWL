@@ -1,64 +1,89 @@
+"""
+Unit-тесты для ротатора API ключей (APIKeyRotator).
+
+Используют mock времени (patch) для проверки корректности алгоритма
+Round-Robin, временной блокировки ключей (Cooldown) и полного удаления (Ban).
+"""
+
 import pytest
+from unittest.mock import patch
+
 from src.l3_agent.llm.api_keys.rotator import APIKeyRotator
 
-# ===================================================================
-# TESTS
-# ===================================================================
+
+@pytest.fixture
+def mock_keys() -> list[str]:
+    """Фикстура: базовый набор мок-ключей."""
+    return ["key1", "key2", "key3"]
 
 
-def test_rotator_initialization():
-    """Тест: ключи успешно загружаются в ротатор."""
-    keys = ["key_1", "key_2", "key_3"]
-    rotator = APIKeyRotator(keys=keys)
-
-    assert rotator.total_keys() == 3
-    assert rotator.keys[0] == "key_1"
-    assert rotator.keys[2] == "key_3"
-
-
-def test_rotator_round_robin():
-    """Тест: ключи выдаются по кругу."""
-    rotator = APIKeyRotator(keys=["key_1", "key_2"])
-
-    # Первый круг
-    assert rotator.get_next_key() == "key_1"
-    assert rotator.get_next_key() == "key_2"
-
-    # Второй круг (вернулись к началу)
-    assert rotator.get_next_key() == "key_1"
-    assert rotator.get_next_key() == "key_2"
-
-
-def test_rotator_empty_keys_raises_error():
-    """Тест: если список ключей пуст, система должна выбросить ValueError."""
+def test_rotator_init_empty_keys() -> None:
+    """При пустом списке ключей ротатор должен падать при инициализации."""
     with pytest.raises(ValueError, match="LLM API keys not found"):
-        APIKeyRotator(keys=[])
+        APIKeyRotator([])
 
 
-def test_rotator_ban_key():
-    """Тест: мертвый ключ должен удаляться из ротации навсегда."""
-    rotator = APIKeyRotator(keys=["key_1", "key_2"])
+def test_rotator_round_robin(mock_keys: list[str]) -> None:
+    """Ключи должны выдаваться по кругу (Round-Robin)."""
+    rotator = APIKeyRotator(mock_keys)
+
+    assert rotator.get_next_key() == "key1"
+    assert rotator.get_next_key() == "key2"
+    assert rotator.get_next_key() == "key3"
+    assert rotator.get_next_key() == "key1"  # Круг замкнулся
+
+
+@patch("src.l3_agent.llm.api_keys.rotator.time.time")
+def test_rotator_cooldown(mock_time, mock_keys: list[str]) -> None:
+    """
+    Если ключ ушел в кулдаун, ротатор должен переключиться на следующий
+    и вернуть заблокированный только по истечении времени.
+    """
+    mock_time.return_value = 100.0  # Устанавливаем фиктивное время: 100 секунд
+
+    rotator = APIKeyRotator(mock_keys)
+
+    # Берем первый ключ и отправляем его в бан на 60 сек
+    assert rotator.get_next_key() == "key1"
+    rotator.cooldown_key("key1", seconds=60)
+
+    # key1 теперь заблокирован до time=160.0. Следующий должен быть key2
+    assert rotator.get_next_key() == "key2"
+    assert rotator.get_next_key() == "key3"
+
+    # Круг замкнулся. key1 все еще в бане, поэтому ротатор должен пропустить его и выдать key2
+    assert rotator.get_next_key() == "key2"
+
+    # Эмулируем прошествие времени: теперь time=161.0 (кулдаун key1 прошел)
+    mock_time.return_value = 161.0
+
+    # После key2 идет key3, а затем key1 должен снова стать доступен
+    assert rotator.get_next_key() == "key3"
+    assert rotator.get_next_key() == "key1"
+
+
+def test_rotator_ban_key(mock_keys: list[str]) -> None:
+    """Забаненный ключ (например при HTTP 401) должен навсегда удаляться из пула."""
+    rotator = APIKeyRotator(mock_keys)
+
+    rotator.ban_key("key2")
+
     assert rotator.total_keys() == 2
-
-    rotator.ban_key("key_1")
-
-    assert rotator.total_keys() == 1
-    assert rotator.get_next_key() == "key_2"
-    assert rotator.get_next_key() == "key_2"  # Остался только один
+    assert rotator.get_next_key() == "key1"
+    assert rotator.get_next_key() == "key3"
+    assert rotator.get_next_key() == "key1"
 
 
-def test_rotator_cooldown_key():
-    """Тест: Rate Limit должен временно убирать ключ из выдачи."""
-    rotator = APIKeyRotator(keys=["key_1", "key_2"])
+@patch("src.l3_agent.llm.api_keys.rotator.time.time")
+def test_rotator_all_keys_exhausted(mock_time, mock_keys: list[str]) -> None:
+    """Если все ключи ушли в кулдаун, ротатор должен выкинуть RuntimeError."""
+    mock_time.return_value = 100.0
 
-    # Отправляем первый ключ в долгий кулдаун
-    rotator.cooldown_key("key_1", seconds=300)
+    rotator = APIKeyRotator(mock_keys)
 
-    # Теперь ротатор должен возвращать только второй ключ, пропуская первый
-    assert rotator.get_next_key() == "key_2"
-    assert rotator.get_next_key() == "key_2"
+    rotator.cooldown_key("key1", 60)
+    rotator.cooldown_key("key2", 60)
+    rotator.cooldown_key("key3", 60)
 
-    # Если отправим в кулдаун и второй ключ — должна быть выброшена ошибка
-    rotator.cooldown_key("key_2", seconds=30)
-    with pytest.raises(RuntimeError, match="Необходимо подождать"):
+    with pytest.raises(RuntimeError, match="Все API ключи исчерпали лимиты"):
         rotator.get_next_key()

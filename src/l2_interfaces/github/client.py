@@ -1,9 +1,16 @@
+"""
+Низкоуровневый клиент для общения с GitHub REST API.
+
+Автоматически обрабатывает пагинацию, rate limits и управляет режимами авторизации
+(Full Access vs Read-Only). Изолирует сетевую логику от навыков агента.
+"""
+
 import asyncio
 import json
 import urllib.error
 import urllib.parse
 import urllib.request
-from typing import Any, Optional, Union, Literal
+from typing import Any, Optional, Union, Literal, Dict
 
 from src.__init__ import __version__
 
@@ -13,7 +20,9 @@ from src.l0_state.interfaces.state import GithubState
 
 
 class GithubHTTPError(Exception):
-    def __init__(self, status: int, payload: Any):
+    """Кастомное исключение для обработки ошибок GitHub API."""
+
+    def __init__(self, status: int, payload: Any) -> None:
         self.status = status
         self.payload = payload
         msg = payload.get("message") if isinstance(payload, dict) else str(payload)
@@ -23,7 +32,7 @@ class GithubHTTPError(Exception):
 class GithubClient:
     """
     Клиент GitHub REST API.
-    Stateful - хранит стейт, управляет авторизацией.
+    Stateful - хранит стейт, управляет авторизацией и кэшированием.
     """
 
     def __init__(
@@ -31,7 +40,15 @@ class GithubClient:
         state: GithubState,
         config: GithubConfig,
         token: Optional[str] = None,
-    ):
+    ) -> None:
+        """
+        Инициализирует клиент GitHub.
+
+        Args:
+            state: Объект состояния интерфейса на приборной панели агента (L0).
+            config: Конфигурация модуля (лимиты, таймауты).
+            token: Опциональный Personal Access Token для авторизации.
+        """
         self.state = state
         self.config = config
         self.token = token
@@ -41,9 +58,9 @@ class GithubClient:
 
     async def start(self) -> None:
         """
-        Запускается при старте системы. Чекает токен, если нужен аккаунт.
+        Запускается при старте системы.
+        Проверяет валидность токена и определяет доступный режим (Agent Account или Read-Only).
         """
-
         self.state.is_online = True
 
         if self.config.agent_account and self.token:
@@ -66,9 +83,11 @@ class GithubClient:
             system_logger.info("[Github] Инициализирован в Read-Only режиме.")
 
     async def stop(self) -> None:
+        """Останавливает клиент (помечает оффлайн)."""
         self.state.is_online = False
 
-    def _build_headers(self, extra: Optional[dict] = None) -> dict:
+    def _build_headers(self, extra: Optional[Dict[str, str]] = None) -> Dict[str, str]:
+        """Собирает HTTP-заголовки с учетом авторизации."""
         headers = {
             "Accept": "application/vnd.github+json",
             "User-Agent": self.user_agent,
@@ -84,16 +103,30 @@ class GithubClient:
         self,
         method: str,
         path: str,
-        params: Optional[dict] = None,
-        body: Optional[dict] = None,
-        extra_headers: Optional[dict] = None,
+        params: Optional[Dict[str, Any]] = None,
+        body: Optional[Dict[str, Any]] = None,
+        extra_headers: Optional[Dict[str, str]] = None,
         response_format: Literal["json", "text", "binary"] = "json",
     ) -> Union[dict, list, str, bytes, None]:
         """
         Низкоуровневый асинхронный HTTP-запрос к API GitHub.
+
+        Args:
+            method: HTTP метод (GET, POST, PUT, DELETE).
+            path: Эндпоинт API (например '/user/repos').
+            params: Query-параметры запроса.
+            body: Полезная нагрузка (JSON).
+            extra_headers: Дополнительные заголовки.
+            response_format: Ожидаемый формат ответа ('json', 'text', 'binary').
+
+        Returns:
+            Распарсенный ответ от API в зависимости от response_format.
+
+        Raises:
+            GithubHTTPError: Если сервер вернул ошибку (4xx, 5xx).
         """
 
-        def _do_request():
+        def _do_request() -> Union[dict, list, str, bytes, None]:
             url = f"{self.api_base}/{path.lstrip('/')}"
             if params:
                 sep = "&" if "?" in url else "?"
@@ -140,11 +173,10 @@ class GithubClient:
 
         return await asyncio.to_thread(_do_request)
 
-    async def get_context_block(self, **kwargs) -> str:
+    async def get_context_block(self, **kwargs: Any) -> str:
         """
-        Отдает отформатированный блок контекста для агента.
+        Отдает отформатированный блок контекста для системного промпта агента.
         """
-
         if not self.state.is_online:
             return "### GITHUB [OFF]\nИнтерфейс отключен."
 
@@ -158,7 +190,11 @@ class GithubClient:
         watchers_block = ""
         if self.state.tracked_repos:
             repos_list = ", ".join(self.state.tracked_repos.keys())
-            events_str = "\n".join(self.state.recent_watcher_events) if self.state.recent_watcher_events else "  Нет недавних событий."
+            events_str = (
+                "\n".join(self.state.recent_watcher_events)
+                if self.state.recent_watcher_events
+                else "  Нет недавних событий."
+            )
             watchers_block = f"\n\n* Отслеживаемые репозитории: {repos_list}\n* Последние события в репозиториях:\n{events_str}\n"
 
         return (

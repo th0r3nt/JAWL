@@ -1,3 +1,11 @@
+"""
+Навыки саморасширения (Access Level 3: CREATOR).
+
+Уровень бога. Позволяет агенту динамически внедрять собственные Python-скрипты,
+написанные им в песочнице, как нативные инструменты фреймворка (Dynamic Skill Injection).
+Также позволяет рисовать кастомные дашборды.
+"""
+
 from typing import Dict
 
 from src.utils.event.registry import Events
@@ -10,7 +18,7 @@ from src.l3_agent.skills.custom import CustomSkillsRegistry
 class MetaCreator:
     """Уровень 3 (CREATOR). Регистрация скриптов агента как нативных навыков."""
 
-    def __init__(self, meta_client: MetaClient, registry: CustomSkillsRegistry):
+    def __init__(self, meta_client: MetaClient, registry: CustomSkillsRegistry) -> None:
         self.client = meta_client
         self.registry = registry
 
@@ -24,13 +32,15 @@ class MetaCreator:
         parameters_dict: Dict[str, str],
     ) -> SkillResult:
         """
-        [3/CREATOR] Регистрирует астомную функцию из песочницы (sandbox/) как нативный навык.
-        Функция обязана возвращать словарь (JSON).
+        Компилирует прокси-обертку (Proxy) для функции из песочницы и
+        внедряет её в ядро агента как полноправный инструмент.
 
-        - skill_name: Имя кастомного навыка для добавления(напр. 'SocialNetwork.create_post'). Префикс 'Custom.' добавится автоматически.
-        - filepath: Путь к скрипту в sandbox/ (напр. 'sandbox/social_network/api.py').
-        - func_name: Имя вызываемой функции внутри скрипта (Напр. create_post). Рекомендуется написать докстринг для этой функции заранее.
-        - parameters_dict: Словарь аргументов. Ключ - имя аргумента, значение - описание/тип (например: {'title': 'str', 'content': 'str = None'}).
+        Args:
+            skill_name: Желаемое имя для вызова (префикс 'Custom.' добавится системой).
+            description: Инструкция, объясняющая, зачем вызывать эту функцию.
+            filepath: Относительный путь к скрипту в 'sandbox/'.
+            func_name: Имя целевой функции внутри скрипта.
+            parameters_dict: JSON-схема аргументов (например, `{"limit": "int = 10"}`).
         """
         success, result_or_err = self.registry.register_skill(
             skill_name, description, filepath, func_name, parameters_dict
@@ -38,16 +48,18 @@ class MetaCreator:
 
         if success:
             return SkillResult.ok(
-                f"Кастомный навык '{result_or_err}' успешно зарегистрирован и теперь доступен для вызов."
+                f"Кастомный навык '{result_or_err}' успешно зарегистрирован и теперь доступен для вызова."
             )
         return SkillResult.fail(f"Ошибка регистрации навыка: {result_or_err}")
 
     @skill()
     async def remove_custom_skill(self, skill_name: str) -> SkillResult:
         """
-        [3/CREATOR] Удаляет созданный ранее кастомный навык по его полному имени (включая 'Custom.').
-        """
+        Удаляет созданный ранее кастомный навык по его полному имени.
 
+        Args:
+            skill_name: Имя навыка (включая 'Custom.').
+        """
         success, err = self.registry.unregister_skill(skill_name)
 
         if success:
@@ -57,7 +69,7 @@ class MetaCreator:
     @skill()
     async def get_custom_skills(self) -> SkillResult:
         """
-        [3/CREATOR] Возвращает список всех зарегистрированных кастомных навыков и их маппинг.
+        Возвращает список всех зарегистрированных кастомных навыков и их маппинг.
         """
         skills = self.registry.get_all_skills()
         if not skills:
@@ -73,12 +85,14 @@ class MetaCreator:
         return SkillResult.ok("\n".join(lines))
 
     @skill()
-    # TODO: добавить декоратор requered_access для Meta?
     async def set_dashboard_block(self, name: str, markdown_content: str) -> SkillResult:
         """
-        [3/CREATOR] Вручную создает или обновляет кастомный блок в системном контексте.
-        Удобно для создания собственных "приборных панелей", чтобы информация всегда была в контексте. 
-        Например: отслеживание цен, кастомных метрик и статусов.
+        Инжектит статический Markdown-блок прямо в приборную панель (L0 State).
+        Используется для создания кастомных "мониторов" (цены, статусы серверов, ToDo-листы).
+
+        Args:
+            name: Уникальный заголовок дашборда.
+            markdown_content: Содержимое блока (будет отрисовано в системном промпте).
         """
         await self.client.bus.publish(
             Events.SYSTEM_DASHBOARD_UPDATE, name=name, content=markdown_content
@@ -88,7 +102,10 @@ class MetaCreator:
     @skill()
     async def remove_dashboard_block(self, name: str) -> SkillResult:
         """
-        [3/CREATOR] Удаляет кастомный блок из системного контекста (полностью очищая его содержимое).
+        Удаляет кастомный блок из системного контекста (полностью очищая его содержимое).
+
+        Args:
+            name: Заголовок удаляемого дашборда.
         """
         await self.client.bus.publish(Events.SYSTEM_DASHBOARD_UPDATE, name=name, content="")
         return SkillResult.ok(f"Дашборд '{name}' удален.")

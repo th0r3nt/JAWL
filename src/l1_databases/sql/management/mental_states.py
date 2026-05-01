@@ -1,5 +1,12 @@
+"""
+CRUD-контроллер таблицы Mental States (Состояния сущностей).
+
+Аналог персональной CRM-системы для агента: позволяет отслеживать статусы
+внешних субъектов (люди/агенты) и объектов (серверы/проекты/процессы).
+"""
+
 import uuid
-from typing import Optional, TYPE_CHECKING, Literal
+from typing import Optional, TYPE_CHECKING, Literal, Any
 from datetime import datetime, timezone
 from sqlalchemy import select, delete, func
 
@@ -14,10 +21,18 @@ if TYPE_CHECKING:
 from src.l3_agent.skills.registry import skill, SkillResult
 from src.l3_agent.swarm.roles import Subagents
 
+
 class SQLMentalStates:
     """CRUD для управления таблицей MentalState (состояния сущностей)."""
 
-    def __init__(self, db: "SQLDB", max_entities: int = 10):
+    def __init__(self, db: "SQLDB", max_entities: int = 10) -> None:
+        """
+        Инициализирует контроллер состояний.
+
+        Args:
+            db: Подключение к SQLite.
+            max_entities: Максимальное количество хранимых сущностей в памяти.
+        """
         self.db = db
         self.max_entities = max_entities
 
@@ -33,8 +48,16 @@ class SQLMentalStates:
         related_information: Optional[str] = None,
     ) -> SkillResult:
         """
-        Создает новую запись в MentalState (отслеживание сущности).
-        related_information: связанная информация. Например: аккаунты/email/репозитории субъекта в разных сетях и подобное.
+        Регистрирует новую сущность для отслеживания.
+
+        Args:
+            name: Название объекта или имя субъекта.
+            tier: Уровень важности.
+            category: Классификатор (subject - одушевленное, object - неодушевленное).
+            description: Базовое описание того, что это такое.
+            status: Текущее состояние (например, 'Спит', 'Упал', 'В ожидании').
+            context: Локальные рабочие заметки.
+            related_information: Статичные метаданные (ссылки, порты, контакты).
         """
 
         if tier not in ("high", "medium", "low", "background"):
@@ -72,7 +95,9 @@ class SQLMentalStates:
 
     @skill(swarm_roles=[Subagents.ARCHIVIST])
     async def get_mental_states(self) -> SkillResult:
-        """Возвращает список всех текущих отслеживаемых сущностей (MentalState)."""
+        """
+        Возвращает список всех зарегистрированных сущностей и их текущих статусов.
+        """
 
         async with self.db.session_factory() as session:
             result = await session.execute(select(MentalStateTable))
@@ -122,7 +147,18 @@ class SQLMentalStates:
         context: Optional[str] = None,
         related_information: Optional[str] = None,
     ) -> SkillResult:
-        """Обновляет текущее состояние сущности в MentalState по её ID."""
+        """
+        Обновляет отдельные поля отслеживаемой сущности.
+
+        Args:
+            state_id: Уникальный ID сущности.
+            tier: Обновленный уровень важности.
+            category: Обновленная категория.
+            description: Обновленное описание.
+            status: Обновленный статус (например 'Проблема решена').
+            context: Обновленный контекст.
+            related_information: Обновленная связанная информация.
+        """
 
         if tier and tier not in ("high", "medium", "low", "background"):
             return SkillResult.fail(
@@ -163,7 +199,12 @@ class SQLMentalStates:
 
     @skill(swarm_roles=[Subagents.ARCHIVIST])
     async def delete_mental_state(self, state_id: str) -> SkillResult:
-        """Удаляет сущность из MentalState, если о ней больше не нужно помнить."""
+        """
+        Удаляет сущность из БД, если о ней больше не нужно помнить.
+
+        Args:
+            state_id: ID удаляемой сущности.
+        """
 
         async with self.db.session_factory() as session:
             result = await session.execute(
@@ -178,7 +219,7 @@ class SQLMentalStates:
         system_logger.debug(f"[SQL DB] {msg}")
         return SkillResult.ok(msg)
 
-    async def get_context_block(self, **kwargs) -> str:
+    async def get_context_block(self, **kwargs: Any) -> str:
         """
         Провайдер контекста для ContextRegistry.
         Отдает отформатированный блок для контекста агента.

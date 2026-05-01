@@ -1,3 +1,10 @@
+"""
+Инициализатор интерфейса самомодификации (Meta).
+
+Отвечает за регистрацию навыков управления конфигурацией агента (динамическое изменение YAML).
+В зависимости от уровня доступа (Access Level 0-3), ограничивает выдаваемые агенту возможности.
+"""
+
 from typing import List, Any, TYPE_CHECKING
 from src.utils.logger import system_logger
 from src.l2_interfaces.meta.client import MetaClient
@@ -16,6 +23,15 @@ if TYPE_CHECKING:
 
 
 def setup_meta(system: "System") -> List[Any]:
+    """
+    Инициализирует интерфейс Meta.
+
+    Args:
+        system (System): Главный DI-контейнер фреймворка.
+
+    Returns:
+        List[Any]: Пустой список (Meta-интерфейс не требует фоновых поллеров).
+    """
     settings_path = system.root_dir / "config" / "settings.yaml"
     interfaces_path = system.root_dir / "config" / "interfaces.yaml"
 
@@ -34,11 +50,10 @@ def setup_meta(system: "System") -> List[Any]:
     # L3 Registry для кастомных навыков
     custom_registry = CustomSkillsRegistry(system.local_data_dir)
 
-    # Загружаем кастомные навыки только если тумблер включен
     if meta_config.custom_skills_enabled:
         custom_registry.load_and_register_all()
 
-    # Динамическая регистрация встроенных навыков
+    # Динамическая регистрация встроенных навыков согласно уровню доступа (RBAC)
     register_instance(MetaSafe(client))
 
     if meta_config.access_level >= 1:
@@ -53,7 +68,7 @@ def setup_meta(system: "System") -> List[Any]:
             register_instance(MetaCreator(client, custom_registry))
         else:
             system_logger.info(
-                "[Meta] Access Level 3 (CREATOR) активен, но кастомные навыки отключены в settings.yaml (custom_skills_enabled=false)."
+                "[Meta] Access Level 3 (CREATOR) активен, но кастомные навыки отключены в settings.yaml."
             )
 
     system.context_registry.register_provider(

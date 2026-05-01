@@ -1,3 +1,8 @@
+"""
+Навыки агента для безопасного переписывания системных файлов JAWL.
+Доступны только начиная с уровня OPERATOR (2).
+"""
+
 from src.l2_interfaces.host.os.client import HostOSClient, HostOSAccessLevel
 from src.l2_interfaces.host.os.decorators import require_access
 from src.l3_agent.skills.registry import SkillResult, skill
@@ -13,10 +18,14 @@ class HostOSDeploy:
     @require_access(HostOSAccessLevel.OPERATOR)
     async def start_deploy_session(self, reason: str) -> SkillResult:
         """
-        Открывает деплой-сессию.
-        Необходимо для получения прав на изменение исходного кода файлов в папке src/.
-        Сохраняет бекапы изменяемых файлов (Copy-on-Write).
+        Открывает деплой-сессию (режим самомодификации).
+        Необходимо вызывать перед любыми попытками изменить исходный код в директории src/.
+        Система начнет делать прозрачные бэкапы изменяемых файлов (Copy-on-Write).
+
+        Args:
+            reason: Обоснование изменения.
         """
+
         if not self.host_os.config.require_deploy_sessions:
             return SkillResult.ok(
                 "Деплой-сессии отключены в конфигурации. Возможность изменения кода напрямую по умолчанию включена."
@@ -33,6 +42,7 @@ class HostOSDeploy:
         Если тесты падают - код не откатывается, но дается попытки на исправление.
         При исчерпании попыток происходит автоматический Rollback.
         """
+
         success, msg = await self.host_os.deploy_manager.commit_session()
         return SkillResult.ok(msg) if success else SkillResult.fail(msg)
 

@@ -1,3 +1,11 @@
+"""
+Сборщик статической части системного промпта.
+
+Отвечает за конкатенацию разрозненных Markdown-файлов (характер, инструкции, примеры)
+в единый статичный System Prompt. Динамический контекст (память, время, логи)
+добавляется отдельно в модуле 'context/builder.py'.
+"""
+
 from pathlib import Path
 from typing import Literal
 
@@ -5,7 +13,7 @@ from typing import Literal
 class PromptBuilder:
     """
     Отвечает за сборку статической части промпта (Характер + Инструкции + Скиллы).
-    Динамический контекст (память, время, логи) добавляется отдельно в context/builder.py.
+    Динамически фильтрует системные инструкции в зависимости от включенных модулей (YAML).
     """
 
     def __init__(
@@ -16,7 +24,19 @@ class PromptBuilder:
         traits_enabled: bool = False,
         mental_states_enabled: bool = False,
         swarm_enabled: bool = False,
-    ):
+    ) -> None:
+        """
+        Инициализирует билдер.
+
+        Args:
+            prompt_dir: Абсолютный путь к директории 'prompt'.
+            drives_enabled: Включен ли модуль внутренних мотиваторов.
+            tasks_enabled: Включен ли модуль долгосрочных задач.
+            traits_enabled: Включен ли модуль черт характера.
+            mental_states_enabled: Включен ли модуль сущностей.
+            swarm_enabled: Включена ли система субагентов.
+        """
+        
         self.prompt_dir = Path(prompt_dir)
 
         # Убеждаемся, что системные папки существуют
@@ -32,7 +52,16 @@ class PromptBuilder:
     def _gather_markdown(self, sub_folder: Literal["personality", "system", "custom"]) -> str:
         """
         Рекурсивно ищет, читает и склеивает все .md файлы в указанной подпапке.
-        Игнорирует примеры (.example.md).
+        Игнорирует примеры (.example.md) и отключает инструкции для выключенных модулей.
+
+        Args:
+            sub_folder: Имя целевой поддиректории.
+
+        Returns:
+            Конкатенированная строка содержимого всех валидных Markdown файлов.
+
+        Raises:
+            RuntimeError: Если файл промпта невозможно прочитать.
         """
 
         target_dir = self.prompt_dir / sub_folder
@@ -85,7 +114,12 @@ class PromptBuilder:
     def build(self) -> str:
         """
         Собирает итоговый системный промпт.
-        Порядок важен: Характер -> Кастомные промпты агента -> Инструкции.
+
+        Порядок блоков строго регламентирован:
+        Характер (Personality) -> Кастомные промпты агента (Custom) -> Инструкции (System).
+
+        Returns:
+            Итоговая строка статического промпта для LLM.
         """
 
         personality = self._gather_markdown("personality")

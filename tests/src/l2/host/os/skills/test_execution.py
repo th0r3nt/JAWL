@@ -2,7 +2,6 @@ import pytest
 from unittest.mock import patch
 from src.l2_interfaces.host.os.client import HostOSAccessLevel
 from src.l2_interfaces.host.os.skills.execution import HostOSExecution
-from src.l2_interfaces.host.os.skills.system import HostOSSystem
 
 from src.l2_interfaces.host.os.decorators import require_access
 from src.l3_agent.skills.registry import SkillResult
@@ -45,18 +44,6 @@ async def test_execution_kill_process_not_found(mock_process, os_client):
     res = await executor.kill_process(pid=99999)
     assert res.is_success is False
     assert "не найден" in res.message
-
-
-@pytest.mark.asyncio
-async def test_get_telemetry(os_client):
-    """Тест: получение телеметрии ОС."""
-    sys_skill = HostOSSystem(os_client)
-    res = await sys_skill.get_telemetry()
-
-    assert res.is_success is True
-    assert "CPU" in res.message
-    assert "RAM" in res.message
-    assert "Uptime" in res.message
 
 
 @pytest.mark.asyncio

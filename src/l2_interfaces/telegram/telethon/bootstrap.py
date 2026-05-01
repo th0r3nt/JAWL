@@ -1,4 +1,9 @@
-from typing import List, Any, TYPE_CHECKING
+"""
+Инициализатор модуля Telegram Telethon (User API).
+Связывает клиент, воркер событий и 7 массивов навыков в единый узел для DI-контейнера.
+"""
+
+from typing import List, Any, TYPE_CHECKING, Optional
 
 from src.utils.logger import system_logger
 
@@ -20,9 +25,21 @@ if TYPE_CHECKING:
     from src.main import System
 
 
-def setup_telethon(system: "System", api_id: str | None, api_hash: str | None) -> List[Any]:
-    """Инициализирует Telethon, регистрирует скиллы и возвращает компоненты жизненного цикла."""
+def setup_telethon(
+    system: "System", api_id: Optional[str], api_hash: Optional[str]
+) -> List[Any]:
+    """
+    Инициализирует интерфейс Telethon, настраивает локальную сессию и регистрирует навыки.
 
+    Args:
+        system (System): Главный DI-контейнер системы.
+        api_id (Optional[str]): TELETHON_API_ID из конфигурации.
+        api_hash (Optional[str]): TELETHON_API_HASH из конфигурации.
+
+    Returns:
+        List[Any]: Компоненты с жизненным циклом (client, events).
+    """
+    
     if not api_id or not api_hash:
         system_logger.error(
             "[Telegram Telethon] TELETHON_API_ID или TELETHON_API_HASH не найдены в .env. Интерфейс отключен."
@@ -30,7 +47,9 @@ def setup_telethon(system: "System", api_id: str | None, api_hash: str | None) -
         return []
 
     config = system.interfaces_config.telegram.telethon
-    session_path = str(system.local_data_dir / "interfaces" / "telegram" / "telethon" / config.session_name)
+    session_path = str(
+        system.local_data_dir / "interfaces" / "telegram" / "telethon" / config.session_name
+    )
 
     # Приводим api_id к числу, как того требует Telethon
     clean_api_id = int(api_id) if str(api_id).isdigit() else api_id
@@ -43,13 +62,13 @@ def setup_telethon(system: "System", api_id: str | None, api_hash: str | None) -
         timezone=system.settings.system.timezone,
     )
     events = TelethonEvents(
-        tg_client=client, 
-        state=system.telethon_state, 
+        tg_client=client,
+        state=system.telethon_state,
         event_bus=system.event_bus,
         config=config,
     )
 
-    # Регистрация навыков для агента
+    # Регистрация обширного арсенала навыков для агента
     register_instance(TelethonAccount(client))
     register_instance(TelethonChats(client))
     register_instance(TelethonMessages(client))
@@ -58,7 +77,7 @@ def setup_telethon(system: "System", api_id: str | None, api_hash: str | None) -
     register_instance(TelethonReactions(client))
     register_instance(TelethonAdmin(client))
 
-    # Регистрация провайдеров контекста (отдают Markdown блоки в промпт агента)
+    # Регистрация провайдеров контекста
     system.context_registry.register_provider(
         name="telethon",
         provider_func=client.get_context_block,
@@ -66,6 +85,4 @@ def setup_telethon(system: "System", api_id: str | None, api_hash: str | None) -
     )
 
     system_logger.info("[Telegram Telethon] Интерфейс загружен.")
-
-    # Возвращаем то, что нужно запустить в главном цикле
     return [client, events]

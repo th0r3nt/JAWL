@@ -1,4 +1,11 @@
-from typing import List, Any, TYPE_CHECKING
+"""
+Инициализатор интерфейса GitHub.
+
+Оркестрирует создание REST API клиента, регистрацию навыков управления кодом (Issues, PRs, Git)
+и запуск фонового мониторинга отслеживаемых репозиториев (Watchers).
+"""
+
+from typing import List, Any, TYPE_CHECKING, Optional
 
 from src.utils.logger import system_logger
 
@@ -18,9 +25,17 @@ if TYPE_CHECKING:
     from src.main import System
 
 
-def setup_github(system: "System", token: str | None) -> List[Any]:
-    """Инициализирует интерфейс GitHub."""
+def setup_github(system: "System", token: Optional[str]) -> List[Any]:
+    """
+    Инициализирует интерфейс GitHub.
 
+    Args:
+        system (System): Главный DI-контейнер фреймворка.
+        token (Optional[str]): Personal Access Token (PAT) из .env.
+
+    Returns:
+        List[Any]: Компоненты жизненного цикла (client, events).
+    """
     config = system.interfaces_config.github
     client = GithubClient(
         state=system.github_state,
@@ -52,5 +67,4 @@ def setup_github(system: "System", token: str | None) -> List[Any]:
     )
     system_logger.info("[Github] Интерфейс загружен.")
 
-    # Возвращаем events, так как у него есть методы start() и stop()
     return [client, events]

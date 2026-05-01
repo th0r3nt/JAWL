@@ -1,3 +1,10 @@
+"""
+Инициализатор интерфейса Web Browser (Playwright).
+
+Оркестрирует запуск headless-браузера, регистрацию навыков навигации/парсинга
+и поднятие фонового Watchdog-а для защиты ОЗУ от утечек (авто-закрытие простаивающих сессий).
+"""
+
 from typing import List, Any, TYPE_CHECKING
 from src.utils.logger import system_logger
 
@@ -16,7 +23,15 @@ if TYPE_CHECKING:
 
 
 def setup_web_browser(system: "System") -> List[Any]:
-    """Инициализирует интерфейс полноценного браузера."""
+    """
+    Инициализирует интерфейс полноценного браузера.
+
+    Args:
+        system (System): Главный DI-контейнер фреймворка.
+
+    Returns:
+        List[Any]: Компоненты жизненного цикла (client, events).
+    """
     config = system.interfaces_config.web.browser
 
     if not hasattr(system, "web_browser_state"):
@@ -30,7 +45,7 @@ def setup_web_browser(system: "System") -> List[Any]:
 
     events = WebBrowserEvents(client=client)
 
-    # Регистрируем навыки
+    # Регистрируем навыки (навигация, клики, скролл, скриншоты)
     register_instance(BrowserNavigation(client))
     register_instance(BrowserInteraction(client))
     register_instance(BrowserExtraction(client))

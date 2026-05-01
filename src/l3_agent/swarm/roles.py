@@ -1,15 +1,28 @@
+"""
+Реестр ролей субагентов (RBAC).
+
+Хранит статические описания всех доступных в системе профессий субагентов.
+Определяет их идентификаторы, названия и файлы системных промптов.
+"""
+
+from typing import List, Optional
 from pydantic import BaseModel
 
 
 class SubagentRole(BaseModel):
+    """Модель описания роли субагента."""
+
     id: str  # Уникальный ID для вызова LLM
     name: str  # Человекочитаемое имя
-    description: str  # Инструкция для главного агента (зачем его вызывать)
+    description: str  # Инструкция для главного агента (зачем вызывать эту роль)
     prompt_file: str  # Имя файла с промптом в папке roles/
 
 
 class Subagents:
-    """Реестр всех доступных ролей субагентов в системе."""
+    """
+    Реестр всех доступных ролей субагентов в системе.
+    Определяет специализацию и доступы каждого типа работника.
+    """
 
     CODER = SubagentRole(
         id="coder",
@@ -39,13 +52,20 @@ class Subagents:
         prompt_file="QA_ENGINEER.md",
     )
 
+    SYSADMIN = SubagentRole(
+        id="sysadmin",
+        name="System Administrator",
+        description="Вызывать для установки зависимостей (pip/npm), выполнения сырых shell-команд, мониторинга ОС (RAM/CPU), управления процессами и работы с сетью.",
+        prompt_file="SYSADMIN.md",
+    )
+
     @classmethod
-    def all(cls) -> list[SubagentRole]:
+    def all(cls) -> List[SubagentRole]:
         """Возвращает список всех зарегистрированных ролей."""
         return [v for k, v in vars(cls).items() if isinstance(v, SubagentRole)]
 
     @classmethod
-    def get_by_id(cls, role_id: str) -> SubagentRole | None:
+    def get_by_id(cls, role_id: str) -> Optional[SubagentRole]:
         """Поиск роли по строковому ID (который передает LLM)."""
         for role in cls.all():
             if role.id == role_id:

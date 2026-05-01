@@ -1,3 +1,10 @@
+"""
+CRUD-контроллер долгосрочных задач (Tasks).
+
+Обеспечивает декомпозицию глобальных целей на подзадачи с сохранением контекста
+и обработкой блокирующих зависимостей (Dependencies).
+"""
+
 import uuid
 import ast
 from datetime import datetime
@@ -36,15 +43,34 @@ STATUS_EMOJIS = {
 
 
 class SQLTasks:
-    """CRUD для управления долгосрочными задачами агента (Tasks v2)."""
+    """CRUD для управления долгосрочными задачами агента."""
 
-    def __init__(self, db: "SQLDB", max_tasks: int = 15, tz_offset: int = 0):
+    def __init__(self, db: "SQLDB", max_tasks: int = 15, tz_offset: int = 0) -> None:
+        """
+        Инициализирует контроллер задач.
+
+        Args:
+            db: Подключение к SQLite.
+            max_tasks: Максимальное количество активных задач в памяти.
+            tz_offset: Смещение временной зоны.
+        """
         self.db = db
         self.max_tasks = max_tasks
         self.tz_offset = tz_offset
 
     def _validate_tags(self, tags: Any) -> tuple[bool, str, list[str]]:
-        """Броня для тегов: конвертирует строку в список и фильтрует мусор."""
+        """
+        Защитный парсер тегов.
+        Нивелирует галлюцинации LLM, если модель передает теги не массивом, а строкой,
+        и жестко фильтрует недопустимые значения против ALLOWED_TAGS.
+
+        Args:
+            tags (Any): Сырые данные от LLM (ожидается list[str], но может прийти str).
+
+        Returns:
+            tuple: (Успех валидации, Текст ошибки, Очищенный список тегов).
+        """
+
         if not tags:
             return True, "", []
 
@@ -82,6 +108,18 @@ class SQLTasks:
         subtasks: Optional[list[dict[str, Any]]] = None,
         due_date_str: Optional[str] = None,
     ) -> SkillResult:
+        """
+        Создает новую долгосрочную задачу.
+
+        Args:
+            title: Краткий заголовок.
+            description: Детальное описание того, что нужно сделать.
+            tags: Массив тегов из списка разрешенных (domain/priority/type).
+            dependencies: Массив ID задач, без которых текущая не может быть выполнена.
+            subtasks: Чек-лист внутренних микрозадач.
+            due_date_str: Дедлайн в формате 'YYYY-MM-DD HH:MM'.
+        """
+
         task_id = str(uuid.uuid4())[:8]
         if tags is None:
             tags = []
@@ -146,6 +184,13 @@ class SQLTasks:
         due_date_str: Optional[str] = None,
         context: Optional[str] = None,
     ) -> SkillResult:
+        """
+        Обновляет отдельные параметры существующей задачи.
+
+        Args:
+            task_id: ID редактируемой задачи.
+            title, description, status, progress, tags, dependencies, subtasks, due_date_str, context: Обновляемые поля.
+        """
         if status and status not in STATUS_EMOJIS.keys():
             return SkillResult.fail(
                 f"Недопустимый статус. Варианты: {', '.join(STATUS_EMOJIS.keys())}"
@@ -209,6 +254,13 @@ class SQLTasks:
 
     @skill()
     async def delete_task(self, task_id: str) -> SkillResult:
+        """
+        Безвозвратно удаляет задачу из БД. Рекомендуется вызывать для выполненных
+        или отмененных задач в целях экономии памяти контекста.
+
+        Args:
+            task_id: ID удаляемой задачи.
+        """
         async with self.db.session_factory() as session:
             result = await session.execute(delete(TaskTable).where(TaskTable.id == task_id))
             await session.commit()
@@ -219,7 +271,11 @@ class SQLTasks:
         system_logger.debug(f"[SQL DB] {msg}")
         return SkillResult.ok(msg)
 
-    async def get_context_block(self, **kwargs) -> str:
+    async def get_context_block(self, **kwargs: Any) -> str:
+        """
+        Формирует блок активных задач для системного промпта.
+        Отслеживает зависимости, подсвечивая заблокированные задачи.
+        """
         async with self.db.session_factory() as session:
             result = await session.execute(select(TaskTable))
             tasks = result.scalars().all()

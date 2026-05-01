@@ -1,3 +1,7 @@
+"""
+Навыки агента для прямой коммуникации с оператором через консоль хост-машины.
+"""
+
 from src.l2_interfaces.host.terminal.client import HostTerminalClient
 from src.l3_agent.skills.registry import SkillResult, skill
 
@@ -9,8 +13,13 @@ class HostTerminalMessages:
     @skill()
     async def send_message_to_terminal(self, text: str) -> SkillResult:
         """
-        Отправляет текстовое сообщение в локальный терминал на хост-машине.
+        Отправляет текстовое сообщение на экран локального терминала (если он открыт).
+        Поддерживает Markdown-разметку.
+
+        Args:
+            text: Текст ответа или уведомления.
         """
+
         try:
             await self.client.broadcast_message(text)
             return SkillResult.ok("Сообщение успешно отправлено в терминал.")

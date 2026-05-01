@@ -1,3 +1,8 @@
+"""
+Навыки для чтения Atom/RSS новостных лент.
+Позволяют агенту извлекать чистый контент (Summary/Description) без перехода на оригинальные сайты.
+"""
+
 from src.utils.logger import system_logger
 from src.utils._tools import truncate_text, clean_html
 from src.l3_agent.skills.registry import skill, SkillResult
@@ -11,7 +16,7 @@ class WebRSSSkills:
         self.client = client
 
     @skill()
-    async def list_rss_feeds(self) -> SkillResult:
+    async def list_feeds(self) -> SkillResult:
         """
         Возвращает список сохраненных (отслеживаемых) RSS-лент.
         """
@@ -25,11 +30,15 @@ class WebRSSSkills:
         return SkillResult.ok("\n".join(lines))
 
     @skill()
-    async def read_rss_feed(self, url: str, limit: int = 5) -> SkillResult:
+    async def read_feed(self, url: str, limit: int = 5) -> SkillResult:
         """
-        Скачивает и читает последние новости из указанной RSS/Atom ленты по её URL.
+        Скачивает XML-ленту, парсит записи и вырезает HTML-мусор из описаний.
+
+        Args:
+            url: Прямая ссылка на RSS/Atom файл.
+            limit: Максимальное количество последних постов для чтения.
         """
-        
+
         try:
             feed = await self.client.fetch_feed(url)
 

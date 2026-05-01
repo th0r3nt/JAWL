@@ -1,3 +1,11 @@
+"""
+Асинхронный клиент для взаимодействия с LLM (OpenAI API совместимый).
+
+Модуль инкапсулирует логику управления HTTP-сессиями и отвечает за бесшовную
+интеграцию с любыми провайдерами, поддерживающими стандарт OpenAI
+(OpenRouter, Gemini, Anthropic, локальные VLLM и т.д.).
+"""
+
 from openai import AsyncOpenAI
 
 from src.utils.logger import system_logger
@@ -10,7 +18,15 @@ class LLMClient:
     Включает автоматическую ротацию ключей и кэширование HTTP-сессий.
     """
 
-    def __init__(self, api_url: str, api_keys_rotator: APIKeyRotator):
+    def __init__(self, api_url: str, api_keys_rotator: APIKeyRotator) -> None:
+        """
+        Инициализирует клиент.
+
+        Args:
+            api_url: Базовый URL для OpenAI API.
+            api_keys_rotator: Менеджер API ключей (ротатор).
+        """
+        
         self.api_url = api_url
         self.rotator = api_keys_rotator
 
@@ -31,8 +47,15 @@ class LLMClient:
 
     def get_session(self) -> AsyncOpenAI:
         """
-        Возвращает закэшированную сессию OpenAI с актуальным ключом.
+        Возвращает закэшированную сессию OpenAI с актуальным "живым" ключом.
+
+        Returns:
+            Экземпляр AsyncOpenAI, готовый к вызову.
+
+        Raises:
+            RuntimeError: Если все API ключи исчерпаны или забанены.
         """
+
         api_key = self.rotator.get_next_key()
 
         if not api_key:
@@ -45,7 +68,11 @@ class LLMClient:
         return self._sessions[api_key]
 
     async def close(self) -> None:
-        """Корректно закрывает все активные пулы HTTP-соединений."""
+        """
+        Корректно закрывает все активные пулы HTTP-соединений.
+        Вызывается при остановке системы (Graceful Shutdown).
+        """
+
         for session in self._sessions.values():
             await session.close()
 

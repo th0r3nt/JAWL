@@ -1,3 +1,9 @@
+"""
+Навыки CRUD для управления файлами и директориями.
+Включает механизмы массового чтения, точечного патчинга кода и управления 
+виртуальным "рабочим пространством" (Workspace) в системном промпте агента.
+"""
+
 import ast
 from pathlib import Path
 from typing import Literal
@@ -27,14 +33,16 @@ class HostOSFiles:
     # ЧТЕНИЕ ФАЙЛОВ
     # =================================================================================
 
-    @skill(swarm_roles=[Subagents.CODER, Subagents.QA_ENGINEER])
+    @skill(swarm_roles=[Subagents.CODER, Subagents.QA_ENGINEER, Subagents.SYSADMIN])
     @require_access(HostOSAccessLevel.SANDBOX)
     async def read_file(
         self, filepath: str, read_from: Literal["head", "tail"] = "head"
     ) -> SkillResult:
         """
         Читает содержимое файла. Имеет встроенную защиту от огромных файлов.
-        read_from: 'head' (с начала) или 'tail' (с конца, полезно для логов).
+
+        Args:
+            read_from: 'head' - с начала, 'tail' - с конца.
         """
         max_chars = self.host_os.config.file_read_max_chars
 
@@ -96,15 +104,17 @@ class HostOSFiles:
         except Exception as e:
             return SkillResult.fail(f"Ошибка при чтении файла: {e}")
 
-    @skill(swarm_roles=[Subagents.CODER, Subagents.QA_ENGINEER])
+    @skill(swarm_roles=[Subagents.CODER, Subagents.QA_ENGINEER, Subagents.SYSADMIN])
     @require_access(HostOSAccessLevel.SANDBOX)
     async def read_files_in_directory(
         self, path: str = ".", max_files: int = 10, recursive: bool = False
     ) -> SkillResult:
         """
         Читает текстовое содержимое сразу нескольких файлов в директории.
-        recursive: Если True, прочитает файлы и во всех вложенных папках.
         Пропускает бинарные файлы.
+
+        Args:
+            recursive: Если True, прочитает файлы и во всех вложенных папках.
         """
 
         try:
@@ -213,7 +223,7 @@ class HostOSFiles:
     # РЕДАКТИРОВАНИЕ ФАЙЛОВ
     # =================================================================================
 
-    @skill(swarm_roles=[Subagents.CODER, Subagents.QA_ENGINEER])
+    @skill(swarm_roles=[Subagents.CODER, Subagents.QA_ENGINEER, Subagents.SYSADMIN])
     @require_access(HostOSAccessLevel.SANDBOX)
     async def write_file(
         self, filepath: str, content: str, description: str = None
@@ -222,9 +232,9 @@ class HostOSFiles:
         Создает новый файл или полностью перезаписывает существующий.
 
         Если передан 'description', к файлу сразу будет привязано текстовое описание.
-        description: советуется писать полезную информацию. Например, "в файле есть функция X, которая делает Y, принимает на вход аргумент Z и T, возвращает W".
 
-        В будущем это поможет искать нужные функции намного быстрее.
+        Args:
+            description: советуется писать полезную информацию. В будущем это поможет искать нужные функции намного быстрее.
         """
 
         try:
@@ -258,10 +268,11 @@ class HostOSFiles:
 
         except PermissionError as e:
             return SkillResult.fail(str(e))
+        
         except Exception as e:
             return SkillResult.fail(f"Ошибка при перезаписи файла: {e}")
 
-    @skill(swarm_roles=[Subagents.CODER, Subagents.QA_ENGINEER])
+    @skill(swarm_roles=[Subagents.CODER, Subagents.QA_ENGINEER, Subagents.SYSADMIN])
     @require_access(HostOSAccessLevel.SANDBOX)
     async def append_to_file(self, filepath: str, content: str) -> SkillResult:
         """
@@ -302,7 +313,7 @@ class HostOSFiles:
         except Exception as e:
             return SkillResult.fail(f"Ошибка при добавлении в файл: {e}")
 
-    @skill(swarm_roles=[Subagents.CODER, Subagents.QA_ENGINEER])
+    @skill(swarm_roles=[Subagents.CODER, Subagents.QA_ENGINEER, Subagents.SYSADMIN])
     @require_access(HostOSAccessLevel.SANDBOX)
     async def delete_lines_matching(
         self, filepath: str, match_string: str, exact_match: bool = False
@@ -356,16 +367,21 @@ class HostOSFiles:
         except Exception as e:
             return SkillResult.fail(f"Ошибка при удалении строк: {e}")
 
-    @skill(swarm_roles=[Subagents.CODER, Subagents.QA_ENGINEER])
+    @skill(swarm_roles=[Subagents.CODER, Subagents.QA_ENGINEER, Subagents.SYSADMIN])
     @require_access(HostOSAccessLevel.SANDBOX)
     async def patch_file(
         self, filepath: str, search_block: str, replace_block: str
     ) -> SkillResult:
         """
-        Точечно заменяет один кусок кода на другой в существующем файле (Search & Replace).
-        Важно: search_block должен идеально совпадать с тем, что есть в файле.
-        Включая все пробелы, отступы и переносы строк.
+        Точечная модификация файла. 
+        Экономит токены и снижает риск повреждения большого файла при полной перезаписи.
+
+        Args:
+            filepath: Путь к целевому файлу.
+            search_block: Точная копия заменяемого фрагмента (включая отступы и пробелы).
+            replace_block: Новый кусок кода, который встанет на место старого.
         """
+
         if not search_block:
             return SkillResult.fail("Ошибка: search_block не может быть пустым.")
 
@@ -422,8 +438,12 @@ class HostOSFiles:
     @require_access(HostOSAccessLevel.SANDBOX)
     async def open_file(self, filepath: str) -> SkillResult:
         """
-        'Открывает' файл. Содержимое открытого файла всегда будет отображаться в системном промпте (вкладки редактора).
-        Крайне полезно и рекомендовано использовать, чтобы держать нужный код перед глазами во время работы над ним.
+        Добавляет файл во "вкладки редактора" (Workspace).
+        Содержимое всех "открытых" файлов будет постоянно инжектиться в системный промпт агента.
+        Критически полезно для удержания контекста при рефакторинге или дебаге.
+
+        Args:
+            filepath: Путь к файлу.
         """
 
         try:
@@ -599,12 +619,13 @@ class HostOSFiles:
     # ОСТАЛЬНЫЕ НАВЫКИ ФАЙЛОВОЙ СИСТЕМЫ
     # =================================================================================
 
-    @skill(swarm_roles=[Subagents.CODER, Subagents.QA_ENGINEER])
+    @skill(swarm_roles=[Subagents.CODER, Subagents.QA_ENGINEER, Subagents.SYSADMIN])
     @require_access(HostOSAccessLevel.SANDBOX)
     async def list_directory(self, path: str = ".", max_depth: int = 1) -> SkillResult:
         """
         Показывает содержимое директории.
-        max_depth: насколько глубоко заглядывать во вложенные папки (0 - только текущая папка, 1 - на один уровень вглубь, и т.д.)
+        Args:
+            max_depth: насколько глубоко заглядывать во вложенные папки (0 - только текущая папка, 1 - на один уровень вглубь, и т.д.)
         """
         limit = self.host_os.config.file_list_limit
 
@@ -717,7 +738,7 @@ class HostOSFiles:
         except Exception as e:
             return SkillResult.fail(f"Ошибка при чтении директории: {e}")
 
-    @skill(swarm_roles=[Subagents.CODER, Subagents.QA_ENGINEER])
+    @skill(swarm_roles=[Subagents.CODER, Subagents.QA_ENGINEER, Subagents.SYSADMIN])
     @require_access(HostOSAccessLevel.SANDBOX)
     async def search_files(self, pattern: str, path: str = ".") -> SkillResult:
         """Поиск файлов по маске (например, '*.py', 'log_*.txt') во вложенных папках."""
@@ -778,7 +799,7 @@ class HostOSFiles:
         except Exception as e:
             return SkillResult.fail(f"Ошибка при поиске файлов: {e}")
 
-    @skill(swarm_roles=[Subagents.CODER, Subagents.QA_ENGINEER])
+    @skill(swarm_roles=[Subagents.CODER, Subagents.QA_ENGINEER, Subagents.SYSADMIN])
     @require_access(HostOSAccessLevel.SANDBOX)
     async def search_content_in_files(
         self,
@@ -953,7 +974,7 @@ class HostOSFiles:
         except Exception as e:
             return SkillResult.fail(f"Ошибка при удалении директории: {e}")
 
-    @skill(swarm_roles=[Subagents.CODER, Subagents.QA_ENGINEER])
+    @skill(swarm_roles=[Subagents.CODER, Subagents.QA_ENGINEER, Subagents.SYSADMIN])
     @require_access(HostOSAccessLevel.SANDBOX)
     async def create_directories(self, paths: Union[str, List[str]]) -> SkillResult:
         """Создает одну или несколько директорий (папок)."""

@@ -1,3 +1,11 @@
+"""
+Инструмент обратной связи субагентов.
+
+Предоставляет субагентам системный навык для сдачи финального отчета.
+После вызова генерирует событие в EventBus, которое будит главного агента
+для проверки результатов работы роя.
+"""
+
 import asyncio
 from pathlib import Path
 from src.l3_agent.skills.registry import skill, SkillResult
@@ -9,10 +17,18 @@ from src.utils.logger import system_logger
 class SubagentReport:
     """
     Навык, предназначенный строго для субагентов.
-    Позволяет им завершить свою работу.
+    Позволяет им завершить свою работу, передав отчет Оркестратору.
     """
 
-    def __init__(self, event_bus: EventBus, sandbox_dir: Path):
+    def __init__(self, event_bus: EventBus, sandbox_dir: Path) -> None:
+        """
+        Инициализирует навык отчета.
+
+        Args:
+            event_bus: Глобальная шина событий (для пробуждения главного агента).
+            sandbox_dir: Папка песочницы, куда будут сохраняться сырые MD-отчеты.
+        """
+        
         self.bus = event_bus
         self.reports_dir = sandbox_dir / "_system" / "subagents"
         self.reports_dir.mkdir(parents=True, exist_ok=True)
@@ -23,16 +39,17 @@ class SubagentReport:
     ) -> SkillResult:
         """
         Отправляет финальный подробный отчет о проделанной работе главному агенту.
-        ОБЯЗАТЕЛЬНО К ВЫЗОВУ КОГДА ЗАДАЧА ВЫПОЛНЕНА, чтобы завершить ваш рабочий процесс.
+        Обязательно к выводу когда задача полностью выполнена, чтобы завершить ваш рабочий процесс.
 
-        - subagent_id: Ваш выданный системный ID (возьмите из первоначальной задачи).
-        - role: Ваша выданная роль (например, 'coder', 'web_researcher').
-        - report: Детальный Markdown-отчет о выполненной задаче и результатах.
+        Args:
+            subagent_id: Ваш выданный системный ID (возьмите из первоначальной задачи).
+            role: Ваша выданная роль (например, 'coder', 'web_researcher').
+            report: Детальный Markdown-отчет о выполненной задаче и результатах.
         """
 
         file_path = self.reports_dir / f"{role}_{subagent_id}.md"
 
-        def _write():
+        def _write() -> None:
             file_path.write_text(report, encoding="utf-8")
 
         await asyncio.to_thread(_write)

@@ -1,3 +1,11 @@
+"""
+Глобальный реестр навыков (Skills Registry) и слой защиты (Guard Layer).
+
+Отвечает за регистрацию нативных и кастомных функций, динамическое создание
+Pydantic-моделей для валидации аргументов (защита от галлюцинаций LLM) и
+Role-Based Access Control (RBAC) для субагентов.
+"""
+
 import inspect
 import asyncio
 from dataclasses import dataclass
@@ -11,8 +19,13 @@ from src.utils._tools import truncate_text
 from src.l3_agent.skills.schema import ActionCall
 from src.l3_agent.swarm.roles import SubagentRole
 
+
 @dataclass
 class SkillResult:
+    """
+    Стандартизированный ответ любого инструмента агента.
+    """
+
     is_success: bool
     message: str
 
@@ -28,18 +41,24 @@ class SkillResult:
 _REGISTRY: Dict[str, Dict[str, Any]] = {}
 
 
-def clear_registry():
+def clear_registry() -> None:
+    """Очищает глобальный реестр (вызывается при ребуте агента)."""
     _REGISTRY.clear()
 
 
-def unregister_skill(skill_name: str):
+def unregister_skill(skill_name: str) -> None:
+    """Удаляет навык из реестра по имени."""
     if skill_name in _REGISTRY:
         del _REGISTRY[skill_name]
 
 
 def _build_skill_name(
-    func: Callable, override: Optional[str] = None, instance: Optional[Any] = None
+    func: Callable[..., Any], override: Optional[str] = None, instance: Optional[Any] = None
 ) -> str:
+    """
+    Генерирует чистое имя функции (убирая системные префиксы src.l2_interfaces...).
+    """
+    
     if override:
         return override
 
@@ -53,7 +72,12 @@ def _build_skill_name(
     return ".".join(clean_segments) + f".{func.__name__}"
 
 
-def _create_pydantic_guard(func: Callable, skill_name: str) -> type[BaseModel]:
+def _create_pydantic_guard(func: Callable[..., Any], skill_name: str) -> type[BaseModel]:
+    """
+    Динамически генерирует Pydantic модель (Guard) на основе сигнатуры функции (type-hints).
+    Обеспечивает Type Coercion (приведение типов) и защиту от мусорных параметров.
+    """
+
     sig = inspect.signature(func)
     fields = {}
 
@@ -72,12 +96,16 @@ def _create_pydantic_guard(func: Callable, skill_name: str) -> type[BaseModel]:
 
 
 def _register_callable(
-    func: Callable,
+    func: Callable[..., Any],
     override: Optional[str] = None,
     instance: Optional[Any] = None,
     swarm_roles: Optional[List[SubagentRole]] = None,
     hidden: bool = False,
-):
+) -> None:
+    """
+    Внутренний метод регистрации Python-функции в реестре.
+    """
+
     skill_name = _build_skill_name(func, override, instance)
     sig = inspect.signature(func)
 
@@ -111,7 +139,13 @@ def _register_callable(
     system_logger.info(f"[Skills] Зарегистрирован скилл: {skill_name}")
 
 
-def register_custom_callable(func: Callable, skill_name: str, description: str, filepath: str):
+def register_custom_callable(
+    func: Callable[..., Any], skill_name: str, description: str, filepath: str
+) -> None:
+    """
+    Регистрирует кастомный прокси-скилл (скрипт из песочницы).
+    """
+
     sig = inspect.signature(func)
     formatted_params = []
     for name, param in sig.parameters.items():
@@ -146,11 +180,12 @@ def skill(
 ) -> Callable[[F], F]:
     """
     Декоратор, который автоматически регистрирует новый навык для агента.
-    Берет dockstring, аргументы и их типы, формируя контекстный блок 'function(arg1: type, arg2: type, ...) - dockstring'.
+    Берет dockstring, аргументы и их типы, формируя контекстный блок 'function(arg1: type) - dockstring'.
 
-    name_override: переопределение название функции (по умолчанию берется Класс.имя_функции).
-    swarm_roles: перечисление субагентов, которые могут использовать этот навык.
-    hidden: если True - главный агент не будет видеть этот навык.
+    Args:
+        name_override: Переопределение названия функции (по умолчанию берется 'Класс.имя_функции').
+        swarm_roles: Массив субагентов, которые могут использовать этот навык (RBAC).
+        hidden: Если True - главный агент не будет видеть этот навык (полезно для системных функций).
     """
 
     def decorator(func: F) -> F:
@@ -167,7 +202,8 @@ def skill(
     return decorator
 
 
-def register_instance(instance: Any):
+def register_instance(instance: Any) -> None:
+    """Регистрирует все задекорированные методы внутри переданного инстанса класса."""
     for attr_name in dir(instance):
         method = getattr(instance, attr_name)
         if callable(method) and getattr(method, "__is_skill__", False):
@@ -180,6 +216,14 @@ def register_instance(instance: Any):
 
 
 def get_skills_library() -> str:
+    """
+    Собирает и форматирует все доступные навыки (и их сигнатуры) для внедрения в системный промпт агента.
+    Автоматически скрывает навыки, которые требуют OS Access Level ВЫШЕ, чем текущий.
+
+    Returns:
+        Отформатированная Markdown строка библиотеки навыков.
+    """
+
     active_docs = []
     custom_docs = []
 
@@ -223,7 +267,16 @@ def get_skills_library() -> str:
     return base
 
 
-async def execute_skill(actions: list[ActionCall]) -> str:
+async def execute_skill(actions: List[ActionCall]) -> str:
+    """
+    Асинхронно и параллельно выполняет массив запрошенных агентом действий.
+
+    Args:
+        actions: Список объектов ActionCall.
+
+    Returns:
+        Скленный Markdown-отчет о выполнении всех действий.
+    """
     if not actions:
         return "Цикл завершен: действий не передано."
 
@@ -244,7 +297,18 @@ async def execute_skill(actions: list[ActionCall]) -> str:
     return "\n".join(report)
 
 
-async def call_skill(name: str, params: dict) -> SkillResult:
+async def call_skill(name: str, params: Dict[str, Any]) -> SkillResult:
+    """
+    Низкоуровневый вызов отдельного навыка с прогоном параметров через Pydantic Guard Layer.
+
+    Args:
+        name: Имя функции в реестре.
+        params: Сырые аргументы из JSON.
+
+    Returns:
+        Объект SkillResult (успех/провал и сообщение).
+    """
+    
     item = _REGISTRY.get(name)
     if not item:
         err_msg = f"Скилл '{name}' не найден."

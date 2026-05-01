@@ -1,3 +1,10 @@
+"""
+Фасад для слоя реляционной памяти (SQL).
+
+Инкапсулирует инициализацию БД и маршрутизирует вызовы к соответствующим
+CRUD-контроллерам таблиц, передавая им лимиты из конфигурации (YAML).
+"""
+
 from pathlib import Path
 
 from src.l1_databases.sql.db import SQLDB
@@ -44,7 +51,14 @@ class SQLManager:
         max_custom_drives: int = 5,
         # Время
         timezone: int = 0,
-    ):
+    ) -> None:
+        """
+        Сборка всех компонентов SQL-памяти и передача лимитов из конфигурации.
+
+        Все аргументы напрямую проксируются из `settings.yaml` для управления
+        глубиной контекста и защитой от переполнения токенов LLM.
+        """
+
         self.drives_enabled = drives_enabled
         self.db = SQLDB(db_path=str(db_path))
 
@@ -85,10 +99,16 @@ class SQLManager:
             tz_offset=timezone,
         )
 
-    async def connect(self):
+    async def connect(self) -> None:
+        """
+        Открывает соединение с базой данных и автоматически инжектит
+        фундаментальные мотиваторы (Drives), если их модуль включен в настройках.
+        """
+
         await self.db.connect()
         if self.drives_enabled:
             await self.drives.bootstrap_fundamental_drives()  # Создает Фундаментальные мотивации, если их нет
 
-    async def disconnect(self):
+    async def disconnect(self) -> None:
+        """Делегирует безопасное закрытие соединения объекту SQLDB."""
         await self.db.disconnect()
