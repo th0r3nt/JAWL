@@ -64,7 +64,7 @@ class ReactLoop:
             tools: Список доступных инструментов в формате JSON Schema.
             cooldown_sec: Время ожидания в секундах при получении Rate Limit (429).
         """
-        
+
         self.llm = llm_client
         self.prompt_builder = prompt_builder
         self.context_builder = context_builder
@@ -179,8 +179,12 @@ class ReactLoop:
         self.agent_state.last_input_tokens = input_tokens
 
         messages = copy.deepcopy(messages)
-        messages = self._inject_images_to_payload(messages)
-        self._dump_context_to_file(messages)
+
+        # Асинхронно инжектим картинки
+        messages = await self._inject_images_to_payload(messages)
+
+        # Асинхронно дампим контекст, чтобы не блокировать Event Loop при записи файла
+        await asyncio.to_thread(self._dump_context_to_file, messages)
 
         system_logger.info(
             f"[ReAct] Шаг {self.agent_state.current_step}/{self.agent_state.max_react_steps}."
@@ -406,7 +410,7 @@ class ReactLoop:
         with open(image_path, "rb") as image_file:
             return base64.b64encode(image_file.read()).decode("utf-8")
 
-    def _inject_images_to_payload(
+    async def _inject_images_to_payload(
         self, messages: List[Dict[str, Any]]
     ) -> List[Dict[str, Any]]:
         """
@@ -438,7 +442,8 @@ class ReactLoop:
                 try:
                     path_obj = Path(img_path)
                     if path_obj.exists():
-                        base64_data = self._encode_image(str(path_obj))
+                        # Выполняем I/O операцию и энкодинг в отдельном потоке
+                        base64_data = await asyncio.to_thread(self._encode_image, str(path_obj))
                         ext = path_obj.suffix.lower()
                         mime = "image/jpeg" if ext in [".jpg", ".jpeg"] else f"image/{ext[1:]}"
 

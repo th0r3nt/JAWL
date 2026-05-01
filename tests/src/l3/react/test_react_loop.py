@@ -169,7 +169,8 @@ async def test_react_no_tool_calls(mock_dependencies, mock_openai_response):
     assert deps["agent_state"].state == AgentStatus.IDLE
 
 
-def test_react_inject_images_no_markers(mock_dependencies):
+@pytest.mark.asyncio
+async def test_react_inject_images_no_markers(mock_dependencies):
     deps = mock_dependencies
     loop = ReactLoop(**deps)
 
@@ -181,13 +182,14 @@ def test_react_inject_images_no_markers(mock_dependencies):
         {"role": "user", "content": "Контекст агента"},
     ]
 
-    result = loop._inject_images_to_payload(messages.copy())
+    result = await loop._inject_images_to_payload(messages.copy())
 
     assert result == messages
     assert isinstance(result[-1]["content"], str)
 
 
-def test_react_inject_images_success(mock_dependencies, tmp_path):
+@pytest.mark.asyncio
+async def test_react_inject_images_success(mock_dependencies, tmp_path):
     deps = mock_dependencies
     loop = ReactLoop(**deps)
 
@@ -196,7 +198,7 @@ def test_react_inject_images_success(mock_dependencies, tmp_path):
 
     # Маркер теперь лежит в результатах последнего действия стейта
     loop.agent_state.last_actions_result = (
-        f"Result: [SYSTEM_MARKER_IMAGE_ATTACHED: {fake_img.resolve()}]"
+        f"Result:[SYSTEM_MARKER_IMAGE_ATTACHED: {fake_img.resolve()}]"
     )
 
     messages = [
@@ -204,7 +206,7 @@ def test_react_inject_images_success(mock_dependencies, tmp_path):
         {"role": "user", "content": "Анализируй"},
     ]
 
-    result = loop._inject_images_to_payload(messages.copy())
+    result = await loop._inject_images_to_payload(messages.copy())
     last_msg_content = result[-1]["content"]
 
     assert isinstance(last_msg_content, list)
