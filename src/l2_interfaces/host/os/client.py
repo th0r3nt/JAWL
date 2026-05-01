@@ -15,7 +15,7 @@ from typing import Union, Dict, Any
 
 from src.utils.logger import system_logger
 from src.utils.settings import HostOSConfig
-from src.l0_state.interfaces.state import HostOSState
+from src.l0_state.interfaces.host.os_state import HostOSState
 
 from src.l2_interfaces.host.os.deploy_manager import HostOSDeployManager
 
@@ -119,12 +119,15 @@ class HostOSClient:
             self.framework_dir, max_retries=self.config.deploy_max_retries
         )
 
+    # =================================================================================
+    # GATEKEEPER (Резолвинг путей и проверки безопасности)
+    # =================================================================================
+
     def validate_path(self, target_path: Union[str, Path], is_write: bool = False) -> Path:
         """
         Умный маршрутизатор и гейткипер.
-        Переводит относительные пути агента в абсолютные физические адреса ОС.
-        Проверяет права (Read/Write) согласно текущему HostOSAccessLevel (SANDBOX, OBSERVER, OPERATOR, ROOT).
-        Защищает файлы конфигурации (.env) и системные директории от случайного или намеренного удаления агентом.
+        Переводит относительные пути агента в абсолютные физические адреса ОС
+        и жестко проверяет права доступа согласно текущим политикам безопасности.
 
         Args:
             target_path: Запрошенный агентом путь (например, 'sandbox/test.py' или '../main.py').
@@ -137,64 +140,63 @@ class HostOSClient:
             PermissionError: Если агент сует свой нос туда, куда ему не положено по уровню доступа.
         """
 
+        resolved_path = self._resolve_path(target_path, is_write)
+        self._check_security_policies(resolved_path, is_write)
+        return resolved_path
+
+    def _resolve_path(self, target_path: Union[str, Path], is_write: bool) -> Path:
+        """Вычисляет абсолютный адрес файла на диске (поддержка алиасов и DWIM-логики)."""
         path_str = str(target_path).replace("\\", "/").strip()
         path_obj = Path(path_str)
 
-        # Если путь абсолютный - оставляем как есть
         if path_obj.is_absolute():
-            resolved_path = path_obj.resolve()
+            return path_obj.resolve()
 
+        if path_str.startswith("sandbox/"):
+            sub_path = path_str[8:]
+            return (self.sandbox_dir / sub_path).resolve()
+
+        if path_str in [".", "./"]:
+            return self.sandbox_dir.resolve()
+
+        if path_str in ["..", "../"]:
+            return self.framework_dir.resolve()
+
+        fw_name = self.framework_dir.name  # Обычно "JAWL"
+
+        # DWIM-логика (Умный резолв)
+        sandbox_target = (self.sandbox_dir / path_str).resolve()
+
+        if path_str.startswith(f"{fw_name}/"):
+            fw_target = (self.framework_dir / path_str[len(fw_name) + 1 :]).resolve()
+        elif path_str == fw_name:
+            fw_target = self.framework_dir.resolve()
         else:
-            # Делегируем сложность скрипту (умный резолв)
-            fw_name = self.framework_dir.name  # Обычно "JAWL"
+            fw_target = (self.framework_dir / path_str).resolve()
 
-            if path_str.startswith(f"{fw_name}/"):
-                # Агент пишет "JAWL/docs/TODO.md" -> ищем в корне фреймворка
-                sub_path = path_str[len(fw_name) + 1 :]
-                resolved_path = (self.framework_dir / sub_path).resolve()
+        # 1. Если файл/папка реально существует в песочнице - 100% работаем с ней (Приоритет)
+        if sandbox_target.exists():
+            return sandbox_target
 
-            elif path_str == fw_name:
-                resolved_path = self.framework_dir.resolve()
+        # 2. Если файл есть во фреймворке, и права позволяют туда смотреть
+        if fw_target.exists() and self.access_level >= HostOSAccessLevel.OBSERVER:
+            if is_write and self.access_level == HostOSAccessLevel.OBSERVER:
+                return sandbox_target
+            return fw_target
 
-            elif path_str.startswith("sandbox/"):
-                # Агент пишет "sandbox/test.txt" -> ищем в песочнице
-                sub_path = path_str[8:]
-                resolved_path = (self.sandbox_dir / sub_path).resolve()
+        # 3. Дефолт (Файла еще не существует - будем создавать в песочнице)
+        return sandbox_target
 
-            elif path_str in [".", "./"]:
-                # Текущая папка по умолчанию - песочница
-                resolved_path = self.sandbox_dir.resolve()
+    def _check_security_policies(self, resolved_path: Path, is_write: bool) -> None:
+        """Жестко валидирует права доступа. Бросает PermissionError при нарушениях."""
 
-            elif path_str in ["..", "../"]:
-                # Подняться на уровень выше - корень фреймворка
-                resolved_path = self.framework_dir.resolve()
-
-            else:
-                # Умный fallback: "Do What I Mean"
-                sandbox_target = (self.sandbox_dir / path_str).resolve()
-                fw_target = (self.framework_dir / path_str).resolve()
-
-                # Если в песочнице запрошенного пути нет, но он физически существует во фреймворке
-                if (
-                    not sandbox_target.exists()
-                    and fw_target.exists()
-                    and self.access_level >= HostOSAccessLevel.OBSERVER
-                ):
-                    if is_write and self.access_level == HostOSAccessLevel.OBSERVER:
-                        resolved_path = sandbox_target
-                    else:
-                        resolved_path = fw_target
-                else:
-                    # Во всех остальных случаях считаем, что агент работает в песочнице
-                    resolved_path = sandbox_target
-
-        # Проверка прав доступа
+        # 1. Защита ключей API
         if not self.config.env_access and ".env" in resolved_path.name.lower():
             raise PermissionError(
                 f"SYSTEM DENIED: Доступ к файлам конфигурации ({resolved_path.name}) запрещен."
             )
 
-        # Защита системной папки песочницы (запрет записи, кроме папки загрузок)
+        # 2. Защита системной директории песочницы (от случайного удаления скриптов демонов)
         if is_write and resolved_path.is_relative_to(self.system_dir):
             if not resolved_path.is_relative_to(self.download_dir):
                 raise PermissionError(
@@ -203,7 +205,7 @@ class HostOSClient:
                     "(исключение: чтение и запись разрешены в sandbox/_system/download/)."
                 )
 
-        # Сначала проверяем базовые права уровня доступа
+        # 3. Применение Role-Based Access Control (RBAC)
         if self.access_level == HostOSAccessLevel.ROOT:
             pass
         elif self.access_level == HostOSAccessLevel.OPERATOR:
@@ -221,7 +223,7 @@ class HostOSClient:
                 f"SANDBOX: Доступ разрешен строго внутри sandbox/. Путь '{resolved_path}' отклонен."
             )
 
-        # Логика деплой-сессий (только если базовые права позволяют запись)
+        # 4. Логика Deploy Sessions (бекапы исходного кода фреймворка)
         is_framework_code = (
             resolved_path.is_relative_to(self.framework_dir)
             and not resolved_path.is_relative_to(self.sandbox_dir)
@@ -239,7 +241,9 @@ class HostOSClient:
             # Если пишем в код во время сессии - делаем бекап
             self.deploy_manager.backup_file(resolved_path)
 
-        return resolved_path
+    # =================================================================================
+    # УТИЛИТЫ И КОНТЕКСТ
+    # =================================================================================
 
     def get_file_metadata(self) -> Dict[str, str]:
         """Читает реестр описаний файлов (Метаданные, оставленные агентом)."""

@@ -18,7 +18,7 @@ from src.utils.event.registry import Events
 from src.utils.logger import system_logger
 from src.utils.dtime import get_now_formatted
 
-from src.l0_state.interfaces.state import HostOSState
+from src.l0_state.interfaces.host.os_state import HostOSState
 from src.l2_interfaces.host.os.client import HostOSClient, HostOSAccessLevel
 from src.l2_interfaces.host.os.polls.utils import is_ignored
 from src.l2_interfaces.host.os.polls.tree_builder import TreeBuilder

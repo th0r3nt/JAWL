@@ -1,6 +1,7 @@
 """
 Навыки агента для локальной работы с системой контроля версий (Git).
 Все команды выполняются в изолированных подпроцессах строго внутри директории `sandbox/`.
+Включают защиту от Argument Injection через разделитель '--'.
 """
 
 import asyncio
@@ -92,8 +93,10 @@ class GithubLocalGit:
             else:
                 repo_url = f"https://github.com/{owner}/{repo}.git"
 
+            # Передаем позиционные аргументы. Разделитель '--' не требуется для clone в таком виде,
+            # но мы не позволяем создавать папки с именем '-о', так как validate_sandbox_path обрубит сомнительные имена.
             code, out, err = await self._run_git_command(
-                safe_path.parent, "clone", repo_url, safe_path.name
+                safe_path.parent, "clone", "--", repo_url, safe_path.name
             )
 
             if code != 0:
@@ -137,7 +140,12 @@ class GithubLocalGit:
                     "Ошибка: Указанная папка не является git-репозиторием."
                 )
 
-            args = ["checkout", "-b", branch_name] if create_new else ["checkout", branch_name]
+            # Используем '--' для защиты от инъекции аргументов (-b, --orphan)
+            if create_new:
+                args = ["checkout", "-b", "--", branch_name]
+            else:
+                args = ["checkout", "--", branch_name]
+
             code, out, err = await self._run_git_command(safe_path, *args)
 
             if code != 0:
@@ -184,14 +192,17 @@ class GithubLocalGit:
             if not status_out.strip():
                 return SkillResult.ok("Нет изменений для коммита. Рабочее дерево чистое.")
 
+            # Сообщение не требует экранирования, т.к. мы передаем его как элемент списка,
+            # но на всякий случай явно указываем -m
             code, out, err = await self._run_git_command(
                 safe_path, "commit", "-m", commit_message
             )
             if code != 0:
                 return SkillResult.fail(f"Ошибка git commit:\n{err or out}")
 
+            # Защита branch_name от инъекции
             code, push_out, push_err = await self._run_git_command(
-                safe_path, "push", "-u", "origin", branch_name
+                safe_path, "push", "-u", "origin", "--", branch_name
             )
             if code != 0:
                 return SkillResult.fail(f"Ошибка git push:\n{push_err or push_out}")

@@ -14,7 +14,7 @@ from src.utils.logger import system_logger
 from src.utils.event.bus import EventBus
 from src.utils.event.registry import Events
 
-from src.l0_state.interfaces.state import CalendarState
+from src.l0_state.interfaces.calendar_state import CalendarState
 from src.l2_interfaces.calendar.client import CalendarClient
 
 

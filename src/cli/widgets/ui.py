@@ -65,7 +65,7 @@ def _build_header_panel(version: str) -> Panel:
     status = _get_agent_status()
     logo_text = Text(LOGO, style="bold cyan")
     subtitle_text = Text("Just A While Loop", style="bold cyan")
-    version_text = Text(f"v{version} (welcome subagents!)\n", style="dim cyan")
+    version_text = Text(f"v{version}\n", style="dim cyan")
 
     status_text = Text()
     if status["is_running"]:

@@ -16,7 +16,7 @@ from src.__init__ import __version__
 
 from src.utils.logger import system_logger
 from src.utils.settings import GithubConfig
-from src.l0_state.interfaces.state import GithubState
+from src.l0_state.interfaces.github_state import GithubState
 
 
 class GithubHTTPError(Exception):

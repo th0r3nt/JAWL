@@ -14,7 +14,7 @@ import asyncio
 from typing import Iterator, Any
 
 from src.utils.logger import system_logger
-from src.l0_state.interfaces.state import EmailState
+from src.l0_state.interfaces.email_state import EmailState
 from src.l2_interfaces.email.utils import decode_mime_header
 
 
@@ -51,7 +51,7 @@ class EmailClient:
             account: Логин почты (адрес).
             password: App Password (пароль приложения с 2FA).
         """
-        
+
         self.state = state
         self.account = account.strip()
         self.password = password.strip()

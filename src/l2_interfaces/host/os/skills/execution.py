@@ -1,7 +1,7 @@
 """
 Навыки для выполнения вычислительных операций: запуск скриптов, демонов и сырых shell-команд.
 Наиболее критичный модуль с точки зрения безопасности. Содержит логику "очистки" переменных
-окружения от токенов перед спавном подпроцессов.
+окружения от токенов перед спавном подпроцессов и инъекцию Sandbox Guard.
 """
 
 import asyncio
@@ -57,14 +57,24 @@ class HostOSExecution:
     def _build_isolated_env(self) -> dict:
         """
         Собирает изолированное окружение (env) для запуска скриптов.
-        Гарантирует, что скрипт увидит и корень фреймворка (src), и корень песочницы (framework_api).
         Очищает окружение от системных секретов (чтобы хитрые агенты не достали их через os.environ).
         """
 
         env = os.environ.copy()
-        
-        # Скраббинг (удаление) секретов фреймворка из дочернего процесса
-        forbidden_substrings = ["TOKEN", "KEY", "SECRET", "PASSWORD", "HASH", "API_ID"]
+
+        # ЖЕСТКИЙ скраббинг секретов фреймворка из дочернего процесса
+        forbidden_substrings = [
+            "TOKEN",
+            "KEY",
+            "SECRET",
+            "PASSWORD",
+            "HASH",
+            "API_ID",
+            "CREDENTIALS",
+            "URL",
+            "URI",
+            "JAWL",
+        ]
         for k in list(env.keys()):
             if any(sub in k.upper() for sub in forbidden_substrings):
                 del env[k]
@@ -76,10 +86,13 @@ class HostOSExecution:
         sb_dir = str(self.host_os.sandbox_dir.resolve())
         sys_dir = str(self.host_os.system_dir.resolve())
 
+        # Переменные для нашего Sandbox Runner (Гарда)
+        env["JAWL_FRAMEWORK_DIR"] = fw_dir
+        env["JAWL_SANDBOX_DIR"] = sb_dir
+
         # Добавляем все директории, чтобы 'import framework_api' работало как и раньше
         paths_to_add = [fw_dir, sb_dir, sys_dir]
 
-        # Подклеиваем старый PYTHONPATH, если он был (без дубликатов)
         current_pythonpath = env.get("PYTHONPATH", "")
         if current_pythonpath:
             for p in current_pythonpath.split(os.pathsep):
@@ -94,7 +107,7 @@ class HostOSExecution:
     async def execute_script(self, filepath: str) -> SkillResult:
         """
         Запускает скрипт (.py, .sh, .bat, .js) в изолированном окружении.
-        Автоматически перехватывает STDOUT и STDERR. При превышении execution_timeout_sec 
+        Автоматически перехватывает STDOUT и STDERR. При превышении execution_timeout_sec
         жестко убивает всё дерево порожденных процессов (включая зомби).
 
         Args:
@@ -119,10 +132,25 @@ class HostOSExecution:
 
             # Формируем изолированное окружение
             env = self._build_isolated_env()
+            env["JAWL_TARGET_SCRIPT"] = str(safe_path)
+
             ext = safe_path.suffix.lower()
 
             if ext == ".py":
-                cmd = [sys.executable, str(safe_path)]
+                # Внедряем безопасную обертку (Guard)
+                runner_path = (
+                    self.host_os.framework_dir
+                    / "src"
+                    / "utils"
+                    / "templates"
+                    / "sandbox_runner.py"
+                )
+
+                # Если обертка существует - используем ее, иначе fallback на стандартный запуск
+                if runner_path.exists():
+                    cmd = [sys.executable, str(runner_path)]
+                else:
+                    cmd = [sys.executable, str(safe_path)]
 
             elif ext == ".sh":
                 import shutil
@@ -294,6 +322,7 @@ class HostOSExecution:
 
             # Формируем изолированное окружение
             env = self._build_isolated_env()
+            env["JAWL_TARGET_SCRIPT"] = str(safe_path)
 
             kwargs = {}
             if sys.platform == "win32":
@@ -301,7 +330,18 @@ class HostOSExecution:
             else:
                 kwargs["start_new_session"] = True
 
-            cmd = [sys.executable, str(safe_path)]
+            # Запускаем через Guard
+            runner_path = (
+                self.host_os.framework_dir
+                / "src"
+                / "utils"
+                / "templates"
+                / "sandbox_runner.py"
+            )
+            if runner_path.exists():
+                cmd = [sys.executable, str(runner_path)]
+            else:
+                cmd = [sys.executable, str(safe_path)]
 
             process = subprocess.Popen(
                 cmd,
@@ -380,7 +420,7 @@ class HostOSExecution:
         self, filepath: str, func_name: str, kwargs: dict = None
     ) -> SkillResult:
         """
-        Изолированный RPC-вызов. Позволяет инамически запустить конкретную функцию 
+        Изолированный RPC-вызов. Позволяет инамически запустить конкретную функцию
         внутри Python-скрипта в песочнице, передать ей аргументы и получить ответ.
 
         Args:

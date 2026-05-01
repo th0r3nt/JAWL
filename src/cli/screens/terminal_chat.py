@@ -1,15 +1,17 @@
 import asyncio
 import json
+import io
 from pathlib import Path
 
 import questionary
 from prompt_toolkit import PromptSession, print_formatted_text, HTML
+from prompt_toolkit.formatted_text import ANSI
 from prompt_toolkit.patch_stdout import patch_stdout
+from rich.console import Console
 from rich.panel import Panel
 from rich.markdown import Markdown
 
 from src.cli.widgets.ui import (
-    console,
     print_error,
     print_info,
     print_success,
@@ -25,7 +27,26 @@ from src.cli.screens.agent_control import _is_agent_running
 ROOT_DIR = Path(__file__).resolve().parent.parent.parent.parent
 
 
-async def _chat_loop(port: int, history_file: Path, agent_name: str):
+def _print_markdown_safe(text: str) -> None:
+    """
+    Рендерит Markdown в буфер, сохраняя цвета (ANSI), и безопасно выводит
+    через prompt_toolkit. Решает проблему конфликта спецсимволов.
+    """
+    formatted_text = text.replace("\n", "  \n")
+
+    # Рендерим rich в виртуальный буфер
+    str_console = Console(file=io.StringIO(), force_terminal=True, color_system="standard")
+    str_console.print(Markdown(formatted_text))
+    ansi_str = str_console.file.getvalue()
+
+    # Обрезаем лишний перенос строки от rich, чтобы не ломать верстку
+    if ansi_str.endswith("\n"):
+        ansi_str = ansi_str[:-1]
+
+    print_formatted_text(ANSI(ansi_str))
+
+
+async def _chat_loop(port: int, history_file: Path, agent_name: str) -> None:
     set_window_title(f"JAWL - Чат с агентом {agent_name}")
 
     try:
@@ -41,7 +62,9 @@ async def _chat_loop(port: int, history_file: Path, agent_name: str):
         return
 
     clear_screen()
-    console.print(
+
+    # Здесь используем обычный Console, так как мы еще не вошли в цикл ввода
+    Console().print(
         Panel(
             f"[bold cyan]Интерактивный чат с агентом {agent_name}[/bold cyan]\n"
             "[dim]Отправка: Enter[/dim]\n"
@@ -70,7 +93,8 @@ async def _chat_loop(port: int, history_file: Path, agent_name: str):
                     print_formatted_text(
                         HTML(f"\n{time_prefix}<ansimagenta><b>{sender}:</b></ansimagenta>")
                     )
-                    console.print(Markdown(text))
+                    _print_markdown_safe(text)
+
             print_formatted_text(HTML("\n<style fg='gray'>--- Конец истории ---</style>\n"))
         except Exception:
             pass
@@ -102,7 +126,7 @@ async def _chat_loop(port: int, history_file: Path, agent_name: str):
                     print_formatted_text(
                         HTML(f"\n{time_prefix}<ansimagenta><b>{agent_name}:</b></ansimagenta>")
                     )
-                    console.print(Markdown(message_text))
+                    _print_markdown_safe(message_text)
                     print("")
 
         except asyncio.CancelledError:
@@ -123,7 +147,6 @@ async def _chat_loop(port: int, history_file: Path, agent_name: str):
 
     try:
         while True:
-
             with patch_stdout():
                 user_input = await session.prompt_async(
                     HTML("<ansigreen><b>Вы:</b></ansigreen> ")
@@ -131,7 +154,6 @@ async def _chat_loop(port: int, history_file: Path, agent_name: str):
 
             text = user_input.strip()
 
-            # Защита от суррогатных символов (эмодзи Windows), которые крашат сокеты и терминал
             try:
                 text = text.encode("utf-8", errors="replace").decode("utf-8")
             except Exception:
@@ -142,7 +164,8 @@ async def _chat_loop(port: int, history_file: Path, agent_name: str):
             if text.lower() in ["/exit", "/quit"]:
                 break
 
-            writer.write((text + "\n").encode("utf-8"))
+            payload = json.dumps({"text": text}, ensure_ascii=False)
+            writer.write((payload + "\n").encode("utf-8"))
             await writer.drain()
 
     except (KeyboardInterrupt, EOFError):

@@ -58,7 +58,7 @@ class SubagentLoop:
             token_tracker: Утилита для учета расходов токенов.
             max_steps: Лимит шагов до принудительного убийства процесса (Timeout).
         """
-        
+
         self.subagent_id = subagent_id
         self.role = role
         self.task_description = task_description
@@ -96,7 +96,19 @@ class SubagentLoop:
             # Вызов LLM
             raw_answer = await self._call_llm_with_retries(messages)
             if raw_answer is None:
-                return  # Завершаем работу при критических сбоях сети
+                # Фикс: Если модель недоступна (404), форсируем краш-репорт
+                system_logger.error(
+                    f"[Swarm] Критическая ошибка API у субагента {self.subagent_id}. Принудительное создание краш-репорта."
+                )
+                await call_skill(
+                    "SubagentReport.submit_final_report",
+                    {
+                        "subagent_id": self.subagent_id,
+                        "role": self.role.id,
+                        "report": "## Сбой инициализации\nСубагент завершил работу с критической ошибкой. Модель недоступна или возвращает ошибку API.",
+                    },
+                )
+                return
 
             # Парсинг ответа
             parsed_response, error_msg = self._parse_response(raw_answer)
@@ -115,9 +127,8 @@ class SubagentLoop:
                 step += 1
                 continue
 
-            # Игнорируем ошибки тайп-хинта Pydantic (parsed_response точно AgentResponse здесь)
-            thoughts = parsed_response.thoughts  # type: ignore
-            actions = parsed_response.actions  # type: ignore
+            thoughts = parsed_response.thoughts
+            actions = parsed_response.actions
 
             # Если нет действий
             if not actions:
@@ -153,15 +164,21 @@ class SubagentLoop:
             system_logger.warning(
                 f"[Swarm] Субагент {self.subagent_id} достиг лимита шагов ({self.max_steps}) и был убит."
             )
+            # Принудительно отправляем то, что успел накопать
+            await call_skill(
+                "SubagentReport.submit_final_report",
+                {
+                    "subagent_id": self.subagent_id,
+                    "role": self.role.id,
+                    "report": "## Timeout Error\nСубагент достиг лимита шагов и был принудительно завершен системой. Задача не выполнена до конца.",
+                },
+            )
 
     # ==================================================================================
     # ПРИВАТНЫЕ МЕТОДЫ
     # ==================================================================================
 
     def _prepare_messages(self, prompt: str) -> List[Dict[str, str]]:
-        """
-        Собирает контекст и обновляет счетчик входящих токенов.
-        """
         context = self.context_builder.build(
             self.subagent_id, self.task_description, self.history
         )
@@ -173,7 +190,6 @@ class SubagentLoop:
         return messages
 
     def _dump_context_to_file(self, messages: List[Dict[str, str]], current_step: int) -> None:
-        """Создает дамп контекста в .md файл для отладки субагентов."""
         try:
             log_dir = Path("logs/subagents")
             log_dir.mkdir(parents=True, exist_ok=True)
@@ -192,9 +208,6 @@ class SubagentLoop:
             system_logger.error(f"[Swarm] Не удалось сохранить дамп промпта: {e}")
 
     async def _call_llm_with_retries(self, messages: List[Dict[str, str]]) -> Optional[str]:
-        """
-        Обрабатывает запросы к LLM, ротацию ключей и Rate Limits.
-        """
         for attempt in range(3):
             try:
                 session = self.llm.get_session()
@@ -233,12 +246,8 @@ class SubagentLoop:
     def _parse_response(
         self, raw_answer: str
     ) -> Tuple[Optional[AgentResponse], Optional[str]]:
-        """
-        Парсит ответ от LLM. Защищает от невалидного JSON.
-        """
         clean_answer = raw_answer.strip()
 
-        # Срезаем Markdown-обертку, если LLM прислала json текстом
         if clean_answer.startswith("```"):
             match = re.search(r"\{.*\}", clean_answer, re.DOTALL)
             if match:
@@ -255,9 +264,6 @@ class SubagentLoop:
             return None, f"Format Error: {e}"
 
     async def _execute_and_log_actions(self, thoughts: str, actions: List[ActionCall]) -> None:
-        """
-        Выполняет запрошенные инструменты, применяет RBAC и сохраняет результаты в историю субагента.
-        """
         results = []
         actions_log = []
 
@@ -276,7 +282,6 @@ class SubagentLoop:
                 res = await call_skill(act.tool_name, act.parameters)
                 results.append(f"* Action [{act.tool_name}]: {res.message}")
 
-                # Фиксируем успешную отправку отчета
                 if act.tool_name == "SubagentReport.submit_final_report" and res.is_success:
                     self.report_submitted = True
 

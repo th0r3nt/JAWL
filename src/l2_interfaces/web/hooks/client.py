@@ -1,4 +1,4 @@
-from src.l0_state.interfaces.state import WebHooksState
+from src.l0_state.interfaces.web.hooks_state import WebHooksState
 from src.utils.settings import WebHooksConfig
 
 

@@ -1,13 +1,11 @@
 import pytest
 
-from src.l0_state.interfaces.state import (
-    AiogramState,
-    HostOSState,
-    HostTerminalState,
-    WebSearchState,
-    CalendarState,
-    CustomDashboardState,
-)
+from src.l0_state.interfaces.telegram.aiogram_state import AiogramState
+from src.l0_state.interfaces.host.os_state import HostOSState
+from src.l0_state.interfaces.host.terminal_state import HostTerminalState
+from src.l0_state.interfaces.web.search_state import WebSearchState
+from src.l0_state.interfaces.calendar_state import CalendarState
+from src.l0_state.interfaces.custom_state import CustomDashboardState
 
 
 def test_host_terminal_state_init():

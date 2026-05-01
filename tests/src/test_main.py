@@ -87,10 +87,10 @@ def test_main_critical_exception(mock_clear, mock_load, mock_system):
 
 
 @pytest.mark.asyncio
-@patch("src.main.SQLManager")
-@patch("src.main.VectorManager")
-@patch("src.main.Heartbeat")
-@patch("src.main.ReactLoop")
+@patch("src.builder.SQLManager")
+@patch("src.builder.VectorManager")
+@patch("src.builder.Heartbeat")
+@patch("src.builder.ReactLoop")
 async def test_system_di_assembly_smoke(
     mock_react, mock_hb, mock_vector, mock_sql, mock_configs
 ):
@@ -160,10 +160,10 @@ async def test_system_shutdown_and_reboot_events(mock_configs):
 
 
 @pytest.mark.asyncio
-@patch("src.main.SQLManager")
-@patch("src.main.VectorManager")
-@patch("src.main.Heartbeat")
-@patch("src.main.ReactLoop")
+@patch("src.builder.SQLManager")
+@patch("src.builder.VectorManager")
+@patch("src.builder.Heartbeat")
+@patch("src.builder.ReactLoop")
 async def test_system_subagent_llm_fallback(
     mock_react, mock_hb, mock_vector, mock_sql, mock_configs
 ):
@@ -188,10 +188,10 @@ async def test_system_subagent_llm_fallback(
 
 
 @pytest.mark.asyncio
-@patch("src.main.SQLManager")
-@patch("src.main.VectorManager")
-@patch("src.main.Heartbeat")
-@patch("src.main.ReactLoop")
+@patch("src.builder.SQLManager")
+@patch("src.builder.VectorManager")
+@patch("src.builder.Heartbeat")
+@patch("src.builder.ReactLoop")
 async def test_system_subagent_dedicated_llm(
     mock_react, mock_hb, mock_vector, mock_sql, mock_configs
 ):
@@ -200,7 +200,6 @@ async def test_system_subagent_dedicated_llm(
     bus = EventBus()
     system = System(event_bus=bus, settings_config=settings, interfaces_config=interfaces)
 
-    # ФИКС 2: Инициализируем L0 State
     system.setup_l0_state()
     system.sys_cfg = settings.system
 

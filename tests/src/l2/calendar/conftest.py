@@ -2,7 +2,7 @@ import pytest
 from pathlib import Path
 from unittest.mock import MagicMock, AsyncMock
 
-from src.l0_state.interfaces.state import CalendarState
+from src.l0_state.interfaces.calendar_state import CalendarState
 from src.utils.event.bus import EventBus
 from src.l2_interfaces.calendar.client import CalendarClient
 from src.l2_interfaces.calendar.events import CalendarEvents

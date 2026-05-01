@@ -8,7 +8,7 @@
 """
 
 import time
-from typing import Any, TYPE_CHECKING, Dict
+from typing import Any, TYPE_CHECKING, Dict, Tuple, List
 
 from telethon import events, utils
 from telethon.tl.types import UpdateMessageReactions, Channel, Chat
@@ -24,7 +24,7 @@ from src.utils.event.registry import Events
 if TYPE_CHECKING:
     from src.utils.settings import TelethonConfig
 
-from src.l0_state.interfaces.state import TelethonState
+from src.l0_state.interfaces.telegram.telethon_state import TelethonState
 from src.l2_interfaces.telegram.telethon.client import TelethonClient
 from src.l2_interfaces.telegram.telethon.utils._message_parser import TelethonMessageParser
 
@@ -50,7 +50,7 @@ class TelethonEvents:
             event_bus (EventBus): Шина событий JAWL.
             config (TelethonConfig): Конфиг с лимитами.
         """
-        
+
         self.tg_client = tg_client
         self.state = state
         self.bus = event_bus
@@ -89,10 +89,14 @@ class TelethonEvents:
         """Останавливает обработку событий."""
         system_logger.info("[Telegram Telethon] Слушатели событий успешно остановлены.")
 
+    # ==========================================================
+    # STATE DASHBOARD BUILDERS (L0 State)
+    # ==========================================================
+
     async def _update_state(self, force: bool = False) -> None:
         """
-        Опрашивает список диалогов и собирает дашборд последних активных чатов.
-        Автоматически определяет форумы (Topics) и подсвечивает диалоги с UNREAD.
+        Оркестратор обновления дашборда активных чатов.
+        Опрашивает список диалогов и делегирует их парсинг специализированным методам.
 
         Args:
             force (bool): Игнорировать rate limiter (3 сек) и обновить немедленно.
@@ -118,127 +122,153 @@ class TelethonEvents:
             async for dialog in client.iter_dialogs(limit=self.state.number_of_last_chats):
                 entity = dialog.entity
 
-                # 1. Сбор метаданных (через кэш, чтобы не бить API)
-                desc_str = ""
-                if dialog.is_group or dialog.is_channel:
-                    if entity.id not in self._chat_desc_cache:
-                        try:
-                            about = ""
-                            if isinstance(entity, Channel):
-                                full = await client(GetFullChannelRequest(channel=entity))
-                                about = full.full_chat.about or ""
-                            elif isinstance(entity, Chat):
-                                full = await client(GetFullChatRequest(chat_id=entity.id))
-                                about = full.full_chat.about or ""
-                            self._chat_desc_cache[entity.id] = about.strip()
-                        except FloodWaitError:
-                            pass
-                        except Exception:
-                            self._chat_desc_cache[entity.id] = ""
-
-                    desc = self._chat_desc_cache.get(entity.id, "")
-                    if desc:
-                        clean_desc = desc.replace("\n", " ")
-                        desc_str = (
-                            f" | Описание: {truncate_text(clean_desc, 100, '... [Обрезано]')}"
-                        )
-
                 is_public = bool(getattr(entity, "username", None))
                 status_str = "Public" if is_public else "Private"
                 participants = getattr(entity, "participants_count", None)
                 part_str = f" | {participants} чел." if participants else ""
-                unread = f" [UNREAD: {dialog.unread_count}]" if dialog.unread_count > 0 else ""
+                unread_str = (
+                    f" [UNREAD: {dialog.unread_count}]" if dialog.unread_count > 0 else ""
+                )
 
-                # 2. Формирование блоков
                 if dialog.is_user:
-                    bot_tag = " [Bot]" if getattr(entity, "bot", False) else ""
-                    overview_lines.append(
-                        f"- [User] {dialog.name}{bot_tag} (ID: `{dialog.id}`){unread}"
+                    overview_line, unread_block = await self._process_user_dialog(
+                        client, dialog, entity, unread_str
                     )
-
-                    if dialog.unread_count > 0:
-                        fetch_limit = max(
-                            2, min(dialog.unread_count, self.config.incoming_history_limit)
-                        )
-                        try:
-                            recent_msgs = await client.get_messages(entity, limit=fetch_limit)
-                            if recent_msgs:
-                                block = f"[User] {dialog.name}{bot_tag} (ID: {dialog.id}) [UNREAD: {dialog.unread_count}]:"
-                                block += f"\n    Last {len(recent_msgs)} messages:"
-                                msg_lines = []
-                                for m in reversed(recent_msgs):
-                                    formatted = await TelethonMessageParser.build_string(
-                                        client=client,
-                                        target_entity=entity,
-                                        msg=m,
-                                        timezone=self.tg_client.timezone,
-                                        truncate_text_flag=True,
-                                    )
-                                    indented = "\n".join(
-                                        [f"        {line}" for line in formatted.split("\n")]
-                                    )
-                                    msg_lines.append(indented)
-                                block += "\n\n" + "\n\n".join(msg_lines)
-                                unread_blocks.append(block)
-                        except Exception as e:
-                            system_logger.debug(
-                                f"[Telethon] Ошибка загрузки истории для {dialog.id}: {e}"
-                            )
+                    overview_lines.append(overview_line)
+                    if unread_block:
+                        unread_blocks.append(unread_block)
 
                 elif dialog.is_group or dialog.is_channel:
-                    chat_type = "Group" if dialog.is_group else "Channel"
-                    forum_str = ""
-
-                    if getattr(dialog.entity, "forum", False):
-                        chat_type = "Forum"
-                        topics_list = []
-                        try:
-                            topics_data = await self._get_topics(
-                                client, dialog.entity, limit=10
-                            )
-                            for topic in topics_data:
-                                t_unread = (
-                                    f" (UNREAD: {topic.unread_count})"
-                                    if getattr(topic, "unread_count", 0) > 0
-                                    else ""
-                                )
-                                topics_list.append(
-                                    f"      ↳ Топик '{getattr(topic, 'title', 'Unknown')}' (ID: {topic.id}){t_unread}"
-                                )
-                        except Exception:
-                            pass
-
-                        if not topics_list and dialog.unread_count > 0:
-                            topics_list.append(
-                                f"      ↳ General / Общий топик (UNREAD: {dialog.unread_count})"
-                            )
-                        if topics_list:
-                            forum_str = "\n" + "\n".join(topics_list)
-
-                    overview_lines.append(
-                        f"- [{status_str} {chat_type}] {dialog.name} (ID: `{dialog.id}`){part_str}{desc_str}{unread}{forum_str}"
+                    desc_str = await self._get_entity_description(client, entity)
+                    overview_line = await self._process_group_dialog(
+                        client, dialog, entity, status_str, unread_str, part_str, desc_str
                     )
+                    overview_lines.append(overview_line)
 
-            # 3. Финальная сборка
-            res_str = ""
-            if unread_blocks:
-                res_str += "ТРЕБУЮТ ВНИМАНИЯ (Непрочитанные личные сообщения):\n"
-                res_str += "\n\n".join(unread_blocks)
-                res_str += "\n\n---\n\n"
-
-            if overview_lines:
-                res_str += "ПОСЛЕДНИЕ ДИАЛОГИ (Общий список):\n"
-                res_str += "\n".join(overview_lines)
-                if total_dialogs > len(overview_lines):
-                    hidden = total_dialogs - len(overview_lines)
-                    res_str += f"\n\n...и еще {hidden} чатов скрыто для экономии контекста. Для просмотра - сооветствующая функция."
-            else:
-                res_str += "Список диалогов пуст."
-
-            self.state.last_chats = res_str
+            self.state.last_chats = self._build_markdown_dashboard(
+                unread_blocks, overview_lines, total_dialogs
+            )
 
         except Exception as e:
             system_logger.error(f"[Telethon] Ошибка обновления стейта: {e}")
+
+    async def _get_entity_description(self, client: Any, entity: Any) -> str:
+        """Извлекает и кэширует описание группы/канала."""
+        if entity.id not in self._chat_desc_cache:
+            try:
+                about = ""
+                if isinstance(entity, Channel):
+                    full = await client(GetFullChannelRequest(channel=entity))
+                    about = full.full_chat.about or ""
+                elif isinstance(entity, Chat):
+                    full = await client(GetFullChatRequest(chat_id=entity.id))
+                    about = full.full_chat.about or ""
+                self._chat_desc_cache[entity.id] = about.strip()
+            except FloodWaitError:
+                pass
+            except Exception:
+                self._chat_desc_cache[entity.id] = ""
+
+        desc = self._chat_desc_cache.get(entity.id, "")
+        if desc:
+            clean_desc = desc.replace("\n", " ")
+            return f" | Описание: {truncate_text(clean_desc, 100, '... [Обрезано]')}"
+        return ""
+
+    async def _process_user_dialog(
+        self, client: Any, dialog: Any, entity: Any, unread_str: str
+    ) -> Tuple[str, str]:
+        """Обрабатывает ЛС, при необходимости выкачивая историю непрочитанных сообщений."""
+
+        bot_tag = " [Bot]" if getattr(entity, "bot", False) else ""
+        overview_line = f"- [User] {dialog.name}{bot_tag} (ID: `{dialog.id}`){unread_str}"
+
+        unread_block = ""
+        if dialog.unread_count > 0:
+            fetch_limit = max(2, min(dialog.unread_count, self.config.incoming_history_limit))
+            try:
+                recent_msgs = await client.get_messages(entity, limit=fetch_limit)
+                if recent_msgs:
+                    block = f"[User] {dialog.name}{bot_tag} (ID: {dialog.id}) [UNREAD: {dialog.unread_count}]:\n    Last {len(recent_msgs)} messages:"
+                    msg_lines = []
+                    for m in reversed(recent_msgs):
+                        formatted = await TelethonMessageParser.build_string(
+                            client=client,
+                            target_entity=entity,
+                            msg=m,
+                            timezone=self.tg_client.timezone,
+                            truncate_text_flag=True,
+                        )
+                        indented = "\n".join(
+                            [f"        {line}" for line in formatted.split("\n")]
+                        )
+                        msg_lines.append(indented)
+                    unread_block = block + "\n\n" + "\n\n".join(msg_lines)
+            except Exception as e:
+                system_logger.debug(f"[Telethon] Ошибка загрузки истории для {dialog.id}: {e}")
+
+        return overview_line, unread_block
+
+    async def _process_group_dialog(
+        self,
+        client: Any,
+        dialog: Any,
+        entity: Any,
+        status_str: str,
+        unread_str: str,
+        part_str: str,
+        desc_str: str,
+    ) -> str:
+        """Обрабатывает группы и каналы, включая логику парсинга Форумов (топиков)."""
+        chat_type = "Group" if dialog.is_group else "Channel"
+        forum_str = ""
+
+        if getattr(entity, "forum", False):
+            chat_type = "Forum"
+            topics_list = []
+            try:
+                topics_data = await self._get_topics(client, entity, limit=10)
+                for topic in topics_data:
+                    t_unread = (
+                        f" (UNREAD: {topic.unread_count})"
+                        if getattr(topic, "unread_count", 0) > 0
+                        else ""
+                    )
+                    topics_list.append(
+                        f"      ↳ Топик '{getattr(topic, 'title', 'Unknown')}' (ID: {topic.id}){t_unread}"
+                    )
+            except Exception:
+                pass
+
+            if not topics_list and dialog.unread_count > 0:
+                topics_list.append(
+                    f"      ↳ General / Общий топик (UNREAD: {dialog.unread_count})"
+                )
+            if topics_list:
+                forum_str = "\n" + "\n".join(topics_list)
+
+        return f"- [{status_str} {chat_type}] {dialog.name} (ID: `{dialog.id}`){part_str}{desc_str}{unread_str}{forum_str}"
+
+    def _build_markdown_dashboard(
+        self, unread_blocks: List[str], overview_lines: List[str], total_dialogs: int
+    ) -> str:
+        """Склеивает блоки в итоговый Markdown для системного промпта агента."""
+        res_str = ""
+        if unread_blocks:
+            res_str += "ТРЕБУЮТ ВНИМАНИЯ (Непрочитанные личные сообщения):\n"
+            res_str += "\n\n".join(unread_blocks)
+            res_str += "\n\n---\n\n"
+
+        if overview_lines:
+            res_str += "ПОСЛЕДНИЕ ДИАЛОГИ (Общий список):\n"
+            res_str += "\n".join(overview_lines)
+            if total_dialogs > len(overview_lines):
+                hidden = total_dialogs - len(overview_lines)
+                res_str += f"\n\n...и еще {hidden} чатов скрыто для экономии контекста. Для просмотра - сооветствующая функция."
+        else:
+            res_str += "Список диалогов пуст."
+
+        return res_str
 
     # ==========================================================
     # ОБРАБОТЧИКИ (HANDLERS)

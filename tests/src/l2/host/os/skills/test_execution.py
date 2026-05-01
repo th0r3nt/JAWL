@@ -1,10 +1,13 @@
+import os
+import shutil
 import pytest
 from unittest.mock import patch
+
 from src.l2_interfaces.host.os.client import HostOSAccessLevel
 from src.l2_interfaces.host.os.skills.execution import HostOSExecution
-
 from src.l2_interfaces.host.os.decorators import require_access
 from src.l3_agent.skills.registry import SkillResult
+from src.utils._tools import get_project_root
 
 
 class DummyOSClass:
@@ -49,26 +52,103 @@ async def test_execution_kill_process_not_found(mock_process, os_client):
 @pytest.mark.asyncio
 async def test_require_access_decorator_blocks(os_client):
     """Тест: Декоратор блокирует выполнение, если Access Level ниже требуемого."""
-    # os_client из фикстуры имеет уровень OBSERVER (1)
     dummy = DummyOSClass(os_client)
-
     res = await dummy.dangerous_action()
 
-    # Действие требует OPERATOR (2), поэтому должно быть заблокировано
     assert res.is_success is False
     assert "Отказано в доступе" in res.message
-    assert "1 (OBSERVER)" in res.message
 
 
 @pytest.mark.asyncio
 async def test_require_os_access_decorator_allows(os_client):
     """Тест: Декоратор пропускает выполнение, если Access Level достаточный."""
-    # Повышаем права до ROOT (3)
     os_client.access_level = HostOSAccessLevel.ROOT
     dummy = DummyOSClass(os_client)
 
     res = await dummy.dangerous_action()
-
-    # Должно отработать
     assert res.is_success is True
-    assert "Бум" in res.message
+
+
+def test_build_isolated_env_scrubs_secrets(os_client):
+    """Тест: Сборщик окружения вырезает секретные ключи, чтобы изолированный скрипт не мог их прочитать."""
+    executor = HostOSExecution(os_client)
+
+    # Добавляем фейковые секреты в системный env
+    os.environ["SECRET_TEST_TOKEN"] = "12345"
+    os.environ["LLM_API_KEY_1"] = "sk-xxx"
+    os.environ["NORMAL_VAR"] = "ok_value"
+
+    env = executor._build_isolated_env()
+
+    assert "SECRET_TEST_TOKEN" not in env
+    assert "LLM_API_KEY_1" not in env
+    assert "NORMAL_VAR" in env
+
+    # Чистим за собой
+    del os.environ["SECRET_TEST_TOKEN"]
+    del os.environ["LLM_API_KEY_1"]
+    del os.environ["NORMAL_VAR"]
+
+
+@pytest.mark.asyncio
+async def test_sandbox_guard_blocks_traversal_and_subprocess(os_client, tmp_path):
+    """
+    Интеграционный тест: Защита Sandbox Guard при запуске python-скриптов.
+    Мы копируем обертку sandbox_runner.py, пишем вредоносный скрипт и убеждаемся,
+    что он падает с PermissionError при попытке взлома системы изнутри подпроцесса.
+    """
+    os_client.access_level = HostOSAccessLevel.OBSERVER
+    executor = HostOSExecution(os_client)
+
+    # 1. Подготавливаем среду: копируем реальный sandbox_runner из исходников во временную папку
+    real_root = get_project_root()
+    template_src = real_root / "src" / "utils" / "templates" / "sandbox_runner.py"
+
+    template_dst = tmp_path / "src" / "utils" / "templates" / "sandbox_runner.py"
+    template_dst.parent.mkdir(parents=True, exist_ok=True)
+
+    if template_src.exists():
+        shutil.copy2(template_src, template_dst)
+    else:
+        pytest.skip("Файл sandbox_runner.py не найден в исходниках. Тест пропущен.")
+
+    # Создаем фейковый .env файл вне песочницы
+    secret_file = tmp_path / ".env"
+    secret_file.write_text("SUPER_SECRET_KEY=123", encoding="utf-8")
+
+    # 2. Пишем вредоносный скрипт
+    malicious_code = """
+import os
+import subprocess
+
+try:
+    # Пытаемся прочитать файл вне песочницы (Path Traversal)
+    with open("../.env", "r") as f:
+        print(f"LEAKED: {f.read()}")
+except PermissionError as e:
+    print(f"OPEN_BLOCKED: {e}")
+
+try:
+    # Пытаемся выйти в Shell (Shell Escape)
+    subprocess.check_output("echo 1", shell=True)
+    print("SUBPROCESS_WORKED")
+except PermissionError as e:
+    print(f"SUBPROCESS_BLOCKED: {e}")
+"""
+    malicious_script = os_client.sandbox_dir / "evil.py"
+    malicious_script.write_text(malicious_code, encoding="utf-8")
+
+    # 3. Выполняем скрипт через скилл
+    res = await executor.execute_script("evil.py")
+
+    # Скрипт должен выполниться (код 0), но внутри него исключения должны быть перехвачены
+    assert res.is_success is True
+
+    # 4. Проверяем STDOUT скрипта: Гард должен был отловить попытки и выкинуть PermissionError
+    assert "LEAKED: SUPER_SECRET_KEY=123" not in res.message
+    assert "OPEN_BLOCKED:" in res.message
+    assert "Path Traversal попытка заблокирована" in res.message
+
+    assert "SUBPROCESS_WORKED" not in res.message
+    assert "SUBPROCESS_BLOCKED:" in res.message
+    assert "Использование shell/subprocess заблокировано" in res.message

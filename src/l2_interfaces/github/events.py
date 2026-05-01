@@ -17,7 +17,7 @@ from src.utils.event.bus import EventBus
 from src.utils.event.registry import Events
 from src.utils.dtime import format_datetime
 
-from src.l0_state.interfaces.state import GithubState
+from src.l0_state.interfaces.github_state import GithubState
 from src.l2_interfaces.github.client import GithubClient
 
 

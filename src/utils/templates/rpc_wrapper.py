@@ -1,17 +1,69 @@
 """
-Обертка, которая выполняется, когда агент хочет вызвать функцию из sandbox/ файла.
+Обертка, которая выполняется, когда агент хочет вызвать функцию из sandbox/ файла (RPC).
+Содержит встроенный Sandbox Guard для защиты ядра от взлома.
 """
 
 import sys
+import os
 import json
 import asyncio
+import builtins
 import traceback
 from importlib.util import spec_from_file_location, module_from_spec
 from pathlib import Path
+import subprocess
 
 target_filepath = Path(sys.argv[1]).resolve()
 func_name = sys.argv[2]
 sandbox_dir = Path(sys.argv[3]).resolve()
+framework_dir = sandbox_dir.parent
+
+# Защита от Path Traversal
+_orig_open = builtins.open
+
+
+def _safe_open(
+    file,
+    mode="r",
+    buffering=-1,
+    encoding=None,
+    errors=None,
+    newline=None,
+    closefd=True,
+    opener=None,
+):
+    try:
+        p = Path(file).resolve()
+        if "Python" in str(p) or "site-packages" in str(p) or "lib" in str(p).lower():
+            pass
+        elif p.is_relative_to(framework_dir) and not p.is_relative_to(sandbox_dir):
+            raise PermissionError(
+                f"[Sandbox Guard] Access Denied: Path Traversal попытка заблокирована. Доступ к '{file}' запрещен."
+            )
+    except Exception as e:
+        if isinstance(e, PermissionError):
+            raise e
+        pass
+    return _orig_open(file, mode, buffering, encoding, errors, newline, closefd, opener)
+
+
+builtins.open = _safe_open
+
+
+# Предотвращение Shell Escape
+def _blocked_func(*args, **kwargs):
+    raise PermissionError(
+        "[Sandbox Guard] Access Denied: Использование shell/subprocess заблокировано в целях безопасности."
+    )
+
+
+subprocess.Popen = _blocked_func
+subprocess.run = _blocked_func
+subprocess.check_output = _blocked_func
+subprocess.call = _blocked_func
+
+os.system = _blocked_func
+os.popen = _blocked_func
 
 # Гарантируем наличие путей в sys.path для прямой доступности
 script_dir = str(target_filepath.parent)
@@ -23,7 +75,6 @@ if str(sandbox_dir) not in sys.path:
 # Умное вычисление имени модуля для поддержки относительных импортов внутри пакетов
 try:
     rel_path = target_filepath.relative_to(sandbox_dir)
-    # my_folder/my_script.py -> my_folder.my_script
     module_name = ".".join(rel_path.with_suffix("").parts)
 except ValueError:
     module_name = "dynamic_sandbox_module"
@@ -47,7 +98,6 @@ def main():
         module = module_from_spec(spec)
         sys.modules[module_name] = module
 
-        # Устанавливаем __package__, чтобы работали относительные импорты (from . import x)
         if "." in module_name:
             module.__package__ = module_name.rsplit(".", 1)[0]
         else:

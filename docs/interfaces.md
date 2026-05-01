@@ -65,7 +65,7 @@ discord/
 Обязательный метод - `get_context_block`. Это то, что агент будет "видеть" в своем системном промпте на каждом тике.
 
 ```python
-from src.l0_state.interfaces.state import DiscordState
+from src.l0_state.interfaces.discord_state import DiscordState
 
 class DiscordClient:
     def __init__(self, state: DiscordState, token: str):

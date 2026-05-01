@@ -1,7 +1,7 @@
 import asyncio
 import feedparser
 
-from src.l0_state.interfaces.state import WebRSSState
+from src.l0_state.interfaces.web.rss_state import WebRSSState
 from src.utils.settings import WebRSSConfig
 
 

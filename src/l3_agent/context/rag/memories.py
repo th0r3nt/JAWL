@@ -13,7 +13,7 @@ from typing import Dict, Any, List, TYPE_CHECKING
 if TYPE_CHECKING:
     from src.l1_databases.vector.management.knowledge import VectorKnowledge
     from src.l1_databases.vector.management.thoughts import VectorThoughts
-    from src.l0_state.interfaces.state import TelethonState
+    from src.l0_state.interfaces.telegram.telethon_state import TelethonState
     from src.l0_state.agent.state import AgentState
 
 
@@ -43,7 +43,7 @@ class RAGMemories:
             auto_rag_top_k: Сколько лучших совпадений брать на один запрос.
             auto_rag_max_query_chars: Лимит символов для одного куска запроса (защита от размытия эмбеддинга).
         """
-        
+
         self.vector_knowledge = vector_knowledge
         self.vector_thoughts = vector_thoughts
         self.telethon_state = telethon_state

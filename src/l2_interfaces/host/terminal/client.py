@@ -14,7 +14,7 @@ from typing import Any, Optional
 from src.utils.logger import system_logger
 from src.utils.dtime import get_now_formatted
 from src.utils.settings import HostTerminalConfig
-from src.l0_state.interfaces.state import HostTerminalState
+from src.l0_state.interfaces.host.terminal_state import HostTerminalState
 
 
 class HostTerminalClient:
@@ -138,9 +138,17 @@ class HostTerminalClient:
 
                 text = data.decode("utf-8").strip()
                 if text:
-                    time_str = get_now_formatted(self.timezone, "%Y-%m-%d %H:%M:%S")
-                    self._record_message("User", text, time_str)
-                    await self.incoming_queue.put(("_MESSAGE", text))
+                    # Извлекаем JSON payload
+                    try:
+                        parsed = json.loads(text)
+                        msg_text = parsed.get("text", text)
+                    except json.JSONDecodeError:
+                        msg_text = text
+
+                    if msg_text:
+                        time_str = get_now_formatted(self.timezone, "%Y-%m-%d %H:%M:%S")
+                        self._record_message("User", msg_text, time_str)
+                        await self.incoming_queue.put(("_MESSAGE", msg_text))
 
         except asyncio.CancelledError:
             pass

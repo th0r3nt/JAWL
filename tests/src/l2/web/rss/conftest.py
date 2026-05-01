@@ -1,7 +1,7 @@
 import pytest
 from unittest.mock import AsyncMock, MagicMock
 from src.utils.settings import WebRSSConfig, RSSFeedConfig
-from src.l0_state.interfaces.state import WebRSSState
+from src.l0_state.interfaces.web.rss_state import WebRSSState
 from src.l2_interfaces.web.rss.client import WebRSSClient
 from src.l2_interfaces.web.rss.events import WebRSSEvents
 from src.utils.event.bus import EventBus

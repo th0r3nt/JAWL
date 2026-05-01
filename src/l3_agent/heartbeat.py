@@ -116,11 +116,14 @@ class Heartbeat:
         if is_awake:
             # Пробрасываем событие прямо в активный цикл
             self.react_loop.add_realtime_event(event_data)
+            system_logger.info(
+                f"[Heartbeat] Входящее событие '{event_name}' ({level.name}) получено во время работы агента. Данные добавлены в контекст текущего цикла."
+            )
 
             # Если множитель 0.0 - это жесткое прерывание текущего процесса
             if multiplier <= 0.01:
                 system_logger.warning(
-                    f"[Heartbeat] Прерывание текущего ReAct-цикла из-за события: {event_name}"
+                    f"[Heartbeat] Прерывание текущего ReAct-цикла из-за события: {event_name} ({level.name})"
                 )
                 self._wake_reason = event_name
                 self._wake_payload = payload
@@ -180,7 +183,7 @@ class Heartbeat:
         Запускает бесконечный цикл пульса агента.
         Управляет временем сна (asyncio.sleep) и вызовами ReAct-цикла.
         """
-        
+
         if self._is_running:
             return
 

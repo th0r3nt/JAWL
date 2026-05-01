@@ -7,7 +7,7 @@
 
 from typing import Any
 
-from src.l0_state.interfaces.state import WebSearchState
+from src.l0_state.interfaces.web.search_state import WebSearchState
 from src.utils.settings import DeepResearchConfig
 
 

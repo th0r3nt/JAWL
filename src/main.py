@@ -5,81 +5,26 @@ import traceback
 from pathlib import Path
 from dotenv import load_dotenv
 from typing import Optional, Any
+
 from src.utils._tools import get_pid_file_path
-
-# ==========================================
-# Утилиты
-# ==========================================
-
 from src.utils.logger import system_logger, apply_logger_config
 from src.utils.event.bus import EventBus
 from src.utils.event.registry import Events
 from src.utils.settings import load_config, SettingsConfig, InterfacesConfig
-from src.utils.token_tracker import TokenTracker
-
+from src.l3_agent.context.registry import ContextRegistry
+from src.l3_agent.skills.registry import clear_registry
 from src import __version__
 
-# ==========================================
-# L0 State
-# ==========================================
-
-from src.l0_state.agent.state import AgentState
-from src.l0_state.interfaces.state import (
-    HostOSState,
-    HostTerminalState,
-    TelethonState,
-    AiogramState,
-    WebSearchState,
-    WebHTTPState,
-    WebBrowserState,
-    WebHooksState,
-    WebRSSState,
-    CalendarState,
-    GithubState,
-    EmailState,
-    CustomDashboardState,
-)
-
-# ==========================================
-# L1 Databases
-# ==========================================
-
-from src.l1_databases.vector.manager import VectorManager
-from src.l1_databases.sql.manager import SQLManager
-
-# ==========================================
-# L2 Interfaces
-# ==========================================
-
-from src.l2_interfaces.initializer import initialize_l2_interfaces
-
-# ==========================================
-# L3 Agent
-# ==========================================
-
-from src.l3_agent.llm.client import LLMClient
-from src.l3_agent.llm.api_keys.rotator import APIKeyRotator
-
-from src.l3_agent.prompt.builder import PromptBuilder
-from src.l3_agent.context.builder import ContextBuilder
-from src.l3_agent.context.registry import ContextRegistry, ContextSection
-from src.l3_agent.context.rag.memories import RAGMemories
-
-from src.l3_agent.react.loop import ReactLoop
-
-from src.l3_agent.heartbeat import Heartbeat
-
-from src.l3_agent.skills.registry import register_instance, clear_registry
-from src.l3_agent.skills.schema import ACTION_SCHEMA
-
-from src.l3_agent.swarm.skills.report import SubagentReport
-from src.l3_agent.swarm.spawn import SwarmManager
+# Архитектурные обертки (Паттерны: Фасад и Строитель)
+from src.builder import SystemBuilder
+from src.utils.event.bridge import EventBridge
 
 
 class System:
     """
-    Корень композиции.
-    Собирает все слои системы воедино, управляет жизненным циклом.
+    Корень композиции (Фасад).
+    Хранит ссылки на все подсистемы и управляет жизненным циклом.
+    Вся сложная инициализация инкапсулирована в SystemBuilder.
     """
 
     def __init__(
@@ -101,191 +46,53 @@ class System:
         # Возвращает в конце работы
         self._exit_code: int = 0  # 0 - выключение, 1 - перезагрузка
 
-        # Заглушки для безопасного вызова stop() при раннем падении
-        self.sql: Optional[SQLManager] = None
-        self.vector: Optional[VectorManager] = None
-        self.heartbeat: Optional[Heartbeat] = None
-        self.llm_client: Optional[LLMClient] = None
+        # Заглушки L0 (Заполняются через SystemBuilder)
+        self.agent_state = None
+        self.os_state = None
+        self.terminal_state = None
+        self.telethon_state = None
+        self.aiogram_state = None
+        self.github_state = None
+        self.email_state = None
+        self.web_search_state = None
+        self.web_http_state = None
+        self.web_browser_state = None
+        self.web_hooks_state = None
+        self.web_rss_state = None
+        self.calendar_state = None
+        self.dashboard_state = None
+
+        # Заглушки L1-L3 (Заполняются через SystemBuilder)
+        self.sql = None
+        self.vector = None
+        self.heartbeat = None
+        self.llm_client = None
+        self.sub_llm_client = None
 
         self.context_registry = ContextRegistry()
 
+    # ==========================================================
+    # Изоляция сложной логики
+    # ==========================================================
+
     def setup_l0_state(self):
-        """Создает стейты. Создает все, даже если интерфейс выключен (во избежание NoneType)."""
-
-        system_logger.info("[System] Инициализация L0 State.")
-
-        # AGENT STATE
-        self.agent_state = AgentState(
-            llm_model=self.settings.llm.main_model,
-            temperature=self.settings.llm.temperature,
-            max_react_steps=self.settings.llm.max_react_steps,
-            heartbeat_interval=self.settings.system.heartbeat_interval,
-            continuous_cycle=self.settings.system.continuous_cycle,
-            proactive_guidance=self.settings.system.proactive_guidance,
-            context_ticks=self.settings.system.context_depth.ticks,
-            context_detailed_ticks=self.settings.system.context_depth.detailed_ticks,
-        )
-
-        # HOST
-        self.os_state = HostOSState()
-        self.terminal_state = HostTerminalState(
-            context_limit=self.interfaces_config.host.terminal.context_limit
-        )
-
-        # TELEGRAM
-        self.telethon_state = TelethonState(
-            number_of_last_chats=self.interfaces_config.telegram.telethon.recent_chats_limit,
-            private_chat_history_limit=self.interfaces_config.telegram.telethon.private_chat_history_limit,
-        )
-        self.aiogram_state = AiogramState(
-            number_of_last_chats=self.interfaces_config.telegram.aiogram.recent_chats_limit
-        )
-
-        # GITHUB
-        self.github_state = GithubState(
-            history_limit=self.interfaces_config.github.history_limit
-        )
-
-        # EMAIL
-        self.email_state = EmailState(recent_limit=self.interfaces_config.email.recent_limit)
-
-        # WEB SEARCH
-        self.web_search_state = WebSearchState(history_limit=10)
-
-        # WEB HTTP
-        self.web_http_state = WebHTTPState(history_limit=10)
-
-        # WEB BROWSER
-        self.web_browser_state = WebBrowserState()
-
-        # WEB HOOKS
-        self.web_hooks_state = WebHooksState(
-            history_limit=self.interfaces_config.web.hooks.history_limit
-        )
-
-        # WEB RSS
-        self.web_rss_state = WebRSSState(
-            recent_limit=self.interfaces_config.web.rss.recent_limit
-        )
-
-        # CALENDAR
-        self.calendar_state = CalendarState()
-
-        # CUSTOM DASHBOARD
-        self.dashboard_state = CustomDashboardState()
+        SystemBuilder(self).build_l0_state()
 
     async def setup_l1_databases(self):
-        """Поднимает базы данных и регистрирует их CRUD-скиллы."""
-
-        self.sys_cfg = self.settings.system
-        system_logger.info("[System] Инициализация L1 Databases.")
-
-        # SQL DB
-        self.sql = SQLManager(
-            db_path=self.local_data_dir / "sql" / "db" / "agent.db",
-            # Ticks
-            ticks_limit=self.sys_cfg.context_depth.ticks,
-            # Детальные тики
-            detailed_ticks=self.sys_cfg.context_depth.detailed_ticks,
-            tick_action_max_chars=self.sys_cfg.context_depth.tick_action_max_chars,
-            tick_result_max_chars=self.sys_cfg.context_depth.tick_result_max_chars,
-            # Старые тики
-            tick_thoughts_short_max_chars=self.sys_cfg.context_depth.tick_thoughts_short_max_chars,
-            tick_action_short_max_chars=self.sys_cfg.context_depth.tick_action_short_max_chars,
-            tick_result_short_max_chars=self.sys_cfg.context_depth.tick_result_short_max_chars,
-            # Tasks
-            max_tasks=self.sys_cfg.sql.tasks.max_tasks,
-            # Mental State
-            max_mental_state_entities=self.sys_cfg.sql.mental_states.max_entities,
-            # Personality Traits
-            max_traits=self.sys_cfg.sql.personality_traits.max_traits,
-            # Drives
-            drives_enabled=self.sys_cfg.sql.drives.enabled,
-            decay_rate=self.sys_cfg.sql.drives.decay_rate,
-            decay_interval_sec=self.sys_cfg.sql.drives.decay_interval_sec,
-            max_history_drives=self.sys_cfg.sql.drives.max_reflections_history,
-            max_custom_drives=self.sys_cfg.sql.drives.max_custom_drives,
-            # Время
-            timezone=self.sys_cfg.timezone,
-        )
-        await self.sql.connect()
-
-        # =========================================================
-        # ДИНАМИЧЕСКАЯ РЕГИСТРАЦИЯ SQL НАВЫКОВ И КОНТЕКСТА
-        # =========================================================
-
-        # DRIVES
-        if self.sys_cfg.sql.drives.enabled:
-            register_instance(self.sql.drives)
-            self.context_registry.register_provider(
-                "sql_drives", self.sql.drives.get_context_block, section=ContextSection.DRIVES
-            )
-
-        # PERSONALITY TRAITS
-        if self.sys_cfg.sql.personality_traits.enabled:
-            register_instance(self.sql.personality_traits)
-            self.context_registry.register_provider(
-                "sql_traits",
-                self.sql.personality_traits.get_context_block,
-                section=ContextSection.TRAITS,
-            )
-
-        # TASKS
-        if self.sys_cfg.sql.tasks.enabled:
-            register_instance(self.sql.tasks)
-            self.context_registry.register_provider(
-                "sql_tasks", self.sql.tasks.get_context_block, section=ContextSection.TASKS
-            )
-
-        # MENTAL STATES
-        if self.sys_cfg.sql.mental_states.enabled:
-            register_instance(self.sql.mental_states)
-            self.context_registry.register_provider(
-                "sql_mental_states",
-                self.sql.mental_states.get_context_block,
-                section=ContextSection.MENTAL_STATES,
-            )
-
-        # Базовые вещи регистрируются всегда
-        self.context_registry.register_provider(
-            "sql_ticks", self.sql.ticks.get_context_block, section=ContextSection.RECENT_TICKS
-        )
-        self.context_registry.register_provider(
-            "agent_state",
-            self.agent_state.get_context_block,
-            section=ContextSection.AGENT_STATE,
-        )
-
-        # Vector DB
-        self.vector = VectorManager(
-            db_path=self.local_data_dir / "vector" / "db",
-            embedding_model_path=self.local_data_dir / "vector" / "embeddings",
-            embedding_model_name=self.settings.system.vector_db.embedding_model,
-            vector_size=self.settings.system.vector_db.vector_size,
-            similarity_threshold=self.settings.system.vector_db.similarity_threshold,
-            timezone=self.settings.system.timezone,
-        )
-        await self.vector.connect()
-
-        # Регистрация навыков для агента
-        register_instance(self.vector.knowledge)
-        register_instance(self.vector.thoughts)
+        await SystemBuilder(self).build_l1_databases()
 
     def setup_l2_interfaces(
         self,
         # Telethon
         telethon_api_id: Optional[str] = None,
         telethon_api_hash: Optional[str] = None,
-        # Aiogram
         aiogram_bot_token: Optional[str] = None,
         # GitHub
         github_token: Optional[str] = None,
-        # Email
         email_account: Optional[str] = None,
         email_password: Optional[str] = None,
         # Web Search
         tavily_api_key: Optional[str] = None,
-        # Web Hooks
         webhook_secret: Optional[str] = None,
     ):
         """Читает конфиг, поднимает нужные интерфейсы и регистрирует их скиллы."""
@@ -296,22 +103,16 @@ class System:
             # Telethon
             "TELETHON_API_ID": telethon_api_id,
             "TELETHON_API_HASH": telethon_api_hash,
-            # Aiogram
             "AIOGRAM_BOT_TOKEN": aiogram_bot_token,
             # GitHub
             "GITHUB_TOKEN": github_token,
-            # Email
             "EMAIL_ACCOUNT": email_account,
             "EMAIL_PASSWORD": email_password,
             # Web Search
             "TAVILY_API_KEY": tavily_api_key,
-            # Web Hooks
             "WEBHOOK_SECRET": webhook_secret,
         }
-
-        # Вся магия сборки интерфейсов скрыта здесь
-        components = initialize_l2_interfaces(self, env_vars)
-        self._lifecycle_components.extend(components)
+        SystemBuilder(self).build_l2_interfaces(env_vars)
 
     def setup_l3_agent(
         self,
@@ -320,191 +121,17 @@ class System:
         sub_llm_api_url: Optional[str] = None,
         sub_llm_api_keys: Optional[list[str]] = None,
     ):
-        """
-        Сборка мозга агента.
-        """
-
-        system_logger.info("[System] Инициализация L3 Agent.")
-
-        # Main LLM Client
-        rotator = APIKeyRotator(keys=llm_api_keys)
-        self.llm_client = LLMClient(api_url=llm_api_url, api_keys_rotator=rotator)
-
-        # Subagent LLM Client
-        if sub_llm_api_keys:
-            system_logger.info("[System] Обнаружены выделенные ключи для субагентов (Swarm).")
-            sub_rotator = APIKeyRotator(keys=sub_llm_api_keys)
-            self.sub_llm_client = LLMClient(
-                api_url=sub_llm_api_url or "", api_keys_rotator=sub_rotator
-            )
-        else:
-            self.sub_llm_client = self.llm_client
-
-        prompt_builder = PromptBuilder(
-            prompt_dir=self.root_dir / "src" / "l3_agent" / "prompt",
-            drives_enabled=self.sys_cfg.sql.drives.enabled,
-            tasks_enabled=self.sys_cfg.sql.tasks.enabled,
-            traits_enabled=self.sys_cfg.sql.personality_traits.enabled,
-            mental_states_enabled=self.sys_cfg.sql.mental_states.enabled,
-            swarm_enabled=self.sys_cfg.swarm.enabled,
-        )
-
-        # Поднимаем RAG-провайдер и регистрируем его
-        rag_memories = RAGMemories(
-            vector_knowledge=self.vector.knowledge,
-            vector_thoughts=self.vector.thoughts,
-            telethon_state=self.telethon_state,
-            agent_state=self.agent_state,
-            auto_rag_top_k=self.settings.system.vector_db.auto_rag_top_k,
-            auto_rag_max_query_chars=self.settings.system.vector_db.auto_rag_max_query_chars,
-        )
-        self.context_registry.register_provider(
-            "rag memories", rag_memories.get_context_block, section=ContextSection.RAG_MEMORIES
-        )
-
-        # Регистрируем провайдер кастомных дашбордов
-        self.context_registry.register_provider(
-            "custom_dashboard",
-            self.dashboard_state.get_context_block,
-            section=ContextSection.INTERFACES,
-        )
-
-        # Инициализируем тонкий ContextBuilder
-        context_builder = ContextBuilder(
-            agent_state=self.agent_state, registry=self.context_registry
-        )
-
-        token_tracker = TokenTracker()
-
-        react_loop = ReactLoop(
-            llm_client=self.llm_client,
-            prompt_builder=prompt_builder,
-            context_builder=context_builder,
-            agent_state=self.agent_state,
-            sql_ticks=self.sql.ticks,
-            vector_manager=self.vector,
-            token_tracker=token_tracker,
-            tools=ACTION_SCHEMA,
-        )
-
-        self.heartbeat = Heartbeat(
-            react_loop=react_loop,
-            heartbeat_interval=self.settings.system.heartbeat_interval,
-            continuous_cycle=self.settings.system.continuous_cycle,
-            accel_config=self.settings.system.event_acceleration,
-            timezone=self.settings.system.timezone,
-        )
-
-        # Инициализация Swarm
-        if self.sys_cfg.swarm.enabled:
-
-            # Навык отчета регистрируем глобально, он изолирован
-            report_skill = SubagentReport(
-                event_bus=self.event_bus, sandbox_dir=self.root_dir / "sandbox"
-            )
-            register_instance(report_skill)
-
-            swarm_manager = SwarmManager(
-                llm_client=self.sub_llm_client,  # ВАЖНО: передаем суб-клиент
-                swarm_config=self.sys_cfg.swarm,
-                root_dir=self.root_dir,
-                token_tracker=token_tracker,
-            )
-            register_instance(swarm_manager)
-
-        # Связываем шину событий с пульсом агента (мост между L2 и L3)
-        self._bridge_events_to_heartbeat()
+        env_vars = {
+            "LLM_API_URL": llm_api_url,
+            "LLM_API_KEYS": llm_api_keys,
+            "SUB_LLM_API_URL": sub_llm_api_url,
+            "SUB_LLM_API_KEYS": sub_llm_api_keys,
+        }
+        SystemBuilder(self).build_l3_agent(env_vars)
 
     def _bridge_events_to_heartbeat(self):
-        """Подписывает Heartbeat на все системные события."""
-
-        def create_handler(evt):
-            def handler(**kwargs):
-                # Если система уже останавливается - игнорируем любые события
-                if evt == Events.SYSTEM_CORE_STOP:
-                    return
-
-                self.heartbeat.answer_to_event(
-                    level=evt.level, event_name=evt.name, payload=kwargs
-                )
-
-            return handler
-
-        # Базовая подписка: будим агента на любые события, кроме остановки
-        for event in Events.all():
-            if event.name in (
-                Events.SYSTEM_CORE_STOP.name,
-                Events.SYSTEM_SHUTDOWN_REQUESTED.name,
-                Events.SYSTEM_REBOOT_REQUESTED.name,
-            ):
-                continue
-            self.event_bus.subscribe(event, create_handler(event))
-
-        # Специфичные подписки
-        def handle_config_update(**kwargs):
-            key = kwargs.get("key")
-
-            # Настройки Heartbeat
-            if key in ("heartbeat_interval", "continuous_cycle"):
-                if self.heartbeat:
-                    self.heartbeat.update_config(key, kwargs.get("value"))
-
-            # Лимиты SQL баз данных
-            elif key == "db_limit":
-                module = kwargs.get("module")
-                val = kwargs.get("value")
-                if self.sql:
-                    if module == "tasks":
-                        self.sql.tasks.max_tasks = val
-
-                    elif module == "personality_traits":
-                        self.sql.personality_traits.max_traits = val
-
-                    elif module == "mental_states":
-                        self.sql.mental_states.max_entities = val
-
-                    elif module == "drives_custom":
-                        self.sql.drives.max_custom = val
-
-                system_logger.info(f"[System] Рантайм-обновление лимита для {module}: {val}")
-
-            # Глубина контекста
-            elif key == "context_depth":
-                if self.sql:
-                    self.sql.ticks.ticks_limit = kwargs.get("total_ticks")
-                    self.sql.ticks.detailed_ticks = kwargs.get("detailed_ticks")
-
-                system_logger.info(
-                    f"[System] Рантайм-обновление контекста: {kwargs.get('total_ticks')} тиков"
-                )
-
-        def handle_dashboard_update(**kwargs):
-            name = kwargs.get("name")
-            content = kwargs.get("content")
-            if name:
-                if content:
-                    self.dashboard_state.blocks[name] = content
-                else:
-                    self.dashboard_state.blocks.pop(name, None)
-
-        # Если агент решил совершить сэппуку
-        def handle_shutdown(**kwargs):
-            self._exit_code = 0
-            if self.heartbeat:
-                self.heartbeat.stop()
-
-        # Если агент запросил перезагрузку
-        def handle_reboot(**kwargs):
-            self._exit_code = 1
-            if self.heartbeat:
-                self.heartbeat.stop()
-
-        self.event_bus.subscribe(Events.SYSTEM_SHUTDOWN_REQUESTED, handle_shutdown)
-        self.event_bus.subscribe(Events.SYSTEM_REBOOT_REQUESTED, handle_reboot)
-
-        self.event_bus.subscribe(Events.SYSTEM_CONFIG_UPDATED, handle_config_update)
-
-        self.event_bus.subscribe(Events.SYSTEM_DASHBOARD_UPDATE, handle_dashboard_update)
+        """Подписывает Heartbeat на все системные события через EventBridge."""
+        EventBridge(self).setup_routing()
 
     # ===========================================
     # RUN & STOP
@@ -542,41 +169,36 @@ class System:
 
         system_logger.info(f"[System] Инициализация JAWL v{__version__} (PID: {os.getpid()}).")
 
-        # Инициализация слоев
         try:
-            # L1 STATE
+            # Сборка архитектуры через методы-обертки (инкапсулируют SystemBuilder)
             self.setup_l0_state()
-
-            # L2 DATABASES
             await self.setup_l1_databases()
 
             # L2 INTERFACES
             self.setup_l2_interfaces(
-                # Telethon
                 telethon_api_id=telethon_api_id,
                 telethon_api_hash=telethon_api_hash,
                 # Aiogram
                 aiogram_bot_token=aiogram_bot_token,
                 # GitHub
                 github_token=github_token,
-                # Email
                 email_account=email_account,
                 email_password=email_password,
                 # Web Search
                 tavily_api_key=tavily_api_key,
-                # Web Hooks
                 webhook_secret=webhook_secret,
             )
 
             # L3 AGENT
             self.setup_l3_agent(
-                # Main LLM
                 llm_api_url=llm_api_url,
                 llm_api_keys=llm_api_keys,
                 # Subagent LLM
                 sub_llm_api_url=sub_llm_api_url,
                 sub_llm_api_keys=sub_llm_api_keys,
             )
+
+            self._bridge_events_to_heartbeat()
 
             # Запуск компонентов
             started_components = []
@@ -599,13 +221,11 @@ class System:
             # Запускаем фоновую следилку за файлом остановки
             stop_watcher_task = asyncio.create_task(self._watch_for_stop_file())
 
-            # Точка входа в бесконечный цикл (тут код заблокируется, пока агент работает)
-            await self.heartbeat.start()
-
-            # Как только агент остановился - отменяем таску, чтобы она не висела в памяти
-            stop_watcher_task.cancel()
+            # Точка входа в бесконечный цикл
+            await self.heartbeat.start() # Тут код заблокируется, пока агент работает
 
             # Если мы дошли сюда - агент остановился штатно
+            stop_watcher_task.cancel()
             return self._exit_code
 
         finally:

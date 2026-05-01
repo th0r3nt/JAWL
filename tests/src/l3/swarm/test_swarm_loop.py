@@ -120,6 +120,56 @@ async def test_subagent_forces_report_submission(mock_loop_deps, mock_openai_res
 
 
 @pytest.mark.asyncio
+@patch("src.l3_agent.swarm.loop.call_skill", new_callable=AsyncMock)
+async def test_subagent_llm_crash_forces_report(mock_call_skill, mock_loop_deps):
+    """Тест: Если LLM субагента падает с критической ошибкой (404/Timeout), он шлет краш-репорт."""
+    loop = SubagentLoop(**mock_loop_deps)
+
+    # Мокаем критическое падение LLM
+    loop._call_llm_with_retries = AsyncMock(return_value=None)
+
+    with patch.object(loop, "_dump_context_to_file"):
+        await loop.run()
+
+    # Убеждаемся, что цикл вызвал инструмент отправки отчета
+    mock_call_skill.assert_called_once()
+    args = mock_call_skill.call_args[0]
+
+    assert args[0] == "SubagentReport.submit_final_report"
+    assert "Сбой инициализации" in args[1]["report"]
+    assert "Модель недоступна" in args[1]["report"]
+
+
+@pytest.mark.asyncio
+@patch("src.l3_agent.swarm.loop.call_skill", new_callable=AsyncMock)
+async def test_subagent_timeout_forces_report(
+    mock_call_skill, mock_loop_deps, mock_openai_response
+):
+    """Тест: Если субагент зациклился и достиг max_steps, он принудительно шлет краш-репорт."""
+    loop = SubagentLoop(**mock_loop_deps)
+    loop.max_steps = 1
+
+    mock_session = AsyncMock()
+    # Агент возвращает разрешенное действие (Allowed.tool), но не отправляет отчет
+    mock_session.chat.completions.create.return_value = mock_openai_response(
+        '{"thoughts": "Working", "actions": [{"tool_name": "Allowed.tool", "parameters": {}}]}'
+    )
+    loop.llm.get_session.return_value = mock_session
+
+    with patch.object(loop, "_dump_context_to_file"):
+        await loop.run()
+
+    assert loop.is_done is False
+
+    # 2 вызова: 1-й это Allowed.tool из ответа модели, 2-й это принудительный submit_final_report
+    assert mock_call_skill.call_count == 2
+
+    forced_call = mock_call_skill.call_args_list[-1]
+    assert forced_call[0][0] == "SubagentReport.submit_final_report"
+    assert "Timeout Error" in forced_call[0][1]["report"]
+
+
+@pytest.mark.asyncio
 async def test_subagent_dump_context_to_file(mock_loop_deps, tmp_path):
     loop = SubagentLoop(**mock_loop_deps)
     messages = [{"role": "system", "content": "Hello"}]

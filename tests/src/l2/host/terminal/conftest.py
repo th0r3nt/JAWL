@@ -2,7 +2,7 @@ import pytest
 from pathlib import Path
 from unittest.mock import MagicMock, AsyncMock
 
-from src.l0_state.interfaces.state import HostTerminalState
+from src.l0_state.interfaces.host.terminal_state import HostTerminalState
 from src.utils.settings import HostTerminalConfig
 from src.utils.event.bus import EventBus
 from src.l2_interfaces.host.terminal.client import HostTerminalClient

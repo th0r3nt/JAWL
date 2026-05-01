@@ -13,7 +13,7 @@ from src.utils.logger import system_logger
 from src.utils.dtime import seconds_to_duration_str
 from src.utils.event.bus import EventBus
 from src.utils.event.registry import Events
-from src.l0_state.interfaces.state import HostOSState
+from src.l0_state.interfaces.host.os_state import HostOSState
 from src.l2_interfaces.host.os.client import HostOSClient
 
 

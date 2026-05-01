@@ -1,5 +1,5 @@
 from src.l2_interfaces.web.search.client import WebSearchClient
-from src.l0_state.interfaces.state import WebSearchState
+from src.l0_state.interfaces.web.search_state import WebSearchState
 
 
 def test_web_search_client_init():

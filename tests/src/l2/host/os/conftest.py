@@ -1,7 +1,7 @@
 import pytest
 from pathlib import Path
 from src.utils.settings import HostOSConfig
-from src.l0_state.interfaces.state import HostOSState
+from src.l0_state.interfaces.host.os_state import HostOSState
 from src.l2_interfaces.host.os.client import HostOSClient
 
 

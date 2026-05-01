@@ -1,4 +1,4 @@
-from src.l0_state.interfaces.state import WebHTTPState
+from src.l0_state.interfaces.web.http_state import WebHTTPState
 from src.utils.settings import WebHTTPConfig
 
 

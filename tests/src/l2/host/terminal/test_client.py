@@ -47,3 +47,43 @@ async def test_terminal_broadcast_message(terminal_client):
     written_data = mock_writer.write.call_args[0][0].decode("utf-8")
     assert "Я проснулся" in written_data
     assert "text" in written_data
+
+
+@pytest.mark.asyncio
+async def test_terminal_handle_client_json_payload(terminal_client):
+    """
+    Тест: TCP-сервер корректно парсит многострочные сообщения, отправленные в формате JSON,
+    предотвращая двойное срабатывание событий (дубликатов) в очереди.
+    """
+    # Мокаем очередь, чтобы отследить, что туда попадет
+    terminal_client.incoming_queue = AsyncMock()
+
+    mock_reader = AsyncMock()
+    mock_writer = MagicMock()
+    mock_writer.close = MagicMock()
+    mock_writer.wait_closed = AsyncMock()
+
+    # Имитируем поток данных из сокета:
+    # 1. Успешный Handshake
+    # 2. JSON-пакет с текстом, содержащим перенос строки
+    # 3. Пустая строка (клиент отключился)
+    payload = json.dumps({"text": "Строка 1\nСтрока 2"}) + "\n"
+
+    mock_reader.readline.side_effect = [b"JAWL_HANDSHAKE\n", payload.encode("utf-8"), b""]
+
+    await terminal_client._handle_client(mock_reader, mock_writer)
+
+    # Проверяем, что в очередь сообщений (для EventBus) попал строго ОДИН ивент _MESSAGE
+    # Несмотря на то, что внутри текста есть \n
+    message_calls = [
+        call
+        for call in terminal_client.incoming_queue.put.call_args_list
+        if call[0][0][0] == "_MESSAGE"
+    ]
+
+    assert len(message_calls) == 1
+    assert "Строка 1\nСтрока 2" in message_calls[0][0][0][1]
+
+    # Убеждаемся, что в стейт (MRU-кэш) тоже попала только одна запись
+    assert len(terminal_client.state.recent_messages) == 1
+    assert "Строка 1\nСтрока 2" in terminal_client.state.recent_messages[0]

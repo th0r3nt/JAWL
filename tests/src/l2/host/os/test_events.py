@@ -1,6 +1,6 @@
 import pytest
 from unittest.mock import MagicMock
-from src.l0_state.interfaces.state import HostOSState
+from src.l0_state.interfaces.host.os_state import HostOSState
 from src.utils.event.bus import EventBus
 from src.l2_interfaces.host.os.events import HostOSEvents
 from src.l2_interfaces.host.os.skills.monitoring import HostOSMonitoring

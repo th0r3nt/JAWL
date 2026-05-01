@@ -16,7 +16,7 @@ from playwright.async_api import async_playwright, Browser, BrowserContext, Page
 from src.utils.logger import system_logger
 from src.utils._tools import truncate_text
 from src.utils.settings import WebBrowserConfig
-from src.l0_state.interfaces.state import WebBrowserState
+from src.l0_state.interfaces.web.browser_state import WebBrowserState
 
 
 class WebBrowserClient:
@@ -73,7 +73,7 @@ class WebBrowserClient:
         Гарантирует, что браузер запущен. Автоматически скачивает Chromium при
         первом запуске, если бинарники отсутствуют на хосте.
         """
-        
+
         async with self._lock:
             if self.page and not self.page.is_closed():
                 return
