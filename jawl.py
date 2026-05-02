@@ -1,3 +1,4 @@
+# ФАЙЛ: jawl.py
 """
 Главный скрипт запуска фреймворка JAWL.
 Действует как умный бутстраппер: проверяет виртуальное окружение,
@@ -97,6 +98,31 @@ def setup_and_run() -> None:
 
     if not is_venv():
         if not venv_dir.exists():
+
+            # GUARD: Защита от слишком новых версий Python
+            if sys.version_info >= (3, 13):
+                print("\n[!] Внимание: Вы используете очень новую версию Python (3.13+).")
+                print(
+                    "[!] Многие ИИ-библиотеки еще не выпустили под нее скомпилированные бинарники."
+                )
+                print(
+                    "[!] Установка может зависнуть на этапе 'Preparing metadata' или завершиться ошибкой компиляции (Rust/C++)."
+                )
+                print("[!] Настоятельно рекомендуется использовать Python 3.11 или 3.12.\n")
+
+                answer = (
+                    input("Вы уверены, что хотите рискнуть и продолжить установку? (y/N): ")
+                    .strip()
+                    .lower()
+                )
+                if answer not in ("y", "yes", "д", "да"):
+                    print(
+                        "Установка отменена. Пожалуйста, запустите скрипт через Python 3.11 или 3.12."
+                    )
+                    sys.exit(0)
+                print()
+            # ----------------------------------------------------
+
             print("[*] JAWL Bootstrapper: Первичная инициализация.")
             print("[*] Создание виртуального окружения (venv).")
             venv.create(venv_dir, with_pip=True)
@@ -108,6 +134,13 @@ def setup_and_run() -> None:
             )
 
             if req_file.exists():
+                print("[*] Обновление pip.")
+                # Принудительно обновляем pip, чтобы он корректно подтягивал свежие wheels (.whl)
+                subprocess.run(
+                    [str(venv_python), "-m", "pip", "install", "--upgrade", "pip"],
+                    stdout=subprocess.DEVNULL,
+                )
+
                 print(
                     "[*] Установка зависимостей из requirements.txt. Пожалуйста, подождите несколько минут."
                 )
@@ -166,6 +199,12 @@ def setup_and_run() -> None:
         print("[*] Запуск автоматического восстановления.")
         time.sleep(2)
 
+        # Обновляем pip перед автовосстановлением
+        subprocess.run(
+            [sys.executable, "-m", "pip", "install", "--upgrade", "pip"],
+            stdout=subprocess.DEVNULL,
+        )
+
         # Проверяем код возврата при восстановлении
         result = subprocess.run([sys.executable, "-m", "pip", "install", "-r", str(req_file)])
 
@@ -219,3 +258,5 @@ if __name__ == "__main__":
         if os.name == "nt":
             input("\nНажмите Enter для выхода.")
         sys.exit(1)
+
+# КОНЕЦ ФАЙЛА 'jawl.py'
