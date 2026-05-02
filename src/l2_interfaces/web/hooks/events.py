@@ -16,7 +16,7 @@ from src.utils.event.bus import EventBus
 from src.utils.event.registry import Events
 from src.utils.dtime import get_now_formatted
 
-from src.l0_state.interfaces.web.hooks_state import WebHooksState
+from src.l2_interfaces.web.hooks.state import WebHooksState
 from src.l2_interfaces.web.hooks.client import WebHooksClient
 
 

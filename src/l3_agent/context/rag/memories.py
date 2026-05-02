@@ -21,7 +21,7 @@ if TYPE_CHECKING:
     from src.l1_databases.vector.management.thoughts import VectorThoughts
     from src.l1_databases.vector.embedding import EmbeddingModel
     from src.l1_databases.graph.manager import GraphManager
-    from src.l0_state.interfaces.telegram.telethon_state import TelethonState
+    from src.l2_interfaces.telegram.telethon.state import TelethonState
     from src.l0_state.agent.state import AgentState
 
 

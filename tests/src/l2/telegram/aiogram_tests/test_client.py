@@ -1,5 +1,5 @@
 import pytest
-from src.l0_state.interfaces.telegram.aiogram_state import AiogramState
+from src.l2_interfaces.telegram.aiogram.state import AiogramState
 from src.l2_interfaces.telegram.aiogram.client import AiogramClient
 
 

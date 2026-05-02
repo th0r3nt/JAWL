@@ -16,7 +16,7 @@ from src.utils.event.bus import EventBus
 from src.utils.event.registry import Events
 from src.utils.logger import system_logger
 
-from src.l0_state.interfaces.telegram.aiogram_state import AiogramState
+from src.l2_interfaces.telegram.aiogram.state import AiogramState
 from src.l2_interfaces.telegram.aiogram.client import AiogramClient
 
 

@@ -1,4 +1,4 @@
-from src.l0_state.interfaces.web.hooks_state import WebHooksState
+from src.l2_interfaces.web.hooks.state import WebHooksState
 from src.utils.settings import WebHooksConfig
 
 
@@ -27,7 +27,7 @@ class WebHooksClient:
             else "  Пока пусто."
         )
 
-        return (f"""
+        return f"""
 ### WEB HOOKS [ON]
 * Сервер: http://{self.state.host}:{self.state.port}
 
@@ -36,4 +36,4 @@ class WebHooksClient:
 
 * Последние вебхуки:
 {hooks_str}
-""")
+"""

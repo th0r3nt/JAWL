@@ -15,7 +15,7 @@ from typing import Union, Dict, Any
 
 from src.utils.logger import system_logger
 from src.utils.settings import HostOSConfig
-from src.l0_state.interfaces.host.os_state import HostOSState
+from src.l2_interfaces.host.os.state import HostOSState
 
 from src.l2_interfaces.host.os.deploy_manager import HostOSDeployManager
 

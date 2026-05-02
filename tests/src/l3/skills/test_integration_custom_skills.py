@@ -3,7 +3,7 @@ import shutil
 from pathlib import Path
 
 from src.utils.settings import HostOSConfig
-from src.l0_state.interfaces.host.os_state import HostOSState
+from src.l2_interfaces.host.os.state import HostOSState
 from src.l2_interfaces.host.os.client import HostOSClient, HostOSAccessLevel
 from src.l2_interfaces.host.os.skills.files.writer import HostOSWriter
 from src.l2_interfaces.host.os.skills.execution import HostOSExecution

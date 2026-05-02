@@ -1,6 +1,6 @@
 import pytest
 from unittest.mock import MagicMock
-from src.l0_state.interfaces.email_state import EmailState
+from src.l2_interfaces.email.state import EmailState
 from src.l2_interfaces.email.client import EmailClient
 
 

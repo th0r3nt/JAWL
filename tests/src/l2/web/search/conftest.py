@@ -1,6 +1,6 @@
 import pytest
 from src.l2_interfaces.web.search.client import WebSearchClient
-from src.l0_state.interfaces.web.search_state import WebSearchState
+from src.l2_interfaces.web.search.state import WebSearchState
 from src.l2_interfaces.web.search.skills.duckduckgo_search import DuckDuckGoSearch
 from src.l2_interfaces.web.search.skills.tavily_search import TavilySearch
 from src.l2_interfaces.web.search.skills.trafilatura_read import TrafilaturaReader

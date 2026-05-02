@@ -35,7 +35,7 @@ def setup_web_browser(system: "System") -> List[Any]:
     config = system.interfaces_config.web.browser
 
     if not hasattr(system, "web_browser_state"):
-        from src.l0_state.interfaces.web.browser_state import WebBrowserState
+        from src.l2_interfaces.web.browser.state import WebBrowserState
 
         system.web_browser_state = WebBrowserState()
 

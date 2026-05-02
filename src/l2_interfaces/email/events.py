@@ -13,7 +13,7 @@ from src.utils.logger import system_logger
 from src.utils.event.bus import EventBus
 from src.utils.event.registry import Events
 
-from src.l0_state.interfaces.email_state import EmailState
+from src.l2_interfaces.email.state import EmailState
 from src.l2_interfaces.email.client import EmailClient
 from src.l2_interfaces.email.utils import decode_mime_header
 

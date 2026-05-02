@@ -5,7 +5,7 @@ from src.utils.event.bus import EventBus
 from src.utils.event.registry import Events
 from src.utils._tools import clean_html
 
-from src.l0_state.interfaces.web.rss_state import WebRSSState
+from src.l2_interfaces.web.rss.state import WebRSSState
 from src.l2_interfaces.web.rss.client import WebRSSClient
 
 

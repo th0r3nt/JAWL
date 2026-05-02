@@ -5,7 +5,7 @@ from src.l3_agent.skills.registry import execute_skill, clear_registry, register
 from src.l3_agent.skills.schema import ActionCall
 
 from src.utils.settings import HostOSConfig
-from src.l0_state.interfaces.host.os_state import HostOSState
+from src.l2_interfaces.host.os.state import HostOSState
 from src.l2_interfaces.host.os.client import HostOSClient, HostOSAccessLevel
 from src.l2_interfaces.host.os.skills.files.writer import HostOSWriter
 

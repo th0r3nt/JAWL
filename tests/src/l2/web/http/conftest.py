@@ -1,6 +1,6 @@
 import pytest
 from src.utils.settings import WebHTTPConfig
-from src.l0_state.interfaces.web.http_state import WebHTTPState
+from src.l2_interfaces.web.http.state import WebHTTPState
 from src.l2_interfaces.web.http.client import WebHTTPClient
 
 

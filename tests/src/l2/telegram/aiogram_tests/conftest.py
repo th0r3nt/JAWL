@@ -2,7 +2,7 @@ import pytest
 from unittest.mock import AsyncMock, MagicMock
 
 from src.utils.event.bus import EventBus
-from src.l0_state.interfaces.telegram.aiogram_state import AiogramState
+from src.l2_interfaces.telegram.aiogram.state import AiogramState
 from src.l2_interfaces.telegram.aiogram.client import AiogramClient
 from src.l2_interfaces.telegram.aiogram.events import AiogramEvents
 

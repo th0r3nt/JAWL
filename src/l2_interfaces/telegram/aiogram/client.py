@@ -8,7 +8,7 @@ Stateful-клиент для работы с Telegram Bot API (через биб
 from typing import Any, Optional
 from aiogram import Bot
 from src.utils.logger import system_logger
-from src.l0_state.interfaces.telegram.aiogram_state import AiogramState
+from src.l2_interfaces.telegram.aiogram.state import AiogramState
 
 
 class AiogramClient:

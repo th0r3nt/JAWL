@@ -17,6 +17,7 @@ from src.l3_agent.skills.registry import register_instance  # noqa: F401
 from src.l3_agent.context.registry import ContextSection  # noqa: F401
 
 # В реальном коде импортируйте ваши модули:
+# from src.l2_interfaces.my_module.state import MyState
 # from src.l2_interfaces.my_module.client import MyClient
 # from src.l2_interfaces.my_module.events import MyEvents
 # from src.l2_interfaces.my_module.skills.tools import MySkills
@@ -30,7 +31,7 @@ def setup_example(system: "System", api_key: Optional[str] = None) -> List[Any]:
     Инициализирует интерфейс и интегрирует его в ядро JAWL.
 
     Args:
-        system (System): Главный DI-контейнер фреймворка (через него мы получаем доступ к EventBus и State).
+        system (System): Главный DI-контейнер фреймворка (через него мы получаем доступ к EventBus).
         api_key (Optional[str]): Пример ключа, который достается из .env файла в initializer.py.
 
     Returns:
@@ -42,10 +43,9 @@ def setup_example(system: "System", api_key: Optional[str] = None) -> List[Any]:
         system_logger.error("[Example] Ключ API не найден. Интерфейс принудительно отключен.")
         return []
 
-    # 1. Создаем стейт.
-    # В реальном коде вы должны создать стейт в src/l0_state/interfaces/state.py
-    # и прокинуть его сюда (например, system.example_state).
-    # Но для примера:
+    # 1. Получаем стейт (приборную панель).
+    # В реальном коде вы должны создать стейт в src/l2_interfaces/my_module/state.py
+    # и зарегистрировать его инициализацию в src/builder.py
     # state = system.example_state
 
     # 2. Инициализируем Клиент (Отвечает за I/O, сессии, запросы)

@@ -3,7 +3,7 @@ from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock
 
 from src.utils.settings import WebBrowserConfig
-from src.l0_state.interfaces.web.browser_state import WebBrowserState
+from src.l2_interfaces.web.browser.state import WebBrowserState
 from src.l2_interfaces.web.browser.client import WebBrowserClient
 
 

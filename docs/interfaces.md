@@ -34,20 +34,7 @@
 
 Создание нового интерфейса (например, `Discord`) всегда состоит из 5 шагов.
 
-### Шаг 1. Создание стейта (L0)
-Откройте файл `src/l0_state/interfaces/state.py` и добавьте класс-хранилище.
-**Правило:** Стейт должен быть пассивным. Никаких I/O операций. Только кэш данных.
-
-```python
-class DiscordState:
-    def __init__(self, recent_limit: int = 10):
-        self.is_online = False
-        self.last_messages = "Пусто." # Будет хранить последние сообщения с интерфейса
-```
-
-Добавьте его инициализацию в `src/main.py` внутри метода `setup_l0_state()`.
-
-### Шаг 2. Структура папок (L2)
+### Шаг 1. Структура папок и Стейт (L0)
 Создайте папку в `src/l2_interfaces/discord/` со следующей структурой:
 ```text
 discord/
@@ -57,15 +44,28 @@ discord/
 ├── __init__.py
 ├── bootstrap.py        # Инициализатор
 ├── client.py           # Менеджер соединения
-└── events.py           # Фоновые слушатели и поллинг (уши агента)
+├── events.py           # Фоновые слушатели (уши агента)
+└── state.py            # Приборная панель (L0 State)
 ```
 
-### Шаг 3. Написание Клиента (`client.py`)
+Откройте `state.py` и добавьте класс-хранилище.
+**Правило:** Стейт должен быть пассивным. Никаких I/O операций. Только кэш данных.
+
+```python
+class DiscordState:
+    def __init__(self, recent_limit: int = 10):
+        self.is_online = False
+        self.last_messages = "Пусто." # Будет хранить последние сообщения с интерфейса
+```
+
+Зарегистрируйте инициализацию этого стейта в `src/builder.py` внутри метода `build_l0_state()`.
+
+### Шаг 2. Написание Клиента (`client.py`)
 Клиент инкапсулирует подключение к API и хранит ссылку на стейт (L0). 
 Обязательный метод - `get_context_block`. Это то, что агент будет "видеть" в своем системном промпте на каждом тике.
 
 ```python
-from src.l0_state.interfaces.discord_state import DiscordState
+from src.l2_interfaces.discord.state import DiscordState
 
 class DiscordClient:
     def __init__(self, state: DiscordState, token: str):
@@ -79,9 +79,9 @@ class DiscordClient:
         return f"### DISCORD [ON]\nПоследние сообщения:\n{self.state.last_messages}"
 ```
 
-### Шаг 4. Написание Навыков (`skills/messages.py`)
+### Шаг 3. Написание Навыков (`skills/messages.py`)
 Навыки - это то, что агент может вызывать. 
-**Правило:** Навыки должны возвращать объект `SkillResult`. Все методы для агента помечаются декоратором `@skill()` - также рекомендуется писать подробные докстринги навыков для агента.
+**Правило:** Навыки должны возвращать объект `SkillResult`. Все методы для агента помечаются декоратором `@skill()`.
 
 ```python
 from src.l3_agent.skills.registry import skill, SkillResult
@@ -101,13 +101,15 @@ class DiscordMessages:
             return SkillResult.fail(f"Ошибка отправки: {e}")
 ```
 
-### Шаг 5. Сборка и Регистрация (`bootstrap.py` и `initializer.py`)
+### Шаг 4. Сборка (`bootstrap.py`)
 В `bootstrap.py` мы связываем всё воедино и отдаем системе.
 
 ```python
 from typing import List, Any
 from src.l3_agent.skills.registry import register_instance
 from src.l3_agent.context.registry import ContextSection
+from src.l2_interfaces.discord.client import DiscordClient
+from src.l2_interfaces.discord.skills.messages import DiscordMessages
 
 def setup_discord(system, token: str) -> List[Any]:
     client = DiscordClient(state=system.discord_state, token=token)
@@ -126,6 +128,7 @@ def setup_discord(system, token: str) -> List[Any]:
     return [client]
 ```
 
+### Шаг 5. Регистрация в Ядре
 Осталось только вызвать `setup_discord` внутри `src/l2_interfaces/initializer.py`.
 
 ### 📌 Чек-лист хорошего интерфейса:

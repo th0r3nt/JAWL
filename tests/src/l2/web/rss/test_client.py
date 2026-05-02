@@ -1,6 +1,6 @@
 import pytest
 from src.l2_interfaces.web.rss.client import WebRSSClient
-from src.l0_state.interfaces.web.rss_state import WebRSSState
+from src.l2_interfaces.web.rss.state import WebRSSState
 from src.utils.settings import WebRSSConfig
 
 

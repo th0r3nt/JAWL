@@ -4,7 +4,7 @@ from pathlib import Path
 from src.utils.event.bus import EventBus
 from src.utils.event.registry import Events
 from src.utils.settings import HostOSConfig
-from src.l0_state.interfaces.host.os_state import HostOSState
+from src.l2_interfaces.host.os.state import HostOSState
 from src.l2_interfaces.host.os.client import HostOSClient, HostOSAccessLevel
 from src.l2_interfaces.host.os.polls.file_watcher import FileWatcher
 

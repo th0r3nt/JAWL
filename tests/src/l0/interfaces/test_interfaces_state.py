@@ -1,11 +1,11 @@
 import pytest
 
-from src.l0_state.interfaces.telegram.aiogram_state import AiogramState
-from src.l0_state.interfaces.host.os_state import HostOSState
-from src.l0_state.interfaces.host.terminal_state import HostTerminalState
-from src.l0_state.interfaces.web.search_state import WebSearchState
-from src.l0_state.interfaces.calendar_state import CalendarState
-from src.l0_state.interfaces.custom_state import CustomDashboardState
+from src.l2_interfaces.telegram.aiogram.state import AiogramState
+from src.l2_interfaces.host.os.state import HostOSState
+from src.l2_interfaces.host.terminal.state import HostTerminalState
+from src.l2_interfaces.web.search.state import WebSearchState
+from src.l2_interfaces.calendar.state import CalendarState
+from src.l2_interfaces.meta.state import CustomDashboardState
 
 
 def test_host_terminal_state_init():

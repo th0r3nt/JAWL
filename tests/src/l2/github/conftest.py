@@ -1,6 +1,6 @@
 import pytest
 from unittest.mock import AsyncMock
-from src.l0_state.interfaces.github_state import GithubState
+from src.l2_interfaces.github.state import GithubState
 from src.utils.settings import GithubConfig
 from src.l2_interfaces.github.client import GithubClient
 

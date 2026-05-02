@@ -1,7 +1,7 @@
 import pytest
 from unittest.mock import AsyncMock, MagicMock
 from src.utils.settings import WebHooksConfig
-from src.l0_state.interfaces.web.hooks_state import WebHooksState
+from src.l2_interfaces.web.hooks.state import WebHooksState
 from src.l2_interfaces.web.hooks.client import WebHooksClient
 from src.l2_interfaces.web.hooks.events import WebHooksEvents
 

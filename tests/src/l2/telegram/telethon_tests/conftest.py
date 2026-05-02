@@ -3,7 +3,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 from src.utils.event.bus import EventBus
 from src.utils.settings import TelethonConfig
-from src.l0_state.interfaces.telegram.telethon_state import TelethonState
+from src.l2_interfaces.telegram.telethon.state import TelethonState
 from src.l2_interfaces.telegram.telethon.client import TelethonClient
 from src.l2_interfaces.telegram.telethon.events import TelethonEvents
 

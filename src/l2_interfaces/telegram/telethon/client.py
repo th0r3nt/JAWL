@@ -11,7 +11,7 @@ from telethon import TelegramClient
 from telethon.tl.functions.users import GetFullUserRequest
 
 from src.utils.logger import system_logger
-from src.l0_state.interfaces.telegram.telethon_state import TelethonState
+from src.l2_interfaces.telegram.telethon.state import TelethonState
 
 
 class TelethonClient:

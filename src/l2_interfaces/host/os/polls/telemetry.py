@@ -5,7 +5,7 @@ import psutil
 
 from src.utils.logger import system_logger
 from src.utils.dtime import get_now_formatted, seconds_to_duration_str
-from src.l0_state.interfaces.host.os_state import HostOSState
+from src.l2_interfaces.host.os.state import HostOSState
 from src.l2_interfaces.host.os.client import HostOSClient
 
 

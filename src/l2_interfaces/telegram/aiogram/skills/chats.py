@@ -6,7 +6,7 @@
 после старта системы (MRU-кэш).
 """
 
-from src.l0_state.interfaces.telegram.aiogram_state import AiogramState
+from src.l2_interfaces.telegram.aiogram.state import AiogramState
 from src.l2_interfaces.telegram.aiogram.client import AiogramClient
 
 from src.l3_agent.skills.registry import SkillResult, skill

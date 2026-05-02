@@ -21,19 +21,19 @@ from src.utils.event.bridge import EventBridge # Строитель
 
 if TYPE_CHECKING:
     from src.l0_state.agent.state import AgentState
-    from src.l0_state.interfaces.host.os_state import HostOSState
-    from src.l0_state.interfaces.host.terminal_state import HostTerminalState
-    from src.l0_state.interfaces.telegram.telethon_state import TelethonState
-    from src.l0_state.interfaces.telegram.aiogram_state import AiogramState
-    from src.l0_state.interfaces.github_state import GithubState
-    from src.l0_state.interfaces.email_state import EmailState
-    from src.l0_state.interfaces.web.search_state import WebSearchState
-    from src.l0_state.interfaces.web.http_state import WebHTTPState
-    from src.l0_state.interfaces.web.browser_state import WebBrowserState
-    from src.l0_state.interfaces.web.hooks_state import WebHooksState
-    from src.l0_state.interfaces.web.rss_state import WebRSSState
-    from src.l0_state.interfaces.calendar_state import CalendarState
-    from src.l0_state.interfaces.custom_state import CustomDashboardState
+    from src.l2_interfaces.host.os.state import HostOSState
+    from src.l2_interfaces.host.terminal.state import HostTerminalState
+    from src.l2_interfaces.telegram.telethon.state import TelethonState
+    from src.l2_interfaces.telegram.aiogram.state import AiogramState
+    from src.l2_interfaces.github.state import GithubState
+    from src.l2_interfaces.email.state import EmailState
+    from src.l2_interfaces.web.search.state import WebSearchState
+    from src.l2_interfaces.web.http.state import WebHTTPState
+    from src.l2_interfaces.web.browser.state import WebBrowserState
+    from src.l2_interfaces.web.hooks.state import WebHooksState
+    from src.l2_interfaces.web.rss.state import WebRSSState
+    from src.l2_interfaces.calendar.state import CalendarState
+    from src.l2_interfaces.meta.state import CustomDashboardState
 
     from src.l1_databases.sql.manager import SQLManager
     from src.l1_databases.vector.manager import VectorManager

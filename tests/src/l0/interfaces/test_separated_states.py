@@ -5,10 +5,10 @@ Unit-тесты логики для разбитых файлов состоян
 корректно ограничивают свою длину и обрезают старые записи (чтобы контекст не переполнялся).
 """
 
-from src.l0_state.interfaces.github_state import GithubState
-from src.l0_state.interfaces.web.browser_state import WebBrowserState
-from src.l0_state.interfaces.web.http_state import WebHTTPState
-from src.l0_state.interfaces.web.search_state import WebSearchState
+from src.l2_interfaces.github.state import GithubState
+from src.l2_interfaces.web.browser.state import WebBrowserState
+from src.l2_interfaces.web.http.state import WebHTTPState
+from src.l2_interfaces.web.search.state import WebSearchState
 
 
 def test_github_state_history_limits() -> None:

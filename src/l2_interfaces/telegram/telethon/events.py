@@ -24,7 +24,7 @@ from src.utils.event.registry import Events
 if TYPE_CHECKING:
     from src.utils.settings import TelethonConfig
 
-from src.l0_state.interfaces.telegram.telethon_state import TelethonState
+from src.l2_interfaces.telegram.telethon.state import TelethonState
 from src.l2_interfaces.telegram.telethon.client import TelethonClient
 from src.l2_interfaces.telegram.telethon.utils._message_parser import TelethonMessageParser
 

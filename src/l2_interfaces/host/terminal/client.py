@@ -14,7 +14,7 @@ from typing import Any, Optional
 from src.utils.logger import system_logger
 from src.utils.dtime import get_now_formatted
 from src.utils.settings import HostTerminalConfig
-from src.l0_state.interfaces.host.terminal_state import HostTerminalState
+from src.l2_interfaces.host.terminal.state import HostTerminalState
 
 
 class HostTerminalClient:

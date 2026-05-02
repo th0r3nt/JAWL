@@ -16,7 +16,7 @@ from playwright.async_api import async_playwright, Browser, BrowserContext, Page
 from src.utils.logger import system_logger
 from src.utils._tools import truncate_text
 from src.utils.settings import WebBrowserConfig
-from src.l0_state.interfaces.web.browser_state import WebBrowserState
+from src.l2_interfaces.web.browser.state import WebBrowserState
 
 
 class WebBrowserClient:
