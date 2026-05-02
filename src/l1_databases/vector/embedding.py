@@ -88,3 +88,31 @@ class EmbeddingModel:
         embeddings_list = list(embedding_generator)
 
         return embeddings_list[0].tolist()
+
+    async def get_embeddings_batch(self, texts: list[str]) -> list[list[float]]:
+        """
+        Генерирует эмбеддинги для массива строк одновременно (Batching).
+        Используется в механизме GraphRAG для резкого ускорения векторизации
+        множественных запросов (нейросети работают с батчами на порядки быстрее).
+
+        Args:
+            texts: Список текстов для векторизации.
+
+        Returns:
+            Список тензоров (List of lists of floats).
+
+        Raises:
+            RuntimeError: Если модель не инициализирована.
+        """
+        
+        if not self.model:
+            raise RuntimeError("Ошибка: модель не инициализирована.")
+
+        if not texts:
+            return []
+
+        # FastEmbed поддерживает передачу списка строк
+        embedding_generator = await asyncio.to_thread(self.model.embed, texts)
+
+        # Конвертируем генератор numpy array в обычный питоновский список списков
+        return [emb.tolist() for emb in embedding_generator]

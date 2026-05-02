@@ -183,7 +183,6 @@ class LLMConfig(BaseModel):
     max_react_steps: int = 15
 
 
-
 class LoggingConfig(BaseModel):
     max_file_size_mb: float = 5.0
     backup_count: int = 1
@@ -193,8 +192,15 @@ class VectorDBConfig(BaseModel):
     similarity_threshold: float = 0.65
     embedding_model: str = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
     vector_size: int = 384
-    auto_rag_top_k: int = 1
-    auto_rag_max_query_chars: int = 200
+
+
+class RAGConfig(BaseModel):
+    enabled: bool = True
+    extraction_engine: str = "flashtext"
+    depth_limit: int = 2
+    max_vector_blocks: int = 5
+    max_graph_nodes: int = 5
+    max_query_chars: int = 200
 
 
 class ContextDepthConfig(BaseModel):
@@ -205,6 +211,8 @@ class ContextDepthConfig(BaseModel):
     tick_thoughts_short_max_chars: int = 1000
     tick_action_short_max_chars: int = 100
     tick_result_short_max_chars: int = 500
+
+    rag: RAGConfig = Field(default_factory=RAGConfig)
 
 
 class EventAccelerationConfig(BaseModel):
@@ -246,6 +254,19 @@ class SQLConfig(BaseModel):
     mental_states: MentalStatesConfig = Field(default_factory=MentalStatesConfig)
     drives: DrivesConfig = Field(default_factory=DrivesConfig)
 
+
+class GraphDBConfig(BaseModel):
+    enabled: bool = True
+    max_nodes: int = 5000
+    max_edges_per_node: int = 20
+
+
+class DBConfig(BaseModel):
+    sql: SQLConfig = Field(default_factory=SQLConfig)
+    vector: VectorDBConfig = Field(default_factory=VectorDBConfig)
+    graph: GraphDBConfig = Field(default_factory=GraphDBConfig)
+
+
 class SwarmContextDepthConfig(BaseModel):
     max_steps: int = 20
     detailed_steps: int = 5
@@ -254,6 +275,7 @@ class SwarmContextDepthConfig(BaseModel):
     thoughts_short_max_chars: int = 2000
     action_short_max_chars: int = 500
     result_short_max_chars: int = 1000
+
 
 class SwarmConfig(BaseModel):
     enabled: bool = False
@@ -265,7 +287,7 @@ class SwarmConfig(BaseModel):
 class SystemConfig(BaseModel):
     timezone: int = 0
     logging: LoggingConfig = Field(default_factory=LoggingConfig)
-    vector_db: VectorDBConfig = Field(default_factory=VectorDBConfig)
+    db: DBConfig = Field(default_factory=DBConfig)
     heartbeat_interval: int = 300
     continuous_cycle: bool = False
     proactive_guidance: bool = False
@@ -273,9 +295,7 @@ class SystemConfig(BaseModel):
         default_factory=EventAccelerationConfig
     )
     context_depth: ContextDepthConfig = Field(default_factory=ContextDepthConfig)
-
     swarm: SwarmConfig = Field(default_factory=SwarmConfig)
-    sql: SQLConfig = Field(default_factory=SQLConfig)
 
 
 class SettingsConfig(BaseModel):

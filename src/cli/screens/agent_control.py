@@ -47,6 +47,7 @@ def _is_agent_running() -> bool:
 def _check_and_setup_env() -> tuple[bool, bool]:
     """
     Проверяет наличие файла .env и базовых ключей.
+    Обеспечивает авто-настройку для локальных LLM (Ollama/vLLM) без лишних вопросов.
     Возвращает: (Успех_проверки, Были_ли_созданы_или_изменены_файлы)
     """
 
@@ -81,6 +82,8 @@ def _check_and_setup_env() -> tuple[bool, bool]:
             f.writelines(env_content)
 
     key_found = False
+    local_url_found = False
+
     for line in env_content:
         line_stripped = line.strip()
         # Ищем любой ключ, начинающийся на LLM_API_KEY_
@@ -88,39 +91,76 @@ def _check_and_setup_env() -> tuple[bool, bool]:
             val = line_stripped.split("=", 1)[1].strip("\"' ")
             if len(val) > 0:
                 key_found = True
-                break
+        # Ищем, не указал ли юзер локальный URL
+        elif line_stripped.startswith("LLM_API_URL=") and "=" in line_stripped:
+            val = line_stripped.split("=", 1)[1].strip("\"' ").lower()
+            if "localhost" in val or "127.0.0.1" in val or "0.0.0.0" in val:
+                local_url_found = True
 
     if not key_found:
-        print_info(" Похоже, вы еще не настроили подключение к LLM.")
-        api_url = questionary.text(
-            "Введите Base URL для LLM (например, ссылку для Gemini или локальной модели).\nОставьте пустым для стандартного OpenAI API:"
-        ).ask()
+        if local_url_found:
+            # Автоматически добавляем заглушку без лишних вопросов
+            new_content = []
+            for line in env_content:
+                if line.startswith("LLM_API_KEY_1="):
+                    new_content.append('LLM_API_KEY_1="local_dummy_key"\n')
+                else:
+                    new_content.append(line)
+            with open(ENV_FILE, "w", encoding="utf-8") as f:
+                f.writelines(new_content)
+            print_info(
+                " Обнаружен локальный URL без ключа. Добавлена заглушка 'local_dummy_key'."
+            )
+            was_modified = True
+        else:
+            print_info(" Похоже, вы еще не настроили подключение к LLM.")
+            api_url = questionary.text(
+                "Введите Base URL для LLM (например, ссылку для Gemini или локальной модели).\nОставьте пустым для стандартного OpenAI API:"
+            ).ask()
 
-        if api_url is None:
-            return False, False
+            if api_url is None:
+                return False, False
 
-        api_key = questionary.text("Введите ваш LLM API Key (Обязательно):").ask()
+            is_local = False
+            if api_url:
+                url_lower = api_url.lower()
+                if (
+                    "localhost" in url_lower
+                    or "127.0.0.1" in url_lower
+                    or "0.0.0.0" in url_lower
+                ):
+                    is_local = True
 
-        if not api_key:
-            print_error("Запуск отменен: API ключ обязателен для работы агента.")
-            return False, False
+            api_key = questionary.text(
+                "Введите ваш LLM API Key (Обязательно для облачных моделей, для локальных - пропустить):"
+            ).ask()
 
-        new_content = []
-        for line in env_content:
-            if line.startswith("LLM_API_KEY_1="):
-                new_content.append(f'LLM_API_KEY_1="{api_key.strip()}"\n')
+            if not api_key:
+                if is_local:
+                    api_key = "local_dummy_key"
+                    print_info(
+                        " API ключ не указан, но обнаружен локальный URL."
+                    )
+                else:
+                    print_error(
+                        "Запуск отменен: API ключ обязателен для работы агента (если модель не локальная)."
+                    )
+                    return False, False
 
-            elif line.startswith("LLM_API_URL="):
-                new_content.append(f'LLM_API_URL="{api_url.strip()}"\n')
+            new_content = []
+            for line in env_content:
+                if line.startswith("LLM_API_KEY_1="):
+                    new_content.append(f'LLM_API_KEY_1="{api_key.strip()}"\n')
+                elif line.startswith("LLM_API_URL="):
+                    new_content.append(f'LLM_API_URL="{api_url.strip()}"\n')
+                else:
+                    new_content.append(line)
 
-            else:
-                new_content.append(line)
+            with open(ENV_FILE, "w", encoding="utf-8") as f:
+                f.writelines(new_content)
 
-        with open(ENV_FILE, "w", encoding="utf-8") as f:
-            f.writelines(new_content)
-
-        print_success("Настройки LLM успешно сохранены в .env")
-        was_modified = True
+            print_success("Настройки LLM успешно сохранены в .env")
+            was_modified = True
 
     return True, was_modified
 
@@ -149,7 +189,7 @@ def _validate_configs() -> bool:
     try:
         load_config()
         return True
-    
+
     except ValidationError as e:
         print_error("Ошибка структуры конфигурации (yaml не совпадает со схемой):")
         for err in e.errors():
@@ -160,7 +200,7 @@ def _validate_configs() -> bool:
             "\n 💡 Подсказка: если вы обновили JAWL, удалите старые файлы settings.yaml и interfaces.yaml в папке config/, чтобы система пересоздала их из актуальных шаблонов."
         )
         return False
-    
+
     except Exception as e:
         print_error(f"Критическая ошибка при чтении настроек: {e}")
         return False
@@ -256,7 +296,7 @@ def start_agent_screen() -> None:
 
     if configs_created or prompts_created or env_modified:
         print("\n")
-        print_info(" [Первичная инициализация завершена]")
+        print_info("[Первичная инициализация завершена]")
         print("\n")
         print_info(" Были созданы базовые файлы конфигурации.")
         print_info(
@@ -294,7 +334,7 @@ def start_agent_screen() -> None:
     else:
         kwargs["start_new_session"] = True
 
-    crash_log_path = ROOT_DIR / "logs" / "startup" /"startup_error.log"
+    crash_log_path = ROOT_DIR / "logs" / "startup" / "startup_error.log"
     crash_log_path.parent.mkdir(parents=True, exist_ok=True)
 
     try:
@@ -311,7 +351,7 @@ def start_agent_screen() -> None:
                 **kwargs,
             )
             PID_FILE.write_text(str(process.pid))
-            
+
         finally:
             # Родительский процесс закрывает свой хэндл, дочерний продолжает писать
             f_err.close()

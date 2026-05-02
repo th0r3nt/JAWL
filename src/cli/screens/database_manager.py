@@ -138,7 +138,7 @@ def _manage_sql_module(
     """Универсальный экран управления (Tasks, Traits, Mental States)."""
     style = get_custom_style()
     settings = _get_settings()
-    cfg = settings["system"]["sql"][config_key]
+    cfg = settings["system"]["db"]["sql"][config_key]
 
     while True:
         clear_screen()
@@ -319,7 +319,7 @@ def _manage_drives_screen():
     while True:
         clear_screen()
         settings = _get_settings()
-        cfg = settings["system"]["sql"]["drives"]
+        cfg = settings["system"]["db"]["sql"]["drives"]
         stats = _get_sql_stats()
         status_str = "[ON]" if cfg["enabled"] else "[OFF]"
 
@@ -457,6 +457,7 @@ def _manage_vector_collection(collection_name: str):
                 if next_offset is not None and current_page_idx + 1 == len(offset_history):
                     offset_history.append(next_offset)
             client.close()
+
         except Exception as e:
             print_error(f"Ошибка чтения БД: {e}")
             wait_for_enter()
@@ -526,12 +527,12 @@ def _manage_vector_collection(collection_name: str):
 
         elif choice == "nuke":
             if questionary.confirm(
-                f"ВНИМАНИЕ! Это удалит ВСЕ записи из {collection_name}. Уверены?",
+                f"Внимание. Это удалит ВСЕ записи из {collection_name}. Вы уверены?",
                 default=False,
                 qmark="⚠️ ",
             ).ask():
                 client = QdrantClient(path=str(VECTOR_DB_DIR))
-                size = _get_settings()["system"]["vector_db"]["vector_size"]
+                size = _get_settings()["system"]["db"]["vector"]["vector_size"]
                 client.delete_collection(collection_name)
                 client.create_collection(
                     collection_name=collection_name,
@@ -596,7 +597,7 @@ def database_manager_screen() -> None:
         draw_header()
 
         settings = _get_settings()
-        sql_cfg = settings.get("system", {}).get("sql", {})
+        sql_cfg = settings.get("system", {}).get("db", {}).get("sql", {})
 
         s_stats = _get_sql_stats()
         v_stats = _get_vector_stats()

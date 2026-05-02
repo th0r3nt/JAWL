@@ -73,10 +73,10 @@ class MetaConfigurator:
         """
 
         db_keys_map = {
-            "tasks": ["system", "sql", "tasks", "max_tasks"],
-            "personality_traits": ["system", "sql", "personality_traits", "max_traits"],
-            "mental_states": ["system", "sql", "mental_states", "max_entities"],
-            "drives_custom": ["system", "sql", "drives", "max_custom_drives"],
+            "tasks": ["system", "db", "sql", "tasks", "max_tasks"],
+            "personality_traits": ["system", "db", "sql", "personality_traits", "max_traits"],
+            "mental_states": ["system", "db", "sql", "mental_states", "max_entities"],
+            "drives_custom": ["system", "db", "sql", "drives", "max_custom_drives"],
         }
 
         path_keys = db_keys_map.get(database)

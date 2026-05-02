@@ -22,15 +22,6 @@ system:
   logging:
     max_file_size_mb: 5.0
     backup_count: 1
-
-  vector_db:
-    similarity_threshold: 0.65
-
-    # Подробнее: docs/yaml/settings/vector_db.md 
-    embedding_model: "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
-    vector_size: 384
-    auto_rag_top_k: 1
-    auto_rag_max_query_chars: 200
     
   # Подробнее: docs/yaml/settings/heartbeat.md
   heartbeat_interval: 600
@@ -55,27 +46,50 @@ system:
     tick_action_short_max_chars: 100 
     tick_result_short_max_chars: 500
 
-  # Подробнее: docs/yaml/settings/sql_db.md
-  sql:
-    tasks: 
+    # Подробнее: docs/yaml/settings/rag.md
+    rag:
       enabled: true
-      max_tasks: 10
+      depth_limit: 2               # Глубина поиска (1 = только первичный поиск)
+      max_vector_blocks: 5         # Лимит текстовых блоков из векторной БД
+      max_graph_nodes: 5           # Лимит узлов из графовой БД
+      max_query_chars: 200         # Лимит символов на один чанк текстового запроса
 
-    personality_traits:
-      enabled: true
-      max_traits: 10
 
-    mental_states:
-      enabled: true
-      max_entities: 10
+  db:
+    # Подробнее: docs/yaml/settings/vector_db.md 
+    vector:
+      similarity_threshold: 0.65
+      embedding_model: "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+      vector_size: 384
+      
+    # Подробнее: docs/yaml/settings/sql_db.md
+    sql:
+      tasks: 
+        enabled: true
+        max_tasks: 10
 
-    # Подробнее: docs/yaml/settings/drives.md
-    drives:
+      personality_traits:
+        enabled: true
+        max_traits: 10
+
+      mental_states:
+        enabled: true
+        max_entities: 10
+
+      # Подробнее: docs/yaml/settings/drives.md
+      drives:
+        enabled: true
+        decay_rate: 10.0
+        decay_interval_sec: 900
+        max_reflections_history: 3
+        max_custom_drives: 5
+
+    # Подробнее: docs/yaml/settings/graph_db.md
+    graph:
       enabled: true
-      decay_rate: 10.0
-      decay_interval_sec: 900
-      max_reflections_history: 3
-      max_custom_drives: 5
+      max_nodes: 5000
+      max_edges_per_node: 20
+
 
   # Подробнее: docs/subagents.md
   swarm:

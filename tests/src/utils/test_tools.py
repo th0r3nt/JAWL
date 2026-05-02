@@ -15,6 +15,7 @@ from src.utils._tools import (
     truncate_text,
     clean_html,
     validate_sandbox_path,
+    draw_image_grid,
 )
 
 
@@ -102,3 +103,35 @@ class TestGatekeeper:
 
         with pytest.raises(PermissionError, match="Доступ запрещен"):
             validate_sandbox_path(forbidden_path)
+
+
+# === НОВЫЕ ТЕСТЫ: ПРОВЕРКА PIL ИЗОБРАЖЕНИЙ ===
+
+
+class TestImageGrid:
+    """Группа тестов для алгоритма наложения координатной сетки."""
+
+    def test_draw_image_grid_creates_correct_overlay(self, tmp_path):
+        """Проверяет, что сетка накладывается без вылетов и корректно переводит картинку в RGB."""
+        from PIL import Image
+
+        # Создаем тестовое изображение
+        test_img_path = tmp_path / "test_screenshot.png"
+        img = Image.new("RGBA", (300, 300), color=(255, 255, 255, 255))
+        img.save(test_img_path)
+
+        # Вызываем функцию наложения сетки (шаг 100px)
+        draw_image_grid(test_img_path, step=100)
+
+        # Загружаем сохраненный результат и проверяем параметры
+        with Image.open(test_img_path) as modified_img:
+            # Изображение должно быть конвертировано в RGB для совместимости
+            assert modified_img.mode == "RGB"
+            assert modified_img.size == (300, 300)
+
+            # Поскольку мы нарисовали линии с шагом 100, пиксель (100, 0)
+            # должен быть красным (так как overlay линия (255, 0, 0, 80) легла на белый фон)
+            r, g, b = modified_img.getpixel((100, 0))
+            assert r == 255  # Красный канал максимальный
+            assert g < 255  # Зеленый просел из-за альфа-канала (краска легла)
+            assert b < 255  # Синий просел

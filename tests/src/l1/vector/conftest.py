@@ -32,6 +32,14 @@ class MockEmbeddingModel:
             # Дефолтный вектор для всего остального ("шум")
             return [0.0, 0.0, 1.0]
 
+    async def get_embeddings_batch(self, texts: list[str]) -> list[list[float]]:
+        """Эмуляция батчевой генерации эмбеддингов для механизма Vector-Graph RAG."""
+        results = []
+        for text in texts:
+            # Для тестов просто в цикле дергаем одиночный метод
+            results.append(await self.get_embedding(text))
+        return results
+
 
 @pytest_asyncio.fixture
 async def vector_db(tmp_path):

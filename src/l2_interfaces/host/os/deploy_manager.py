@@ -191,13 +191,16 @@ class HostOSDeployManager:
 
         # 1. Восстанавливаем оригиналы
         for root, dirs, files in os.walk(self.backup_dir):
+            if "__pycache__" in root:
+                continue
             for file in files:
-                if file in (".deploy_active", ".newfiles_manifest"):
+                if file in (".deploy_active", ".newfiles_manifest") or file.endswith(".pyc"):
                     continue
                 backup_path = Path(root) / file
                 rel_path = backup_path.relative_to(self.backup_dir)
                 target_path = self.framework_dir / rel_path
 
+                target_path.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(backup_path, target_path)
 
         # 2. Удаляем файлы, которых не было до сессии

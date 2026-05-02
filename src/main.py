@@ -4,7 +4,7 @@ import asyncio
 import traceback
 from pathlib import Path
 from dotenv import load_dotenv
-from typing import Optional, Any
+from typing import Optional, Any, TYPE_CHECKING
 
 from src.utils._tools import get_pid_file_path
 from src.utils.logger import system_logger, apply_logger_config
@@ -15,9 +15,32 @@ from src.l3_agent.context.registry import ContextRegistry
 from src.l3_agent.skills.registry import clear_registry
 from src import __version__
 
-# Архитектурные обертки (Паттерны: Фасад и Строитель)
-from src.builder import SystemBuilder
-from src.utils.event.bridge import EventBridge
+# Архитектурные обертки
+from src.builder import SystemBuilder # Фасад
+from src.utils.event.bridge import EventBridge # Строитель
+
+if TYPE_CHECKING:
+    from src.l0_state.agent.state import AgentState
+    from src.l0_state.interfaces.host.os_state import HostOSState
+    from src.l0_state.interfaces.host.terminal_state import HostTerminalState
+    from src.l0_state.interfaces.telegram.telethon_state import TelethonState
+    from src.l0_state.interfaces.telegram.aiogram_state import AiogramState
+    from src.l0_state.interfaces.github_state import GithubState
+    from src.l0_state.interfaces.email_state import EmailState
+    from src.l0_state.interfaces.web.search_state import WebSearchState
+    from src.l0_state.interfaces.web.http_state import WebHTTPState
+    from src.l0_state.interfaces.web.browser_state import WebBrowserState
+    from src.l0_state.interfaces.web.hooks_state import WebHooksState
+    from src.l0_state.interfaces.web.rss_state import WebRSSState
+    from src.l0_state.interfaces.calendar_state import CalendarState
+    from src.l0_state.interfaces.custom_state import CustomDashboardState
+
+    from src.l1_databases.sql.manager import SQLManager
+    from src.l1_databases.vector.manager import VectorManager
+    from src.l1_databases.graph.manager import GraphManager
+
+    from src.l3_agent.heartbeat import Heartbeat
+    from src.l3_agent.llm.client import LLMClient
 
 
 class System:
@@ -47,27 +70,28 @@ class System:
         self._exit_code: int = 0  # 0 - выключение, 1 - перезагрузка
 
         # Заглушки L0 (Заполняются через SystemBuilder)
-        self.agent_state = None
-        self.os_state = None
-        self.terminal_state = None
-        self.telethon_state = None
-        self.aiogram_state = None
-        self.github_state = None
-        self.email_state = None
-        self.web_search_state = None
-        self.web_http_state = None
-        self.web_browser_state = None
-        self.web_hooks_state = None
-        self.web_rss_state = None
-        self.calendar_state = None
-        self.dashboard_state = None
+        self.agent_state: Optional["AgentState"] = None
+        self.os_state: Optional["HostOSState"] = None
+        self.terminal_state: Optional["HostTerminalState"] = None
+        self.telethon_state: Optional["TelethonState"] = None
+        self.aiogram_state: Optional["AiogramState"] = None
+        self.github_state: Optional["GithubState"] = None
+        self.email_state: Optional["EmailState"] = None
+        self.web_search_state: Optional["WebSearchState"] = None
+        self.web_http_state: Optional["WebHTTPState"] = None
+        self.web_browser_state: Optional["WebBrowserState"] = None
+        self.web_hooks_state: Optional["WebHooksState"] = None
+        self.web_rss_state: Optional["WebRSSState"] = None
+        self.calendar_state: Optional["CalendarState"] = None
+        self.dashboard_state: Optional["CustomDashboardState"] = None
 
         # Заглушки L1-L3 (Заполняются через SystemBuilder)
-        self.sql = None
-        self.vector = None
-        self.heartbeat = None
-        self.llm_client = None
-        self.sub_llm_client = None
+        self.sql: Optional["SQLManager"] = None
+        self.vector: Optional["VectorManager"] = None
+        self.graph: Optional["GraphManager"] = None
+        self.heartbeat: Optional["Heartbeat"] = None
+        self.llm_client: Optional["LLMClient"] = None
+        self.sub_llm_client: Optional["LLMClient"] = None
 
         self.context_registry = ContextRegistry()
 
@@ -222,7 +246,7 @@ class System:
             stop_watcher_task = asyncio.create_task(self._watch_for_stop_file())
 
             # Точка входа в бесконечный цикл
-            await self.heartbeat.start() # Тут код заблокируется, пока агент работает
+            await self.heartbeat.start()  # Тут код заблокируется, пока агент работает
 
             # Если мы дошли сюда - агент остановился штатно
             stop_watcher_task.cancel()
@@ -291,6 +315,9 @@ class System:
             await self.vector.disconnect()
         if self.sql:
             await self.sql.disconnect()
+        if self.graph:
+            await self.graph.disconnect()
+
         if self.event_bus:
             await self.event_bus.stop()
         if self.llm_client:
@@ -358,6 +385,11 @@ async def main() -> int:
             for k, v in sorted(os.environ.items())
             if k.startswith("LLM_API_KEY_") and v.strip()
         ]
+
+        # Фикс для локальных моделей: если URL указан, но ключей нет - ставим заглушку
+        # Если юзер вообще ничего не ввел (и проигнорировал CLI), тоже ставим заглушку, чтобы ротатор не крашился
+        if not LLM_API_KEYS:
+            LLM_API_KEYS = ["local_dummy_key"]
 
         # Собираем ключи субагентов (если есть)
         SUB_LLM_API_URL = os.getenv("SUB_LLM_API_URL", None)

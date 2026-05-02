@@ -27,6 +27,7 @@ from src.l0_state.interfaces.custom_state import CustomDashboardState
 
 from src.l1_databases.vector.manager import VectorManager
 from src.l1_databases.sql.manager import SQLManager
+from src.l1_databases.graph.manager import GraphManager
 
 from src.l2_interfaces.initializer import initialize_l2_interfaces
 
@@ -56,7 +57,7 @@ class SystemBuilder:
 
     def build_l0_state(self) -> None:
         """Создает стейты (приборную панель)."""
-        
+
         system_logger.info("[System] Инициализация L0 State.")
         sys = self.system
 
@@ -113,27 +114,27 @@ class SystemBuilder:
             tick_thoughts_short_max_chars=self.sys_cfg.context_depth.tick_thoughts_short_max_chars,
             tick_action_short_max_chars=self.sys_cfg.context_depth.tick_action_short_max_chars,
             tick_result_short_max_chars=self.sys_cfg.context_depth.tick_result_short_max_chars,
-            max_tasks=self.sys_cfg.sql.tasks.max_tasks,
-            max_mental_state_entities=self.sys_cfg.sql.mental_states.max_entities,
-            max_traits=self.sys_cfg.sql.personality_traits.max_traits,
-            drives_enabled=self.sys_cfg.sql.drives.enabled,
-            decay_rate=self.sys_cfg.sql.drives.decay_rate,
-            decay_interval_sec=self.sys_cfg.sql.drives.decay_interval_sec,
-            max_history_drives=self.sys_cfg.sql.drives.max_reflections_history,
-            max_custom_drives=self.sys_cfg.sql.drives.max_custom_drives,
+            max_tasks=self.sys_cfg.db.sql.tasks.max_tasks,
+            max_mental_state_entities=self.sys_cfg.db.sql.mental_states.max_entities,
+            max_traits=self.sys_cfg.db.sql.personality_traits.max_traits,
+            drives_enabled=self.sys_cfg.db.sql.drives.enabled,
+            decay_rate=self.sys_cfg.db.sql.drives.decay_rate,
+            decay_interval_sec=self.sys_cfg.db.sql.drives.decay_interval_sec,
+            max_history_drives=self.sys_cfg.db.sql.drives.max_reflections_history,
+            max_custom_drives=self.sys_cfg.db.sql.drives.max_custom_drives,
             timezone=self.sys_cfg.timezone,
         )
         await sys.sql.connect()
 
         # DRIVES
-        if self.sys_cfg.sql.drives.enabled:
+        if self.sys_cfg.db.sql.drives.enabled:
             register_instance(sys.sql.drives)
             sys.context_registry.register_provider(
                 "sql_drives", sys.sql.drives.get_context_block, section=ContextSection.DRIVES
             )
 
         # PERSONALITY TRAITS
-        if self.sys_cfg.sql.personality_traits.enabled:
+        if self.sys_cfg.db.sql.personality_traits.enabled:
             register_instance(sys.sql.personality_traits)
             sys.context_registry.register_provider(
                 "sql_traits",
@@ -142,14 +143,14 @@ class SystemBuilder:
             )
 
         # TASKS
-        if self.sys_cfg.sql.tasks.enabled:
+        if self.sys_cfg.db.sql.tasks.enabled:
             register_instance(sys.sql.tasks)
             sys.context_registry.register_provider(
                 "sql_tasks", sys.sql.tasks.get_context_block, section=ContextSection.TASKS
             )
 
         # MENTAL STATES
-        if self.sys_cfg.sql.mental_states.enabled:
+        if self.sys_cfg.db.sql.mental_states.enabled:
             register_instance(sys.sql.mental_states)
             sys.context_registry.register_provider(
                 "sql_mental_states",
@@ -171,15 +172,26 @@ class SystemBuilder:
         sys.vector = VectorManager(
             db_path=sys.local_data_dir / "vector" / "db",
             embedding_model_path=sys.local_data_dir / "vector" / "embeddings",
-            embedding_model_name=sys.settings.system.vector_db.embedding_model,
-            vector_size=sys.settings.system.vector_db.vector_size,
-            similarity_threshold=sys.settings.system.vector_db.similarity_threshold,
-            timezone=sys.settings.system.timezone,
+            embedding_model_name=self.sys_cfg.db.vector.embedding_model,
+            vector_size=self.sys_cfg.db.vector.vector_size,
+            similarity_threshold=self.sys_cfg.db.vector.similarity_threshold,
+            timezone=self.sys_cfg.timezone,
         )
         await sys.vector.connect()
 
         register_instance(sys.vector.knowledge)
         register_instance(sys.vector.thoughts)
+
+        # Graph DB
+        if self.sys_cfg.db.graph.enabled:
+
+            sys.graph = GraphManager(
+                db_path=sys.local_data_dir / "graph" / "agent_graph.db",
+                max_nodes=self.sys_cfg.db.graph.max_nodes,
+            )
+            await sys.graph.connect()
+
+            register_instance(sys.graph.crud)
 
     def build_l2_interfaces(self, env_vars: dict) -> None:
         """Читает конфиг, поднимает нужные интерфейсы и регистрирует их скиллы."""
@@ -213,20 +225,22 @@ class SystemBuilder:
 
         prompt_builder = PromptBuilder(
             prompt_dir=sys_obj.root_dir / "src" / "l3_agent" / "prompt",
-            drives_enabled=self.sys_cfg.sql.drives.enabled,
-            tasks_enabled=self.sys_cfg.sql.tasks.enabled,
-            traits_enabled=self.sys_cfg.sql.personality_traits.enabled,
-            mental_states_enabled=self.sys_cfg.sql.mental_states.enabled,
+            drives_enabled=self.sys_cfg.db.sql.drives.enabled,
+            tasks_enabled=self.sys_cfg.db.sql.tasks.enabled,
+            traits_enabled=self.sys_cfg.db.sql.personality_traits.enabled,
+            mental_states_enabled=self.sys_cfg.db.sql.mental_states.enabled,
             swarm_enabled=self.sys_cfg.swarm.enabled,
         )
 
         rag_memories = RAGMemories(
             vector_knowledge=sys_obj.vector.knowledge,
             vector_thoughts=sys_obj.vector.thoughts,
+            # Прокидываем графовую базу, если она включена
+            graph_manager=sys_obj.graph if self.sys_cfg.db.graph.enabled else None,
+            embedding_model=sys_obj.vector.embedding,
             telethon_state=sys_obj.telethon_state,
             agent_state=sys_obj.agent_state,
-            auto_rag_top_k=sys_obj.settings.system.vector_db.auto_rag_top_k,
-            auto_rag_max_query_chars=sys_obj.settings.system.vector_db.auto_rag_max_query_chars,
+            rag_config=self.sys_cfg.context_depth.rag,
         )
         sys_obj.context_registry.register_provider(
             "rag memories", rag_memories.get_context_block, section=ContextSection.RAG_MEMORIES

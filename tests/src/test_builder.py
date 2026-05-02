@@ -55,6 +55,9 @@ def mock_system(tmp_path: Path) -> System:
     sys_mock.calendar_state = MagicMock()
     sys_mock.dashboard_state = MagicMock()
 
+    # Добавляем мок для графа, чтобы избежать AttributeError в тестах L3
+    sys_mock.graph = MagicMock()
+
     return sys_mock
 
 
@@ -129,6 +132,7 @@ def test_build_l3_agent(
     # Подготавливаем фиктивные данные для сборки
     mock_system.sql = MagicMock()
     mock_system.vector = MagicMock()
+    mock_system.graph = MagicMock()  # Явно инициализируем, чтобы не было ошибки
 
     env_vars = {"LLM_API_URL": "http://mock", "LLM_API_KEYS": ["key1"]}
 

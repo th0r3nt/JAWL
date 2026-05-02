@@ -8,6 +8,7 @@ Proxy-функции для скриптов из песочницы и внед
 
 import json
 import inspect
+import ast
 from pathlib import Path
 from typing import Dict, Any, Tuple
 
@@ -27,8 +28,8 @@ class CustomSkillsRegistry:
         Args:
             data_dir: Путь к директории хранения локальных данных (Local Data Dir).
         """
-        
-        self.json_path = data_dir / "meta" / "custom_skills.json"
+
+        self.json_path = data_dir / "interfaces" / "meta" / "custom_skills.json"
         self.json_path.parent.mkdir(parents=True, exist_ok=True)
 
         if not self.json_path.exists():
@@ -75,11 +76,23 @@ class CustomSkillsRegistry:
         # Метапрограммирование: создаем фейковые параметры для inspect.signature
         parameters = []
         for p_name, p_desc in params_dict.items():
-            is_optional = "optional" in str(p_desc).lower() or "=" in str(p_desc)
-            default = None if is_optional else inspect.Parameter.empty
+            p_str = str(p_desc).lower()
+            is_optional = "optional" in p_str or "=" in p_str
 
-            # Достаем базовый тип, например "str = None" -> "str"
+            # Извлекаем реальное дефолтное значение из строки (если оно есть)
+            default_val = None
+            if "=" in p_str:
+                try:
+                    val_str = str(p_desc).split("=", 1)[1].strip()
+                    default_val = ast.literal_eval(val_str)
+                except Exception:
+                    pass
+
+            default = default_val if is_optional else inspect.Parameter.empty
+
+            # Достаем базовый тип, например "float = 13.0" -> "float"
             base_type_str = str(p_desc).split("=")[0].strip().lower()
+            base_type_str = base_type_str.replace("optional", "").strip()
             real_type = type_mapping.get(base_type_str, Any)
 
             parameters.append(

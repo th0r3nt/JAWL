@@ -37,12 +37,18 @@ def recover_deploy_crashes(root_dir: Path):
         try:
             # Восстанавливаем оригиналы
             for r, d, files in os.walk(backup_dir):
+                if "__pycache__" in r:
+                    continue
                 for file in files:
-                    if file in (".deploy_active", ".newfiles_manifest"):
+                    if file in (".deploy_active", ".newfiles_manifest") or file.endswith(
+                        ".pyc"
+                    ):
                         continue
                     b_path = Path(r) / file
                     rel_path = b_path.relative_to(backup_dir)
                     target_path = root_dir / rel_path
+
+                    target_path.parent.mkdir(parents=True, exist_ok=True)
                     shutil.copy2(b_path, target_path)
 
             # Удаляем новые файлы
@@ -111,11 +117,9 @@ def setup_and_run() -> None:
                 )
                 if result.returncode != 0:
                     print("\n[!] Ошибка при первичной установке зависимостей.")
-                    print(
-                        "[!] Внимательно изучите ошибки pip выше (возможно, версия Python не поддерживается)."
-                    )
+                    print("[!] Изучите ошибки pip выше.")
                     if os.name == "nt":
-                        input("Нажмите Enter для выхода...")
+                        input("Нажмите Enter для выхода.")
                     sys.exit(1)
 
                 print("[*] Установка завершена.\n")
@@ -144,6 +148,11 @@ def setup_and_run() -> None:
         from src.cli.menu import main_menu
         from src.cli.screens.logs import logs_screen
         from src.cli.screens.terminal_chat import _open_terminal_chat
+
+        # Принудительно импортируем ядро. Это заставит интерпретатор
+        # проверить наличие ВООБЩЕ ВСЕХ библиотек из requirements.txt до запуска меню
+        import src.main  # noqa: F401
+
     except ModuleNotFoundError as e:
         if os.environ.get("JAWL_RECOVERY_ATTEMPTED") == "1":
             print(

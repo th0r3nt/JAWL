@@ -47,3 +47,28 @@ async def test_add_task_limit(tasks_manager):
     res_fail = await tasks_manager.create_task("Task 3", "3", ["type:routine"])
     assert res_fail.is_success is False
     assert "Достигнут лимит" in res_fail.message
+
+
+def test_validate_tags_hallucinations(tasks_manager):
+    """Тест: защита БД от некорректного формата тегов, сгенерированных LLM."""
+
+    # 1. LLM присылает строку вместо списка (классическая галлюцинация)
+    is_valid, err, tags = tasks_manager._validate_tags("['type:routine', 'priority:high']")
+    assert is_valid is True
+    assert tags == ["type:routine", "priority:high"]
+
+    # 2. LLM присылает одиночный тег как строку
+    is_valid, err, tags = tasks_manager._validate_tags("domain:code")
+    assert is_valid is True
+    assert tags == ["domain:code"]
+
+    # 3. LLM выдумывает несуществующий тег
+    is_valid, err, tags = tasks_manager._validate_tags(["domain:magic"])
+    assert is_valid is False
+    assert "недопустим" in err
+    assert len(tags) == 0
+
+    # 4. Передача None (допустимо, вернется пустой список)
+    is_valid, err, tags = tasks_manager._validate_tags(None)
+    assert is_valid is True
+    assert tags == []

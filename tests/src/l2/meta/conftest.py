@@ -12,7 +12,7 @@ def tmp_settings(tmp_path: Path) -> Path:
     p = tmp_path / "settings.yaml"
     data = """
 llm:
-  model: "claude-opus-4.7"
+  main_model: "claude-opus-4.7"
   available_models:
     - "claude-opus-4.7"
     - "gpt-4o"
@@ -20,11 +20,12 @@ llm:
   max_react_steps: 15
 system:
   heartbeat_interval: 60
-  sql:
-    tasks:
-      max_tasks: 10
-    mental_states:
-      max_entities: 5
+  db:
+    sql:
+      tasks:
+        max_tasks: 10
+      mental_states:
+        max_entities: 5
   context_depth:
     ticks: 15
     detailed_ticks: 3
