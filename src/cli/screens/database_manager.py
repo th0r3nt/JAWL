@@ -7,6 +7,7 @@ from pathlib import Path
 import questionary
 from ruamel.yaml import YAML
 from qdrant_client import QdrantClient, models
+import kuzu
 
 from src.cli.widgets.ui import (
     draw_header,
@@ -21,10 +22,13 @@ from src.cli.widgets.ui import (
 from src.cli.screens.agent_control import _is_agent_running
 
 ROOT_DIR = Path(__file__).resolve().parent.parent.parent.parent
+LOCAL_DATA_DIR = ROOT_DIR / "src" / "utils" / "local" / "data"
 
-DB_DIR = ROOT_DIR / "src" / "utils" / "local" / "data"
-SQL_DB_FILE = DB_DIR / "sql" / "db" / "agent.db"
-VECTOR_DB_DIR = DB_DIR / "vector" / "db"
+SQL_DB_FILE = LOCAL_DATA_DIR / "sql" / "db" / "agent.db"
+VECTOR_DB_DIR = LOCAL_DATA_DIR / "vector" / "db"
+GRAPH_DB_DIR = LOCAL_DATA_DIR / "graph"
+
+INTERFACES_DIR = LOCAL_DATA_DIR / "interfaces"
 
 SETTINGS_FILE = ROOT_DIR / "config" / "settings.yaml"
 SETTINGS_EXAMPLE = ROOT_DIR / "config" / "settings.example.yaml"
@@ -122,6 +126,23 @@ def _get_vector_stats() -> dict:
             except Exception:
                 pass
         client.close()
+    except Exception:
+        pass
+    return stats
+
+
+def _get_graph_stats() -> dict:
+    stats = {"concepts": 0}
+    db_path = GRAPH_DB_DIR / "agent_graph.db"
+    if not db_path.exists():
+        return stats
+    try:
+        db = kuzu.Database(str(db_path))
+        conn = kuzu.Connection(db)
+        # Считаем только когнитивные узлы (Concept)
+        res = conn.execute("MATCH (n:Concept) RETURN count(n)")
+        if res.has_next():
+            stats["concepts"] = res.get_next()[0]
     except Exception:
         pass
     return stats
@@ -601,6 +622,7 @@ def database_manager_screen() -> None:
 
         s_stats = _get_sql_stats()
         v_stats = _get_vector_stats()
+        g_stats = _get_graph_stats()
 
         ms_on = "[ON] " if sql_cfg.get("mental_states", {}).get("enabled") else "[OFF]"
         ts_on = "[ON] " if sql_cfg.get("tasks", {}).get("enabled") else "[OFF]"
@@ -637,6 +659,12 @@ def database_manager_screen() -> None:
             ),
             questionary.Choice("Стереть векторную базу данных", "clean_vector"),
             questionary.Separator(" "),
+            questionary.Separator("🗂️ Graph DB (Kuzu)"),
+            questionary.Choice(f" ● Concepts             ({g_stats['concepts']} записей)", "dummy_graph_info"),
+            questionary.Choice("Стереть графовую базу данных", "clean_graph"),
+            questionary.Separator(" "),
+            questionary.Separator("🗂️ Interfaces Cache"),
+            questionary.Choice("Стереть кэш всех интерфейсов (local/data/interfaces/)", "clean_interfaces"),
             questionary.Separator(" "),
             questionary.Choice("❌ Выход в главное меню", "exit"),
         ]
@@ -689,7 +717,7 @@ def database_manager_screen() -> None:
         # Global Delete
         elif choice == "clean_sql":
             if questionary.confirm(
-                "⚠️ Вы уверены? Это необратимо удалит SQL базу.", default=False, qmark=""
+                "⚠️ Вы уверены? Это необратимо удалит SQL DB.", default=False, qmark=""
             ).ask():
                 if SQL_DB_FILE.exists():
                     SQL_DB_FILE.unlink()
@@ -700,11 +728,33 @@ def database_manager_screen() -> None:
 
         elif choice == "clean_vector":
             if questionary.confirm(
-                "⚠️ Вы уверены? Это необратимо удалит Vector базу.", default=False, qmark=""
+                "⚠️ Вы уверены? Это необратимо удалит Vector DB.", default=False, qmark=""
             ).ask():
                 if VECTOR_DB_DIR.exists():
                     shutil.rmtree(VECTOR_DB_DIR)
                     print_success("Векторная база очищена.")
                 else:
                     print_info("Векторная база уже пуста.")
+                wait_for_enter()
+
+        elif choice == "clean_graph":
+            if questionary.confirm(
+                "⚠️ Вы уверены? Это необратимо удалит Graph DB.", default=False, qmark=""
+            ).ask():
+                if GRAPH_DB_DIR.exists():
+                    shutil.rmtree(GRAPH_DB_DIR, ignore_errors=True)
+                    print_success("Графовая база данных успешно очищена.")
+                else:
+                    print_info("Графовая база уже пуста.")
+                wait_for_enter()
+                
+        elif choice == "clean_interfaces":
+            if questionary.confirm(
+                "⚠️ Вы уверены? Это сотрет историю браузера, сессии Telegram, настройки отслеживания папок и дашборды. Агент забудет всё, что происходило в L2 интерфейсах.", default=False, qmark=""
+            ).ask():
+                if INTERFACES_DIR.exists():
+                    shutil.rmtree(INTERFACES_DIR, ignore_errors=True)
+                    print_success("Кэш всех интерфейсов успешно удален. При следующем запуске сессии будут созданы заново.")
+                else:
+                    print_info("Папка интерфейсов уже пуста.")
                 wait_for_enter()

@@ -105,14 +105,15 @@ class CodeGraphIndexing:
 
         stats = {"files": 0, "classes": 0, "functions": 0}
 
-        # Собираем список Python файлов, игнорируя виртуальные окружения
-        py_files = [
-            p
-            for p in root_dir.rglob("*.py")
-            if "venv" not in p.parts
-            and ".venv" not in p.parts
-            and "__pycache__" not in p.parts
-        ]
+        # Читаем игнорируемые папки из конфигурации
+        exclude_dirs = set(self.client.config.exclude_dirs)
+
+        # Собираем список Python файлов, игнорируя мусорные директории
+        py_files = []
+        for p in root_dir.rglob("*.py"):
+            # Проверяем, пересекается ли путь файла с множеством исключенных папок
+            if not set(p.parts).intersection(exclude_dirs):
+                py_files.append(p)
 
         # 1-й проход: Создаем узлы (Файлы, Классы, Функции)
         # Мы используем asyncio.run() внутри потока - это допустимо, т.к. мы в отдельном Thread

@@ -31,6 +31,18 @@ host:
 # Подробнее: docs/yaml/interfaces/code_graph.md
 code_graph:
   enabled: false
+  max_search_results: 15
+  max_structure_items: 200
+  exclude_dirs:
+    - "venv"
+    - ".venv"
+    - "env"
+    - "__pycache__"
+    - ".git"
+    - "node_modules"
+    - ".pytest_cache"
+    - "dist"
+    - "build"
 
 telegram:
   # Подробнее: docs/yaml/interfaces/telegram/telethon.md

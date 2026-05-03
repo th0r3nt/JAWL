@@ -38,7 +38,10 @@ def setup_code_graph(system: "System") -> List[Any]:
 
         system.code_graph_state = CodeGraphState(data_dir=system.local_data_dir)
 
-    client = CodeGraphClient(state=system.code_graph_state, host_os=host_os_client)
+    config = system.interfaces_config.code_graph
+    client = CodeGraphClient(
+        state=system.code_graph_state, config=config, host_os=host_os_client
+    )
 
     # Регистрируем навыки
     register_instance(CodeGraphIndexing(client, system.graph.ast_crud, system.vector.code_ast))

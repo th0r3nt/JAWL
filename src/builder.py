@@ -107,6 +107,9 @@ class SystemBuilder:
         system_logger.info("[System] Инициализация L1 Databases.")
         sys = self.system
 
+        # =================================================================
+        # SQL
+
         sys.sql = SQLManager(
             db_path=sys.local_data_dir / "sql" / "db" / "agent.db",
             ticks_limit=self.sys_cfg.context_depth.ticks,
@@ -128,14 +131,14 @@ class SystemBuilder:
         )
         await sys.sql.connect()
 
-        # DRIVES
+        # Drives
         if self.sys_cfg.db.sql.drives.enabled:
             register_instance(sys.sql.drives)
             sys.context_registry.register_provider(
                 "sql_drives", sys.sql.drives.get_context_block, section=ContextSection.DRIVES
             )
 
-        # PERSONALITY TRAITS
+        # Personality Traits
         if self.sys_cfg.db.sql.personality_traits.enabled:
             register_instance(sys.sql.personality_traits)
             sys.context_registry.register_provider(
@@ -144,14 +147,14 @@ class SystemBuilder:
                 section=ContextSection.TRAITS,
             )
 
-        # TASKS
+        # Tasks
         if self.sys_cfg.db.sql.tasks.enabled:
             register_instance(sys.sql.tasks)
             sys.context_registry.register_provider(
                 "sql_tasks", sys.sql.tasks.get_context_block, section=ContextSection.TASKS
             )
 
-        # MENTAL STATES
+        # Mental States
         if self.sys_cfg.db.sql.mental_states.enabled:
             register_instance(sys.sql.mental_states)
             sys.context_registry.register_provider(
@@ -160,7 +163,7 @@ class SystemBuilder:
                 section=ContextSection.MENTAL_STATES,
             )
 
-        # Базовые вещи регистрируются всегда
+        # Регистрируются всегда
         sys.context_registry.register_provider(
             "sql_ticks", sys.sql.ticks.get_context_block, section=ContextSection.RECENT_TICKS
         )
@@ -170,7 +173,9 @@ class SystemBuilder:
             section=ContextSection.AGENT_STATE,
         )
 
+        # =================================================================
         # Vector DB
+
         sys.vector = VectorManager(
             db_path=sys.local_data_dir / "vector" / "db",
             embedding_model_path=sys.local_data_dir / "vector" / "embeddings",
@@ -184,16 +189,16 @@ class SystemBuilder:
         register_instance(sys.vector.knowledge)
         register_instance(sys.vector.thoughts)
 
+        # =================================================================
         # Graph DB
-        if self.sys_cfg.db.graph.enabled:
 
-            sys.graph = GraphManager(
-                db_path=sys.local_data_dir / "graph" / "agent_graph.db",
-                max_nodes=self.sys_cfg.db.graph.max_nodes,
-            )
-            await sys.graph.connect()
+        sys.graph = GraphManager(
+            db_path=sys.local_data_dir / "graph" / "agent_graph.db",
+            max_nodes=self.sys_cfg.db.graph.max_nodes,
+        )
+        await sys.graph.connect()
 
-            register_instance(sys.graph.crud)
+        register_instance(sys.graph.crud)
 
     def build_l2_interfaces(self, env_vars: dict) -> None:
         """Читает конфиг, поднимает нужные интерфейсы и регистрирует их скиллы."""
@@ -237,8 +242,7 @@ class SystemBuilder:
         rag_memories = RAGMemories(
             vector_knowledge=sys_obj.vector.knowledge,
             vector_thoughts=sys_obj.vector.thoughts,
-            # Прокидываем графовую базу, если она включена
-            graph_manager=sys_obj.graph if self.sys_cfg.db.graph.enabled else None,
+            graph_manager=sys_obj.graph,
             embedding_model=sys_obj.vector.embedding,
             telethon_state=sys_obj.telethon_state,
             agent_state=sys_obj.agent_state,

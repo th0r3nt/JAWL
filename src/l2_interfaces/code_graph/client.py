@@ -8,12 +8,15 @@
 from typing import Any
 from src.l2_interfaces.code_graph.state import CodeGraphState
 from src.l2_interfaces.host.os.client import HostOSClient
+from src.utils.settings import CodeGraphConfig
+
 
 class CodeGraphClient:
     """Менеджер интерфейса Code Graph."""
 
-    def __init__(self, state: CodeGraphState, host_os: HostOSClient):
+    def __init__(self, state: CodeGraphState, config: CodeGraphConfig, host_os: HostOSClient):
         self.state = state
+        self.config = config
         self.host_os = host_os
         self.state.is_online = True
 
@@ -29,4 +32,8 @@ class CodeGraphClient:
         for pid, path in self.state.active_indexes.items():
             lines.append(f"- [ID: `{pid}`] Путь: {path}")
 
-        return "### CODE GRAPH [ON]\n" + "\n".join(lines) + "\nДля навигации необходимо указывать ID проекта в навыках."
+        return (
+            "### CODE GRAPH [ON]\n"
+            + "\n".join(lines)
+            + "\nДля навигации необходимо указывать ID проекта в навыках."
+        )

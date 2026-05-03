@@ -2,7 +2,7 @@ import pytest
 from pathlib import Path
 from unittest.mock import patch
 
-from src.utils.settings import HostOSConfig
+from src.utils.settings import HostOSConfig, CodeGraphConfig
 from src.l2_interfaces.host.os.state import HostOSState
 from src.l2_interfaces.host.os.client import HostOSClient, HostOSAccessLevel
 
@@ -68,7 +68,8 @@ async def setup_integration_env(tmp_path: Path):
 
     # 4. Поднимаем интерфейс Code Graph
     cg_state = CodeGraphState(data_dir=tmp_path)
-    cg_client = CodeGraphClient(state=cg_state, host_os=os_client)
+    cg_config = CodeGraphConfig(enabled=True)
+    cg_client = CodeGraphClient(state=cg_state, config=cg_config, host_os=os_client)
 
     indexer = CodeGraphIndexing(cg_client, graph_manager.ast_crud, vector_manager.code_ast)
     navigator = CodeGraphNavigation(cg_client, graph_manager.ast_crud, vector_manager.code_ast)

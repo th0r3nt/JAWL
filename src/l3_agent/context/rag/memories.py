@@ -34,7 +34,7 @@ class RAGMemories:
         self,
         vector_knowledge: "VectorKnowledge",
         vector_thoughts: "VectorThoughts",
-        graph_manager: Optional["GraphManager"],
+        graph_manager: "GraphManager",
         embedding_model: "EmbeddingModel",
         telethon_state: "TelethonState",
         agent_state: "AgentState",
@@ -45,7 +45,6 @@ class RAGMemories:
         self.agent_state = agent_state
         self.config = rag_config
 
-        # Инициализация строительных блоков (Передаем выбранный движок)
         self.extractor = EntityExtractor(
             max_query_chars=rag_config.max_query_chars, engine=rag_config.extraction_engine
         )
@@ -53,14 +52,10 @@ class RAGMemories:
         self.vector_search = VectorSearchWrapper(
             vector_knowledge=vector_knowledge,
             vector_thoughts=vector_thoughts,
-            # top_k для внутренних запросов делаем чуть больше лимита, чтобы было из чего выбирать
             top_k=rag_config.max_vector_blocks + 2,
         )
 
-        # Если GraphDB выключена в настройках - передаем None менеджер (обертка всё равно не упадет)
-        self.graph_search = GraphSearchWrapper(
-            graph_manager=graph_manager, max_neighbors=10  # Лимит связей за 1 проход
-        )
+        self.graph_search = GraphSearchWrapper(graph_manager=graph_manager, max_neighbors=10)
 
         # Инициализация самого Оркестратора
         self.orchestrator = GraphRAGOrchestrator(

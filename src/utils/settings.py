@@ -145,7 +145,22 @@ class MetaConfig(BaseModel):
 
 
 class CodeGraphConfig(BaseModel):
-    enabled: bool = True
+    enabled: bool = False
+    exclude_dirs: list[str] = Field(
+        default_factory=lambda: [
+            "venv",
+            ".venv",
+            "env",
+            "__pycache__",
+            ".git",
+            "node_modules",
+            ".pytest_cache",
+            "dist",
+            "build",
+        ]
+    )
+    max_search_results: int = 5
+    max_structure_items: int = 100
 
 
 class MultimodalityConfig(BaseModel):
@@ -261,7 +276,6 @@ class SQLConfig(BaseModel):
 
 
 class GraphDBConfig(BaseModel):
-    enabled: bool = True
     max_nodes: int = 5000
     max_edges_per_node: int = 20
 

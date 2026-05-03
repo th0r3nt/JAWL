@@ -5,6 +5,8 @@
 благодаря векторному поиску по связям в детерминированном графе.
 """
 
+from typing import Optional
+
 from src.utils.logger import system_logger
 from src.l3_agent.skills.registry import skill, SkillResult
 from src.l3_agent.swarm.roles import Subagents
@@ -28,11 +30,11 @@ class CodeGraphNavigation:
 
     @skill(swarm_roles=[Subagents.CODER, Subagents.QA_ENGINEER])
     async def search_code_semantic(
-        self, project_id: str, query: str, limit: int = 5
+        self, project_id: str, query: str, limit: Optional[int] = None
     ) -> SkillResult:
         """
         Семантический поиск по докстрингам классов и функций проекта.
-        Полезно, если нет информации о названии функции, но есть информация о том, что она должна делать. 
+        Полезно, если нет информации о названии функции, но есть информация о том, что она должна делать.
         Например: 'где сохраняются логи тиков'
 
         Args:
@@ -46,7 +48,8 @@ class CodeGraphNavigation:
             )
 
         try:
-            results = await self.vector.search(query, project_id, limit)
+            search_limit = limit if limit is not None else self.client.config.max_search_results
+            results = await self.vector.search(query, project_id, search_limit)
 
             if not results:
                 return SkillResult.ok(
@@ -75,7 +78,7 @@ class CodeGraphNavigation:
     async def trace_dependencies(self, project_id: str, target_name: str) -> SkillResult:
         """
         Поиск "радиуса поражения". Показывает, в каких файлах импортируется
-        указанный файл, или какие функции находятся внутри класса. 
+        указанный файл, или какие функции находятся внутри класса.
         Например: полезно перед рефакторингом, чтобы понять, какие тесты нужно обновить.
 
         Args:
@@ -142,10 +145,18 @@ class CodeGraphNavigation:
                     f"Файл '{filepath}' пуст, не содержит классов/функций, либо не проиндексирован."
                 )
 
-            lines = [f"Структура файла `{filepath}`:"]
+            limit = self.client.config.max_structure_items
+            lines = [f"Структура файла `{filepath}` (Лимит отображения: {limit}):"]
+            count = 0
+
             for item in contents:
-                if item["relation"] == "CONTAINS":
-                    clean_name = item["id"].replace(f"{project_id}::{filepath}::", "")
+                if count >= limit:
+                    lines.append("- ... [Остальные элементы скрыты для экономии контекста]")
+                    break
+
+                if item['relation'] == "CONTAINS":
+                    clean_name = item['id'].replace(f"{project_id}::{filepath}::", "")
+                    count += 1
                     lines.append(f"- [{item['type']}] {clean_name}")
 
                     # Если это класс, ищем его методы (связь DEFINES)

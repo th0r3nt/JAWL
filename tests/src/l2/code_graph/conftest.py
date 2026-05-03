@@ -2,6 +2,8 @@ import pytest
 from pathlib import Path
 from unittest.mock import MagicMock, AsyncMock
 
+from src.utils.settings import CodeGraphConfig
+
 from src.l2_interfaces.code_graph.state import CodeGraphState
 from src.l2_interfaces.code_graph.client import CodeGraphClient
 from src.l1_databases.graph.management.crud_ast import GraphASTCRUD
@@ -15,6 +17,16 @@ def cg_state(tmp_path: Path):
 
 
 @pytest.fixture
+def cg_config():
+    return CodeGraphConfig(
+        enabled=True,
+        max_search_results=5,
+        max_structure_items=100,
+        exclude_dirs=["venv", "__pycache__"],
+    )
+
+
+@pytest.fixture
 def mock_host_os():
     os_mock = MagicMock(spec=HostOSClient)
     # Настраиваем гейткипер, чтобы он пропускал пути в тестах
@@ -24,8 +36,8 @@ def mock_host_os():
 
 
 @pytest.fixture
-def cg_client(cg_state, mock_host_os):
-    return CodeGraphClient(state=cg_state, host_os=mock_host_os)
+def cg_client(cg_state, cg_config, mock_host_os):
+    return CodeGraphClient(state=cg_state, config=cg_config, host_os=mock_host_os)
 
 
 @pytest.fixture
