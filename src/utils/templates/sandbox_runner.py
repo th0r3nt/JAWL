@@ -1,16 +1,29 @@
 """
 Изолированная среда выполнения для Python-скриптов агента в песочнице.
-Перехватывает попытки выхода за пределы sandbox/ (Path Traversal),
-а также блокирует модули `os.system` и `subprocess`.
+
+ВАЖНО: это НЕ настоящая изоляция. Это best-effort in-process barrier.
+Для серьёзной изоляции используйте отдельный процесс + seccomp / Docker /
+WASM / VM. Смотрите документацию ``_sandbox_guard.py`` для списка
+векторов, которые барьер НЕ покрывает.
+
+Что блокируется:
+  - Path Traversal через ``builtins.open``, ``io.open``, ``os.open``,
+    ``_io.FileIO``, ``pathlib`` (через патченный ``builtins.open``).
+  - Shell escape через ``subprocess.*``, ``os.system``, ``os.popen``,
+    ``os.fork``/``execv*``/``posix_spawn*``/``spawn*``.
+  - Обход патчей через ``importlib.reload`` protected-модулей.
+  - Прямой вызов libc/msvcrt через ``ctypes.CDLL``.
+  - Убийство родительского процесса через ``os.kill``.
+  - Утечка секретов через ``os.environ`` (скрабинг по префиксам).
 """
 
-import sys
-import os
-import builtins
-from pathlib import Path
-import subprocess
+from __future__ import annotations
 
-# Читаем корневые пути из окружения
+import os
+import sys
+from pathlib import Path
+
+# Читаем корневые пути из окружения РОДИТЕЛЯ до скрабинга.
 FW_DIR_STR = os.environ.get("JAWL_FRAMEWORK_DIR")
 SB_DIR_STR = os.environ.get("JAWL_SANDBOX_DIR")
 TARGET_SCRIPT = os.environ.get("JAWL_TARGET_SCRIPT")
@@ -22,67 +35,29 @@ if not FW_DIR_STR or not SB_DIR_STR or not TARGET_SCRIPT:
 FRAMEWORK_DIR = Path(FW_DIR_STR).resolve()
 SANDBOX_DIR = Path(SB_DIR_STR).resolve()
 
-# Патч функции builtins.open
-_orig_open = builtins.open
+# _sandbox_guard.py должен лежать рядом; добавляем его директорию в sys.path
+# до инициализации, чтобы импорт гарантированно сработал вне зависимости от
+# того, как был запущен интерпретатор.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from _sandbox_guard import install as _install_sandbox  # noqa: E402
 
+# Устанавливаем все защиты ДО запуска целевого скрипта.
+_install_sandbox(FRAMEWORK_DIR, SANDBOX_DIR)
 
-def _safe_open(
-    file,
-    mode="r",
-    buffering=-1,
-    encoding=None,
-    errors=None,
-    newline=None,
-    closefd=True,
-    opener=None,
-):
-    try:
-        # Пытаемся разрезолвить путь
-        p = Path(file).resolve()
-
-        # Разрешаем доступ к системным библиотекам Python (site-packages, lib)
-        if "Python" in str(p) or "site-packages" in str(p) or "lib" in str(p).lower():
-            pass
-        # Если файл внутри директории фреймворка, но НЕ внутри песочницы - БЛОКИРУЕМ
-        elif p.is_relative_to(FRAMEWORK_DIR) and not p.is_relative_to(SANDBOX_DIR):
-            raise PermissionError(
-                f"[Sandbox Guard] Access Denied: Path Traversal попытка заблокирована. Доступ к '{file}' запрещен."
-            )
-    except Exception as e:
-        if isinstance(e, PermissionError):
-            raise e
-        # Если путь кривой и не резолвится, пускаем дальше, чтобы open сам упал с FileNotFoundError
-        pass
-
-    return _orig_open(file, mode, buffering, encoding, errors, newline, closefd, opener)
-
-
-builtins.open = _safe_open
-
-
-# Предотвращение Shell Escape
-def _blocked_func(*args, **kwargs):
-    raise PermissionError(
-        "[Sandbox Guard] Access Denied: Использование shell/subprocess заблокировано в целях безопасности."
-    )
-
-
-subprocess.Popen = _blocked_func
-subprocess.run = _blocked_func
-subprocess.check_output = _blocked_func
-subprocess.call = _blocked_func
-
-os.system = _blocked_func
-os.popen = _blocked_func
-
-# Добавляем пути в sys.path для корректных импортов
+# sys.path для целевого скрипта
 sys.path.insert(0, str(Path(TARGET_SCRIPT).parent))
 sys.path.insert(0, str(SANDBOX_DIR))
 
-# Выполняем целевой скрипт
-with _orig_open(TARGET_SCRIPT, "r", encoding="utf-8") as f:
+# Читаем код целевого скрипта через уже защищённый open — патч уже активен,
+# но файл находится внутри sandbox/ и разрешён.
+import builtins  # noqa: E402  (needs to happen after install)
+
+with builtins.open(TARGET_SCRIPT, "r", encoding="utf-8") as f:
     code = f.read()
 
-# Эмулируем __main__ для правильного запуска if __name__ == '__main__':
-globals_dict = {"__name__": "__main__", "__file__": TARGET_SCRIPT, "__builtins__": builtins}
-exec(code, globals_dict)
+globals_dict = {
+    "__name__": "__main__",
+    "__file__": TARGET_SCRIPT,
+    "__builtins__": builtins,
+}
+exec(code, globals_dict)  # noqa: S102 — интенционально, это sandbox-runner

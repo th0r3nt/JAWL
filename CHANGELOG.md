@@ -2,6 +2,13 @@
 
 Все значимые изменения в проекте JAWL фиксируются в этом файле. Формат базируется на [Keep a Changelog](https://keepachangelog.com/ru/1.0.0/).
 
+## [Unreleased]
+
+### Security
+- **Sandbox Guard Hardening (sandbox_runner.py + rpc_wrapper.py)**: существовавшая в `sandbox_runner.py` защита закрывала только `builtins.open` и `subprocess.*`, оставляя открытыми тривиальные обходы (Path Traversal через `pathlib.Path.read_text` / `os.open` / `_io.FileIO`; Shell Escape через `os.fork` + `os.execv*` / `os.posix_spawn` / `ctypes.CDLL("libc.so.6")`; снятие патчей через `importlib.reload(subprocess)`; суицид агента через `os.kill(os.getppid(), SIGKILL)`). Общая логика защиты вынесена в `src/utils/templates/_sandbox_guard.py` и теперь переиспользуется обоими путями запуска кода (`execute_script` и `execute_sandbox_func`). Покрыто 12 новыми регрессионными тестами (`tests/src/utils/templates/test_sandbox_guard.py`). Дополненный скрабинг секретов в `os.environ` работает по allowlist имён + расширенному списку подстрок (OAUTH/DSN/COOKIE/и т.д.).
+- **Честное предупреждение в README**: добавлен абзац с явным списком что песочница *не* закрывает (Cython/C-extension, произвольные `.so` через ctypes, `mmap`, syscalls через ассемблерные расширения) и рекомендацией использовать внешнюю изоляцию (Docker/seccomp/VM) для серьёзных сценариев.
+
+---
 
 ## [0.13.1-beta] - 2026-05-03
 
