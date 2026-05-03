@@ -37,3 +37,7 @@ scripts/
 copy_all_code.py
 all_code.txt
 architecture.canvas
+
+# Мусор от тестов
+MagicMock/
+MagicMock

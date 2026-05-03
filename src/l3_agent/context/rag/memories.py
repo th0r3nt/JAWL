@@ -7,7 +7,7 @@
 """
 
 import re
-from typing import Dict, Any, List, TYPE_CHECKING, Optional
+from typing import Dict, Any, List, TYPE_CHECKING
 
 from src.utils.settings import RAGConfig
 
