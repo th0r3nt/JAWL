@@ -389,10 +389,64 @@ def _log_missing_defaults(model: BaseModel, prefix: str = "", file_name: str = "
             _log_missing_defaults(value, prefix=f"{prefix}{key}.", file_name=file_name)
 
 
+def _deep_update_ruamel(base_map, user_map) -> bool:
+    """
+    Рекурсивно проходит по базовому словарю (example) и добавляет
+    недостающие ключи в пользовательский словарь.
+    """
+    
+    from ruamel.yaml.comments import CommentedMap
+
+    modified = False
+    if isinstance(base_map, CommentedMap) and isinstance(user_map, CommentedMap):
+        for key in base_map:
+            if key not in user_map:
+                user_map[key] = base_map[key]
+                modified = True
+            else:
+                if _deep_update_ruamel(base_map[key], user_map[key]):
+                    modified = True
+    return modified
+
+
+def _sync_yaml_file(user_file: Path, example_file: Path) -> None:
+    """
+    Умная синхронизация: если в пользовательском YAML не хватает новых полей,
+    они будут скопированы из .example файла с сохранением старых настроек.
+    """
+
+    if not example_file.exists():
+        return
+
+    if not user_file.exists():
+        shutil.copy(example_file, user_file)
+        system_logger.info(f"[Config] Создан базовый файл конфигурации {user_file.name}")
+        return
+
+    # Загружаем через ruamel для сохранения комментариев
+    ryaml = yaml.YAML()
+    ryaml.preserve_quotes = True
+
+    try:
+        with open(example_file, "r", encoding="utf-8") as f:
+            example_data = ryaml.load(f)
+        with open(user_file, "r", encoding="utf-8") as f:
+            user_data = ryaml.load(f)
+
+        if _deep_update_ruamel(example_data, user_data):
+            with open(user_file, "w", encoding="utf-8") as f:
+                ryaml.dump(user_data, f)
+            system_logger.info(
+                f"[Config] Файл {user_file.name} автоматически обновлен (добавлены новые поля из шаблона)."
+            )
+
+    except Exception as e:
+        system_logger.error(f"[Config] Ошибка авто-обновления {user_file.name}: {e}")
+
+
 def load_config() -> tuple[SettingsConfig, InterfacesConfig]:
     """
-    Загружает и валидирует настройки из YAML файлов.
-    Автовосстанавливает при отсутствии.
+    Загружает, валидирует и при необходимости автоматически "лечит" настройки из YAML файлов.
     """
 
     base_dir = Path.cwd() / "config"
@@ -403,21 +457,14 @@ def load_config() -> tuple[SettingsConfig, InterfacesConfig]:
     interfaces_file = base_dir / "interfaces.yaml"
     interfaces_example = base_dir / "interfaces.example.yaml"
 
-    # Автовосстановление файлов конфигурации из .example
-    if not settings_file.exists() and settings_example.exists():
-        shutil.copy(settings_example, settings_file)
-
-    if not interfaces_file.exists() and interfaces_example.exists():
-        shutil.copy(interfaces_example, interfaces_file)
+    # Умная синхронизация (добавление пропущенных полей из example)
+    _sync_yaml_file(settings_file, settings_example)
+    _sync_yaml_file(interfaces_file, interfaces_example)
 
     settings_data = load_yaml(settings_file)
     interfaces_data = load_yaml(interfaces_file)
 
     settings_config = SettingsConfig(**settings_data)
     interfaces_config = InterfacesConfig(**interfaces_data)
-
-    # Логируем, если юзер не обновил файлы конфигурации и мы подставили дефолты
-    _log_missing_defaults(settings_config, file_name="settings.yaml")
-    _log_missing_defaults(interfaces_config, file_name="interfaces.yaml")
 
     return settings_config, interfaces_config

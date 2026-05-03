@@ -299,7 +299,7 @@ class System:
         Остановка и очистка ресурсов.
         """
 
-        system_logger.info("[System] Инициирована остановка JAWL. Нанимаем киллеров, сколько убьем процесс.")
+        system_logger.info("[System] Инициирована остановка JAWL. Нанимаем киллеров.")
         await self.event_bus.publish(Events.SYSTEM_CORE_STOP, status="offline")
 
         if self.heartbeat:
@@ -330,7 +330,7 @@ class System:
         if hasattr(self, "sub_llm_client") and self.sub_llm_client is not self.llm_client:
             await self.sub_llm_client.close()
 
-        system_logger.info("[System] Остановка завершена. Процесс выслежен и жестоко убит.")
+        system_logger.info("[System] Остановка завершена. Процесс выслежен и убит.")
 
 
 # ===================================================================
