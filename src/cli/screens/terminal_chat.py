@@ -165,16 +165,25 @@ async def _chat_loop(port: int, history_file: Path, agent_name: str) -> None:
                 break
 
             payload = json.dumps({"text": text}, ensure_ascii=False)
-            writer.write((payload + "\n").encode("utf-8"))
-            await writer.drain()
+            
+            try:
+                writer.write((payload + "\n").encode("utf-8"))
+                await writer.drain()
+            except (ConnectionError, OSError):
+                with patch_stdout():
+                    print_formatted_text(HTML("\n<ansired><b>✗ Соединение разорвано (Агент перезагружается или выключен).</b></ansired>"))
+                break
 
     except (KeyboardInterrupt, EOFError):
         pass
 
     finally:
         receive_task.cancel()
-        writer.close()
-        await writer.wait_closed()
+        try:
+            writer.close()
+            await writer.wait_closed()
+        except (ConnectionError, OSError):
+            pass # Игнорируем ошибки закрытия мертвого сокета
 
 
 def terminal_chat_screen() -> None:

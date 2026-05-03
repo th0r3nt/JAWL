@@ -292,7 +292,9 @@ class HostOSClient:
 
         framework_block = ""
         if self.access_level >= HostOSAccessLevel.OBSERVER and self.state.framework_files:
-            framework_block = f"\n{self.state.framework_files}"
+            framework_block = f"{self.state.framework_files}"
+        else:
+            framework_block = "Нет доступа к полной директории фреймворка."
 
         access_levels_desc = (
             "Существующие уровни доступа: \n"
@@ -362,6 +364,8 @@ class HostOSClient:
             rc_lines = [""]
             rc_lines.extend(self.state.recent_file_changes)
             recent_changes_block = "" + "\n\n".join(rc_lines) + "\n"
+        else: 
+            recent_changes_block = "Нет последних изменений."
 
         # ===============================================
         # Абсолютные пути, если активен уровень доступа ROOT
@@ -388,7 +392,9 @@ class HostOSClient:
 * Uptime: {self.state.uptime}
 
 * Network: \n{getattr(self.state, 'network', 'Неизвестно')}
+
 * Telemetry: {self.state.telemetry}
+
 * Polling interval: {self.state.polling_interval}
 
 * Active Daemons:

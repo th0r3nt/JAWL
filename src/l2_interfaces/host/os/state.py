@@ -11,7 +11,7 @@ class HostOSState:
 
         # Статические данные (определяются 1 раз при старте)
         self.os_info = "Неизвестно."  # Окно/Linux/Mac
-        self.cpu_name = "Пооцессор неизвестен."
+        self.cpu_name = "unknown CPU"
         self.total_ram_gb = 0.0
 
         # Динамические данные

@@ -71,7 +71,7 @@ web:
   search:
     enabled: false
     search_engine: "duckduckgo" # "duckduckgo", "tavily"
-    reader_engine: "jina" # "trafilatura", "jina"
+    reader_engine: "trafilatura" # "trafilatura", "jina"
     request_timeout_sec: 15
     max_page_chars: 10000
 

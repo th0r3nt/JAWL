@@ -260,6 +260,58 @@ class HostOSExecution:
 
         except Exception as e:
             return SkillResult.fail(f"Ошибка выполнения shell-команды: {e}")
+        
+    @skill(swarm_roles=[Subagents.CODER, Subagents.QA_ENGINEER])
+    @require_access(HostOSAccessLevel.OBSERVER)
+    async def run_pytest(self, target_path: str = "tests/") -> SkillResult:
+        """
+        Рабочий запуск тестирования (pytest) для проверки архитектуры 
+        или запуска написанных тестов. Выполняется в нативном окружении ОС (без ограничений песочницы).
+
+        Args:
+            target_path: Путь к конкретному файлу или директории (по умолчанию 'tests/').
+        """
+        try:
+            safe_path = self.host_os.validate_path(target_path, is_write=False)
+            
+            if not safe_path.exists():
+                return SkillResult.fail(f"Путь не найден: {safe_path.name}")
+
+            cmd = [sys.executable, "-m", "pytest", str(safe_path), "-v", "--disable-warnings"]
+            
+            process = await asyncio.create_subprocess_exec(
+                *cmd,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+                cwd=str(self.host_os.framework_dir)
+            )
+            
+            try:
+                stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=120)
+            except asyncio.TimeoutError:
+                self._kill_process_tree(process.pid)
+                return SkillResult.fail("Тесты выполнялись дольше 120 секунд и были прерваны (Таймаут).")
+
+            # Pytest часто пишет полезный вывод и в stdout, и в stderr. Собираем всё
+            out_str = stdout.decode("utf-8", errors="replace").strip()
+            err_str = stderr.decode("utf-8", errors="replace").strip()
+            
+            full_log = f"{out_str}\n{err_str}".strip()
+            # Берем хвост лога, так как там самая важная сводка (Traceback)
+            clean_log = full_log[-4000:] if len(full_log) > 4000 else full_log
+            
+            exit_code = process.returncode
+            system_logger.info(f"[Host OS] Выполнен run_pytest для {safe_path.name} (Код: {exit_code})")
+
+            if exit_code == 0:
+                return SkillResult.ok(f"Тесты успешно пройдены.\n\nЛог:\n```\n{clean_log}\n```")
+            else:
+                return SkillResult.fail(f"Тесты провалены (Код {exit_code}).\n\nЛог (последние строки):\n```\n{clean_log}\n```")
+
+        except PermissionError as e:
+            return SkillResult.fail(str(e))
+        except Exception as e:
+            return SkillResult.fail(f"Критическая ошибка при запуске pytest: {e}")
 
     @skill(swarm_roles=[Subagents.SYSADMIN])
     @require_access(HostOSAccessLevel.ROOT)
