@@ -1,6 +1,6 @@
 import base64
 import asyncio
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional, Literal
 
 from src.l2_interfaces.github.client import GithubClient
@@ -78,7 +78,7 @@ class GithubRepositories:
         """
 
         try:
-            now = datetime.utcnow()
+            now = datetime.now(timezone.utc)
             if period == "daily":
                 delta = timedelta(days=1)
 
