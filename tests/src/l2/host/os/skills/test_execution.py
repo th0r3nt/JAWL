@@ -112,6 +112,13 @@ async def test_sandbox_guard_blocks_traversal_and_subprocess(os_client, tmp_path
     else:
         pytest.skip("Файл sandbox_runner.py не найден в исходниках. Тест пропущен.")
 
+    # sandbox_runner импортирует _sandbox_guard.py по абсолютному пути
+    # относительно framework_dir, поэтому приносим и его в tmp-корень.
+    guard_src = real_root / "src" / "utils" / "templates" / "_sandbox_guard.py"
+    guard_dst = tmp_path / "src" / "utils" / "templates" / "_sandbox_guard.py"
+    if guard_src.exists():
+        shutil.copy2(guard_src, guard_dst)
+
     # Создаем фейковый .env файл вне песочницы
     secret_file = tmp_path / ".env"
     secret_file.write_text("SUPER_SECRET_KEY=123", encoding="utf-8")

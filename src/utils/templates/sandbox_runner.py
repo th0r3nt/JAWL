@@ -3,18 +3,21 @@
 
 ВАЖНО: это НЕ настоящая изоляция. Это best-effort in-process barrier.
 Для серьёзной изоляции используйте отдельный процесс + seccomp / Docker /
-WASM / VM. Смотрите документацию ``_sandbox_guard.py`` для списка
-векторов, которые барьер НЕ покрывает.
+WASM / VM. Смотрите README, раздел "Безопасность и Отказ от
+ответственности", для полного списка векторов, которые барьер НЕ
+покрывает.
 
 Что блокируется:
   - Path Traversal через ``builtins.open``, ``io.open``, ``os.open``,
-    ``_io.FileIO``, ``pathlib`` (через патченный ``builtins.open``).
+    ``_io.FileIO``, ``pathlib`` (через патченный ``builtins.open`` +
+    низкоуровневые хуки).
   - Shell escape через ``subprocess.*``, ``os.system``, ``os.popen``,
     ``os.fork``/``execv*``/``posix_spawn*``/``spawn*``.
-  - Обход патчей через ``importlib.reload`` protected-модулей.
+  - Обход патчей через ``importlib.reload`` защищённых модулей.
   - Прямой вызов libc/msvcrt через ``ctypes.CDLL``.
   - Убийство родительского процесса через ``os.kill``.
-  - Утечка секретов через ``os.environ`` (скрабинг по префиксам).
+  - Утечка секретов через ``os.environ`` (скрабинг по allowlist имён +
+    hint-substring списку).
 """
 
 from __future__ import annotations
@@ -23,7 +26,7 @@ import os
 import sys
 from pathlib import Path
 
-# Читаем корневые пути из окружения РОДИТЕЛЯ до скрабинга.
+# Читаем корневые пути из окружения РОДИТЕЛЯ.
 FW_DIR_STR = os.environ.get("JAWL_FRAMEWORK_DIR")
 SB_DIR_STR = os.environ.get("JAWL_SANDBOX_DIR")
 TARGET_SCRIPT = os.environ.get("JAWL_TARGET_SCRIPT")
@@ -35,22 +38,31 @@ if not FW_DIR_STR or not SB_DIR_STR or not TARGET_SCRIPT:
 FRAMEWORK_DIR = Path(FW_DIR_STR).resolve()
 SANDBOX_DIR = Path(SB_DIR_STR).resolve()
 
-# _sandbox_guard.py должен лежать рядом; добавляем его директорию в sys.path
-# до инициализации, чтобы импорт гарантированно сработал вне зависимости от
-# того, как был запущен интерпретатор.
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _sandbox_guard import install as _install_sandbox  # noqa: E402
+# _sandbox_guard.py лежит в src/utils/templates/ рядом с этим файлом
+# в исходном дереве. Когда execute_script копирует sandbox_runner.py
+# в tmp-директорию, он не копирует guard отдельно. Поэтому ищем guard
+# по абсолютному пути внутри FRAMEWORK_DIR.
+_GUARD_PATH = FRAMEWORK_DIR / "src" / "utils" / "templates" / "_sandbox_guard.py"
 
-# Устанавливаем все защиты ДО запуска целевого скрипта.
-_install_sandbox(FRAMEWORK_DIR, SANDBOX_DIR)
+if not _GUARD_PATH.is_file():
+    print(f"FATAL ERROR: Sandbox guard module not found at {_GUARD_PATH}")
+    sys.exit(1)
+
+# Ленивая загрузка guard-а через importlib, чтобы не тащить лишний sys.path,
+# который потом может поменять пользовательский код.
+import importlib.util  # noqa: E402
+
+_spec = importlib.util.spec_from_file_location("_sandbox_guard", _GUARD_PATH)
+_guard = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(_guard)
+
+_guard.install(FRAMEWORK_DIR, SANDBOX_DIR)
 
 # sys.path для целевого скрипта
 sys.path.insert(0, str(Path(TARGET_SCRIPT).parent))
 sys.path.insert(0, str(SANDBOX_DIR))
 
-# Читаем код целевого скрипта через уже защищённый open — патч уже активен,
-# но файл находится внутри sandbox/ и разрешён.
-import builtins  # noqa: E402  (needs to happen after install)
+import builtins  # noqa: E402
 
 with builtins.open(TARGET_SCRIPT, "r", encoding="utf-8") as f:
     code = f.read()

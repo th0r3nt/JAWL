@@ -26,6 +26,12 @@ async def test_integration_rpc_sandbox_execution(tmp_path: Path):
     template_dst.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(template_src, template_dst)
 
+    # rpc_wrapper импортирует _sandbox_guard.py по абсолютному пути
+    # относительно framework_dir, поэтому приносим и его в tmp-корень.
+    guard_src = real_root / "src" / "utils" / "templates" / "_sandbox_guard.py"
+    guard_dst = tmp_path / "src" / "utils" / "templates" / "_sandbox_guard.py"
+    shutil.copy2(guard_src, guard_dst)
+
     # 2. Поднимаем клиент ОС с уровнем ROOT (чтобы разрешить выполнение)
     config = HostOSConfig(access_level=HostOSAccessLevel.ROOT, execution_timeout_sec=5)
     client = HostOSClient(base_dir=tmp_path, config=config, state=HostOSState(), timezone=3)

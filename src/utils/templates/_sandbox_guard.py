@@ -153,7 +153,7 @@ class PathChecker:
             self.sandbox_dir
         ):
             raise PermissionError(
-                f"[Sandbox Guard] Access Denied: path '{file}' is outside of sandbox/."
+                f"[Sandbox Guard] Access Denied: Path Traversal попытка заблокирована. Доступ к '{file}' запрещен."
             )
 
 
@@ -164,7 +164,7 @@ def _blocked_func(*args: Any, **kwargs: Any) -> None:  # noqa: D401, ARG001
     """Универсальный блокиратор — просто бросает ``PermissionError``."""
 
     raise PermissionError(
-        "[Sandbox Guard] Access Denied: this API is blocked in sandbox."
+        "[Sandbox Guard] Access Denied: Использование shell/subprocess заблокировано в целях безопасности."
     )
 
 
@@ -203,6 +203,24 @@ def _install_file_guards(checker: PathChecker) -> None:
             super().__init__(file, mode, closefd, opener)
 
     _io.FileIO = _SafeFileIO  # type: ignore[assignment]
+
+    # 4. pathlib перехват
+    # В Python 3.10 Path.open() вызывает ``self._accessor.open(...)``, где
+    # ``_accessor.open`` биндится к оригинальному ``os.open`` во время
+    # импорта модуля - до нашего патча. В Python 3.11+ этот слой
+    # удалён и ``Path.open`` зовет ``io.open`` напрямую, но для
+    # обратной совместимости переприсываем Path.open целиком.
+    import pathlib
+
+    _orig_path_open = pathlib.Path.open
+
+    def _safe_path_open(self, mode="r", buffering=-1, encoding=None,
+                         errors=None, newline=None):  # type: ignore[no-untyped-def]
+        checker.check(str(self))
+        # Делегируем io.open явно, чтобы пройти через наш патч.
+        return io.open(str(self), mode, buffering, encoding, errors, newline)
+
+    pathlib.Path.open = _safe_path_open  # type: ignore[assignment,method-assign]
 
 
 def _install_process_guards() -> None:

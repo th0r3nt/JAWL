@@ -32,6 +32,12 @@ async def test_integration_agent_self_extension(tmp_path: Path):
     template_dst.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(template_src, template_dst)
 
+    # rpc_wrapper импортирует _sandbox_guard.py по абсолютному пути
+    # относительно framework_dir, поэтому приносим и его в tmp-корень.
+    guard_src = real_root / "src" / "utils" / "templates" / "_sandbox_guard.py"
+    guard_dst = tmp_path / "src" / "utils" / "templates" / "_sandbox_guard.py"
+    shutil.copy2(guard_src, guard_dst)
+
     # 2. ИНИЦИАЛИЗАЦИЯ ИНТЕРФЕЙСОВ
     # Даем агенту права ROOT (3), чтобы он мог выполнять код
     os_config = HostOSConfig(access_level=HostOSAccessLevel.ROOT, execution_timeout_sec=5)

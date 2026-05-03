@@ -23,10 +23,30 @@ framework_dir = sandbox_dir.parent
 
 # Подключаем общий Sandbox Guard (ставит все защиты: I/O, subprocess, fork,
 # ctypes, importlib.reload, скрабинг секретов в env и т.д.).
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _sandbox_guard import install as _install_sandbox  # noqa: E402
+# rpc_wrapper копируется в sandbox/_system/.tmp/ при запуске, поэтому ищем
+# _sandbox_guard.py по абсолютному пути внутри framework_dir.
+_guard_path = framework_dir / "src" / "utils" / "templates" / "_sandbox_guard.py"
 
-_install_sandbox(framework_dir, sandbox_dir)
+if not _guard_path.is_file():
+    sys.stdout.write("\n---RPC_RESULT---\n")
+    sys.stdout.write(
+        json.dumps(
+            {
+                "status": "error",
+                "error": f"Sandbox guard module not found at {_guard_path}",
+            }
+        )
+        + "\n"
+    )
+    sys.exit(1)
+
+import importlib.util  # noqa: E402
+
+_spec = importlib.util.spec_from_file_location("_sandbox_guard", _guard_path)
+_guard = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(_guard)
+
+_guard.install(framework_dir, sandbox_dir)
 
 # Гарантируем наличие путей в sys.path для прямой доступности
 script_dir = str(target_filepath.parent)
