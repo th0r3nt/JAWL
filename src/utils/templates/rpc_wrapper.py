@@ -1,6 +1,9 @@
 """
 Обертка, которая выполняется, когда агент хочет вызвать функцию из sandbox/ файла (RPC).
 Содержит встроенный Sandbox Guard для защиты ядра от взлома.
+
+ВАЖНО: см. ``_sandbox_guard.py`` — это best-effort in-process barrier,
+а не настоящая изоляция.
 """
 
 import sys
@@ -11,7 +14,6 @@ import builtins
 import traceback
 from importlib.util import spec_from_file_location, module_from_spec
 from pathlib import Path
-import subprocess
 import inspect
 
 target_filepath = Path(sys.argv[1]).resolve()
@@ -19,52 +21,32 @@ func_name = sys.argv[2]
 sandbox_dir = Path(sys.argv[3]).resolve()
 framework_dir = sandbox_dir.parent
 
-# Защита от Path Traversal
-_orig_open = builtins.open
+# Подключаем общий Sandbox Guard (ставит все защиты: I/O, subprocess, fork,
+# ctypes, importlib.reload, скрабинг секретов в env и т.д.).
+# rpc_wrapper копируется в sandbox/_system/.tmp/ при запуске, поэтому ищем
+# _sandbox_guard.py по абсолютному пути внутри framework_dir.
+_guard_path = framework_dir / "src" / "utils" / "templates" / "_sandbox_guard.py"
 
-
-def _safe_open(
-    file,
-    mode="r",
-    buffering=-1,
-    encoding=None,
-    errors=None,
-    newline=None,
-    closefd=True,
-    opener=None,
-):
-    try:
-        p = Path(file).resolve()
-        if "Python" in str(p) or "site-packages" in str(p) or "lib" in str(p).lower():
-            pass
-        elif p.is_relative_to(framework_dir) and not p.is_relative_to(sandbox_dir):
-            raise PermissionError(
-                f"[Sandbox Guard] Access Denied: Path Traversal попытка заблокирована. Доступ к '{file}' запрещен."
-            )
-    except Exception as e:
-        if isinstance(e, PermissionError):
-            raise e
-        pass
-    return _orig_open(file, mode, buffering, encoding, errors, newline, closefd, opener)
-
-
-builtins.open = _safe_open
-
-
-# Предотвращение Shell Escape
-def _blocked_func(*args, **kwargs):
-    raise PermissionError(
-        "[Sandbox Guard] Access Denied: Использование shell/subprocess заблокировано в целях безопасности."
+if not _guard_path.is_file():
+    sys.stdout.write("\n---RPC_RESULT---\n")
+    sys.stdout.write(
+        json.dumps(
+            {
+                "status": "error",
+                "error": f"Sandbox guard module not found at {_guard_path}",
+            }
+        )
+        + "\n"
     )
+    sys.exit(1)
 
+import importlib.util  # noqa: E402
 
-subprocess.Popen = _blocked_func
-subprocess.run = _blocked_func
-subprocess.check_output = _blocked_func
-subprocess.call = _blocked_func
+_spec = importlib.util.spec_from_file_location("_sandbox_guard", _guard_path)
+_guard = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(_guard)
 
-os.system = _blocked_func
-os.popen = _blocked_func
+_guard.install(framework_dir, sandbox_dir)
 
 # Гарантируем наличие путей в sys.path для прямой доступности
 script_dir = str(target_filepath.parent)
