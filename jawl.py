@@ -59,7 +59,12 @@ def recover_deploy_crashes(root_dir: Path):
                     new_files = f.read().splitlines()
                 for nf in new_files:
                     if nf:
-                        (root_dir / nf).unlink(missing_ok=True)
+                        target = root_dir / nf
+                        if target.exists():
+                            if target.is_dir():
+                                shutil.rmtree(target, ignore_errors=True)
+                            else:
+                                target.unlink(missing_ok=True)
 
             # 3. Чистим
             shutil.rmtree(backup_dir, ignore_errors=True)
@@ -121,7 +126,7 @@ def setup_and_run() -> None:
                     )
                     sys.exit(0)
                 print("\n")
-                
+
             # ----------------------------------------------------
 
             print("\n[*] JAWL Bootstrapper: Первичная инициализация.")
@@ -197,7 +202,9 @@ def setup_and_run() -> None:
                 input("Нажмите Enter для выхода.")
             sys.exit(1)
 
-        print(f"\n\n[*] Сбой: отсутствует модуль {e.name}. Похоже, зависимости были повреждены.")
+        print(
+            f"\n\n[*] Сбой: отсутствует модуль {e.name}. Похоже, зависимости были повреждены."
+        )
         print("[*] Запуск автоматического восстановления.")
         time.sleep(2)
 

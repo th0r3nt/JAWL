@@ -91,6 +91,13 @@ class HostOSDeployManager:
             return
 
         if filepath.exists():
+            if filepath.is_dir():
+                # Если это директория (например, при удалении папки целиком), бэкапим все файлы внутри
+                for child in filepath.rglob("*"):
+                    if child.is_file():
+                        self.backup_file(child)
+                return
+
             backup_path.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(filepath, backup_path)
             system_logger.debug(f"[Deploy] Бэкап файла: {rel_path}")
@@ -209,7 +216,12 @@ class HostOSDeployManager:
                 new_files = f.read().splitlines()
             for nf in new_files:
                 if nf:
-                    (self.framework_dir / nf).unlink(missing_ok=True)
+                    target = self.framework_dir / nf
+                    if target.exists():
+                        if target.is_dir():
+                            shutil.rmtree(target, ignore_errors=True)
+                        else:
+                            target.unlink(missing_ok=True)
 
         self._cleanup()
         system_logger.info("[Deploy] Изменения успешно откачены (Rollback).")
