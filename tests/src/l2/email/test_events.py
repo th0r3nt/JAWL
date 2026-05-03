@@ -24,8 +24,8 @@ def test_check_new_emails_success(email_events):
     ]
     email_events.client.imap_connection.return_value.__enter__.return_value = mock_mail
 
-    # Устанавливаем 101 как уже обработанное
-    email_events._seen_uids.add("101")
+    # Устанавливаем 101 как уже обработанное (_seen_uids теперь LRU OrderedDict)
+    email_events._seen_uids["101"] = None
 
     new_emails = email_events._check_new_emails()
 
