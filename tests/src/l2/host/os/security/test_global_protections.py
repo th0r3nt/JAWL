@@ -78,7 +78,9 @@ async def test_attack_zip_slip_vulnerability(os_client, tmp_path):
         zf.writestr("../../evil_payload.txt", "Hacked!")
 
     # Агент пытается распаковать его в песочницу
-    res = await archive_skill.extract_archive(str(malicious_zip_path), extract_to="extracted")
+    res = await archive_skill.extract_archive(
+        str(malicious_zip_path), extract_to="sandbox/extracted"
+    )
 
     assert res.is_success is False
     assert "Обнаружена попытка выхода за пределы директории" in res.message

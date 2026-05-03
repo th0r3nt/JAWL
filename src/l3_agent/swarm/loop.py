@@ -8,7 +8,6 @@
 """
 
 import json
-import re
 import asyncio
 import openai
 from pathlib import Path
@@ -248,20 +247,23 @@ class SubagentLoop:
     ) -> Tuple[Optional[AgentResponse], Optional[str]]:
         clean_answer = raw_answer.strip()
 
-        if clean_answer.startswith("```"):
-            match = re.search(r"\{.*\}", clean_answer, re.DOTALL)
-            if match:
-                clean_answer = match.group(0)
+        start_idx = clean_answer.find("{")
+        end_idx = clean_answer.rfind("}")
 
-        if not clean_answer.startswith("{"):
-            return None, "System Error: Invalid JSON format. Use tool_calls."
+        if start_idx != -1 and end_idx != -1 and end_idx > start_idx:
+            json_str = clean_answer[start_idx : end_idx + 1]
+            try:
+                parsed = AgentResponse.model_validate_json(json_str)
+                return parsed, None
+            except ValidationError as e:
+                return None, f"Format Error: {e}"
+            except Exception as e:
+                return None, f"Parsing Error: {e}"
 
-        try:
-            parsed = AgentResponse.model_validate_json(clean_answer)
-            return parsed, None
-
-        except ValidationError as e:
-            return None, f"Format Error: {e}"
+        return (
+            None,
+            "System Error: Invalid JSON format. Please use correct JSON tool_calls format.",
+        )
 
     async def _execute_and_log_actions(self, thoughts: str, actions: List[ActionCall]) -> None:
         results = []

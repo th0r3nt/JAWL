@@ -32,7 +32,7 @@ def recover_deploy_crashes(root_dir: Path):
     active_flag = backup_dir / ".deploy_active"
 
     if backup_dir.exists() and active_flag.exists():
-        print("[*] Обнаружено критическое падение во время деплой-сессии")
+        print("[*] Обнаружено критическое падение во время деплой-сессии.")
         print("[*] Агент сломал код к чертям. Инициирован автоматический откат исходников.")
 
         try:
@@ -124,7 +124,7 @@ def setup_and_run() -> None:
                 
             # ----------------------------------------------------
 
-            print("[*] JAWL Bootstrapper: Первичная инициализация.")
+            print("\n[*] JAWL Bootstrapper: Первичная инициализация.")
             print("[*] Создание виртуального окружения (venv).")
             venv.create(venv_dir, with_pip=True)
 
@@ -143,7 +143,7 @@ def setup_and_run() -> None:
                 )
 
                 print(
-                    "[*] Установка зависимостей из requirements.txt. Пожалуйста, подождите несколько минут.\n\n"
+                    "\n[*] Установка зависимостей из requirements.txt. Пожалуйста, подождите несколько минут.\n\n"
                 )
                 # Проверяем успешность установки
                 result = subprocess.run(

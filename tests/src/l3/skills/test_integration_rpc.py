@@ -42,12 +42,12 @@ def calculate_metrics(cpu_load: int, user: str) -> dict:
         status = "normal"
     return {"user": user, "status": status, "score": cpu_load * 2}
 """
-    write_res = await writer.write_file("metrics.py", script_code)
+    write_res = await writer.write_file("sandbox/metrics.py", script_code)
     assert write_res.is_success is True
 
     # 4. Агент динамически вызывает функцию из написанного им скрипта (RPC)
     rpc_res = await executor.execute_sandbox_func(
-        filepath="metrics.py",
+        filepath="sandbox/metrics.py",
         func_name="calculate_metrics",
         kwargs={"cpu_load": 95, "user": "Admin"},
     )

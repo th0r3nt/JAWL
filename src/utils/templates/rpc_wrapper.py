@@ -12,6 +12,7 @@ import traceback
 from importlib.util import spec_from_file_location, module_from_spec
 from pathlib import Path
 import subprocess
+import inspect
 
 target_filepath = Path(sys.argv[1]).resolve()
 func_name = sys.argv[2]
@@ -105,10 +106,32 @@ def main():
 
         spec.loader.exec_module(module)
 
-        if not hasattr(module, func_name):
-            raise AttributeError(f"В модуле {target_filepath.name} нет функции '{func_name}'")
+        # ЛОГИКА ИНСТАНЦИРОВАНИЯ И ВЫЗОВА МЕТОДОВ
+        if "." in func_name:
+            class_name, method_name = func_name.split(".", 1)
+            if not hasattr(module, class_name):
+                raise AttributeError(
+                    f"Объект '{class_name}' не найден в модуле {target_filepath.name}"
+                )
 
-        func = getattr(module, func_name)
+            cls_obj = getattr(module, class_name)
+            if inspect.isclass(cls_obj):
+                # Создаем экземпляр класса (предполагаем no-args конструктор)
+                instance = cls_obj()
+                if not hasattr(instance, method_name):
+                    raise AttributeError(f"В классе '{class_name}' нет метода '{method_name}'")
+                func = getattr(instance, method_name)
+            else:
+                # Если это не класс, а просто вложенный объект
+                obj = getattr(module, class_name)
+                func = getattr(obj, method_name)
+        else:
+            if not hasattr(module, func_name):
+                raise AttributeError(
+                    f"В модуле {target_filepath.name} нет функции '{func_name}'"
+                )
+            func = getattr(module, func_name)
+
         result = asyncio.run(_runner(func, kwargs))
 
         sys.stdout.write("\n---RPC_RESULT---\n")

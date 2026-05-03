@@ -105,7 +105,7 @@ class WebHTTPRequests:
                 return SkillResult.fail(scheme_error)
 
             if "/" not in dest_filename and "\\" not in dest_filename:
-                dest_filename = f"_system/download/{dest_filename}"
+                dest_filename = f"sandbox/_system/download/{dest_filename}"
 
             # Защищаем систему - пишем только в песочницу
             safe_path = validate_sandbox_path(dest_filename)

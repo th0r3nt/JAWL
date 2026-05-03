@@ -10,6 +10,7 @@ from src.utils._tools import truncate_text, validate_sandbox_path, format_size
 from src.l3_agent.skills.registry import SkillResult, skill
 from src.l3_agent.swarm.roles import Subagents
 
+
 class GithubRepositories:
     """Навыки для работы с репозиториями и кодом."""
 
@@ -251,14 +252,14 @@ class GithubRepositories:
     ) -> SkillResult:
         """
         Скачивает репозиторий в виде ZIP-архива. Без .git файлов. По умолчанию сохраняет в sandbox/download/.
-        
+
         Args:
             ref: Опционально (имя ветки, тег или коммит).
         """
 
         try:
             if "/" not in dest_filename and "\\" not in dest_filename:
-                dest_filename = f"_system/download/{dest_filename}"
+                dest_filename = f"sandbox/_system/download/{dest_filename}"
 
             safe_path = validate_sandbox_path(dest_filename)
             safe_path.parent.mkdir(parents=True, exist_ok=True)

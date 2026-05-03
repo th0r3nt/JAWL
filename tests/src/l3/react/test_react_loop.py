@@ -73,7 +73,7 @@ async def test_react_invalid_json_retry(
     mock_session = AsyncMock()
 
     mock_session.chat.completions.create.side_effect = [
-        mock_openai_response("{broken json"),
+        mock_openai_response("{broken json}"),
         mock_openai_response('{"thoughts": "Починил.", "actions": []}'),
     ]
     deps["llm_client"].get_session = MagicMock(return_value=mock_session)

@@ -145,47 +145,28 @@ class HostOSClient:
         return resolved_path
 
     def _resolve_path(self, target_path: Union[str, Path], is_write: bool) -> Path:
-        """Вычисляет абсолютный адрес файла на диске (поддержка алиасов и DWIM-логики)."""
+        """
+        Вычисляет абсолютный адрес файла на диске.
+        Все относительные пути строго резолвятся от корня фреймворка (JAWL/).
+        Никакого DWIM (угадывания) - что агент передал, туда и идем.
+        """
+
         path_str = str(target_path).replace("\\", "/").strip()
         path_obj = Path(path_str)
 
         if path_obj.is_absolute():
             return path_obj.resolve()
 
-        if path_str.startswith("sandbox/"):
-            sub_path = path_str[8:]
-            return (self.sandbox_dir / sub_path).resolve()
+        fw_name = self.framework_dir.name
 
-        if path_str in [".", "./"]:
-            return self.sandbox_dir.resolve()
-
-        if path_str in ["..", "../"]:
+        # Поддержка, если агент зачем-то указал имя корня (например, "JAWL/sandbox/test.py")
+        if path_str.startswith(f"{fw_name}/"):
+            path_str = path_str[len(fw_name) + 1 :]
+        elif path_str == fw_name:
             return self.framework_dir.resolve()
 
-        fw_name = self.framework_dir.name  # Обычно "JAWL"
-
-        # DWIM-логика (Умный резолв)
-        sandbox_target = (self.sandbox_dir / path_str).resolve()
-
-        if path_str.startswith(f"{fw_name}/"):
-            fw_target = (self.framework_dir / path_str[len(fw_name) + 1 :]).resolve()
-        elif path_str == fw_name:
-            fw_target = self.framework_dir.resolve()
-        else:
-            fw_target = (self.framework_dir / path_str).resolve()
-
-        # 1. Если файл/папка реально существует в песочнице - 100% работаем с ней (Приоритет)
-        if sandbox_target.exists():
-            return sandbox_target
-
-        # 2. Если файл есть во фреймворке, и права позволяют туда смотреть
-        if fw_target.exists() and self.access_level >= HostOSAccessLevel.OBSERVER:
-            if is_write and self.access_level == HostOSAccessLevel.OBSERVER:
-                return sandbox_target
-            return fw_target
-
-        # 3. Дефолт (Файла еще не существует - будем создавать в песочнице)
-        return sandbox_target
+        # Просто приклеиваем переданный путь к корню фреймворка
+        return (self.framework_dir / path_str).resolve()
 
     def _check_security_policies(self, resolved_path: Path, is_write: bool) -> None:
         """Жестко валидирует права доступа. Бросает PermissionError при нарушениях."""
@@ -205,7 +186,17 @@ class HostOSClient:
                     "(исключение: чтение и запись разрешены в sandbox/_system/download/)."
                 )
 
-        # 3. Применение Role-Based Access Control (RBAC)
+        # 3. Защита конфигурации (Config Override)
+        config_dir = self.framework_dir / "config"
+        if is_write and resolved_path.is_relative_to(config_dir):
+            if self.access_level < HostOSAccessLevel.ROOT:
+                raise PermissionError(
+                    "SYSTEM DENIED: Изменение файлов в папке 'config/' "
+                    "запрещено для вашего уровня доступа. Требуется ROOT (3). "
+                    "Для безопасного изменения конфигурации рекомендуется использовать навыки Meta-интерфейса."
+                )
+
+        # 4. Применение Role-Based Access Control (RBAC)
         if self.access_level == HostOSAccessLevel.ROOT:
             pass
         elif self.access_level == HostOSAccessLevel.OPERATOR:
@@ -223,7 +214,7 @@ class HostOSClient:
                 f"SANDBOX: Доступ разрешен строго внутри sandbox/. Путь '{resolved_path}' отклонен."
             )
 
-        # 4. Логика Deploy Sessions (бекапы исходного кода фреймворка)
+        # 5. Логика Deploy Sessions (бекапы исходного кода фреймворка)
         is_framework_code = (
             resolved_path.is_relative_to(self.framework_dir)
             and not resolved_path.is_relative_to(self.sandbox_dir)
@@ -301,7 +292,7 @@ class HostOSClient:
 
         framework_block = ""
         if self.access_level >= HostOSAccessLevel.OBSERVER and self.state.framework_files:
-            framework_block = f"\n\n* JAWL Directory:\n{self.state.framework_files}"
+            framework_block = f"\n{self.state.framework_files}"
 
         access_levels_desc = (
             "Существующие уровни доступа: \n"
@@ -360,6 +351,8 @@ class HostOSClient:
                 except Exception:
                     pass
             workspace_block = "\n" + "\n".join(ws_lines) + "\n"
+        else:
+             workspace_block = "Нет открытых вкладок."
 
         # ===============================================
         # Сборка истории изменений
@@ -369,6 +362,19 @@ class HostOSClient:
             rc_lines = [""]
             rc_lines.extend(self.state.recent_file_changes)
             recent_changes_block = "" + "\n\n".join(rc_lines) + "\n"
+
+        # ===============================================
+        # Абсолютные пути, если активен уровень доступа ROOT
+
+        absolute_paths_block = ""
+        if self.access_level == HostOSAccessLevel.ROOT:
+            home_dir = Path.home().resolve().as_posix()
+            fw_dir = self.framework_dir.resolve().as_posix()
+            absolute_paths_block = (
+                f"\n[Активен уровен доступа ROOT]\n"
+                f"* Абсолютный путь фреймворка: {fw_dir}\n"
+                f"* Домашняя директория: {home_dir}\n"
+            )
 
         # ===============================================
         # Финальная сборка
@@ -390,6 +396,7 @@ class HostOSClient:
 
 * Current Access Level: {self.access_level.value}/{self.access_level.name} (текущий уровень доступа)
 {access_levels_desc}
+{absolute_paths_block}
 
 * Framework Directory:
 {framework_block}
@@ -403,8 +410,11 @@ class HostOSClient:
 * Workspace:
 {workspace_block}
 
-[Напоминание] Папка sandbox/_system/ является системной и не подлежит изменению.
-Внутри неё также находится файл 'framework_api.py'. 
-Этот файл позволяет взаимодействовать с пробуждениями и контекстом агента.
-Если нужна более подробная информация - рекомендуется прочитать файл.
+[Напоминание] 
+- Папка sandbox/_system/ является системной и не подлежит изменению.
+- Внутри неё также находится файл 'framework_api.py'. 
+- Этот файл позволяет взаимодействовать с пробуждениями и контекстом агента.
+
+- Все относительные пути строго исчисляются от корневой директории фреймворка (JAWL/).
+- Если необходимо создать файл в песочнице - нужно указывать это (например, `sandbox/имя_файла.py`).
 """.strip()

@@ -33,7 +33,7 @@ async def test_integration_llm_json_to_real_disk(tmp_path: Path):
         ActionCall(
             tool_name="HostOSWriter.write_file",
             parameters={
-                "filepath": "integration_test.txt",
+                "filepath": "sandbox/integration_test.txt",
                 "content": "Real data on real disk!",
             },
         )

@@ -296,7 +296,7 @@ class System:
         Остановка и очистка ресурсов.
         """
 
-        system_logger.info("[System] Инициирована остановка JAWL.")
+        system_logger.info("[System] Инициирована остановка JAWL. Нанимаем киллеров, сколько убьем процесс.")
         await self.event_bus.publish(Events.SYSTEM_CORE_STOP, status="offline")
 
         if self.heartbeat:

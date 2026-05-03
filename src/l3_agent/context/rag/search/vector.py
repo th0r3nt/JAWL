@@ -103,6 +103,9 @@ class VectorSearchWrapper:
                 if point_id in unique_points:
                     if score > unique_points[point_id]["score"]:
                         unique_points[point_id]["score"] = score
+                        unique_points[point_id]["collection"] = collection_name
+                        unique_points[point_id]["text"] = text
+                        unique_points[point_id]["tags"] = point.payload.get("tags", [])
                 else:
                     unique_points[point_id] = {
                         "id": point_id,

@@ -159,7 +159,7 @@ def _check_and_setup_env() -> tuple[bool, bool]:
             with open(ENV_FILE, "w", encoding="utf-8") as f:
                 f.writelines(new_content)
 
-            print_success("Настройки LLM успешно сохранены в .env")
+            print_success("\nНастройки LLM успешно сохранены в .env")
             was_modified = True
 
     return True, was_modified
@@ -296,7 +296,7 @@ def start_agent_screen() -> None:
 
     if configs_created or prompts_created or env_modified:
         print("\n")
-        print_info("[Первичная инициализация завершена]")
+        print_info(" [Первичная инициализация завершена]")
         print("\n")
         print_info(" Были созданы базовые файлы конфигурации.")
         print_info(
@@ -311,7 +311,7 @@ def start_agent_screen() -> None:
         print_info(
             " Просмотрите src/l3_agent/prompt/personality/, чтобы настроить личность и характер агента."
         )
-        print_success("После финальной настройки выберите 'Запустить агента' в меню еще раз.")
+        print_success("\nПосле финальной настройки выберите 'Запустить агента' в меню еще раз.")
         wait_for_enter()
         return
 

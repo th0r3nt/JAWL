@@ -66,7 +66,7 @@ def calculate_crypto_tax(profit: float, rate: float = 13.0) -> dict:
     net = profit - tax
     return {"gross": profit, "tax": tax, "net": net}
 """
-    await writer.write_file("crypto_math.py", script_code)
+    await writer.write_file("sandbox/crypto_math.py", script_code)
 
     # 4. ШАГ 2: АГЕНТ РЕГИСТРИРУЕТ НАВЫК ЧЕРЕЗ META-ИНТЕРФЕЙС
     reg_action = ActionCall(
@@ -74,7 +74,7 @@ def calculate_crypto_tax(profit: float, rate: float = 13.0) -> dict:
         parameters={
             "skill_name": "crypto_tax",
             "description": "Считает налоги на крипту.",
-            "filepath": "crypto_math.py",
+            "filepath": "sandbox/crypto_math.py",
             "func_name": "calculate_crypto_tax",
             "parameters_dict": {"profit": "float", "rate": "float = 13.0"},
         },

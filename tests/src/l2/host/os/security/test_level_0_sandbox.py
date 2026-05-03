@@ -40,18 +40,10 @@ def test_sandbox_escape_absolute_path(os_client):
 
 def test_sandbox_fake_framework_folder(os_client):
     """
-    АТАКА: Агент создает внутри песочницы папку, названную так же, как корень фреймворка,
-    чтобы сбить с толку резолвер путей (DWIM-логику).
+    АТАКА: Агент передает путь к корневой папке фреймворка без префикса sandbox/.
+    Так как DWIM логика отключена, это трактуется как выход из песочницы.
     """
-    fake_fw_dir = os_client.sandbox_dir / os_client.framework_dir.name
-    fake_fw_dir.mkdir(exist_ok=True)
-
-    fake_file = fake_fw_dir / "fake_core.py"
-    fake_file.touch()
-
-    # Гейткипер должен понять, что это файл ВНУТРИ песочницы, и разрешить доступ,
-    # не перепутав его с реальным ядром.
-    resolved = os_client.validate_path(
-        f"{os_client.framework_dir.name}/fake_core.py", is_write=True
-    )
-    assert resolved == fake_file.resolve()
+    with pytest.raises(PermissionError, match="SANDBOX: Доступ разрешен строго внутри sandbox/"):
+        os_client.validate_path(
+            f"{os_client.framework_dir.name}/fake_core.py", is_write=True
+        )

@@ -19,14 +19,14 @@ from src.cli.screens.terminal_chat import terminal_chat_screen
 
 def main_menu() -> None:
     choices = [
-        questionary.Choice("🚀 Запустить агента", "start"),
-        questionary.Choice("⏹️ Остановить агента", "stop"),
-        questionary.Choice("💻 Чат", "terminal"),
-        questionary.Choice("📋 Логи", "logs"),
-        questionary.Choice("⚙️ Мастер настройки интерфейсов", "setup"),
-        questionary.Choice("🗄️ Управление базами данных", "db_manager"),
+        questionary.Choice("[>] Запустить агента", "start"),
+        questionary.Choice("[■] Остановить агента", "stop"),
+        questionary.Choice("[@] Чат", "terminal"),
+        questionary.Choice("[i] Логи", "logs"),
+        questionary.Choice("[*] Мастер настройки интерфейсов", "setup"),
+        questionary.Choice("[#] Управление базами данных", "db_manager"),
         questionary.Separator(" "),
-        questionary.Choice("❌ Выход", "exit"),
+        questionary.Choice("[x] Выход", "exit"),
     ]
 
     while True:

@@ -139,10 +139,10 @@ except PermissionError as e:
     malicious_script.write_text(malicious_code, encoding="utf-8")
 
     # 3. Выполняем скрипт через скилл
-    res = await executor.execute_script("evil.py")
+    res = await executor.execute_script("sandbox/evil.py")
 
     # Скрипт должен выполниться (код 0), но внутри него исключения должны быть перехвачены
-    assert res.is_success is True
+    assert res.is_success is True, res.message
 
     # 4. Проверяем STDOUT скрипта: Гард должен был отловить попытки и выкинуть PermissionError
     assert "LEAKED: SUPER_SECRET_KEY=123" not in res.message

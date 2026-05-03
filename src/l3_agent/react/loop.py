@@ -273,7 +273,7 @@ class ReactLoop:
                     temperature=self.agent_state.temperature,
                     # max_tokens=60000,
                     reasoning_effort="high",
-                    timeout=120.0,
+                    timeout=180.0,
                 )
 
                 message_obj = response.choices[0].message
@@ -342,35 +342,38 @@ class ReactLoop:
 
         clean_answer = raw_answer.strip()
 
-        # Срезаем Markdown-обертку, если LLM всё-таки решила прислать json как текст
-        if clean_answer.startswith("```"):
-            match = re.search(r"\{.*\}", clean_answer, re.DOTALL)
-            if match:
-                clean_answer = match.group(0)
+        # Пуленепробиваемый поиск границ JSON
+        start_idx = clean_answer.find("{")
+        end_idx = clean_answer.rfind("}")
 
-        if not clean_answer.startswith("{"):
-            # Имитация пустого действия
-            return AgentResponse(thoughts=clean_answer, actions=[])
+        if start_idx != -1 and end_idx != -1 and end_idx > start_idx:
+            json_str = clean_answer[start_idx:end_idx + 1]
+            try:
+                parsed_response = AgentResponse.model_validate_json(json_str)
+                return parsed_response
+                
+            except ValidationError as e:
+                system_logger.warning("[ReAct] Ошибка структуры JSON.")
+                err_msg = f"Format Error: {e}"
 
-        try:
-            parsed_response = AgentResponse.model_validate_json(clean_answer)
-            return parsed_response
+                await self.sql_ticks.save_tick(
+                    thoughts="[System: LLM provided invalid JSON format]",
+                    # Сохраняем только начало битого JSON, чтобы не переполнять логи
+                    actions=[{"tool_name": "unknown", "parameters": {"raw": json_str[:500]}}],
+                    results={
+                        "execution_report": err_msg,
+                        "step": self.agent_state.current_step,
+                        "max_steps": self.agent_state.max_react_steps,
+                    },
+                )
+                self.agent_state.last_actions_result = err_msg
+                return None
+                
+            except Exception:
+                pass # Если парсинг упал тотально (вообще не JSON), идем к fallback ниже
 
-        except ValidationError as e:
-            system_logger.warning("[ReAct] Ошибка структуры JSON.")
-            err_msg = f"Format Error: {e}"
-
-            await self.sql_ticks.save_tick(
-                thoughts="[System: LLM provided invalid JSON format]",
-                actions=[{"tool_name": "unknown", "parameters": {"raw": clean_answer}}],
-                results={
-                    "execution_report": err_msg,
-                    "step": self.agent_state.current_step,
-                    "max_steps": self.agent_state.max_react_steps,
-                },
-            )
-            self.agent_state.last_actions_result = err_msg
-            return None
+        # Если { } не найдено, значит LLM просто решила поболтать текстом
+        return AgentResponse(thoughts=clean_answer, actions=[])
 
     def add_realtime_event(self, event_data: Dict[str, Any]) -> None:
         """

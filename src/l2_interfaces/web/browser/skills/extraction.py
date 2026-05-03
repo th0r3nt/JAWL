@@ -34,7 +34,7 @@ class BrowserExtraction:
             self.client.touch()
 
             if "/" not in filename and "\\" not in filename:
-                filename = f"_system/download/{filename}"
+                filename = f"sandbox/_system/download/{filename}"
 
             safe_path = validate_sandbox_path(filename)
             safe_path.parent.mkdir(parents=True, exist_ok=True)

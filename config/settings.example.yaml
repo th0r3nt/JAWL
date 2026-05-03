@@ -39,7 +39,7 @@ system:
   # Подробнее: docs/yaml/settings/context.md
   context_depth:
     ticks: 15
-    detailed_ticks: 3
+    detailed_ticks: 4
     tick_action_max_chars: 10000
     tick_result_max_chars: 20000
     tick_thoughts_short_max_chars: 1000

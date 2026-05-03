@@ -15,10 +15,13 @@ def test_observer_read_framework_allowed(os_client):
     core_file = os_client.framework_dir / "src" / "main.py"
 
     # Чтение разрешено
-    assert os_client.validate_path(core_file, is_write=False) == core_file.resolve()
+    assert os_client.validate_path("src/main.py", is_write=False) == core_file.resolve()
 
-    # Использование "../" для возврата в корень фреймворка разрешено (DWIM логика)
-    assert os_client.validate_path("../src/main.py", is_write=False) == core_file.resolve()
+    # Использование "../" теперь честно идет вверх, поэтому блокируется, если выходит за JAWL
+    with pytest.raises(
+        PermissionError, match="OBSERVER: Чтение разрешено только в пределах JAWL."
+    ):
+        os_client.validate_path("../src/main.py", is_write=False)
 
 
 def test_observer_write_framework_blocked(os_client):

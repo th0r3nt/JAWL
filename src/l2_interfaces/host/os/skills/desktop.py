@@ -144,7 +144,7 @@ class HostOSDesktop:
         """
         try:
             if "/" not in filename and "\\" not in filename:
-                filename = f"_system/download/{filename}"
+                filename = f"sandbox/_system/download/{filename}"
 
             safe_path = self.host_os.validate_path(filename, is_write=True)
             safe_path.parent.mkdir(parents=True, exist_ok=True)

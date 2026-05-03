@@ -88,20 +88,20 @@ async def test_os_files_open_and_close_workspace(os_client):
     target.touch()
 
     # Открытие
-    res_open = await workspace.open_file("editor_test.py")
-    assert res_open.is_success is True
+    res_open = await workspace.open_file("sandbox/editor_test.py")
+    assert res_open.is_success is True, res_open.message
     assert "editor_test.py" in os_client.state.opened_workspace_files
 
     # Превышение лимита
     os_client.config.workspace_max_opened_files = 1
     target2 = os_client.sandbox_dir / "editor_test2.py"
     target2.touch()
-    res_limit = await workspace.open_file("editor_test2.py")
+    res_limit = await workspace.open_file("sandbox/editor_test2.py")
     assert res_limit.is_success is False
     assert "максимальное количество" in res_limit.message
 
     # Закрытие
-    res_close = await workspace.close_file("editor_test.py")
+    res_close = await workspace.close_file("sandbox/editor_test.py")
     assert res_close.is_success is True
     assert "editor_test.py" not in os_client.state.opened_workspace_files
 
@@ -138,14 +138,16 @@ async def test_os_files_patch_file(os_client):
 
     # Успешный патч
     res_patch = await editor.patch_file(
-        filepath="script.py", search_block="    return a - b", replace_block="    return a + b"
+        filepath="sandbox/script.py",
+        search_block="    return a - b",
+        replace_block="    return a + b",
     )
 
     assert res_patch.is_success is True
     assert "return a + b" in target.read_text(encoding="utf-8")
 
     # Патч с ошибкой (блок не найден)
-    res_fail = await editor.patch_file("script.py", "return a * b", "return a / b")
+    res_fail = await editor.patch_file("sandbox/script.py", "return a * b", "return a / b")
     assert res_fail.is_success is False
     assert "не найден" in res_fail.message
 
@@ -163,7 +165,7 @@ async def test_os_files_read_files_in_directory_char_limit(os_client):
     (os_client.sandbox_dir / "f2.txt").write_text("1234567890", encoding="utf-8")
     (os_client.sandbox_dir / "f3.txt").write_text("1234567890", encoding="utf-8")
 
-    res = await reader.read_files_in_directory(".", max_files=10)
+    res = await reader.read_files_in_directory("sandbox", max_files=10)
 
     assert res.is_success is True
     # Проверяем, что сработал аварийный тормоз
