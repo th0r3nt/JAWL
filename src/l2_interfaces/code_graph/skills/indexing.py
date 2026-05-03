@@ -63,7 +63,7 @@ class CodeGraphIndexing:
             msg = (
                 f"Кодовая база '{project_id}' успешно проиндексирована.\n"
                 f"Найдено: {stats['files']} файлов, {stats['classes']} классов, {stats['functions']} функций.\n"
-                f"Теперь его можно изучить подробнее с помощью сооветствующих навыков."
+                f"Теперь его можно изучить подробнее с помощью соответствующих навыков."
             )
             system_logger.info(f"[Code Graph] Индексация '{project_id}' завершена.")
             return SkillResult.ok(msg)

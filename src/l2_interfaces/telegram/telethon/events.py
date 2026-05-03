@@ -264,7 +264,7 @@ class TelethonEvents:
             res_str += "\n".join(overview_lines)
             if total_dialogs > len(overview_lines):
                 hidden = total_dialogs - len(overview_lines)
-                res_str += f"\n\n...и еще {hidden} чатов скрыто для экономии контекста. Для просмотра - сооветствующая функция."
+                res_str += f"\n\n...и еще {hidden} чатов скрыто для экономии контекста. Для просмотра - соответствующая функция."
         else:
             res_str += "Список диалогов пуст."
 
