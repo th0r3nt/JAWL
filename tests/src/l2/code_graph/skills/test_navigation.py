@@ -40,8 +40,8 @@ async def test_trace_dependencies(nav_skill):
     res = await nav_skill.trace_dependencies("test_prj", "src/api.py")
 
     assert res.is_success is True
-    assert "<- src/main.py (FILE)" in res.message
-    assert "-> src/api.py::Auth (CLASS)" in res.message
+    assert "Его импортирует: src/main.py (FILE)" in res.message
+    assert "Внутри него находится: src/api.py::Auth (CLASS)" in res.message
 
 
 @pytest.mark.asyncio

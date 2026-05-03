@@ -77,44 +77,62 @@ class CodeGraphNavigation:
     @skill(swarm_roles=[Subagents.CODER, Subagents.QA_ENGINEER])
     async def trace_dependencies(self, project_id: str, target_name: str) -> SkillResult:
         """
-        Поиск "радиуса поражения". Показывает, в каких файлах импортируется
-        указанный файл, или какие функции находятся внутри класса.
+        Поиск "радиуса поражения" (Blast Radius). Показывает, в каких файлах импортируется 
+        указанный файл, или какие функции находятся внутри класса. 
         Например: полезно перед рефакторингом, чтобы понять, какие тесты нужно обновить.
 
         Args:
             project_id: ID проиндексированного графа.
             target_name: Имя файла (например 'src/main.py') или полный путь к классу ('src/main.py::MyClass').
         """
+
         if project_id not in self.client.state.active_indexes:
             return SkillResult.fail(f"Проект '{project_id}' не найден.")
 
         node_id = f"{project_id}::{target_name}"
 
-        try:
-            # Кто зависит от нас (входящие связи: кто нас импортирует)
-            usages = await self.graph.get_usages(node_id)
+        # Маппинг связей на человеческий язык для лучшего понимания агентом
+        def format_relation(rel_type: str, direction: str) -> str:
+            mapping = {
+                "in": {
+                    "IMPORTS": "Его импортирует",
+                    "CONTAINS": "Он находится внутри",
+                    "DEFINES": "Его определяет",
+                    "CALLS": "Его вызывает",
+                },
+                "out": {
+                    "IMPORTS": "Он импортирует",
+                    "CONTAINS": "Внутри него находится",
+                    "DEFINES": "Он определяет",
+                    "CALLS": "Он вызывает",
+                }
+            }
+            return mapping.get(direction, {}).get(rel_type, f"[{rel_type}] связано с")
 
-            # От кого зависим мы (исходящие связи: что мы импортируем / что лежит внутри)
+        try:
+            # Входящие связи (кто зависит от нас)
+            usages = await self.graph.get_usages(node_id)
+            # Исходящие связи (от чего зависим мы)
             deps = await self.graph.get_dependencies(node_id)
 
             if not usages and not deps:
-                return SkillResult.ok(
-                    f"Узел '{target_name}' не найден в графе или не имеет связей."
-                )
+                return SkillResult.ok(f"Узел '{target_name}' не найден в графе или не имеет связей.")
 
-            lines = [f"Архитектурные связи для `{target_name}`:\n\n"]
-
+            lines = [f"Архитектурные связи для `{target_name}`:\n"]
+            
             if usages:
-                lines.append("Входящие связи:")
+                lines.append("Кто использует этот узел (Зависят от него):")
                 for u in usages:
-                    clean_id = u["id"].replace(f"{project_id}::", "")
-                    lines.append(f"  - [{u['relation']}] <- {clean_id} ({u['type']})")
-
+                    clean_id = u['id'].replace(f"{project_id}::", "")
+                    rel_text = format_relation(u['relation'], "in")
+                    lines.append(f"  - {rel_text}: {clean_id} ({u['type']})")
+                    
             if deps:
-                lines.append("\n\nИсходящие связи:")
+                lines.append("\nЧто использует этот узел (Он зависит от них):")
                 for d in deps:
-                    clean_id = d["id"].replace(f"{project_id}::", "")
-                    lines.append(f"  - [{d['relation']}] -> {clean_id} ({d['type']})")
+                    clean_id = d['id'].replace(f"{project_id}::", "")
+                    rel_text = format_relation(d['relation'], "out")
+                    lines.append(f"  - {rel_text}: {clean_id} ({d['type']})")
 
             return SkillResult.ok("\n".join(lines))
 
