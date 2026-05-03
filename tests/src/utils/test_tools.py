@@ -40,9 +40,33 @@ def test_truncate_text() -> None:
     text = "Hello World!"
     # Не режет, если лимит больше текста
     assert truncate_text(text, 50) == "Hello World!"
-    # Режет с добавлением суффикса
+    # Режет с добавлением суффикса. Результат ДОЛЖЕН вписываться в max_chars.
     truncated = truncate_text(text, 5, suffix="...")
-    assert truncated == "Hello..."
+    assert truncated == "He..."
+    assert len(truncated) == 5
+
+
+def test_truncate_text_never_exceeds_max_chars() -> None:
+    """Главное инвариант: длина результата всегда <= max_chars."""
+    # Длинный текст, длинный дефолтный суффикс.
+    long_text = "a" * 1000
+    for limit in (1, 10, 50, 100, 200, 500, 999):
+        result = truncate_text(long_text, limit)
+        assert len(result) <= limit, (
+            f"truncate_text превысил лимит: limit={limit}, len(result)={len(result)}"
+        )
+
+
+def test_truncate_text_suffix_longer_than_limit() -> None:
+    """Если суффикс длиннее лимита, суффикс тоже обрезается."""
+    result = truncate_text("abcdef", max_chars=3, suffix="...[long suffix]")
+    assert len(result) == 3
+
+
+def test_truncate_text_zero_and_negative_max() -> None:
+    """max_chars <= 0 → пустая строка."""
+    assert truncate_text("abc", 0) == ""
+    assert truncate_text("abc", -5) == ""
 
 
 class TestHTMLCleaner:
