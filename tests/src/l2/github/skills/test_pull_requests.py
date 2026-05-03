@@ -1,4 +1,3 @@
-# Файл: tests\l2\github\test_pull_requests.py
 import pytest
 from src.l2_interfaces.github.skills.pull_requests import GithubPullRequests
 

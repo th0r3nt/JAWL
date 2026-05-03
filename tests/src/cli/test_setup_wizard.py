@@ -1,20 +1,28 @@
-from src.cli.screens.setup_wizard import _toggle_interface
+from pathlib import Path
+from unittest.mock import patch
+
+from src.cli.screens.setup_wizard import _ensure_yaml_exists
 
 
-def test_toggle_interface_existing():
-    """Тест: переключение существующего флага в словаре."""
-    data = {"web": {"browser": {"enabled": False}}}
+def test_ensure_yaml_exists_copies_example(tmp_path: Path):
+    """Тест: Если целевого конфига нет, но есть шаблон (.example), он копируется."""
 
-    _toggle_interface(data, ["web", "browser", "enabled"])
-    assert data["web"]["browser"]["enabled"] is True
+    # Создаем фейковый .example.yaml
+    example_file = tmp_path / "settings.example.yaml"
+    example_file.write_text("test: data", encoding="utf-8")
 
-    _toggle_interface(data, ["web", "browser", "enabled"])
-    assert data["web"]["browser"]["enabled"] is False
+    # Мокаем CONFIG_DIR на нашу временную папку
+    with patch("src.cli.screens.setup_wizard.CONFIG_DIR", tmp_path):
+        target_path = _ensure_yaml_exists("settings.yaml")
+
+        assert target_path is not None
+        assert target_path.exists()
+        assert target_path.read_text(encoding="utf-8") == "test: data"
 
 
-def test_toggle_interface_creates_missing_keys():
-    """Тест: если ключей в YAML нет, они создаются автоматически."""
-    data = {}
+def test_ensure_yaml_exists_no_template(tmp_path: Path):
+    """Тест: Если нет ни конфига, ни шаблона, возвращается None."""
 
-    _toggle_interface(data, ["github", "enabled"])
-    assert data["github"]["enabled"] is True
+    with patch("src.cli.screens.setup_wizard.CONFIG_DIR", tmp_path):
+        target_path = _ensure_yaml_exists("missing.yaml")
+        assert target_path is None

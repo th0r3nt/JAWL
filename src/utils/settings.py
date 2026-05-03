@@ -1,4 +1,3 @@
-# Файл: src/utils/settings.py
 import shutil
 import yaml
 from pathlib import Path

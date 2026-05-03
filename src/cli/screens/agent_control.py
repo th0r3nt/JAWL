@@ -14,11 +14,11 @@ from src.utils.settings import load_config
 from src.utils._tools import get_pid_file_path
 
 from src.cli.widgets.ui import print_success, print_error, print_info, wait_for_enter
+from src.cli.screens.onboarding import run_onboarding_if_needed
 
 ROOT_DIR = Path(__file__).resolve().parent.parent.parent.parent
 PID_FILE = ROOT_DIR / "src" / "utils" / "local" / "data" / "agent.pid"
 ENV_FILE = ROOT_DIR / ".env"
-ENV_EXAMPLE = ROOT_DIR / ".env.example"
 MAIN_SCRIPT = ROOT_DIR / "src" / "main.py"
 STOP_FILE = ROOT_DIR / "src" / "utils" / "local" / "data" / "agent.stop"
 PROMPTS_DIR = ROOT_DIR / "src" / "l3_agent" / "prompt" / "personality"
@@ -33,144 +33,19 @@ def _is_agent_running() -> bool:
     try:
         pid = int(pid_file.read_text().strip())
         if psutil.pid_exists(pid):
-            # Дополнительная проверка: это всё еще Python-процесс?
             proc = psutil.Process(pid)
             return proc.is_running() and "python" in proc.name().lower()
         return False
     except (ValueError, psutil.NoSuchProcess, psutil.AccessDenied):
-        # Если файл есть, а процесса нет - файл мусорный, удаляем
         if pid_file.exists():
             pid_file.unlink()
         return False
 
 
-def _check_and_setup_env() -> tuple[bool, bool]:
-    """
-    Проверяет наличие файла .env и базовых ключей.
-    Обеспечивает авто-настройку для локальных LLM (Ollama/vLLM) без лишних вопросов.
-    Возвращает: (Успех_проверки, Были_ли_созданы_или_изменены_файлы)
-    """
-
-    was_modified = False
-
-    if not ENV_FILE.exists():
-        if ENV_EXAMPLE.exists():
-            try:
-                with open(ENV_EXAMPLE, "r", encoding="utf-8-sig") as f:
-                    content = f.read()
-            except UnicodeDecodeError:
-                with open(ENV_EXAMPLE, "r", encoding="cp1251") as f:
-                    content = f.read()
-
-            with open(ENV_FILE, "w", encoding="utf-8") as f:
-                f.write(content)
-            print_info(" Создан базовый файл .env из .env.example")
-            was_modified = True
-        else:
-            print_error("Не найден ни .env, ни .env.example.")
-            return False, False
-
-    try:
-        with open(ENV_FILE, "r", encoding="utf-8-sig") as f:
-            env_content = f.readlines()
-
-    except UnicodeDecodeError:
-        with open(ENV_FILE, "r", encoding="cp1251") as f:
-            env_content = f.readlines()
-
-        with open(ENV_FILE, "w", encoding="utf-8") as f:
-            f.writelines(env_content)
-
-    key_found = False
-    local_url_found = False
-
-    for line in env_content:
-        line_stripped = line.strip()
-        # Ищем любой ключ, начинающийся на LLM_API_KEY_
-        if line_stripped.startswith("LLM_API_KEY_") and "=" in line_stripped:
-            val = line_stripped.split("=", 1)[1].strip("\"' ")
-            if len(val) > 0:
-                key_found = True
-        # Ищем, не указал ли юзер локальный URL
-        elif line_stripped.startswith("LLM_API_URL=") and "=" in line_stripped:
-            val = line_stripped.split("=", 1)[1].strip("\"' ").lower()
-            if "localhost" in val or "127.0.0.1" in val or "0.0.0.0" in val:
-                local_url_found = True
-
-    if not key_found:
-        if local_url_found:
-            # Автоматически добавляем заглушку без лишних вопросов
-            new_content = []
-            for line in env_content:
-                if line.startswith("LLM_API_KEY_1="):
-                    new_content.append('LLM_API_KEY_1="local_dummy_key"\n')
-                else:
-                    new_content.append(line)
-            with open(ENV_FILE, "w", encoding="utf-8") as f:
-                f.writelines(new_content)
-            print_info(
-                " Обнаружен локальный URL без ключа. Добавлена заглушка 'local_dummy_key'."
-            )
-            was_modified = True
-        else:
-            print_info(" Похоже, вы еще не настроили подключение к LLM.")
-            api_url = questionary.text(
-                "Введите Base URL для LLM (например, ссылку для Gemini или локальной модели).\nОставьте пустым для стандартного OpenAI API:"
-            ).ask()
-
-            if api_url is None:
-                return False, False
-
-            is_local = False
-            if api_url:
-                url_lower = api_url.lower()
-                if (
-                    "localhost" in url_lower
-                    or "127.0.0.1" in url_lower
-                    or "0.0.0.0" in url_lower
-                ):
-                    is_local = True
-
-            api_key = questionary.text(
-                "Введите ваш LLM API Key (Обязательно для облачных моделей, для локальных - пропустить):"
-            ).ask()
-
-            if not api_key:
-                if is_local:
-                    api_key = "local_dummy_key"
-                    print_info(
-                        " API ключ не указан, но обнаружен локальный URL."
-                    )
-                else:
-                    print_error(
-                        "Запуск отменен: API ключ обязателен для работы агента (если модель не локальная)."
-                    )
-                    return False, False
-
-            new_content = []
-            for line in env_content:
-                if line.startswith("LLM_API_KEY_1="):
-                    new_content.append(f'LLM_API_KEY_1="{api_key.strip()}"\n')
-                elif line.startswith("LLM_API_URL="):
-                    new_content.append(f'LLM_API_URL="{api_url.strip()}"\n')
-                else:
-                    new_content.append(line)
-
-            with open(ENV_FILE, "w", encoding="utf-8") as f:
-                f.writelines(new_content)
-
-            print_success("\nНастройки LLM успешно сохранены в .env")
-            was_modified = True
-
-    return True, was_modified
-
-
-def _check_and_setup_prompts() -> bool:
+def _check_and_setup_prompts() -> None:
     """Проверяет наличие файлов промпта личности. Если их нет, создает из .example.md."""
     if not PROMPTS_DIR.exists():
         PROMPTS_DIR.mkdir(parents=True, exist_ok=True)
-
-    created_any = False
 
     for example_file in PROMPTS_DIR.rglob("*.example.md"):
         target_name = example_file.name.replace(".example.md", ".md")
@@ -179,9 +54,6 @@ def _check_and_setup_prompts() -> bool:
         if not target_file.exists():
             shutil.copy(example_file, target_file)
             print_info(f" Создан базовый файл личности: {target_name}")
-            created_any = True
-
-    return created_any
 
 
 def _validate_configs() -> bool:
@@ -279,42 +151,20 @@ def start_agent_screen() -> None:
         wait_for_enter()
         return
 
-    settings_existed = (ROOT_DIR / "config" / "settings.yaml").exists()
-    interfaces_existed = (ROOT_DIR / "config" / "interfaces.yaml").exists()
+    # 1. Запуск онбординга, если .env или ключей еще нет
+    if not run_onboarding_if_needed():
+        wait_for_enter()
+        return
 
+    # 2. Тихая генерация промптов личности (если их удалили)
+    _check_and_setup_prompts()
+
+    # 3. Валидация всех Pydantic-схем перед запуском основного кода
     if not _validate_configs():
         wait_for_enter()
         return
 
-    configs_created = not (settings_existed and interfaces_existed)
-    prompts_created = _check_and_setup_prompts()
-
-    env_success, env_modified = _check_and_setup_env()
-    if not env_success:
-        wait_for_enter()
-        return
-
-    if configs_created or prompts_created or env_modified:
-        print("\n")
-        print_info(" [Первичная инициализация завершена]")
-        print("\n")
-        print_info(" Были созданы базовые файлы конфигурации.")
-        print_info(
-            " Обязательно зайдите в config/interfaces.yaml и настройте под себя возможности агента."
-        )
-        print_info(" По умолчанию большинство интерфейсов отключено в целях безопасности.")
-        print_info(
-            " Также проверьте config/settings.yaml для настройки параметров модели, БД и лимитов."
-        )
-        print("\n")
-        print_info(" Были созданы файлы личности агента и/или .env.")
-        print_info(
-            " Просмотрите src/l3_agent/prompt/personality/, чтобы настроить личность и характер агента."
-        )
-        print_success("\nПосле финальной настройки выберите 'Запустить агента' в меню еще раз.")
-        wait_for_enter()
-        return
-
+    # 4. Проверка телеграм-сессии
     if not _telethon_auth_flow():
         wait_for_enter()
         return
@@ -326,10 +176,8 @@ def start_agent_screen() -> None:
     env["PYTHONPATH"] = str(ROOT_DIR)
     env["PYTHONIOENCODING"] = "utf-8"
 
-    # Гарантируем полное отсоединение от родительского процесса и консоли
     kwargs = {"close_fds": True}
     if os.name == "nt":
-        # 0x08000000 = DETACHED_PROCESS - изолирует процесс от родительской консоли
         kwargs["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP | 0x08000000
     else:
         kwargs["start_new_session"] = True
@@ -338,7 +186,6 @@ def start_agent_screen() -> None:
     crash_log_path.parent.mkdir(parents=True, exist_ok=True)
 
     try:
-        # Открываем реальный файл для логгирования фатальных крашей, избегая блокировок tempfile
         f_err = open(crash_log_path, "w", encoding="utf-8")
 
         try:
@@ -353,13 +200,10 @@ def start_agent_screen() -> None:
             PID_FILE.write_text(str(process.pid))
 
         finally:
-            # Родительский процесс закрывает свой хэндл, дочерний продолжает писать
             f_err.close()
 
-        # Даем агенту 5 секунд на старт
         time.sleep(5)
 
-        # Проверяем, не упал ли он
         if process.poll() is not None:
             if PID_FILE.exists():
                 PID_FILE.unlink()

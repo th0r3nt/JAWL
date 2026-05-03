@@ -1,4 +1,3 @@
-# Файл: tests\l2\host_os\test_desktop.py
 import pytest
 from unittest.mock import patch, MagicMock
 from src.l2_interfaces.host.os.skills.desktop import HostOSDesktop
