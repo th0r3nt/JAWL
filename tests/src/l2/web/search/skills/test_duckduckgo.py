@@ -48,5 +48,7 @@ async def test_web_search_exception(mock_ddgs_class, mock_sleep, ddg_skill):
     assert "Ошибка веб-поиска" in res.message
     assert "Connection Reset" in res.message
     
-    # Проверяем, что ретраи реально были (sleep вызывался 3 раза)
-    assert mock_sleep.call_count == 3
+    # Проверяем, что ретраи реально были.
+    # При 3 попытках спим ровно 2 раза (между 1→2 и 2→3),
+    # после последней попытки сразу raise, без бессмысленного sleep.
+    assert mock_sleep.call_count == 2
