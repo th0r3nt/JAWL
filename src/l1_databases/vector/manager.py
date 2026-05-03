@@ -2,7 +2,7 @@
 Фасад для слоя семантической векторной памяти.
 
 Оркестрирует запуск Qdrant клиента, загрузку ONNX Embedding-модели
-и сборку CRUD-контроллеров для знаний и мыслей.
+и сборку CRUD-контроллеров для знаний, мыслей и Code Graph.
 """
 
 from pathlib import Path
@@ -12,6 +12,7 @@ from src.l1_databases.vector.embedding import EmbeddingModel
 from src.l1_databases.vector.collections import VectorCollection
 from src.l1_databases.vector.management.knowledge import VectorKnowledge
 from src.l1_databases.vector.management.thoughts import VectorThoughts
+from src.l1_databases.vector.management.code_ast import VectorCodeAST
 
 
 class VectorManager:
@@ -40,12 +41,18 @@ class VectorManager:
             similarity_threshold: Порог косинусного сходства для отсева нерелевантного шума.
             timezone: Смещение часового пояса.
         """
+
         self.collection_name_knowledge = "knowledge"
         self.collection_name_thoughts = "thoughts"
+        self.collection_name_code_ast = "code_ast"
 
         self.db = VectorDB(
             db_path=str(db_path),
-            collections=[self.collection_name_knowledge, self.collection_name_thoughts],
+            collections=[
+                self.collection_name_knowledge,
+                self.collection_name_thoughts,
+                self.collection_name_code_ast,
+            ],
             vector_size=vector_size,
         )
         self.embedding = EmbeddingModel(
@@ -54,8 +61,10 @@ class VectorManager:
 
         knowledge_col = VectorCollection(self.db, self.collection_name_knowledge)
         thoughts_col = VectorCollection(self.db, self.collection_name_thoughts)
+        code_ast_col = VectorCollection(self.db, self.collection_name_code_ast)
 
         # Передаем timezone в CRUD-обработчики
+
         self.knowledge = VectorKnowledge(
             db=self.db,
             collection=knowledge_col,
@@ -69,6 +78,13 @@ class VectorManager:
             embedding_model=self.embedding,
             similarity_threshold=similarity_threshold,
             timezone=timezone,
+        )
+
+        self.code_ast = VectorCodeAST(
+            db=self.db,
+            collection=code_ast_col,
+            embedding_model=self.embedding,
+            similarity_threshold=similarity_threshold,
         )
 
     async def connect(self) -> None:

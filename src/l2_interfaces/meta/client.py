@@ -111,7 +111,7 @@ class MetaClient:
 
         return (
             f"### META [ON]\n"
-            f"* Access Level: {self.access_level} (текущий уровень) \n{access_levels_desc}\n"
+            f"* Access Level: {self.access_level} (текущий уровень) \n{access_levels_desc}\n\n"
             f"* Custom Skills: {custom_status}\n"
             f"* Available LLM models: [{models_str}]"
         )

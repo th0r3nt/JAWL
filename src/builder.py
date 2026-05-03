@@ -24,6 +24,7 @@ from src.l2_interfaces.calendar.state import CalendarState
 from src.l2_interfaces.github.state import GithubState
 from src.l2_interfaces.email.state import EmailState
 from src.l2_interfaces.meta.state import CustomDashboardState
+from src.l2_interfaces.code_graph.state import CodeGraphState
 
 from src.l1_databases.vector.manager import VectorManager
 from src.l1_databases.sql.manager import SQLManager
@@ -76,6 +77,7 @@ class SystemBuilder:
         sys.terminal_state = HostTerminalState(
             context_limit=sys.interfaces_config.host.terminal.context_limit
         )
+        sys.code_graph_state = CodeGraphState(data_dir=sys.local_data_dir)
         sys.telethon_state = TelethonState(
             number_of_last_chats=sys.interfaces_config.telegram.telethon.recent_chats_limit,
             private_chat_history_limit=sys.interfaces_config.telegram.telethon.private_chat_history_limit,

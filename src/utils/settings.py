@@ -144,6 +144,10 @@ class MetaConfig(BaseModel):
     custom_skills_enabled: bool = True
 
 
+class CodeGraphConfig(BaseModel):
+    enabled: bool = True
+
+
 class MultimodalityConfig(BaseModel):
     enabled: bool = False
 
@@ -160,6 +164,7 @@ class InterfacesConfig(BaseModel):
     github: GithubConfig = Field(default_factory=GithubConfig)
     web: WebConfig = Field(default_factory=WebConfig)
     meta: MetaConfig = Field(default_factory=MetaConfig)
+    code_graph: CodeGraphConfig = Field(default_factory=CodeGraphConfig)
     multimodality: MultimodalityConfig = Field(default_factory=MultimodalityConfig)
     calendar: CalendarConfig = Field(default_factory=CalendarConfig)
     email: EmailConfig = Field(default_factory=EmailConfig)

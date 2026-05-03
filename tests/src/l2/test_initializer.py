@@ -1,13 +1,13 @@
 import pytest
 from unittest.mock import MagicMock, patch
 
-from src.l2_interfaces.initializer import make_off_provider, initialize_l2_interfaces
+from src.l2_interfaces.initializer import off_provider, initialize_l2_interfaces
 
 
 @pytest.mark.asyncio
-async def test_make_off_provider():
+async def test_off_provider():
     """Тест: Фабрика заглушек корректно генерирует отключенные блоки контекста."""
-    provider = make_off_provider("TEST_MODULE")
+    provider = off_provider("TEST_MODULE")
 
     # Провайдер должен принимать любые kwargs и возвращать строку
     result = await provider(event_name="TEST", payload={})

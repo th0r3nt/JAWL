@@ -14,6 +14,7 @@ if TYPE_CHECKING:
 # Импорт интерфейсов
 from src.l2_interfaces.host.os.bootstrap import setup_host_os
 from src.l2_interfaces.host.terminal.bootstrap import setup_host_terminal
+from src.l2_interfaces.code_graph.bootstrap import setup_code_graph
 from src.l2_interfaces.meta.bootstrap import setup_meta
 from src.l2_interfaces.telegram.telethon.bootstrap import setup_telethon
 from src.l2_interfaces.telegram.aiogram.bootstrap import setup_aiogram
@@ -32,7 +33,7 @@ from src.l2_interfaces.github.bootstrap import setup_github
 from src.l3_agent.context.registry import ContextSection
 
 
-def make_off_provider(name: str) -> Any:
+def off_provider(name: str) -> Any:
     """
     Создает заглушку-провайдер контекста для аппаратно отключенных интерфейсов.
     Агент будет видеть этот статус и понимать, что инструмент недоступен.
@@ -76,7 +77,7 @@ def initialize_l2_interfaces(
         components.extend(setup_host_os(system))
     else:
         system.context_registry.register_provider(
-            "host os", make_off_provider("HOST OS"), ContextSection.INTERFACES
+            "host os", off_provider("HOST OS"), ContextSection.INTERFACES
         )
 
     # ================================================================
@@ -87,7 +88,18 @@ def initialize_l2_interfaces(
         components.extend(setup_host_terminal(system))
     else:
         system.context_registry.register_provider(
-            "host terminal", make_off_provider("HOST TERMINAL"), ContextSection.INTERFACES
+            "host terminal", off_provider("HOST TERMINAL"), ContextSection.INTERFACES
+        )
+
+    # ================================================================
+    # CODE GRAPH
+    # ================================================================
+
+    if getattr(config, "code_graph", None) and getattr(config.code_graph, "enabled", False):
+        components.extend(setup_code_graph(system))
+    else:
+        system.context_registry.register_provider(
+            "code_graph", off_provider("CODE GRAPH"), ContextSection.INTERFACES
         )
 
     # ================================================================
@@ -104,7 +116,7 @@ def initialize_l2_interfaces(
         )
     else:
         system.context_registry.register_provider(
-            "telethon", make_off_provider("TELETHON"), ContextSection.INTERFACES
+            "telethon", off_provider("TELETHON"), ContextSection.INTERFACES
         )
 
     # ================================================================
@@ -120,7 +132,7 @@ def initialize_l2_interfaces(
         )
     else:
         system.context_registry.register_provider(
-            "aiogram", make_off_provider("AIOGRAM"), ContextSection.INTERFACES
+            "aiogram", off_provider("AIOGRAM"), ContextSection.INTERFACES
         )
 
     # ================================================================
@@ -136,7 +148,7 @@ def initialize_l2_interfaces(
         )
     else:
         system.context_registry.register_provider(
-            "github", make_off_provider("GITHUB"), ContextSection.INTERFACES
+            "github", off_provider("GITHUB"), ContextSection.INTERFACES
         )
 
     # ================================================================
@@ -155,7 +167,7 @@ def initialize_l2_interfaces(
         )
     else:
         system.context_registry.register_provider(
-            "email", make_off_provider("EMAIL"), ContextSection.INTERFACES
+            "email", off_provider("EMAIL"), ContextSection.INTERFACES
         )
 
     # ================================================================
@@ -166,7 +178,7 @@ def initialize_l2_interfaces(
         components.extend(setup_web_search(system, env_vars.get("TAVILY_API_KEY")))
     else:
         system.context_registry.register_provider(
-            "web search", make_off_provider("WEB SEARCH"), ContextSection.INTERFACES
+            "web search", off_provider("WEB SEARCH"), ContextSection.INTERFACES
         )
 
     # ================================================================
@@ -177,7 +189,7 @@ def initialize_l2_interfaces(
         components.extend(setup_web_http(system))
     else:
         system.context_registry.register_provider(
-            "web http", make_off_provider("WEB HTTP"), ContextSection.INTERFACES
+            "web http", off_provider("WEB HTTP"), ContextSection.INTERFACES
         )
 
     # ================================================================
@@ -188,7 +200,7 @@ def initialize_l2_interfaces(
         components.extend(setup_web_browser(system))
     else:
         system.context_registry.register_provider(
-            "web browser", make_off_provider("WEB BROWSER"), ContextSection.INTERFACES
+            "web browser", off_provider("WEB BROWSER"), ContextSection.INTERFACES
         )
 
     # ================================================================
@@ -201,7 +213,7 @@ def initialize_l2_interfaces(
         )
     else:
         system.context_registry.register_provider(
-            "web hooks", make_off_provider("WEB HOOKS"), ContextSection.INTERFACES
+            "web hooks", off_provider("WEB HOOKS"), ContextSection.INTERFACES
         )
 
     # ================================================================
@@ -212,7 +224,7 @@ def initialize_l2_interfaces(
         components.extend(setup_web_rss(system))
     else:
         system.context_registry.register_provider(
-            "web rss", make_off_provider("WEB RSS"), ContextSection.INTERFACES
+            "web rss", off_provider("WEB RSS"), ContextSection.INTERFACES
         )
 
     # ================================================================
@@ -243,7 +255,7 @@ def initialize_l2_interfaces(
         components.extend(setup_multimodality(system))
     else:
         system.context_registry.register_provider(
-            "multimodality", make_off_provider("MULTIMODALITY"), ContextSection.INTERFACES
+            "multimodality", off_provider("MULTIMODALITY"), ContextSection.INTERFACES
         )
 
     # ================================================================
@@ -254,7 +266,7 @@ def initialize_l2_interfaces(
         components.extend(setup_calendar(system))
     else:
         system.context_registry.register_provider(
-            "calendar", make_off_provider("CALENDAR"), ContextSection.INTERFACES
+            "calendar", off_provider("CALENDAR"), ContextSection.INTERFACES
         )
 
     # ================================================================

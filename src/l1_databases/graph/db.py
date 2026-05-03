@@ -10,7 +10,12 @@ from pathlib import Path
 import kuzu
 
 from src.utils.logger import system_logger
-from src.l1_databases.graph.schema import GRAPH_NODE_TABLE, GRAPH_EDGE_TABLES
+from src.l1_databases.graph.schema import (
+    GRAPH_NODE_TABLE,
+    GRAPH_EDGE_TABLES,
+    CODE_NODE_TABLE,
+    CODE_EDGE_TABLES,
+)
 
 
 class GraphDB:
@@ -42,10 +47,14 @@ class GraphDB:
         Реализовано через перехват исключений для обеспечения идемпотентности
         и защиты от изменения структуры системных таблиц в новых версиях KuzuDB.
         """
+
         if not self.conn:
             return
 
-        # 1. Инициализация основной таблицы узлов
+        # =================================================================
+        # ОСНОВНАЯ ТАБЛИЦА УЗЛОВ
+        # =================================================================
+
         try:
             query = f"""
             CREATE NODE TABLE {GRAPH_NODE_TABLE}(
@@ -62,11 +71,40 @@ class GraphDB:
             if "already exists" not in str(e).lower():
                 raise e
 
-        # 2. Инициализация всех разрешенных типов связей (ребер)
         for edge in GRAPH_EDGE_TABLES:
             try:
                 self.conn.execute(
                     f"CREATE REL TABLE {edge}(FROM {GRAPH_NODE_TABLE} TO {GRAPH_NODE_TABLE}, description STRING);"
+                )
+            except RuntimeError as e:
+                if "already exists" not in str(e).lower():
+                    raise e
+
+        # =================================================================
+        # CODE GRAPH (AST)
+        # =================================================================
+
+        try:
+            query = f"""
+            CREATE NODE TABLE {CODE_NODE_TABLE}(
+                id STRING, 
+                name STRING, 
+                type STRING, 
+                file_path STRING, 
+                project_id STRING,
+                PRIMARY KEY (id)
+            )
+            """
+            self.conn.execute(query)
+        except RuntimeError as e:
+            if "already exists" not in str(e).lower():
+                raise e
+
+        for edge in CODE_EDGE_TABLES:
+            try:
+                # В AST графах нам не нужно поле 'description' для связей, достаточно самого факта связи
+                self.conn.execute(
+                    f"CREATE REL TABLE {edge}(FROM {CODE_NODE_TABLE} TO {CODE_NODE_TABLE});"
                 )
             except RuntimeError as e:
                 if "already exists" not in str(e).lower():

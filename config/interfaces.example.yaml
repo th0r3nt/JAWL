@@ -10,7 +10,7 @@ host:
     require_deploy_sessions: true 
     deploy_max_retries: 5 
 
-    framework_tree_depth: 1
+    framework_tree_depth: 2
     monitoring_interval_sec: 30
     execution_timeout_sec: 60 
 
@@ -28,6 +28,9 @@ host:
     history_limit: 50 
     context_limit: 10 
 
+# Подробнее: docs/yaml/interfaces/code_graph.md
+code_graph:
+  enabled: false
 
 telegram:
   # Подробнее: docs/yaml/interfaces/telegram/telethon.md

@@ -23,6 +23,7 @@ if TYPE_CHECKING:
     from src.l0_state.agent.state import AgentState
     from src.l2_interfaces.host.os.state import HostOSState
     from src.l2_interfaces.host.terminal.state import HostTerminalState
+    from src.l2_interfaces.code_graph.state import CodeGraphState
     from src.l2_interfaces.telegram.telethon.state import TelethonState
     from src.l2_interfaces.telegram.aiogram.state import AiogramState
     from src.l2_interfaces.github.state import GithubState
@@ -73,6 +74,7 @@ class System:
         self.agent_state: Optional["AgentState"] = None
         self.os_state: Optional["HostOSState"] = None
         self.terminal_state: Optional["HostTerminalState"] = None
+        self.code_graph_state: Optional["CodeGraphState"] = None
         self.telethon_state: Optional["TelethonState"] = None
         self.aiogram_state: Optional["AiogramState"] = None
         self.github_state: Optional["GithubState"] = None
@@ -84,6 +86,7 @@ class System:
         self.web_rss_state: Optional["WebRSSState"] = None
         self.calendar_state: Optional["CalendarState"] = None
         self.dashboard_state: Optional["CustomDashboardState"] = None
+
 
         # Заглушки L1-L3 (Заполняются через SystemBuilder)
         self.sql: Optional["SQLManager"] = None
