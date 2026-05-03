@@ -143,7 +143,7 @@ def start_server():
 
     assert res_deps.is_success is True
     # Проверяем входящие связи (usages)
-    assert "<- main.py (FILE)" in res_deps.message
+    assert "Его импортирует: main.py (FILE)" in res_deps.message
 
     # ======================================================
     # 5. СЕМАНТИЧЕСКИЙ ПОИСК (search_code_semantic)
