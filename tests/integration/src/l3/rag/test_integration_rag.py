@@ -13,6 +13,7 @@ from src.l3_agent.context.rag.memories import RAGMemories
 
 from tests.integration.src.l1.vector.conftest import MockEmbeddingModel
 
+
 @pytest.mark.asyncio
 async def test_integration_auto_graphrag_context_injection(tmp_path: Path):
     """
@@ -39,7 +40,7 @@ async def test_integration_auto_graphrag_context_injection(tmp_path: Path):
 
     # Вектор
     await knowledge.save_knowledge(
-        "Секретный код от хранилища Яблоко: 4242", tags=["type:fact"]
+        "Секретный код от хранилища Яблоко: 4242", tags=["type:fact"], source="Документация"
     )
 
     # Граф

@@ -37,6 +37,8 @@ VectorTag = Literal[
     "retention:ephemeral",  # Временно
 ]
 
+ReliabilityLevel = Literal["verified", "assumption", "untrusted"]
+
 
 class VectorKnowledge:
     """Интерфейс агента к базе объективных знаний."""
@@ -66,13 +68,21 @@ class VectorKnowledge:
         self.timezone = timezone
 
     @skill(swarm_roles=[Subagents.ARCHIVIST])
-    async def save_knowledge(self, knowledge_text: str, tags: List[VectorTag]) -> SkillResult:
+    async def save_knowledge(
+        self,
+        knowledge_text: str,
+        tags: List[VectorTag],
+        source: str,
+        reliability: ReliabilityLevel = "verified",
+    ) -> SkillResult:
         """
         Векторизует и сохраняет фрагмент знаний в базу.
 
         Args:
             knowledge_text: Текстовый блок информации для запоминания.
             tags: Строгий список тегов для будущей жесткой фильтрации при RAG.
+            source: Откуда взят факт (Например: 'Telegram: @boss', 'URL: habr.com/...', 'Вывод из логов версии v0.1.0').
+            reliability: Степень доверия. 'verified' - факт, 'assumption' - гипотеза, 'untrusted' - сомнительный источник.
         """
 
         if not tags:
@@ -85,7 +95,13 @@ class VectorKnowledge:
             vector = await self.embedding_model.get_embedding(str(knowledge_text))
             point_id = str(uuid.uuid4())
 
-            payload = {"text": str(knowledge_text), "created_at": time.time(), "tags": tags}
+            payload = {
+                "text": str(knowledge_text),
+                "created_at": time.time(),
+                "tags": tags,
+                "source": source,
+                "reliability": reliability,
+            }
 
             await self.db.client.upsert(
                 collection_name=self.collection.name,
@@ -177,7 +193,10 @@ class VectorKnowledge:
                     point.payload.get("created_at"), self.timezone
                 )
 
-                md_block = f"[ID: `{point.id}`] [Время: {time_str}] {tags_str} Релевантность: {score}/{self.similarity_threshold}\n{text}"
+                source = point.payload.get("source", "Не указан")
+                reliability = point.payload.get("reliability", "verified")
+
+                md_block = f"[ID: `{point.id}`] \n[Время: {time_str}] \n[Источник: {source}] \n[Надежность: {reliability}] \n[Тэги: {tags_str}] \n[Релевантность: {score}/{self.similarity_threshold}] \n{text}"
                 formatted_results.append(md_block)
 
             return SkillResult.ok("\n\n".join(formatted_results))
@@ -204,6 +223,7 @@ class VectorKnowledge:
             msg = f"[Vector DB] Знание успешно удалено из базы данных (ID: {point_id})."
             system_logger.debug(msg)
             return SkillResult.ok(msg)
+
         except Exception as e:
             msg = f"[Vector DB] Ошибка при удалении знания: {e}"
             system_logger.error(msg)
@@ -267,7 +287,10 @@ class VectorKnowledge:
                     point.payload.get("created_at"), self.timezone
                 )
 
-                md_block = f"[ID: `{point.id}`] [Время: {time_str}] {tags_str}\n{text}"
+                source = point.payload.get("source", "Не указан")
+                reliability = point.payload.get("reliability", "verified")
+
+                md_block = f"[ID: `{point.id}`] \n[Время: {time_str}] \n[Источник: {source}] \n[Надежность: {reliability}] \n[Тэги: {tags_str}] \n{text}"
                 formatted_results.append(md_block)
 
             return SkillResult.ok("\n\n".join(formatted_results))

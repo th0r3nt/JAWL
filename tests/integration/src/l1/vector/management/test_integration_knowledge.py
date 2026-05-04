@@ -12,10 +12,10 @@ def extract_id(log_msg: str) -> str:
 @pytest.mark.asyncio
 async def test_knowledge_save_and_search(knowledge_manager):
     res1 = await knowledge_manager.save_knowledge(
-        "Боги смерти едят яблоки", tags=["domain:lore"]
+        "Боги смерти едят яблоки", tags=["domain:lore"], source="Test"
     )
     res2 = await knowledge_manager.save_knowledge(
-        "Машина имеет мощный двигатель", tags=["domain:tech"]
+        "Машина имеет мощный двигатель", tags=["domain:tech"], source="Test"
     )
 
     assert res1.is_success
@@ -28,7 +28,7 @@ async def test_knowledge_save_and_search(knowledge_manager):
 
 @pytest.mark.asyncio
 async def test_knowledge_delete(knowledge_manager):
-    save_result = await knowledge_manager.save_knowledge("Временный факт", tags=["type:fact"])
+    save_result = await knowledge_manager.save_knowledge("Временный факт", tags=["type:fact"], source="Test")
     point_id = extract_id(save_result.message)
 
     del_result = await knowledge_manager.delete_knowledge(point_id)
@@ -37,9 +37,9 @@ async def test_knowledge_delete(knowledge_manager):
 
 @pytest.mark.asyncio
 async def test_knowledge_get_all(knowledge_manager):
-    await knowledge_manager.save_knowledge("Факт 1", tags=["type:fact"])
-    await knowledge_manager.save_knowledge("Факт 2", tags=["type:fact"])
-    await knowledge_manager.save_knowledge("Факт 3", tags=["type:fact"])
+    await knowledge_manager.save_knowledge("Факт 1", tags=["type:fact"], source="Test")
+    await knowledge_manager.save_knowledge("Факт 2", tags=["type:fact"], source="Test")
+    await knowledge_manager.save_knowledge("Факт 3", tags=["type:fact"], source="Test")
 
     result = await knowledge_manager.get_all_knowledge(limit=2)
     assert result.message.count("[ID:") == 2
@@ -47,6 +47,6 @@ async def test_knowledge_get_all(knowledge_manager):
 
 @pytest.mark.asyncio
 async def test_knowledge_search_not_found(knowledge_manager):
-    await knowledge_manager.save_knowledge("Яблоко", tags=["type:fact"])
+    await knowledge_manager.save_knowledge("Яблоко", tags=["type:fact"], source="Test")
     search_result = await knowledge_manager.search_knowledge("Неизвестный космос")
     assert "не дал результатов" in search_result.message

@@ -186,8 +186,10 @@ class GraphRAGOrchestrator:
             blocks.append("\n### Воспоминания:")
             for vec in top_vectors:
                 tags_str = f"[{', '.join(vec['tags'])}]" if vec["tags"] else "[Без тегов]"
+                src_str = f" [Источник: {vec.get('source', 'Внутренний монолог')}]"
+                rel_str = f" [Надежность: {vec.get('reliability', 'assumption')}]"
                 blocks.append(
-                    f"[ID: `{vec['id'][:8]}`] {tags_str} (Релевантность: {vec['score']:.2f})\n{vec['text']}"
+                    f"[ID: `{vec['id'][:8]}`]{src_str}{rel_str} {tags_str} (Релевантность: {vec['score']:.2f})\n{vec['text']}"
                 )
 
         return (

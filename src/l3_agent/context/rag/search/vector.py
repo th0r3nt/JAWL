@@ -106,6 +106,12 @@ class VectorSearchWrapper:
                         unique_points[point_id]["collection"] = collection_name
                         unique_points[point_id]["text"] = text
                         unique_points[point_id]["tags"] = point.payload.get("tags", [])
+                        unique_points[point_id]["source"] = point.payload.get(
+                            "source", "Внутренний монолог"
+                        )
+                        unique_points[point_id]["reliability"] = point.payload.get(
+                            "reliability", "assumption"
+                        )
                 else:
                     unique_points[point_id] = {
                         "id": point_id,
@@ -113,6 +119,8 @@ class VectorSearchWrapper:
                         "score": score,
                         "collection": collection_name,
                         "tags": point.payload.get("tags", []),
+                        "source": point.payload.get("source", "Внутренний монолог"),
+                        "reliability": point.payload.get("reliability", "assumption"),
                     }
 
         # Возвращаем плоский список всех найденных уникальных точек
