@@ -22,6 +22,44 @@ async def test_webhook_auth_failure(hooks_events):
 
 
 @pytest.mark.asyncio
+async def test_webhook_auth_uses_constant_time_compare(hooks_events, monkeypatch):
+    """Тест: сравнение токена должно идти через hmac.compare_digest (защита от timing attack)."""
+    import src.l2_interfaces.web.hooks.events as events_module
+
+    original_compare = events_module.hmac.compare_digest
+    calls = {"count": 0}
+
+    def spy_compare(a, b):
+        calls["count"] += 1
+        return original_compare(a, b)
+
+    monkeypatch.setattr(events_module.hmac, "compare_digest", spy_compare)
+
+    req = MagicMock(spec=web.Request)
+    req.query = {"token": "wrong_token"}
+    req.headers = {}
+    req.remote = "127.0.0.1"
+
+    resp = await hooks_events.handle_webhook(req)
+    assert resp.status == 401
+    # Именно compare_digest должен был вызваться (а не !=).
+    assert calls["count"] >= 1
+
+
+@pytest.mark.asyncio
+async def test_webhook_auth_missing_token_rejected(hooks_events):
+    """Тест: запрос без токена должен отклоняться (раньше None != secret тоже отклонял,
+    но теперь compare_digest(None, ...) кинул бы TypeError — страхуемся от регрессии)."""
+    req = MagicMock(spec=web.Request)
+    req.query = {}
+    req.headers = {}
+    req.remote = "127.0.0.1"
+
+    resp = await hooks_events.handle_webhook(req)
+    assert resp.status == 401
+
+
+@pytest.mark.asyncio
 async def test_webhook_json_success(hooks_events, mock_bus):
     """Тест: Успешная обработка JSON вебхука и публикация в шину."""
     req = MagicMock(spec=web.Request)
