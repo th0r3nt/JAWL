@@ -72,4 +72,4 @@ globals_dict = {
     "__file__": TARGET_SCRIPT,
     "__builtins__": builtins,
 }
-exec(code, globals_dict)  # noqa: S102 — интенционально, это sandbox-runner
+exec(code, globals_dict)  # noqa: S102 - интенционально, это sandbox-runner

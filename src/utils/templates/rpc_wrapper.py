@@ -2,19 +2,18 @@
 Обертка, которая выполняется, когда агент хочет вызвать функцию из sandbox/ файла (RPC).
 Содержит встроенный Sandbox Guard для защиты ядра от взлома.
 
-ВАЖНО: см. ``_sandbox_guard.py`` — это best-effort in-process barrier,
+ВАЖНО: см. ``_sandbox_guard.py`` - это best-effort in-process barrier,
 а не настоящая изоляция.
 """
 
 import sys
-import os
 import json
 import asyncio
-import builtins
 import traceback
 from importlib.util import spec_from_file_location, module_from_spec
 from pathlib import Path
 import inspect
+import importlib.util
 
 target_filepath = Path(sys.argv[1]).resolve()
 func_name = sys.argv[2]
@@ -40,12 +39,9 @@ if not _guard_path.is_file():
     )
     sys.exit(1)
 
-import importlib.util  # noqa: E402
-
 _spec = importlib.util.spec_from_file_location("_sandbox_guard", _guard_path)
 _guard = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(_guard)
-
 _guard.install(framework_dir, sandbox_dir)
 
 # Гарантируем наличие путей в sys.path для прямой доступности
@@ -98,13 +94,11 @@ def main():
 
             cls_obj = getattr(module, class_name)
             if inspect.isclass(cls_obj):
-                # Создаем экземпляр класса (предполагаем no-args конструктор)
                 instance = cls_obj()
                 if not hasattr(instance, method_name):
                     raise AttributeError(f"В классе '{class_name}' нет метода '{method_name}'")
                 func = getattr(instance, method_name)
             else:
-                # Если это не класс, а просто вложенный объект
                 obj = getattr(module, class_name)
                 func = getattr(obj, method_name)
         else:
