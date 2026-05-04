@@ -128,7 +128,7 @@ def setup_and_run() -> None:
 
             # ----------------------------------------------------
 
-            print("\n[*] JAWL Bootstrapper: Первичная инициализация.")
+            print("\n[*] JAWL Bootstrapper: Инициализация.")
             print("[*] Создание виртуального окружения (venv).")
             venv.create(venv_dir, with_pip=True)
 

@@ -2,9 +2,12 @@
 Навыки агента для работы с профилями и уведомлениями GitHub.
 """
 
-from src.l2_interfaces.github.client import GithubClient
-from src.l3_agent.skills.registry import SkillResult, skill
 from src.utils.logger import system_logger
+
+from src.l2_interfaces.github.client import GithubClient
+from src.l2_interfaces.github.decorators import require_agent_account
+
+from src.l3_agent.skills.registry import SkillResult, skill
 
 
 class GithubAccounts:
@@ -41,9 +44,10 @@ class GithubAccounts:
             return SkillResult.fail(f"Ошибка при получении профиля: {e}")
 
     @skill()
+    @require_agent_account()
     async def get_my_notifications(self, unread_only: bool = True) -> SkillResult:
         """
-        [Требует Agent Account] Проверяет входящие уведомления агента (меншны, ревью).
+        Проверяет входящие уведомления (меншны, ревью).
 
         Args:
             unread_only: Если True, вернет только новые непрочитанные.
@@ -76,9 +80,10 @@ class GithubAccounts:
             return SkillResult.fail(f"Ошибка при проверке уведомлений: {e}")
 
     @skill()
+    @require_agent_account()
     async def mark_notifications_as_read(self) -> SkillResult:
         """
-        [Требует Agent Account] Помечает все текущие непрочитанные уведомления как прочитанные.
+        Помечает все текущие непрочитанные уведомления как прочитанные.
         Полезно вызывать после их прочтения, чтобы очистить инбокс.
         """
         

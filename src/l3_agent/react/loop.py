@@ -9,7 +9,7 @@
 import openai
 import asyncio
 from typing import Dict, Any, List, Optional
-from pydantic import ValidationError
+import time
 
 import base64
 import re
@@ -17,6 +17,7 @@ import copy
 from pathlib import Path
 
 from src.utils.logger import system_logger
+from src.utils.settings import TreeOfThoughtsConfig
 from src.utils.token_tracker import TokenTracker
 
 from src.l0_state.agent.state import AgentState, AgentStatus
@@ -27,6 +28,8 @@ from src.l1_databases.vector.manager import VectorManager
 from src.l3_agent.llm.client import LLMClient
 from src.l3_agent.prompt.builder import PromptBuilder
 from src.l3_agent.context.builder import ContextBuilder
+
+from src.l3_agent.tot.generator import ToTGenerator
 
 from src.l3_agent.skills.registry import execute_skill
 from src.l3_agent.skills.schema import AgentResponse, ActionCall
@@ -49,6 +52,8 @@ class ReactLoop:
         token_tracker: TokenTracker,
         tools: list,
         cooldown_sec: int = 30,
+        tot_config: Optional[TreeOfThoughtsConfig] = None,
+        tot_generator: Optional[ToTGenerator] = None,
     ) -> None:
         """
         Инициализирует цикл ReAct.
@@ -66,14 +71,22 @@ class ReactLoop:
         """
 
         self.llm = llm_client
+
         self.prompt_builder = prompt_builder
         self.context_builder = context_builder
+
         self.agent_state = agent_state
+
         self.sql_ticks = sql_ticks
         self.vector_manager = vector_manager
+
         self.tracker = token_tracker
+
         self.tools = tools
         self.cooldown_sec = cooldown_sec
+
+        self.tot_config = tot_config
+        self.tot_generator = tot_generator
 
         # Хранилище Event Log: входящие события с интерфейсов, которые приходят между шагами раздумий агента
         self.current_events: List[Dict[str, Any]] = []
@@ -106,6 +119,17 @@ class ReactLoop:
 
             while self.agent_state.current_step <= self.agent_state.max_react_steps:
                 self.agent_state.update_state(AgentStatus.THINKING)
+
+                # =======================================================
+                # Генерация дерева мыслей
+                if self.tot_config and self.tot_config.enabled and self.tot_config.mode in ("auto", "hybrid"):
+                    # Генерируем на 1-м шаге, а затем каждые N шагов
+                    if (self.agent_state.current_step == 1) or \
+                       ((self.agent_state.current_step - 1) % self.tot_config.auto_interval_steps == 0):
+                        
+                        tree_md = await self.tot_generator.generate(event_name, payload, missed_events)
+                        if tree_md:
+                            self.agent_state.current_thoughts_tree = tree_md
 
                 # =======================================================
                 # Сборка контекста и промпта
@@ -266,27 +290,36 @@ class ReactLoop:
                     model=self.agent_state.llm_model,
                     messages=messages,
                     tools=self.tools,
-                    # tool_choice={
-                    #     "type": "function",
-                    #     "function": {"name": "execute_skill"},
-                    # },
                     temperature=self.agent_state.temperature,
-                    # max_tokens=60000,
-                    reasoning_effort="high",
                     timeout=120.0,
                 )
 
                 message_obj = response.choices[0].message
 
                 if message_obj.tool_calls:
-                    # Если модель вызвала функцию, берем СТРОГО её JSON-аргументы
                     raw_answer = str(message_obj.tool_calls[0].function.arguments)
                 else:
-                    # Иначе это просто текстовый ответ (или галлюцинация)
                     raw_answer = message_obj.content or ""
 
                 self.tracker.add_output_record(raw_answer)
                 return raw_answer
+
+            except RuntimeError as e:
+                # Отлавливаем ошибку ротатора (все ключи в бане)
+                if "исчерпали лимиты" in str(e):
+                    import re
+
+                    match = re.search(r"подождать (\d+) сек", str(e))
+                    wait_sec = int(match.group(1)) if match else 10
+                    system_logger.warning(
+                        f"[LLM] Все ключи в кулдауне. Ждем {wait_sec} сек."
+                    )
+                    await asyncio.sleep(wait_sec + 1)  # +1 сек для гарантии
+                    continue
+                else:
+                    system_logger.error(f"[LLM] Внутренняя ошибка API: {e}")
+                    self.agent_state.update_state(AgentStatus.ERROR)
+                    return None
 
             except (openai.APITimeoutError, asyncio.TimeoutError):
                 timeout_retries += 1
@@ -308,13 +341,44 @@ class ReactLoop:
                         f"[LLM] Квота исчерпана. Бан ключа {session.api_key[:8]} на 24ч"
                     )
                     self.llm.rotator.cooldown_key(session.api_key, 86400)
+                    await asyncio.sleep(5)
                 else:
-                    system_logger.info(
-                        f"[LLM] Рейт-лимит. Пауза 60с для {session.api_key[:8]}"
-                    )
-                    self.llm.rotator.cooldown_key(session.api_key, 60)
+                    # Динамический расчет кулдауна на основе заголовков API провайдера
+                    wait_time = 60
+                    if e.response is not None:
+                        headers = e.response.headers
+                        # Ищем заголовки OpenRouter / OpenAI / Anthropic
+                        retry_after = (
+                            headers.get("retry-after")
+                            or headers.get("x-ratelimit-reset")
+                            or headers.get("retry-after-ms")
+                        )
+                        if retry_after:
+                            try:
+                                if headers.get("retry-after-ms"):
+                                    wait_time = max(1, int(int(retry_after) / 1000))
+                                else:
+                                    wait_time = int(float(retry_after))
+                                # Если провайдер отдал timestamp в будущем
+                                if wait_time > time.time():
 
-                await asyncio.sleep(self.cooldown_sec)
+                                    wait_time = int(wait_time - time.time())
+                            except ValueError:
+                                pass
+
+                    wait_time = max(2, min(wait_time, 300))  # Ограничиваем от 2с до 5 минут
+
+                    system_logger.info(
+                        f"[LLM] Рейт-лимит (429). Пауза {wait_time}с для ключа {session.api_key[:8]}"
+                    )
+                    self.llm.rotator.cooldown_key(session.api_key, wait_time)
+
+                    # Если у нас всего 1 ключ, логичнее сразу подождать здесь
+                    if self.llm.rotator.total_keys() == 1:
+                        await asyncio.sleep(wait_time + 1)
+                    else:
+                        await asyncio.sleep(1)  # Быстрый переход к следующему ключу в пуле
+
                 continue
 
             except openai.AuthenticationError:
@@ -330,35 +394,41 @@ class ReactLoop:
     async def _parse_response(self, raw_answer: str) -> Optional[AgentResponse]:
         """
         Парсит JSON-ответ агента.
-        В случае ошибки возвращает None и записывает Traceback (ошибку) в БД для
-        корректировки агента на следующем шаге.
-
-        Args:
-            raw_answer: Сырая текстовая строка от модели.
-
-        Returns:
-            Объект AgentResponse или None, если парсинг провалился.
+        В случае ошибки возвращает None и записывает Traceback (ошибку) в БД.
         """
-
         clean_answer = raw_answer.strip()
 
-        # Пуленепробиваемый поиск границ JSON
-        start_idx = clean_answer.find("{")
-        end_idx = clean_answer.rfind("}")
+        # Умный парсинг JSON (защита от мусора и markdown)
+        json_str = ""
+        json_match = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", clean_answer, re.DOTALL)
 
-        if start_idx != -1 and end_idx != -1 and end_idx > start_idx:
-            json_str = clean_answer[start_idx:end_idx + 1]
+        if json_match:
+            json_str = json_match.group(1)
+        else:
+            # Fallback: ищем валидную JSON структуру перебором (откидывая мусор до и после)
+            start_idx = clean_answer.find("{")
+            while start_idx != -1:
+                end_idx = clean_answer.rfind("}")
+                if end_idx > start_idx:
+                    candidate = clean_answer[start_idx : end_idx + 1]
+                    try:
+                        return AgentResponse.model_validate_json(candidate)
+                    except Exception:
+                        # Если не распарсилось, ищем следующую открывающую скобку
+                        start_idx = clean_answer.find("{", start_idx + 1)
+                else:
+                    break
+
+        if json_str:
             try:
                 parsed_response = AgentResponse.model_validate_json(json_str)
                 return parsed_response
-                
-            except ValidationError as e:
+            except Exception as e:
                 system_logger.warning("[ReAct] Ошибка структуры JSON.")
                 err_msg = f"Format Error: {e}"
 
                 await self.sql_ticks.save_tick(
                     thoughts="[System: LLM provided invalid JSON format]",
-                    # Сохраняем только начало битого JSON, чтобы не переполнять логи
                     actions=[{"tool_name": "unknown", "parameters": {"raw": json_str[:500]}}],
                     results={
                         "execution_report": err_msg,
@@ -368,11 +438,8 @@ class ReactLoop:
                 )
                 self.agent_state.last_actions_result = err_msg
                 return None
-                
-            except Exception:
-                pass # Если парсинг упал тотально (вообще не JSON), идем к fallback ниже
 
-        # Если { } не найдено, значит LLM просто решила поболтать текстом
+        # Если { } не найдено вообще, значит LLM просто решила поболтать текстом
         return AgentResponse(thoughts=clean_answer, actions=[])
 
     def add_realtime_event(self, event_data: Dict[str, Any]) -> None:
@@ -394,7 +461,7 @@ class ReactLoop:
         """
 
         try:
-            with open("logs/last_prompt.md", "w", encoding="utf-8") as f:
+            with open("logs/last_main_prompt.md", "w", encoding="utf-8") as f:
                 for m in messages:
                     role = getattr(
                         m,
@@ -446,7 +513,9 @@ class ReactLoop:
                     path_obj = Path(img_path)
                     if path_obj.exists():
                         # Выполняем I/O операцию и энкодинг в отдельном потоке
-                        base64_data = await asyncio.to_thread(self._encode_image, str(path_obj))
+                        base64_data = await asyncio.to_thread(
+                            self._encode_image, str(path_obj)
+                        )
                         ext = path_obj.suffix.lower()
                         mime = "image/jpeg" if ext in [".jpg", ".jpeg"] else f"image/{ext[1:]}"
 

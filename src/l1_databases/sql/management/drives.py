@@ -120,6 +120,14 @@ class SQLDrives:
                 else drive.last_satisfied_at
             )
 
+            # Защита от legacy/кривых данных: decay_rate обязан быть > 0, иначе математика
+            # ниже рассыпается: current_deficit выйдет отрицательным или получим ZeroDivisionError.
+            if drive.decay_rate <= 0:
+                return SkillResult.fail(
+                    f"Драйв '{drive.name}' имеет невалидный decay_rate={drive.decay_rate}. "
+                    f"Ожидается положительное число. Пересоздайте драйв с корректным decay_rate."
+                )
+
             # Высчитываем текущий дефицит
             intervals_passed = (now - last_sat).total_seconds() / self.decay_interval_sec
             current_deficit = min(100.0, intervals_passed * drive.decay_rate)
@@ -155,8 +163,15 @@ class SQLDrives:
         Args:
             name: Короткое имя новой потребности.
             description: Развернутое описание того, в каких случаях она должна удовлетворяться.
-            decay_rate: На сколько процентов растет дефицит за 1 интервал.
+            decay_rate: На сколько процентов растет дефицит за 1 интервал. Должно быть > 0.
         """
+
+        # decay_rate упадет в деление в satisfy_drive, поэтому корень валидации здесь.
+        if decay_rate <= 0:
+            return SkillResult.fail(
+                f"decay_rate должен быть положительным числом, получено {decay_rate}. "
+                f"Нулевая или отрицательная скорость дефицита ломает математику драйва."
+            )
 
         async with self.db.session_factory() as session:
             count_res = await session.execute(

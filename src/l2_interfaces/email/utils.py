@@ -39,7 +39,7 @@ def decode_mime_header(header_value: str) -> str:
 
 def strip_html_tags(text: str) -> str:
     """Суровый и дешевый способ вырезать HTML-теги для экономии контекста."""
-    clean = re.compile("<.*?>")
+    clean = re.compile("<.*?>", re.DOTALL)
     return re.sub(clean, " ", text).strip()
 
 

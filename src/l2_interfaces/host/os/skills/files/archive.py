@@ -26,33 +26,56 @@ class HostOSArchive:
     def _is_safe_archive(self, archive_path: Path, extract_to: Path) -> bool:
         """
         Проверяет внутренние пути архива на наличие уязвимости ZIP Slip
-        (использование абсолютных путей или '..', пытающихся выйти за пределы extract_to).
+        (использование абсолютных путей или '..', пытающихся выйти за пределы extract_to),
+        а также на симлинки/хардлинки внутри tar-архивов с таргетом вне песочницы
+        (Tar Slip / symlink attack - имя члена выглядит безопасно, но linkname указывает
+        на /etc/passwd или другой чувствительный файл, shutil.unpack_archive на Python <3.12
+        последует за ним).
         """
+
+        extract_to_resolved = extract_to.resolve()
+
+        def _member_in_sandbox(name: str) -> bool:
+            """Резолвит name относительно extract_to и проверяет is_relative_to(sandbox)."""
+            member_path = Path(name)
+            if member_path.is_absolute():
+                return False
+            resolved = (extract_to / member_path).resolve()
+            return resolved.is_relative_to(extract_to_resolved)
 
         # Определяем формат архива
         if zipfile.is_zipfile(archive_path):
             with zipfile.ZipFile(archive_path, "r") as zf:
-                names = zf.namelist()
-        elif tarfile.is_tarfile(archive_path):
-            with tarfile.open(archive_path, "r") as tf:
-                names = tf.getnames()
-        else:
-            # Неизвестный формат - делегируем shutil, но риск остается (хотя shutil в Python 3.12+ фильтрует Tar)
+                for name in zf.namelist():
+                    if not _member_in_sandbox(name):
+                        return False
             return True
 
-        for name in names:
-            # Имитируем распаковку и резолвим путь
-            member_path = Path(name)
+        if tarfile.is_tarfile(archive_path):
+            with tarfile.open(archive_path, "r") as tf:
+                for member in tf.getmembers():
+                    # Базовая проверка name: абсолютный / .. / выход из sandbox
+                    if not _member_in_sandbox(member.name):
+                        return False
 
-            if member_path.is_absolute():
-                return False
+                    # Дополнительная проверка для symlink/hardlink: linkname не должен
+                    # быть абсолютным и не должен выводить за пределы extract_to.
+                    # tf.getnames() эту часть не показывает, поэтому нужны конкретные members.
+                    if member.issym() or member.islnk():
+                        linkname = member.linkname
+                        if not linkname:
+                            continue
+                        link_path = Path(linkname)
+                        if link_path.is_absolute():
+                            return False
+                        # Резолвим относительно директории, в которой будет лежать сам линк
+                        link_parent = (extract_to / Path(member.name)).parent
+                        resolved_link = (link_parent / link_path).resolve()
+                        if not resolved_link.is_relative_to(extract_to_resolved):
+                            return False
+            return True
 
-            resolved_target = (extract_to / member_path).resolve()
-
-            # Если результирующий путь вываливается за папку назначения - это атака
-            if not resolved_target.is_relative_to(extract_to.resolve()):
-                return False
-
+        # Неизвестный формат - делегируем shutil (Python 3.12+ фильтрует опасные члены).
         return True
 
     @skill()

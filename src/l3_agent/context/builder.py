@@ -40,6 +40,9 @@ class ContextBuilder:
         self.registry.register_provider(
             "heartbeat", self._heartbeat_provider, section=ContextSection.HEARTBEAT
         )
+        self.registry.register_provider(
+            "tree_of_thoughts", self._tot_provider, section=ContextSection.TREE_OF_THOUGHTS
+        )
 
     async def build(
         self, event_name: str, payload: Dict[str, Any], missed_events: List[Dict[str, Any]]
@@ -240,3 +243,12 @@ class ContextBuilder:
             lines.append(f"\n#### Recent Chat History:\n{payload['recent_history']}")
 
         return "\n".join(lines)
+
+    async def _tot_provider(self, **kwargs: Any) -> str:
+        """
+        Инжектит сгенерированное дерево мыслей (если оно есть).
+        """
+        
+        if self.agent_state.current_thoughts_tree:
+            return self.agent_state.current_thoughts_tree
+        return ""

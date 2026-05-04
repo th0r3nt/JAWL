@@ -36,19 +36,17 @@ class HostOSDeploy:
 
     @skill()
     @require_access(HostOSAccessLevel.OPERATOR)
-    async def commit_deploy_session(self) -> SkillResult:
+    async def commit_deploy_session(self, test_path: str = "tests/unit/", force: bool = False) -> SkillResult:
         """
-        Завершает деплой-сессию, прогоняя тесты (pytest) и синтаксис-чеки.
+        Завершает деплой-сессию. Физически проверяет код на синтаксические ошибки и запускает pytest.
+        По умолчанию запускается вся директория быстрых юнит-тестов (tests/unit/).
 
-        Важно: если была изменена базовая логика JAWL, необходимо перед коммитом
-        исправить соответствующие тесты, иначе система не позволит применить изменения 
-        из-за упавших проверок работоспособности.
-
-        Если тесты падают - даются попытки на исправление. 
-        При исчерпании попыток происходит автоматический Rollback.
+        Args:
+            test_path: Путь к тестам для проверки. По умолчанию "tests/unit/".
+            force: Принудительный коммит. Установить True, если тесты падают из-за причин, не связанных с измененным кодом. Применять в крайнем случае.
         """
 
-        success, msg = await self.host_os.deploy_manager.commit_session()
+        success, msg = await self.host_os.deploy_manager.commit_session(test_path=test_path, force=force)
         return SkillResult.ok(msg) if success else SkillResult.fail(msg)
 
     @skill()

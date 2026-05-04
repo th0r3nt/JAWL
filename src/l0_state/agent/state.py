@@ -50,8 +50,10 @@ class AgentState(BaseModel):
     start_time: float = Field(default_factory=time.time)
     last_input_tokens: int = 0
 
-    # Краткосрочная память для ассоциативного RAG и инъекции мультимодальности (изображений)
+    # Краткосрочная память
     last_thoughts: str = ""
+    current_thoughts_tree: str = ""  # Хранит Markdown-дерево мыслей, сгенерированное ToT
+
     last_action_args: list[str] = Field(default_factory=list)
     last_action_error: str = ""
     last_actions_result: str = ""  # Результат последних выполненных действий
@@ -63,6 +65,8 @@ class AgentState(BaseModel):
         """
         self.current_step = 1
         self.last_thoughts = ""
+        self.current_thoughts_tree = ""
+        
         self.last_action_args.clear()
         self.last_action_error = ""
         self.last_actions_result = ""

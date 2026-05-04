@@ -7,6 +7,7 @@
 
 import asyncio
 import email
+from collections import OrderedDict
 from typing import List, Dict, Optional
 
 from src.utils.logger import system_logger
@@ -40,8 +41,12 @@ class EmailEvents:
         self._is_running = False
         self._polling_task: Optional[asyncio.Task] = None
 
-        # Хранит UIDs уже обработанных (просмотренных поллером) писем
-        self._seen_uids: set[str] = set()
+        # LRU-кэш UIDов уже обработанных писем.
+        # Ограничен сверху: без этого он рос бы бесконечно у юзеров, которые
+        # копят UNSEEN-письма, не читая их (таких больше, чем кажется).
+        # OrderedDict + move_to_end делает O(1) на seen-check, insert и evict.
+        self._seen_uids_capacity: int = 10_000
+        self._seen_uids: "OrderedDict[str, None]" = OrderedDict()
 
     async def start(self) -> None:
         """Запускает цикл фонового мониторинга."""
@@ -79,9 +84,14 @@ class EmailEvents:
                 for uid in new_uids:
                     uid_str = uid.decode()
                     if uid_str in self._seen_uids:
+                        # Освежаем LRU-позицию, чтобы не вытеснить активный UID.
+                        self._seen_uids.move_to_end(uid_str)
                         continue
 
-                    self._seen_uids.add(uid_str)
+                    self._seen_uids[uid_str] = None
+                    if len(self._seen_uids) > self._seen_uids_capacity:
+                        # Выбрасываем самый старый UID (FIFO-грань LRU).
+                        self._seen_uids.popitem(last=False)
 
                     # Читаем заголовки для ивента
                     res, msg_data = mail.uid(

@@ -6,6 +6,7 @@
 агента. Защищен механизмом валидации токена.
 """
 
+import hmac
 import json
 import uuid
 from typing import Optional
@@ -101,7 +102,12 @@ class WebHooksEvents:
             if auth_header.startswith("Bearer "):
                 token = auth_header.replace("Bearer ", "").strip()
 
-        if token != self.client.secret_token:
+        # hmac.compare_digest — защита от timing attack. Обычное != прекращает сравнение на
+        # первом несовпадающем символе, и разница во времени ответа позволяет атакующему
+        # подбирать секрет посимвольно. compare_digest всегда сравнивает за одинаковое время.
+        if not self.client.secret_token or not hmac.compare_digest(
+            token or "", self.client.secret_token
+        ):
             system_logger.warning(
                 f"[Web Hooks] Несанкционированная попытка доступа с IP {request.remote} (входящий токен невалиден)"
             )

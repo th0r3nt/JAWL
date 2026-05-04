@@ -120,7 +120,7 @@ web:
 
     feeds:
       - name: "Habr"
-        url: "https://habr.com/ru/rss/all/all/"
+        url: "https://habr.com/ru/rss/hub/artificial_intelligence/"
 
 # Подробнее: docs/yaml/interfaces/meta.md
 meta:

@@ -102,7 +102,6 @@ def draw_header(version: str = __version__) -> None:
     clear_screen()
     console.print(_build_header_panel(version))
 
-
 def launch_in_new_window(arg: str) -> None:
     script_path = ROOT_DIR / "jawl.py"
     cmd = [sys.executable, str(script_path), arg]

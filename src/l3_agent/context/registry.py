@@ -36,8 +36,11 @@ class ContextSection(IntEnum):
     # Последние действия
     RECENT_TICKS = 140
 
+    # Дерево мыслей, если используется Tree of Thoughts
+    TREE_OF_THOUGHTS = 150
+
     # Причина пробуждения и фоновые логи
-    HEARTBEAT = 150
+    HEARTBEAT = 160
 
 
 class ContextRegistry:

@@ -1,4 +1,3 @@
-# Файл: src/utils/settings.py
 import shutil
 import yaml
 from pathlib import Path
@@ -303,6 +302,14 @@ class SwarmConfig(BaseModel):
     context_depth: SwarmContextDepthConfig = Field(default_factory=SwarmContextDepthConfig)
 
 
+class TreeOfThoughtsConfig(BaseModel):
+    enabled: bool = False
+    model: str = "unknown"
+    mode: str = "hybrid"  # "manual", "auto", "hybrid"
+    auto_interval_steps: int = 3
+    branches: int = 3  # Количество генерируемых путей (веток)
+
+
 class SystemConfig(BaseModel):
     timezone: int = 0
     logging: LoggingConfig = Field(default_factory=LoggingConfig)
@@ -315,6 +322,7 @@ class SystemConfig(BaseModel):
     )
     context_depth: ContextDepthConfig = Field(default_factory=ContextDepthConfig)
     swarm: SwarmConfig = Field(default_factory=SwarmConfig)
+    tree_of_thoughts: TreeOfThoughtsConfig = Field(default_factory=TreeOfThoughtsConfig)
 
 
 class SettingsConfig(BaseModel):
@@ -424,6 +432,7 @@ def _sync_yaml_file(user_file: Path, example_file: Path) -> None:
 
     # Загружаем через ruamel для сохранения комментариев
     from ruamel.yaml import YAML
+
     ryaml = YAML()
     ryaml.preserve_quotes = True
 
@@ -436,10 +445,13 @@ def _sync_yaml_file(user_file: Path, example_file: Path) -> None:
         if _deep_update_ruamel(example_data, user_data):
             with open(user_file, "w", encoding="utf-8") as f:
                 ryaml.dump(user_data, f)
-            system_logger.info(f"[Config] Файл {user_file.name} автоматически обновлен (добавлены новые поля из шаблона).")
+            system_logger.info(
+                f"[Config] Файл {user_file.name} автоматически обновлен (добавлены новые поля из шаблона)."
+            )
 
     except Exception as e:
         system_logger.error(f"[Config] Ошибка авто-обновления {user_file.name}: {e}")
+
 
 def load_config() -> tuple[SettingsConfig, InterfacesConfig]:
     """

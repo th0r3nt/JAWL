@@ -23,7 +23,7 @@ def main_menu() -> None:
         questionary.Choice("[■] Остановить агента", "stop"),
         questionary.Choice("[@] Чат", "terminal"),
         questionary.Choice("[i] Логи", "logs"),
-        questionary.Choice("[*] Мастер настройки интерфейсов", "setup"),
+        questionary.Choice("[*] Мастер настройки", "setup"),
         questionary.Choice("[#] Управление базами данных", "db_manager"),
         questionary.Separator(" "),
         questionary.Choice("[x] Выход", "exit"),

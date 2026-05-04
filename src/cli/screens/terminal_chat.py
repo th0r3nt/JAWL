@@ -7,6 +7,7 @@ import questionary
 from prompt_toolkit import PromptSession, print_formatted_text, HTML
 from prompt_toolkit.formatted_text import ANSI
 from prompt_toolkit.patch_stdout import patch_stdout
+from prompt_toolkit.key_binding import KeyBindings
 from rich.console import Console
 from rich.panel import Panel
 from rich.markdown import Markdown
@@ -101,6 +102,22 @@ async def _chat_loop(port: int, history_file: Path, agent_name: str) -> None:
 
     session = PromptSession()
 
+    bindings = KeyBindings()
+
+    @bindings.add("enter")
+    def handle_enter(event):
+        """Отправка сообщения по Enter."""
+        event.current_buffer.validate_and_handle()
+
+    @bindings.add("escape", "enter")  # Alt + Enter (Shift+Enter вызывает краш на Windows)
+    def handle_newline(event):
+        """Перенос строки."""
+        event.current_buffer.insert_text("\n")
+
+    def prompt_continuation(width, line_number, is_soft_wrap):
+        """Отрисовка многоточия на новых строках для красоты."""
+        return "... ".rjust(width)
+    
     async def receive_messages():
         try:
             while True:
@@ -149,7 +166,10 @@ async def _chat_loop(port: int, history_file: Path, agent_name: str) -> None:
         while True:
             with patch_stdout():
                 user_input = await session.prompt_async(
-                    HTML("<ansigreen><b>Вы:</b></ansigreen> ")
+                    HTML("<ansigreen><b>Вы:</b></ansigreen> "),
+                    multiline=True,                           # Многострочность
+                    key_bindings=bindings,                    # Биндинги
+                    prompt_continuation=prompt_continuation,  # Отрисовка переносов
                 )
 
             text = user_input.strip()

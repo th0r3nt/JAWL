@@ -176,14 +176,18 @@ class SQLMentalStates:
             if not state:
                 return SkillResult.fail(f"MentalState с ID {state_id} не найден.")
 
-            # Обновляем только переданные поля
+            # Обновляем только явно переданные поля.
+            # Важно: используем `is not None`, а не truthy-check. Иначе пустая строка "" не
+            # пройдёт проверку, и агент не сможет очистить description/status, получив при этом
+            # сообщение об успешном обновлении (silent update failure).
+            # tier/category валидируются выше и допускают только фиксированные строки, тут можно трузи оставить.
             if tier:
                 state.tier = tier
             if category:
                 state.category = category
-            if description:
+            if description is not None:
                 state.description = description
-            if status:
+            if status is not None:
                 state.status = status
             if context is not None:
                 state.context = context

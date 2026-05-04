@@ -14,6 +14,12 @@ from src.l3_agent.skills.registry import skill, SkillResult
 from src.l3_agent.swarm.roles import Subagents
 
 
+# Количество попыток и базовая задержка Exponential Backoff.
+# Паузы между попытками: 1с, 2с (перед последней попыткой).
+DDG_MAX_ATTEMPTS = 3
+DDG_BACKOFF_BASE_SEC = 1.0
+
+
 class DuckDuckGoSearch:
     """Движок поиска ссылок через DuckDuckGo."""
 
@@ -30,18 +36,23 @@ class DuckDuckGoSearch:
             with DDGS() as ddgs:
                 return list(ddgs.text(query, max_results=max_results))
 
-        last_err = None
+        last_err: Exception | None = None
 
         async with self._semaphore:
-            # Делаем 3 попытки с экспоненциальной паузой
-            for attempt in range(3):
+            for attempt in range(DDG_MAX_ATTEMPTS):
                 try:
                     return await asyncio.to_thread(_do_search)
                 except Exception as e:
                     last_err = e
-                    await asyncio.sleep(1 * (2**attempt))
+                    # После последней попытки не спим, сразу выходим.
+                    if attempt == DDG_MAX_ATTEMPTS - 1:
+                        break
+                    await asyncio.sleep(DDG_BACKOFF_BASE_SEC * (2**attempt))
 
-        system_logger.error(f"[Web] DDG Rate Limit исчерпан для запроса '{query}': {last_err}")
+        system_logger.error(
+            f"[Web] DDG Rate Limit исчерпан для запроса '{query}': {last_err}"
+        )
+        assert last_err is not None  # логически недостижимо, но typechecker спит спокойнее
         raise last_err
 
     @skill(swarm_roles=[Subagents.WEB_RESEARCHER])
