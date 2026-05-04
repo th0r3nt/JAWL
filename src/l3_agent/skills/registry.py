@@ -333,7 +333,7 @@ async def call_skill(name: str, params: Dict[str, Any]) -> SkillResult:
     try:
         result = await func(**clean_kwargs)
         res_msg = truncate_text(
-            str(result.message), max_chars=500, suffix="... [Результат обрезан для логов]"
+            str(result.message), max_chars=200, suffix="... [Результат обрезан для логов]"
         )
         status = "Success" if result.is_success else "Fail"
         system_logger.info(f"[Agent Action Result] {name} ({status}): {res_msg}")

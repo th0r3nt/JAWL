@@ -77,9 +77,12 @@ def test_build_l0_state(mock_system: System) -> None:
 
 
 @pytest.mark.asyncio
+@patch("src.builder.GraphManager")
 @patch("src.builder.VectorManager")
 @patch("src.builder.SQLManager")
-async def test_build_l1_databases(mock_sql_cls, mock_vector_cls, mock_system: System) -> None:
+async def test_build_l1_databases(
+    mock_sql_cls, mock_vector_cls, mock_graph_cls, mock_system: System
+) -> None:
     """Тест: L1 Базы данных инициализируются и подключаются."""
     builder = SystemBuilder(mock_system)
 
@@ -92,6 +95,10 @@ async def test_build_l1_databases(mock_sql_cls, mock_vector_cls, mock_system: Sy
     mock_vector_instance.connect = AsyncMock()
     mock_vector_cls.return_value = mock_vector_instance
 
+    mock_graph_instance = MagicMock()
+    mock_graph_instance.connect = AsyncMock()
+    mock_graph_cls.return_value = mock_graph_instance
+
     await builder.build_l1_databases()
 
     # Проверяем создание и коннект
@@ -100,6 +107,9 @@ async def test_build_l1_databases(mock_sql_cls, mock_vector_cls, mock_system: Sy
 
     mock_vector_cls.assert_called_once()
     mock_vector_instance.connect.assert_awaited_once()
+
+    mock_graph_cls.assert_called_once()
+    mock_graph_instance.connect.assert_awaited_once()
 
     # Проверяем регистрацию контекста
     assert mock_system.context_registry.register_provider.call_count >= 2

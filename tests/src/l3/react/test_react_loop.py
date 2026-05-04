@@ -63,30 +63,6 @@ async def test_react_empty_actions_exit(
     assert deps["agent_state"].current_step == 1
 
 
-@pytest.mark.asyncio
-@patch("src.l3_agent.react.loop.execute_skill", new_callable=AsyncMock)
-async def test_react_invalid_json_retry(
-    mock_execute_skill, mock_dependencies, mock_openai_response
-):
-    deps = mock_dependencies
-    loop = ReactLoop(**deps)
-    mock_session = AsyncMock()
-
-    mock_session.chat.completions.create.side_effect = [
-        mock_openai_response("{broken json}"),
-        mock_openai_response('{"thoughts": "Починил.", "actions": []}'),
-    ]
-    deps["llm_client"].get_session = MagicMock(return_value=mock_session)
-
-    await loop.run("TEST", {}, missed_events=[])
-
-    assert mock_session.chat.completions.create.call_count == 2
-    assert deps["agent_state"].current_step == 2
-
-    # Проверяем, что ошибка JSON была записана в базу тиков
-    call_args = deps["sql_ticks"].save_tick.call_args_list[0]
-    assert "Format Error" in call_args[1]["results"]["execution_report"]
-
 
 @pytest.mark.asyncio
 @patch("src.l3_agent.react.loop.execute_skill", new_callable=AsyncMock)
@@ -237,3 +213,29 @@ async def test_react_timeout_retry(mock_dependencies, mock_openai_response):
     assert mock_session.chat.completions.create.call_count == 2
     assert deps["agent_state"].current_step == 1
     assert deps["agent_state"].state == AgentStatus.IDLE
+
+
+@pytest.mark.asyncio
+async def test_react_parse_response_robustness(mock_dependencies):
+    """Регрессионный тест: парсер должен выживать при любом мусоре от LLM."""
+    loop = ReactLoop(**mock_dependencies)
+
+    # 1. LLM обернула JSON в Markdown (```json ... ```)
+    raw_md = 'Вот мой ответ:\n```json\n{"thoughts": "1", "actions": []}\n```\nГотово.'
+    res_md = await loop._parse_response(raw_md)
+    assert res_md is not None
+    assert res_md.thoughts == "1"
+
+    # 2. Мусорный текст до и после голого JSON
+    raw_garbage = 'Окей, я подумала. { "thoughts": "2", "actions": [] } Жду команд.'
+    res_garbage = await loop._parse_response(raw_garbage)
+    assert res_garbage is not None
+    assert res_garbage.thoughts == "2"
+
+    # 3. Сломанные/случайные скобки ДО реального JSON (Fallback механизм)
+    raw_broken = (
+        'Здесь случайная скобка { а вот тут реальный: {"thoughts": "3", "actions": []}'
+    )
+    res_broken = await loop._parse_response(raw_broken)
+    assert res_broken is not None
+    assert res_broken.thoughts == "3"

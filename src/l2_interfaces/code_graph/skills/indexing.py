@@ -185,9 +185,17 @@ class CodeGraphIndexing:
                     system_logger.debug(f"[Code Graph] Ошибка парсинга {filepath.name}: {e}")
 
         # 2-й проход: Строим связи импортов
-        # Для простоты: если в файле A есть `from B import C`, мы связываем файл A с файлом, который похож на B.
         async def _process_imports():
-            file_ids = {p.relative_to(root_dir).as_posix() for p in py_files}
+            # Создаем маппинг модулей: "src.utils" -> "src/utils.py"
+            module_map = {}
+            for filepath in py_files:
+                rel_path = filepath.relative_to(root_dir)
+                mod = str(rel_path.with_suffix("")).replace("\\", ".").replace("/", ".")
+                if mod.endswith(".__init__"):
+                    mod = mod[:-9]
+                elif mod == "__init__":
+                    mod = ""
+                module_map[mod] = rel_path.as_posix()
 
             for filepath in py_files:
                 try:
@@ -196,13 +204,47 @@ class CodeGraphIndexing:
                     source = filepath.read_text(encoding="utf-8")
                     tree = ast.parse(source)
 
+                    base_mod = (
+                        str(filepath.relative_to(root_dir).with_suffix(""))
+                        .replace("\\", ".")
+                        .replace("/", ".")
+                    )
+                    if base_mod.endswith(".__init__"):
+                        base_mod = base_mod[:-9]
+                    base_parts = base_mod.split(".") if base_mod else []
+
+                    deps = set()
                     for node in ast.walk(tree):
-                        if isinstance(node, ast.ImportFrom) and node.module:
-                            # Пытаемся угадать путь к файлу (например src.utils -> src/utils.py)
-                            guessed_path = node.module.replace(".", "/") + ".py"
-                            if guessed_path in file_ids:
-                                target_id = f"{project_id}::{guessed_path}"
-                                await self.graph.link_nodes(file_id, target_id, "IMPORTS")
+                        if isinstance(node, ast.Import):
+                            for alias in node.names:
+                                if alias.name in module_map:
+                                    deps.add(module_map[alias.name])
+                        elif isinstance(node, ast.ImportFrom):
+                            level = node.level
+                            mod = node.module or ""
+                            resolved_mod = (
+                                mod
+                                if level == 0
+                                else ".".join(
+                                    base_parts[: len(base_parts) - level]
+                                    + ([mod] if mod else [])
+                                )
+                            )
+
+                            for alias in node.names:
+                                full_target = (
+                                    f"{resolved_mod}.{alias.name}"
+                                    if resolved_mod
+                                    else alias.name
+                                )
+                                if full_target in module_map:
+                                    deps.add(module_map[full_target])
+                                elif resolved_mod in module_map:
+                                    deps.add(module_map[resolved_mod])
+
+                    for dep_path in deps:
+                        target_id = f"{project_id}::{dep_path}"
+                        await self.graph.link_nodes(file_id, target_id, "IMPORTS")
 
                 except Exception:
                     pass

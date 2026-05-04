@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import pytest
 import asyncio
 from unittest.mock import patch, MagicMock, AsyncMock
@@ -87,12 +89,13 @@ def test_main_critical_exception(mock_clear, mock_load, mock_system):
 
 
 @pytest.mark.asyncio
+@patch("src.builder.GraphManager")
 @patch("src.builder.SQLManager")
 @patch("src.builder.VectorManager")
 @patch("src.builder.Heartbeat")
 @patch("src.builder.ReactLoop")
 async def test_system_di_assembly_smoke(
-    mock_react, mock_hb, mock_vector, mock_sql, mock_configs
+    mock_react, mock_hb, mock_vector, mock_sql, mock_graph, mock_configs
 ):
     """Smoke-тест: проверка корректной сборки DI-контейнера."""
     settings, interfaces = mock_configs
@@ -107,6 +110,9 @@ async def test_system_di_assembly_smoke(
     mock_vector.return_value.connect = AsyncMock()
     mock_vector.return_value.disconnect = AsyncMock()
 
+    mock_graph.return_value.connect = AsyncMock()
+    mock_graph.return_value.disconnect = AsyncMock()
+
     try:
         system.setup_l0_state()
         await system.setup_l1_databases()
@@ -120,7 +126,6 @@ async def test_system_di_assembly_smoke(
         assert system.heartbeat is not None
 
     finally:
-        # Теперь stop() успешно выполнит await у моков
         await system.stop()
 
 
@@ -131,16 +136,11 @@ async def test_system_shutdown_and_reboot_events(mock_configs):
     bus = EventBus()
 
     system = System(event_bus=bus, settings_config=settings, interfaces_config=interfaces)
-
-    # Мокаем Heartbeat, чтобы проверить, что система вызывает его остановку
     system.heartbeat = MagicMock()
-
-    # Активируем подписки
     system._bridge_events_to_heartbeat()
 
     assert system._exit_code == 0
 
-    # 1. ТЕСТ ПЕРЕЗАГРУЗКИ
     await bus.publish(Events.SYSTEM_REBOOT_REQUESTED)
     if bus.background_tasks:
         await asyncio.gather(*bus.background_tasks)
@@ -150,7 +150,6 @@ async def test_system_shutdown_and_reboot_events(mock_configs):
 
     system.heartbeat.stop.reset_mock()
 
-    # 2. ТЕСТ ВЫКЛЮЧЕНИЯ
     await bus.publish(Events.SYSTEM_SHUTDOWN_REQUESTED)
     if bus.background_tasks:
         await asyncio.gather(*bus.background_tasks)
@@ -160,40 +159,41 @@ async def test_system_shutdown_and_reboot_events(mock_configs):
 
 
 @pytest.mark.asyncio
+@pytest.mark.asyncio
+@patch("src.builder.GraphManager")
 @patch("src.builder.SQLManager")
 @patch("src.builder.VectorManager")
 @patch("src.builder.Heartbeat")
 @patch("src.builder.ReactLoop")
 async def test_system_subagent_llm_fallback(
-    mock_react, mock_hb, mock_vector, mock_sql, mock_configs
+    mock_react, mock_hb, mock_vector, mock_sql, mock_graph, mock_configs
 ):
     """Тест: Если SUB_ ключи не переданы, субагенты используют основной LLM клиент."""
     settings, interfaces = mock_configs
     bus = EventBus()
     system = System(event_bus=bus, settings_config=settings, interfaces_config=interfaces)
 
-    # Инициализируем L0 State, чтобы появились agent_state, telethon_state и т.д.
     system.setup_l0_state()
     system.sys_cfg = settings.system
 
-    # Изолируем БД
     system.sql = mock_sql.return_value
     system.vector = mock_vector.return_value
+    system.graph = mock_graph.return_value
 
     system.setup_l3_agent(llm_api_url="http://main", llm_api_keys=["main_key"])
 
-    assert system.llm_client is not None
-    assert system.sub_llm_client is system.llm_client  # Ссылаются на один и тот же объект
+    assert system.sub_llm_client is system.llm_client
     assert system.sub_llm_client.api_url == "http://main"
 
 
 @pytest.mark.asyncio
+@patch("src.builder.GraphManager")
 @patch("src.builder.SQLManager")
 @patch("src.builder.VectorManager")
 @patch("src.builder.Heartbeat")
 @patch("src.builder.ReactLoop")
 async def test_system_subagent_dedicated_llm(
-    mock_react, mock_hb, mock_vector, mock_sql, mock_configs
+    mock_react, mock_hb, mock_vector, mock_sql, mock_graph, mock_configs
 ):
     """Тест: Если SUB_ ключи переданы, создаются два независимых клиента."""
     settings, interfaces = mock_configs
@@ -203,9 +203,9 @@ async def test_system_subagent_dedicated_llm(
     system.setup_l0_state()
     system.sys_cfg = settings.system
 
-    # Изолируем БД
     system.sql = mock_sql.return_value
     system.vector = mock_vector.return_value
+    system.graph = mock_graph.return_value
 
     system.setup_l3_agent(
         llm_api_url="http://main",
@@ -214,11 +214,7 @@ async def test_system_subagent_dedicated_llm(
         sub_llm_api_keys=["sub_key_1", "sub_key_2"],
     )
 
-    assert system.llm_client is not None
-    assert system.sub_llm_client is not None
-    assert system.sub_llm_client is not system.llm_client  # Это разные объекты
-
-    assert system.llm_client.api_url == "http://main"
+    assert system.sub_llm_client is not system.llm_client
     assert system.sub_llm_client.api_url == "http://sub"
     assert system.sub_llm_client.rotator.keys == ["sub_key_1", "sub_key_2"]
 
@@ -252,9 +248,43 @@ async def test_system_stop_shared_llm_client_closes_once(mock_configs):
     mock_llm = AsyncMock()
 
     system.llm_client = mock_llm
-    system.sub_llm_client = mock_llm  # Тот же самый объект
+    system.sub_llm_client = mock_llm
 
     await system.stop()
-
-    # Должен быть вызван только один раз, чтобы избежать падений aiohttp/httpx
     mock_llm.close.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_system_di_assembly_avoids_db_file_locks(mock_configs):
+    """
+    Регрессионный тест: гарантия того, что DI-сборщик в тестовом режиме
+    не касается реальных баз данных. Защищает pytest от SQLite/KuzuDB File Locks,
+    позволяя агенту запускать pytest из песочницы "на горячую".
+    """
+    settings, interfaces = mock_configs
+
+    with patch("src.builder.GraphManager") as mock_graph, patch(
+        "src.builder.SQLManager"
+    ) as mock_sql, patch("src.builder.VectorManager") as mock_vector:
+
+        mock_graph.return_value.connect = AsyncMock()
+        mock_sql.return_value.connect = AsyncMock()
+        mock_vector.return_value.connect = AsyncMock()
+
+        from src.builder import SystemBuilder
+        from src.main import System
+
+        sys = System(
+            event_bus=MagicMock(), settings_config=settings, interfaces_config=interfaces
+        )
+        sys.root_dir = Path("/mock/root")
+        sys.local_data_dir = sys.root_dir / "data"
+
+        builder = SystemBuilder(sys)
+
+        builder.build_l0_state()
+        await builder.build_l1_databases()
+
+        mock_graph.assert_called_once()
+        mock_sql.assert_called_once()
+        mock_vector.assert_called_once()

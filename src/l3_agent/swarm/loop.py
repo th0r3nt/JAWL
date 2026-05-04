@@ -247,18 +247,33 @@ class SubagentLoop:
     ) -> Tuple[Optional[AgentResponse], Optional[str]]:
         clean_answer = raw_answer.strip()
 
-        start_idx = clean_answer.find("{")
-        end_idx = clean_answer.rfind("}")
+        import re
 
-        if start_idx != -1 and end_idx != -1 and end_idx > start_idx:
-            json_str = clean_answer[start_idx : end_idx + 1]
+        json_str = ""
+        json_match = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", clean_answer, re.DOTALL)
+
+        if json_match:
+            json_str = json_match.group(1)
+        else:
+            start_idx = clean_answer.find("{")
+            while start_idx != -1:
+                end_idx = clean_answer.rfind("}")
+                if end_idx > start_idx:
+                    candidate = clean_answer[start_idx : end_idx + 1]
+                    try:
+                        parsed = AgentResponse.model_validate_json(candidate)
+                        return parsed, None
+                    except Exception:
+                        start_idx = clean_answer.find("{", start_idx + 1)
+                else:
+                    break
+
+        if json_str:
             try:
                 parsed = AgentResponse.model_validate_json(json_str)
                 return parsed, None
-            except ValidationError as e:
-                return None, f"Format Error: {e}"
             except Exception as e:
-                return None, f"Parsing Error: {e}"
+                return None, f"Format Error: {e}"
 
         return (
             None,

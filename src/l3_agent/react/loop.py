@@ -330,35 +330,41 @@ class ReactLoop:
     async def _parse_response(self, raw_answer: str) -> Optional[AgentResponse]:
         """
         Парсит JSON-ответ агента.
-        В случае ошибки возвращает None и записывает Traceback (ошибку) в БД для
-        корректировки агента на следующем шаге.
-
-        Args:
-            raw_answer: Сырая текстовая строка от модели.
-
-        Returns:
-            Объект AgentResponse или None, если парсинг провалился.
+        В случае ошибки возвращает None и записывает Traceback (ошибку) в БД.
         """
-
         clean_answer = raw_answer.strip()
 
-        # Пуленепробиваемый поиск границ JSON
-        start_idx = clean_answer.find("{")
-        end_idx = clean_answer.rfind("}")
+        # Умный парсинг JSON (защита от мусора и markdown)
+        json_str = ""
+        json_match = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", clean_answer, re.DOTALL)
 
-        if start_idx != -1 and end_idx != -1 and end_idx > start_idx:
-            json_str = clean_answer[start_idx:end_idx + 1]
+        if json_match:
+            json_str = json_match.group(1)
+        else:
+            # Fallback: ищем валидную JSON структуру перебором (откидывая мусор до и после)
+            start_idx = clean_answer.find("{")
+            while start_idx != -1:
+                end_idx = clean_answer.rfind("}")
+                if end_idx > start_idx:
+                    candidate = clean_answer[start_idx : end_idx + 1]
+                    try:
+                        return AgentResponse.model_validate_json(candidate)
+                    except Exception:
+                        # Если не распарсилось, ищем следующую открывающую скобку
+                        start_idx = clean_answer.find("{", start_idx + 1)
+                else:
+                    break
+
+        if json_str:
             try:
                 parsed_response = AgentResponse.model_validate_json(json_str)
                 return parsed_response
-                
-            except ValidationError as e:
+            except Exception as e:
                 system_logger.warning("[ReAct] Ошибка структуры JSON.")
                 err_msg = f"Format Error: {e}"
 
                 await self.sql_ticks.save_tick(
                     thoughts="[System: LLM provided invalid JSON format]",
-                    # Сохраняем только начало битого JSON, чтобы не переполнять логи
                     actions=[{"tool_name": "unknown", "parameters": {"raw": json_str[:500]}}],
                     results={
                         "execution_report": err_msg,
@@ -368,11 +374,8 @@ class ReactLoop:
                 )
                 self.agent_state.last_actions_result = err_msg
                 return None
-                
-            except Exception:
-                pass # Если парсинг упал тотально (вообще не JSON), идем к fallback ниже
 
-        # Если { } не найдено, значит LLM просто решила поболтать текстом
+        # Если { } не найдено вообще, значит LLM просто решила поболтать текстом
         return AgentResponse(thoughts=clean_answer, actions=[])
 
     def add_realtime_event(self, event_data: Dict[str, Any]) -> None:
@@ -446,7 +449,9 @@ class ReactLoop:
                     path_obj = Path(img_path)
                     if path_obj.exists():
                         # Выполняем I/O операцию и энкодинг в отдельном потоке
-                        base64_data = await asyncio.to_thread(self._encode_image, str(path_obj))
+                        base64_data = await asyncio.to_thread(
+                            self._encode_image, str(path_obj)
+                        )
                         ext = path_obj.suffix.lower()
                         mime = "image/jpeg" if ext in [".jpg", ".jpeg"] else f"image/{ext[1:]}"
 

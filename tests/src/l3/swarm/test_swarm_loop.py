@@ -185,3 +185,26 @@ async def test_subagent_dump_context_to_file(mock_loop_deps, tmp_path):
         assert "SUBAGENT DUMP" in content
         assert "**Role**: SOFTWARE ENGINEER" in content  # Имя из объекта
         assert "Hello" in content
+
+
+def test_subagent_parse_response_robustness(mock_loop_deps):
+    """Регрессионный тест: парсер субагента устойчив к галлюцинациям форматирования LLM."""
+    loop = SubagentLoop(**mock_loop_deps)
+
+    # 1. Markdown
+    raw_md = 'Отчет:\n```\n{"thoughts": "a", "actions": []}\n```\n'
+    res_md, err_md = loop._parse_response(raw_md)
+    assert err_md is None
+    assert res_md.thoughts == "a"
+
+    # 2. Грязный текст с фейковыми скобками (проверка перебора)
+    raw_dirty = ' { сломанный json } {"thoughts": "b", "actions": []} конец.'
+    res_dirty, err_dirty = loop._parse_response(raw_dirty)
+    assert err_dirty is None
+    assert res_dirty.thoughts == "b"
+
+    # 3. Полный мусор (возвращает ошибку, а не падает)
+    raw_fail = "Я просто текст без джейсона"
+    res_fail, err_fail = loop._parse_response(raw_fail)
+    assert res_fail is None
+    assert "Invalid JSON" in err_fail
