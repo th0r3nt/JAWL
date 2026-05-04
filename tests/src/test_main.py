@@ -258,9 +258,7 @@ async def test_system_stop_shared_llm_client_closes_once(mock_configs):
 @patch("src.builder.VectorManager")
 @patch("src.builder.Heartbeat")
 @patch("src.builder.ReactLoop")
-async def test_system_di_assembly_avoids_db_file_locks(
-    mock_react, mock_hb, mock_vector, mock_sql, mock_graph, mock_configs, tmp_path
-):
+async def test_system_di_assembly_avoids_db_file_locks(mock_configs, tmp_path):
     """
     Регрессионный тест: гарантия того, что DI-сборщик в тестовом режиме
     не касается реальных баз данных. Защищает pytest от SQLite/KuzuDB File Locks,
@@ -282,7 +280,6 @@ async def test_system_di_assembly_avoids_db_file_locks(
         sys = System(
             event_bus=MagicMock(), settings_config=settings, interfaces_config=interfaces
         )
-        
         sys.root_dir = tmp_path / "mock_root"
         sys.local_data_dir = sys.root_dir / "data"
 
