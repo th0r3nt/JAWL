@@ -94,18 +94,33 @@ def truncate_text(
     """
     Универсальная защита контекста агента от переполнения гигантскими текстами.
 
+    Гарантирует, что длина результата не превышает ``max_chars`` (с учетом
+    длины суффикса). Если ``max_chars`` меньше длины суффикса, суффикс тоже
+    обрезается, чтобы вписаться в лимит.
+
     Args:
         text (str): Исходный длинный текст.
-        max_chars (int): Максимально допустимое количество символов.
+        max_chars (int): Максимально допустимое количество символов (жесткий потолок).
         suffix (str, optional): Строка, которая будет добавлена в конец при обрезке.
 
     Returns:
-        str: Оригинальный или усеченный текст с суффиксом.
+        str: Оригинальный или усеченный текст с суффиксом, длиной строго <= max_chars.
     """
 
-    if len(text) > max_chars:
-        return text[:max_chars] + suffix
-    return text
+    if max_chars <= 0:
+        return ""
+
+    if len(text) <= max_chars:
+        return text
+
+    # Корневой баг до этого фикса: text[:max_chars] + suffix могло быть длиннее
+    # и самого max_chars, и исходного текста. "Защита" и увеличивала размер.
+    if len(suffix) >= max_chars:
+        # Суффикс сам по себе не влезает; обрезаем его, основной текст выкидываем.
+        return suffix[:max_chars]
+
+    body_budget = max_chars - len(suffix)
+    return text[:body_budget] + suffix
 
 
 def get_project_root() -> Path:
