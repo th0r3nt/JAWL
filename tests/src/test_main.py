@@ -253,11 +253,6 @@ async def test_system_stop_shared_llm_client_closes_once(mock_configs):
 
 
 @pytest.mark.asyncio
-@patch("src.builder.GraphManager")
-@patch("src.builder.SQLManager")
-@patch("src.builder.VectorManager")
-@patch("src.builder.Heartbeat")
-@patch("src.builder.ReactLoop")
 async def test_system_di_assembly_avoids_db_file_locks(mock_configs, tmp_path):
     """
     Регрессионный тест: гарантия того, что DI-сборщик в тестовом режиме

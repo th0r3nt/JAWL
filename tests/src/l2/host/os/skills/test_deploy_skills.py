@@ -48,11 +48,13 @@ async def test_commit_deploy_session(deploy_skills):
         return_value=(True, "Тесты пройдены")
     )
 
-    res = await deploy_skills.commit_deploy_session()
+    res = await deploy_skills.commit_deploy_session(test_path="tests/", force=True)
 
     assert res.is_success is True
     assert "Тесты пройдены" in res.message
-    deploy_skills.host_os.deploy_manager.commit_session.assert_awaited_once()
+    deploy_skills.host_os.deploy_manager.commit_session.assert_awaited_once_with(
+        test_path="tests/", force=True
+    )
 
 
 @pytest.mark.asyncio

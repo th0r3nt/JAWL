@@ -107,22 +107,23 @@ class HostOSDeployManager:
                 f.write(f"{rel_path}\n")
             system_logger.debug(f"[Deploy] Новый файл добавлен в манифест: {rel_path}")
 
-    async def commit_session(self) -> Tuple[bool, str]:
+    async def commit_session(self, test_path: str = "tests/src/test_builder.py tests/src/test_main.py", force: bool = False) -> Tuple[bool, str]:
         """
         Закрывает деплой-сессию и фиксирует изменения.
         Автоматически запускает синтаксический анализатор (compileall) и тесты (pytest).
-        При падении тестов списывает одну попытку. Если попытки исчерпаны — вызывает rollback_session().
+        При падении тестов списывает одну попытку. Если попытки исчерпаны - вызывает rollback_session().
 
-        Returns:
-            Tuple[Успешность коммита, Подробный текстовый отчет или Traceback ошибки].
+        Args:
+            test_path: Какие тесты запускать. По умолчанию только базовые Smoke-тесты.
+            force: Если True, игнорирует падение pytest и сохраняет код (не рекомендуется).
         """
 
         if not self.is_active:
             return False, "Нет активной деплой-сессии."
 
-        system_logger.info("[Deploy] Запуск валидации изменений...")
+        system_logger.info(f"[Deploy] Запуск валидации изменений... (force={force}, target={test_path})")
 
-        # 1. Синтаксическая проверка
+        # 1. Синтаксическая проверка (ОБЯЗАТЕЛЬНА ВСЕГДА, ИНАЧЕ СИСТЕМА НЕ ВСТАНЕТ)
         proc_syntax = await asyncio.create_subprocess_exec(
             sys.executable,
             "-m",
@@ -141,13 +142,16 @@ class HostOSDeployManager:
             )
 
         # 2. Прогон тестов (Pytest)
+        # Разбиваем test_path по пробелам, чтобы можно было передать несколько файлов
+        test_args = test_path.split()
+        
         proc_tests = await asyncio.create_subprocess_exec(
             sys.executable,
             "-m",
             "pytest",
             "-q",
             "--disable-warnings",
-            "tests/",
+            *test_args,
             cwd=str(self.framework_dir),
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
@@ -160,7 +164,13 @@ class HostOSDeployManager:
             out_str = stdout_test.decode("utf-8", errors="replace")
             # Берем только хвост лога, чтобы не убить контекст агента
             err_msg = out_str[-3000:] if len(out_str) > 3000 else out_str
-            return self._handle_failure(f"Тесты упали:\n{err_msg}")
+            
+            if force:
+                system_logger.warning("[Deploy] Тесты ПРОВАЛЕНЫ, но применен FORCE-коммит. Сохраняем изменения.")
+                self._cleanup()
+                return True, f"ВНИМАНИЕ: Тесты провалены, но коммит принудительно сохранен (force=True). Лог:\n{err_msg}\n\nДеплой-сессия закрыта."
+            else:
+                return self._handle_failure(f"Тесты упали:\n{err_msg}")
 
         # ЕСЛИ ВСЁ ГУД:
         self._cleanup()
