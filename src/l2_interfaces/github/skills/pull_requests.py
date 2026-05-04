@@ -2,10 +2,13 @@
 Навыки для взаимодействия с GitHub Pull Requests.
 """
 
-from src.l2_interfaces.github.client import GithubClient
-from src.l3_agent.skills.registry import SkillResult, skill
 from src.utils._tools import truncate_text
 from src.utils.logger import system_logger
+
+from src.l2_interfaces.github.client import GithubClient
+
+from src.l3_agent.skills.registry import SkillResult, skill
+from src.l2_interfaces.github.decorators import require_agent_account
 
 
 class GithubPullRequests:
@@ -83,15 +86,16 @@ class GithubPullRequests:
             return SkillResult.fail(f"Ошибка при чтении Diff PR: {e}")
 
     @skill()
+    @require_agent_account()
     async def create_pull_request(
         self, owner: str, repo: str, title: str, head: str, base: str = "main", body: str = ""
     ) -> SkillResult:
         """
-        [Требует Agent Account] Создает новый Pull Request.
+        Создает новый Pull Request.
 
         Args:
-            head: ветка, из которой переносим изменения.
-            base: ветка, куда вливаем изменения.
+            head: Ветка, из которой переносить изменения.
+            base: Ветка, куда вливать изменения.
         """
 
         if not self.client.config.agent_account:

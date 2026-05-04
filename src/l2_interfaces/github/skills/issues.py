@@ -1,11 +1,13 @@
 import urllib.parse
 from typing import Literal, Optional
 
-from src.l2_interfaces.github.client import GithubClient
-from src.l3_agent.skills.registry import SkillResult, skill
 from src.utils.logger import system_logger
 from src.utils._tools import truncate_text
 
+from src.l2_interfaces.github.client import GithubClient
+
+from src.l3_agent.skills.registry import SkillResult, skill
+from src.l2_interfaces.github.decorators import require_agent_account
 
 class GithubIssues:
     """Навыки для работы с Issues и Pull Requests."""
@@ -85,11 +87,12 @@ class GithubIssues:
             return SkillResult.fail(f"Ошибка при чтении issue: {e}")
 
     @skill()
+    @require_agent_account()
     async def create_issue(
         self, owner: str, repo: str, title: str, body: str = ""
     ) -> SkillResult:
         """
-        [Требует Agent Account] Создает issue в репозитории.
+        Создает issue в репозитории.
         """
 
         if not self.client.config.agent_account:
@@ -111,11 +114,12 @@ class GithubIssues:
             return SkillResult.fail(f"Ошибка при создании issue: {e}")
 
     @skill()
+    @require_agent_account()
     async def add_comment(
         self, owner: str, repo: str, issue_number: int, body: str
     ) -> SkillResult:
         """
-        [Требует Agent Account] Добавляет комментарий к Issue или Pull Request.
+        Добавляет комментарий к Issue или Pull Request.
         """
 
         if not self.client.config.agent_account:

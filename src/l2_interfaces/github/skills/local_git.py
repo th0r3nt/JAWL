@@ -8,9 +8,11 @@ import asyncio
 from pathlib import Path
 from typing import Tuple
 
-from src.l2_interfaces.github.client import GithubClient
 from src.utils.logger import system_logger
 from src.utils._tools import truncate_text, validate_sandbox_path
+
+from src.l2_interfaces.github.client import GithubClient
+from src.l2_interfaces.github.decorators import require_github_token
 
 from src.l3_agent.skills.registry import SkillResult, skill
 from src.l3_agent.swarm.roles import Subagents
@@ -159,6 +161,7 @@ class GithubLocalGit:
             return SkillResult.fail(f"Ошибка git checkout: {e}")
 
     @skill(swarm_roles=[Subagents.CODER])
+    @require_github_token()
     async def git_commit_and_push(
         self, repo_folder: str, commit_message: str, branch_name: str
     ) -> SkillResult:

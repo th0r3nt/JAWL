@@ -3,9 +3,11 @@ import asyncio
 from datetime import datetime, timedelta, timezone
 from typing import Optional, Literal
 
-from src.l2_interfaces.github.client import GithubClient
 from src.utils.logger import system_logger
 from src.utils._tools import truncate_text, validate_sandbox_path, format_size
+
+from src.l2_interfaces.github.client import GithubClient
+from src.l2_interfaces.github.decorators import require_agent_account, require_github_token
 
 from src.l3_agent.skills.registry import SkillResult, skill
 from src.l3_agent.swarm.roles import Subagents
@@ -156,9 +158,10 @@ class GithubRepositories:
             return SkillResult.fail(f"Ошибка при получении репозитория: {e}")
 
     @skill()
+    @require_github_token()
     async def search_code(self, query: str, per_page: int = 10) -> SkillResult:
         """
-        [Требует auth-токен] Ищет код по GitHub.
+        Ищет код по GitHub.
         """
 
         if not self.client.token:
@@ -382,9 +385,10 @@ class GithubRepositories:
             return SkillResult.fail(f"Ошибка при просмотре директории репозитория: {e}")
 
     @skill()
+    @require_agent_account()
     async def star_repository(self, owner: str, repo: str) -> SkillResult:
         """
-        [Требует Agent Account] Ставит звезду репозиторию.
+        Ставит звезду репозиторию.
         """
 
         if not self.client.config.agent_account:
@@ -399,9 +403,10 @@ class GithubRepositories:
             return SkillResult.fail(f"Ошибка при постановке звезды: {e}")
 
     @skill()
+    @require_agent_account()
     async def unstar_repository(self, owner: str, repo: str) -> SkillResult:
         """
-        [Требует Agent Account] Убирает звезду с репозитория.
+        Убирает звезду с репозитория.
         """
 
         if not self.client.config.agent_account:
@@ -441,11 +446,12 @@ class GithubRepositories:
             return SkillResult.fail(f"Ошибка при получении списка веток: {e}")
 
     @skill()
+    @require_agent_account()
     async def create_repository(
         self, name: str, description: str = "", private: bool = False
     ) -> SkillResult:
         """
-        [Требует Agent Account] Создает новый репозиторий в аккаунте.
+        Создает новый репозиторий в аккаунте.
         Автоматически инициализирует с README.md.
         """
 
@@ -475,9 +481,10 @@ class GithubRepositories:
             return SkillResult.fail(f"Ошибка при создании репозитория: {e}")
 
     @skill()
+    @require_agent_account()
     async def fork_repository(self, owner: str, repo: str) -> SkillResult:
         """
-        [Требует Agent Account] Делает форк (копию) чужого репозитория в аккаунт.
+        Делает форк (копию) чужого репозитория в аккаунт.
         """
 
         if not self.client.config.agent_account:
@@ -500,11 +507,12 @@ class GithubRepositories:
             return SkillResult.fail(f"Ошибка при форке репозитория: {e}")
 
     @skill()
+    @require_agent_account()
     async def create_gist(
         self, filename: str, content: str, description: str = "", public: bool = True
     ) -> SkillResult:
         """
-        [Требует Agent Account] Создает Gist (публичный или приватный сниппет кода/текста).
+        Создает Gist (публичный или приватный сниппет кода/текста).
         Удобно для того, чтобы поделиться логами, длинными скриптами или заметками по ссылке.
         """
         if not self.client.config.agent_account:

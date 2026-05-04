@@ -247,6 +247,15 @@ def get_skills_library() -> str:
             if host_os is not None and host_os.access_level.value < req_level:
                 continue
 
+        # Динамическое сокрытие (например, скрытие GitHub навыков, если нет токена)
+        visibility_check = getattr(func, "__visibility_check__", None)
+        if visibility_check and instance is not None:
+            try:
+                if not visibility_check(instance):
+                    continue
+            except Exception:
+                pass
+
         active_docs.append(doc)
 
     formatted_docs = []
