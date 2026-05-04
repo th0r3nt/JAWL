@@ -169,6 +169,7 @@ def start_agent_screen() -> None:
         wait_for_enter()
         return
 
+    print("\n")
     print_info(" Инициализация систем агента.")
     PID_FILE.parent.mkdir(parents=True, exist_ok=True)
 

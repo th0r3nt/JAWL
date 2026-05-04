@@ -138,14 +138,15 @@ def run_onboarding_if_needed() -> bool:
 
     # 1. Имя агента
     agent_name = questionary.text(
-        "Как назовем вашего агента? (Оставьте пустым для 'Agent'):", style=style
+        "\nКак назовем вашего агента? (Оставьте пустым для 'Agent'):", style=style
     ).ask()
     if agent_name is None:
         return False
     agent_name = agent_name.strip() or "Agent"
 
     # 2. LLM Base URL
-    print_info("\n Настройка подключения к языковой модели (LLM).")
+    print("\n")
+    print_info(" Настройка подключения к языковой модели (LLM).")
     llm_url = questionary.text(
         "Введите Base URL (Например, для локальной модели: 'http://127.0.0.1:11434/v1/').\nОставьте пустым для стандартного OpenAI API:",
         style=style,
@@ -177,7 +178,8 @@ def run_onboarding_if_needed() -> bool:
         return False
 
     # 5. Настройка Swarm (Субагенты)
-    print_info("\n Подсистема Swarm позволяет делегировать сложные задачи фоновым субагентам.")
+    print("\n")
+    print_info("Подсистема Swarm позволяет делегировать сложные задачи фоновым субагентам.")
     enable_swarm = questionary.confirm(
         "Включить систему субагентов (Swarm)?", default=True, style=style
     ).ask()
@@ -201,6 +203,7 @@ def run_onboarding_if_needed() -> bool:
 
         settings_updates[("system", "swarm", "subagent_model")] = sub_model.strip()
 
+        print("\n")
         print_info(
             " Вы можете указать отдельные API ключи для субагентов, чтобы не тратить лимиты основного ключа."
         )
@@ -223,7 +226,8 @@ def run_onboarding_if_needed() -> bool:
     _update_env_file(env_updates)
     _update_settings_yaml(settings_updates)
 
-    print_success("\nПервоначальная настройка успешно завершена!")
+    print("\n")
+    print_success("Первоначальная настройка успешно завершена!")
     print_info(
         " Позже вы сможете изменить эти и другие параметры через 'Мастер настройки' в главном меню."
     )
