@@ -67,13 +67,57 @@ def _blocked_func(*args, **kwargs):
     )
 
 
+# subprocess: все остальные функции внутренне вызывают Popen, и если Popen заменён — они
+# автоматически блокируются. Но для явности и защиты от Python-ов без run/check_call/и т.д.
+# перекрываем все.
 subprocess.Popen = _blocked_func
 subprocess.run = _blocked_func
 subprocess.check_output = _blocked_func
+subprocess.check_call = _blocked_func
 subprocess.call = _blocked_func
+subprocess.getoutput = _blocked_func
+subprocess.getstatusoutput = _blocked_func
 
+# os.system / os.popen — классика.
 os.system = _blocked_func
 os.popen = _blocked_func
+
+# os.spawn* семейство: запускает процесс напрямую через posix_spawn/spawn, мимо subprocess.
+for _name in (
+    "spawnl",
+    "spawnle",
+    "spawnlp",
+    "spawnlpe",
+    "spawnv",
+    "spawnve",
+    "spawnvp",
+    "spawnvpe",
+    "posix_spawn",
+    "posix_spawnp",
+    "startfile",
+):
+    if hasattr(os, _name):
+        setattr(os, _name, _blocked_func)
+
+# os.exec* семейство: заменяет текущий процесс на другой бинарник.
+for _name in (
+    "execl",
+    "execle",
+    "execlp",
+    "execlpe",
+    "execv",
+    "execve",
+    "execvp",
+    "execvpe",
+):
+    if hasattr(os, _name):
+        setattr(os, _name, _blocked_func)
+
+# os.fork / os.forkpty — раздваивает процесс; дальше форк-чилд может обойти Python-уровневые гарды
+# своей копией памяти и продолжить вызовы syscalls напрямую через ctypes. Запрещаем.
+for _name in ("fork", "forkpty"):
+    if hasattr(os, _name):
+        setattr(os, _name, _blocked_func)
 
 # Добавляем пути в sys.path для корректных импортов
 sys.path.insert(0, str(Path(TARGET_SCRIPT).parent))

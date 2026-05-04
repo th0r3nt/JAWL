@@ -152,3 +152,86 @@ except PermissionError as e:
     assert "SUBPROCESS_WORKED" not in res.message
     assert "SUBPROCESS_BLOCKED:" in res.message
     assert "Использование shell/subprocess заблокировано" in res.message
+
+
+@pytest.mark.asyncio
+async def test_sandbox_guard_blocks_os_spawn_and_exec_family(os_client, tmp_path):
+    """
+    Раньше Sandbox Guard перезаписывал только subprocess.Popen/run/check_output/call
+    и os.system/os.popen. Обход: os.spawnlp / os.posix_spawn / os.execvp /
+    os.fork вызывают процесс напрямую через syscall, мимо всего списка.
+    """
+    os_client.access_level = HostOSAccessLevel.OBSERVER
+    executor = HostOSExecution(os_client)
+
+    real_root = get_project_root()
+    template_src = real_root / "src" / "utils" / "templates" / "sandbox_runner.py"
+    template_dst = tmp_path / "src" / "utils" / "templates" / "sandbox_runner.py"
+    template_dst.parent.mkdir(parents=True, exist_ok=True)
+
+    if template_src.exists():
+        shutil.copy2(template_src, template_dst)
+    else:
+        pytest.skip("Файл sandbox_runner.py не найден в исходниках. Тест пропущен.")
+
+    malicious_code = """
+import os
+
+# 1. os.spawnlp — раньше совсем не блокировался
+try:
+    os.spawnlp(os.P_WAIT, 'echo', 'echo', 'SPAWN_WORKED')
+    print("SPAWNLP_NOT_BLOCKED")
+except PermissionError as e:
+    print(f"SPAWNLP_BLOCKED: {e}")
+except Exception as e:
+    print(f"SPAWNLP_ERROR: {type(e).__name__}")
+
+# 2. os.posix_spawn — прямой syscall
+try:
+    os.posix_spawn('/bin/echo', ['echo', 'POSIX_WORKED'], os.environ)
+    print("POSIX_SPAWN_NOT_BLOCKED")
+except PermissionError as e:
+    print(f"POSIX_SPAWN_BLOCKED: {e}")
+except Exception as e:
+    print(f"POSIX_SPAWN_ERROR: {type(e).__name__}")
+
+# 3. os.execvp — замена текущего процесса; тестируем что хотя бы обёртка падает
+try:
+    os.execvp('echo', ['echo', 'EXEC_WORKED'])
+    print("EXECVP_NOT_BLOCKED")
+except PermissionError as e:
+    print(f"EXECVP_BLOCKED: {e}")
+except Exception as e:
+    print(f"EXECVP_ERROR: {type(e).__name__}")
+
+# 4. os.fork
+try:
+    pid = os.fork()
+    if pid == 0:
+        # child
+        os._exit(0)
+    print("FORK_NOT_BLOCKED")
+except PermissionError as e:
+    print(f"FORK_BLOCKED: {e}")
+except Exception as e:
+    print(f"FORK_ERROR: {type(e).__name__}")
+"""
+    malicious_script = os_client.sandbox_dir / "evil_spawn.py"
+    malicious_script.write_text(malicious_code, encoding="utf-8")
+
+    res = await executor.execute_script("sandbox/evil_spawn.py")
+    assert res.is_success is True, res.message
+
+    # Ни одно из 4 семейств не должно спакнуть процессы
+    assert "SPAWN_WORKED" not in res.message
+    assert "POSIX_WORKED" not in res.message
+    assert "SPAWNLP_NOT_BLOCKED" not in res.message
+    assert "POSIX_SPAWN_NOT_BLOCKED" not in res.message
+    assert "EXECVP_NOT_BLOCKED" not in res.message
+    assert "FORK_NOT_BLOCKED" not in res.message
+
+    # И все четыре должны ответить PermissionError от гарда
+    assert "SPAWNLP_BLOCKED:" in res.message
+    assert "POSIX_SPAWN_BLOCKED:" in res.message
+    assert "EXECVP_BLOCKED:" in res.message
+    assert "FORK_BLOCKED:" in res.message
