@@ -1,5 +1,7 @@
 import pytest
 import os
+import io
+import tarfile
 import zipfile
 from pathlib import Path
 from unittest.mock import patch, MagicMock
@@ -87,6 +89,123 @@ async def test_attack_zip_slip_vulnerability(os_client, tmp_path):
 
     # Убеждаемся, что файл физически не вырвался из песочницы
     assert not (os_client.sandbox_dir.parent.parent / "evil_payload.txt").exists()
+
+
+@pytest.mark.asyncio
+async def test_attack_tar_symlink_slip(os_client):
+    """
+    АТАКА (Tar Symlink Slip): злой tar-архив с symlink'ом, имя которого
+    выглядит безопасно внутри sandbox, но linkname указывает на /etc/passwd.
+    shutil.unpack_archive на Python <3.12 последует за ним, и агент
+    получает чтение секретов через sandbox/link.
+    ОЖИДАНИЕ: _is_safe_archive отклоняет архив до распаковки.
+    """
+    os_client.access_level = HostOSAccessLevel.SANDBOX
+    archive_skill = HostOSArchive(os_client)
+
+    malicious_tar_path = os_client.sandbox_dir / "evil.tar"
+    with tarfile.open(malicious_tar_path, "w") as tar:
+        # Безобидный файл для маскировки
+        info = tarfile.TarInfo(name="readme.txt")
+        info.size = 5
+        tar.addfile(info, io.BytesIO(b"hello"))
+
+        # Симлинк на /etc/passwd - имя в sandbox, таргет абсолютный
+        sym_info = tarfile.TarInfo(name="stolen_secrets")
+        sym_info.type = tarfile.SYMTYPE
+        sym_info.linkname = "/etc/passwd"
+        sym_info.size = 0
+        tar.addfile(sym_info)
+
+    res = await archive_skill.extract_archive(
+        str(malicious_tar_path), extract_to="sandbox/extracted"
+    )
+
+    assert res.is_success is False
+    assert "Обнаружена попытка выхода за пределы директории" in res.message
+
+    # И самое главное — симлинк не должен быть создан
+    assert not (os_client.sandbox_dir / "extracted" / "stolen_secrets").exists()
+
+
+@pytest.mark.asyncio
+async def test_attack_tar_symlink_relative_escape(os_client):
+    """
+    АТАКА (Tar Symlink Slip via relative path): symlink с относительным
+    выходом за пределы sandbox (../../../etc/passwd). Тонкий вариант
+    предыдущего, обходит проверку is_absolute().
+    """
+    os_client.access_level = HostOSAccessLevel.SANDBOX
+    archive_skill = HostOSArchive(os_client)
+
+    malicious_tar_path = os_client.sandbox_dir / "evil_rel.tar"
+    with tarfile.open(malicious_tar_path, "w") as tar:
+        sym_info = tarfile.TarInfo(name="leak")
+        sym_info.type = tarfile.SYMTYPE
+        sym_info.linkname = "../../../../../../etc/passwd"
+        sym_info.size = 0
+        tar.addfile(sym_info)
+
+    res = await archive_skill.extract_archive(
+        str(malicious_tar_path), extract_to="sandbox/extracted"
+    )
+
+    assert res.is_success is False
+    assert not (os_client.sandbox_dir / "extracted" / "leak").exists()
+
+
+@pytest.mark.asyncio
+async def test_attack_tar_hardlink_slip(os_client):
+    """
+    АТАКА (Tar Hardlink Slip): хардлинк на абсолютный путь. Аналогично
+    symlink'у, shutil.unpack_archive на Python <3.12 создаст хардлинк на
+    внешний файл.
+    """
+    os_client.access_level = HostOSAccessLevel.SANDBOX
+    archive_skill = HostOSArchive(os_client)
+
+    malicious_tar_path = os_client.sandbox_dir / "evil_hl.tar"
+    with tarfile.open(malicious_tar_path, "w") as tar:
+        hl_info = tarfile.TarInfo(name="shadow_access")
+        hl_info.type = tarfile.LNKTYPE
+        hl_info.linkname = "/etc/shadow"
+        hl_info.size = 0
+        tar.addfile(hl_info)
+
+    res = await archive_skill.extract_archive(
+        str(malicious_tar_path), extract_to="sandbox/extracted"
+    )
+
+    assert res.is_success is False
+
+
+@pytest.mark.asyncio
+async def test_safe_tar_with_relative_symlink_allowed(os_client):
+    """
+    РЕГРЕСС-ГУАРД: безопасный архив с symlink'ом на соседний файл
+    внутри sandbox ДОЛЖЕН распаковываться. Фикс не должен ломать
+    легитимные сценарии.
+    """
+    os_client.access_level = HostOSAccessLevel.SANDBOX
+    archive_skill = HostOSArchive(os_client)
+
+    safe_tar_path = os_client.sandbox_dir / "safe.tar"
+    with tarfile.open(safe_tar_path, "w") as tar:
+        info = tarfile.TarInfo(name="real.txt")
+        info.size = 5
+        tar.addfile(info, io.BytesIO(b"hello"))
+
+        sym_info = tarfile.TarInfo(name="link_to_real")
+        sym_info.type = tarfile.SYMTYPE
+        sym_info.linkname = "real.txt"
+        sym_info.size = 0
+        tar.addfile(sym_info)
+
+    res = await archive_skill.extract_archive(
+        str(safe_tar_path), extract_to="sandbox/safe_out"
+    )
+
+    assert res.is_success is True, res.message
 
 
 @pytest.mark.asyncio
