@@ -1,5 +1,3 @@
-from pathlib import Path
-
 import pytest
 import asyncio
 from unittest.mock import patch, MagicMock, AsyncMock
@@ -255,7 +253,14 @@ async def test_system_stop_shared_llm_client_closes_once(mock_configs):
 
 
 @pytest.mark.asyncio
-async def test_system_di_assembly_avoids_db_file_locks(mock_configs):
+@patch("src.builder.GraphManager")
+@patch("src.builder.SQLManager")
+@patch("src.builder.VectorManager")
+@patch("src.builder.Heartbeat")
+@patch("src.builder.ReactLoop")
+async def test_system_di_assembly_avoids_db_file_locks(
+    mock_react, mock_hb, mock_vector, mock_sql, mock_graph, mock_configs, tmp_path
+):
     """
     Регрессионный тест: гарантия того, что DI-сборщик в тестовом режиме
     не касается реальных баз данных. Защищает pytest от SQLite/KuzuDB File Locks,
@@ -263,13 +268,13 @@ async def test_system_di_assembly_avoids_db_file_locks(mock_configs):
     """
     settings, interfaces = mock_configs
 
-    with patch("src.builder.GraphManager") as mock_graph, patch(
+    with patch("src.builder.GraphManager") as mock_graph_internal, patch(
         "src.builder.SQLManager"
-    ) as mock_sql, patch("src.builder.VectorManager") as mock_vector:
+    ) as mock_sql_internal, patch("src.builder.VectorManager") as mock_vector_internal:
 
-        mock_graph.return_value.connect = AsyncMock()
-        mock_sql.return_value.connect = AsyncMock()
-        mock_vector.return_value.connect = AsyncMock()
+        mock_graph_internal.return_value.connect = AsyncMock()
+        mock_sql_internal.return_value.connect = AsyncMock()
+        mock_vector_internal.return_value.connect = AsyncMock()
 
         from src.builder import SystemBuilder
         from src.main import System
@@ -277,7 +282,8 @@ async def test_system_di_assembly_avoids_db_file_locks(mock_configs):
         sys = System(
             event_bus=MagicMock(), settings_config=settings, interfaces_config=interfaces
         )
-        sys.root_dir = Path("/mock/root")
+        
+        sys.root_dir = tmp_path / "mock_root"
         sys.local_data_dir = sys.root_dir / "data"
 
         builder = SystemBuilder(sys)
@@ -285,6 +291,6 @@ async def test_system_di_assembly_avoids_db_file_locks(mock_configs):
         builder.build_l0_state()
         await builder.build_l1_databases()
 
-        mock_graph.assert_called_once()
-        mock_sql.assert_called_once()
-        mock_vector.assert_called_once()
+        mock_graph_internal.assert_called_once()
+        mock_sql_internal.assert_called_once()
+        mock_vector_internal.assert_called_once()
