@@ -177,11 +177,11 @@ async def test_subagent_dump_context_to_file(mock_loop_deps, tmp_path):
     with patch("src.l3_agent.swarm.loop.Path") as mock_path_class:
         mock_dir = MagicMock()
         mock_path_class.return_value = mock_dir
-        mock_dir.__truediv__.return_value = tmp_path / "last_prompt.md"
+        mock_dir.__truediv__.return_value = tmp_path / "last_sub_prompt.md"
 
         loop._dump_context_to_file(messages, current_step=1)
 
-        content = (tmp_path / "last_prompt.md").read_text(encoding="utf-8")
+        content = (tmp_path / "last_sub_prompt.md").read_text(encoding="utf-8")
         assert "SUBAGENT DUMP" in content
         assert "**Role**: SOFTWARE ENGINEER" in content  # Имя из объекта
         assert "Hello" in content

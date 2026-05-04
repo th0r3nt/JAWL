@@ -105,3 +105,13 @@ system:
       thoughts_short_max_chars: 2000
       action_short_max_chars: 500
       result_short_max_chars: 1000
+
+
+  # Подробнее: docs/yaml/settings/tot.md
+  tree_of_thoughts:
+    enabled: false
+    model: unknown
+    temperature: 1.4
+    mode: "hybrid"  # "manual", "auto", "hybrid"
+    auto_interval_steps: 5
+    branches: 3

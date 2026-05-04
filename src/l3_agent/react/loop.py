@@ -17,6 +17,7 @@ import copy
 from pathlib import Path
 
 from src.utils.logger import system_logger
+from src.utils.settings import TreeOfThoughtsConfig
 from src.utils.token_tracker import TokenTracker
 
 from src.l0_state.agent.state import AgentState, AgentStatus
@@ -27,6 +28,8 @@ from src.l1_databases.vector.manager import VectorManager
 from src.l3_agent.llm.client import LLMClient
 from src.l3_agent.prompt.builder import PromptBuilder
 from src.l3_agent.context.builder import ContextBuilder
+
+from src.l3_agent.tot.generator import ToTGenerator
 
 from src.l3_agent.skills.registry import execute_skill
 from src.l3_agent.skills.schema import AgentResponse, ActionCall
@@ -49,6 +52,8 @@ class ReactLoop:
         token_tracker: TokenTracker,
         tools: list,
         cooldown_sec: int = 30,
+        tot_config: Optional[TreeOfThoughtsConfig] = None,
+        tot_generator: Optional[ToTGenerator] = None,
     ) -> None:
         """
         Инициализирует цикл ReAct.
@@ -66,14 +71,22 @@ class ReactLoop:
         """
 
         self.llm = llm_client
+
         self.prompt_builder = prompt_builder
         self.context_builder = context_builder
+
         self.agent_state = agent_state
+
         self.sql_ticks = sql_ticks
         self.vector_manager = vector_manager
+
         self.tracker = token_tracker
+
         self.tools = tools
         self.cooldown_sec = cooldown_sec
+
+        self.tot_config = tot_config
+        self.tot_generator = tot_generator
 
         # Хранилище Event Log: входящие события с интерфейсов, которые приходят между шагами раздумий агента
         self.current_events: List[Dict[str, Any]] = []
@@ -106,6 +119,17 @@ class ReactLoop:
 
             while self.agent_state.current_step <= self.agent_state.max_react_steps:
                 self.agent_state.update_state(AgentStatus.THINKING)
+
+                # =======================================================
+                # Генерация дерева мыслей
+                if self.tot_config and self.tot_config.enabled and self.tot_config.mode in ("auto", "hybrid"):
+                    # Генерируем на 1-м шаге, а затем каждые N шагов
+                    if (self.agent_state.current_step == 1) or \
+                       ((self.agent_state.current_step - 1) % self.tot_config.auto_interval_steps == 0):
+                        
+                        tree_md = await self.tot_generator.generate(event_name, payload, missed_events)
+                        if tree_md:
+                            self.agent_state.current_thoughts_tree = tree_md
 
                 # =======================================================
                 # Сборка контекста и промпта
@@ -437,7 +461,7 @@ class ReactLoop:
         """
 
         try:
-            with open("logs/last_prompt.md", "w", encoding="utf-8") as f:
+            with open("logs/last_main_prompt.md", "w", encoding="utf-8") as f:
                 for m in messages:
                     role = getattr(
                         m,

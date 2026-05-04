@@ -193,7 +193,7 @@ class SubagentLoop:
             log_dir = Path("logs/subagents")
             log_dir.mkdir(parents=True, exist_ok=True)
 
-            with open(log_dir / "last_prompt.md", "w", encoding="utf-8") as f:
+            with open(log_dir / "last_sub_prompt.md", "w", encoding="utf-8") as f:
                 f.write("# SUBAGENT DUMP\n")
                 f.write(f"* **Role**: {self.role.name.upper()}\n")
                 f.write(f"* **Subagent ID**: {self.subagent_id}\n")

@@ -34,16 +34,23 @@ from src.l2_interfaces.initializer import initialize_l2_interfaces
 
 from src.l3_agent.llm.client import LLMClient
 from src.l3_agent.llm.api_keys.rotator import APIKeyRotator
+
 from src.l3_agent.prompt.builder import PromptBuilder
 from src.l3_agent.context.builder import ContextBuilder
 from src.l3_agent.context.registry import ContextSection
 from src.l3_agent.context.rag.memories import RAGMemories
+
 from src.l3_agent.react.loop import ReactLoop
 from src.l3_agent.heartbeat import Heartbeat
+
 from src.l3_agent.skills.registry import register_instance
 from src.l3_agent.skills.schema import ACTION_SCHEMA
+
 from src.l3_agent.swarm.skills.report import SubagentReport
 from src.l3_agent.swarm.spawn import SwarmManager
+
+from src.l3_agent.tot.generator import ToTGenerator
+from src.l3_agent.tot.skills import DeepThinkSkill
 
 if TYPE_CHECKING:
     from src.main import System
@@ -230,6 +237,9 @@ class SystemBuilder:
         else:
             sys_obj.sub_llm_client = sys_obj.llm_client
 
+        # ======================================================================
+        # Prompt Builder
+
         prompt_builder = PromptBuilder(
             prompt_dir=sys_obj.root_dir / "src" / "l3_agent" / "prompt",
             drives_enabled=self.sys_cfg.db.sql.drives.enabled,
@@ -237,7 +247,11 @@ class SystemBuilder:
             traits_enabled=self.sys_cfg.db.sql.personality_traits.enabled,
             mental_states_enabled=self.sys_cfg.db.sql.mental_states.enabled,
             swarm_enabled=self.sys_cfg.swarm.enabled,
+            tot_enabled=self.sys_cfg.tree_of_thoughts.enabled,
         )
+
+        # ======================================================================
+        # RAG
 
         rag_memories = RAGMemories(
             vector_knowledge=sys_obj.vector.knowledge,
@@ -258,13 +272,41 @@ class SystemBuilder:
             section=ContextSection.INTERFACES,
         )
 
+        # ======================================================================
+        # Context Builder
+
         context_builder = ContextBuilder(
             agent_state=sys_obj.agent_state, registry=sys_obj.context_registry
         )
 
+        # ======================================================================
+        # Token Tracker
+
         token_tracker = TokenTracker()
 
+        # ======================================================================
+        # Tree of Thoughts
+
+        tot_generator = None
+        if self.sys_cfg.tree_of_thoughts.enabled:
+            tot_generator = ToTGenerator(
+                llm_client=sys_obj.sub_llm_client, # Используем клиент субагентов для экономии (у него ротатор)
+                model_name=self.sys_cfg.tree_of_thoughts.model,
+                branches_count=self.sys_cfg.tree_of_thoughts.branches,
+                prompt_builder=prompt_builder,
+                context_registry=sys_obj.context_registry,
+                agent_state=sys_obj.agent_state,
+                token_tracker=token_tracker,
+                root_dir=sys_obj.root_dir,
+            )
+            
+            # Регистрируем ручной навык, если режим позволяет
+            if self.sys_cfg.tree_of_thoughts.mode in ("manual", "hybrid"):
+                register_instance(DeepThinkSkill(tot_generator))
+
+        # ======================================================================
         # ReactLoop
+
         react_loop = ReactLoop(
             llm_client=sys_obj.llm_client,
             prompt_builder=prompt_builder,
@@ -274,9 +316,13 @@ class SystemBuilder:
             vector_manager=sys_obj.vector,
             token_tracker=token_tracker,
             tools=ACTION_SCHEMA,
+            tot_config=self.sys_cfg.tree_of_thoughts,
+            tot_generator=tot_generator,
         )
 
+        # ======================================================================
         # Heartbeat
+
         sys_obj.heartbeat = Heartbeat(
             react_loop=react_loop,
             heartbeat_interval=sys_obj.settings.system.heartbeat_interval,
@@ -285,7 +331,9 @@ class SystemBuilder:
             timezone=sys_obj.settings.system.timezone,
         )
 
+        # ======================================================================
         # Swarm
+
         if self.sys_cfg.swarm.enabled:
             report_skill = SubagentReport(
                 event_bus=sys_obj.event_bus, sandbox_dir=sys_obj.root_dir / "sandbox"

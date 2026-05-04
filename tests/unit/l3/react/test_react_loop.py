@@ -22,7 +22,7 @@ def test_react_dump_context_to_file(mock_dependencies):
 
         loop._dump_context_to_file(messages)
 
-        mock_open.assert_called_once_with("logs/last_prompt.md", "w", encoding="utf-8")
+        mock_open.assert_called_once_with("logs/last_main_prompt.md", "w", encoding="utf-8")
 
         # Проверяем, что все сообщения были записаны
         written_content = "".join([call[0][0] for call in mock_file.write.call_args_list])

@@ -223,12 +223,65 @@ def run_onboarding_if_needed() -> bool:
         if sub_key is not None and sub_key.strip():
             env_updates["SUB_LLM_API_KEY_1"] = sub_key.strip()
 
+    # 6. Настройка Tree of Thoughts
+    print("\n")
+    print_info("Подсистема Tree of Thoughts позволяет агенту генерировать и оценивать несколько стратегических вариантов перед выполнением действий, но при этом расходует больше токенов.")
+    enable_tot = questionary.confirm(
+        "Включить Tree of Thoughts?", default=True, style=style
+    ).ask()
+    
+    if enable_tot is None:
+        return False
+        
+    if enable_tot:
+        # Предлагаем модель субагентов по умолчанию, так как она обычно дешевле и быстрее
+        default_tot_model = sub_model.strip() if enable_swarm and sub_model else main_model.strip()
+        
+        tot_model = questionary.text(
+            "Введите название LLM модели для Tree of Thoughts:",
+            default=default_tot_model,
+            style=style,
+        ).ask()
+        if not tot_model:
+            return False
+
+        tot_mode = questionary.select(
+            "Выберите режим работы Tree of Thoughts:",
+            choices=[
+                questionary.Choice("Автоматический (каждые 5 шагов ReAct цикла + всегда на первом шаге ReAct Loop)", "auto"),
+                questionary.Choice("Ручной (агент будет использовать через отдельный вызов навыка)", "manual"),
+                questionary.Choice("Гибридный (автоматически каждые 5 шагов + по вызову навыка)", "hybrid"),
+            ],
+            style=style,
+            qmark=""
+        ).ask()
+        if not tot_mode:
+            return False
+
+        tot_branches_str = questionary.text(
+            "Сколько вариантов (веток мыслей) генерировать за один раз? (Рекомендуется 2-5):",
+            default="3",
+            style=style,
+        ).ask()
+        if not tot_branches_str:
+            return False
+
+        try:
+            tot_branches = int(tot_branches_str.strip())
+        except ValueError:
+            tot_branches = 3 # Фоллбэк, если юзер введет текст вместо цифры
+            
+        settings_updates[("system", "tree_of_thoughts", "enabled")] = True
+        settings_updates[("system", "tree_of_thoughts", "model")] = tot_model.strip()
+        settings_updates[("system", "tree_of_thoughts", "mode")] = tot_mode
+        settings_updates[("system", "tree_of_thoughts", "branches")] = tot_branches
+
     # Сохраняем все данные
     _update_env_file(env_updates)
     _update_settings_yaml(settings_updates)
 
     print("\n")
-    print_success("Первоначальная настройка успешно завершена!")
+    print_success("Первоначальная настройка успешно завершена.")
     print_info(
         " Позже вы сможете изменить эти и другие параметры через 'Мастер настройки' в главном меню."
     )

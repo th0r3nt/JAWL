@@ -24,6 +24,7 @@ class PromptBuilder:
         traits_enabled: bool = False,
         mental_states_enabled: bool = False,
         swarm_enabled: bool = False,
+        tot_enabled: bool = False,
     ) -> None:
         """
         Инициализирует билдер.
@@ -35,8 +36,9 @@ class PromptBuilder:
             traits_enabled: Включен ли модуль черт характера.
             mental_states_enabled: Включен ли модуль сущностей.
             swarm_enabled: Включена ли система субагентов.
+            tot_enabled: Включена ли система стратегического планирования (Tree of Thoughts).
         """
-        
+
         self.prompt_dir = Path(prompt_dir)
 
         # Убеждаемся, что системные папки существуют
@@ -48,6 +50,7 @@ class PromptBuilder:
         self.traits_enabled = traits_enabled
         self.mental_states_enabled = mental_states_enabled
         self.swarm_enabled = swarm_enabled
+        self.tot_enabled = tot_enabled
 
     def _gather_markdown(self, sub_folder: Literal["personality", "system", "custom"]) -> str:
         """
@@ -88,6 +91,9 @@ class PromptBuilder:
         if not self.swarm_enabled:
             valid_files = [f for f in valid_files if f.name.upper() != "SWARM.md"]
 
+        if not self.tot_enabled:
+            valid_files = [f for f in valid_files if f.name.upper() != "TREE_OF_THOUGHTS.md"]
+    
         def sort_key(path: Path):
             name = path.name.upper()
 
