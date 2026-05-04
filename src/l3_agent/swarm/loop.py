@@ -12,7 +12,7 @@ import asyncio
 import openai
 from pathlib import Path
 from typing import Dict, List, Tuple, Optional
-from pydantic import ValidationError
+import time
 
 from src.utils.logger import system_logger
 from src.utils.token_tracker import TokenTracker
@@ -207,7 +207,7 @@ class SubagentLoop:
             system_logger.error(f"[Swarm] Не удалось сохранить дамп промпта: {e}")
 
     async def _call_llm_with_retries(self, messages: List[Dict[str, str]]) -> Optional[str]:
-        for attempt in range(3):
+        for attempt in range(5):
             try:
                 session = self.llm.get_session()
                 response = await session.chat.completions.create(
@@ -225,15 +225,55 @@ class SubagentLoop:
                 self.tracker.add_output_record(raw_answer, log_prefix="[Subagent LLM]")
                 return raw_answer
 
-            except openai.RateLimitError:
+            except RuntimeError as e:
+                if "исчерпали лимиты" in str(e):
+                    import re
+
+                    match = re.search(r"подождать (\d+) сек", str(e))
+                    wait_sec = int(match.group(1)) if match else 10
+                    system_logger.warning(
+                        f"[Swarm] Все ключи в кулдауне. Субагент {self.subagent_id} ждет {wait_sec}с."
+                    )
+                    await asyncio.sleep(wait_sec + 1)
+                    continue
+                else:
+                    return None
+
+            except openai.RateLimitError as e:
+                wait_time = 30
+                if e.response is not None:
+                    headers = e.response.headers
+                    retry_after = (
+                        headers.get("retry-after")
+                        or headers.get("x-ratelimit-reset")
+                        or headers.get("retry-after-ms")
+                    )
+                    if retry_after:
+                        try:
+                            if headers.get("retry-after-ms"):
+                                wait_time = max(1, int(int(retry_after) / 1000))
+                            else:
+                                wait_time = int(float(retry_after))
+                            
+                            if wait_time > time.time():
+                                wait_time = int(wait_time - time.time())
+                        except ValueError:
+                            pass
+
+                wait_time = max(2, min(wait_time, 120))
                 system_logger.warning(
-                    f"[Swarm] Rate Limit у субагента {self.subagent_id}. Пауза 30с."
+                    f"[Swarm] Rate Limit (429) у субагента {self.subagent_id}. Кулдаун ключа на {wait_time}с."
                 )
-                self.llm.rotator.cooldown_key(session.api_key, 60)
-                await asyncio.sleep(30)
+                self.llm.rotator.cooldown_key(session.api_key, wait_time)
+
+                if self.llm.rotator.total_keys() == 1:
+                    await asyncio.sleep(wait_time + 1)
+                else:
+                    await asyncio.sleep(1)
+                continue
 
             except Exception as e:
-                if attempt == 2:
+                if attempt == 4:
                     system_logger.error(
                         f"[Swarm] LLM ошибка у субагента {self.subagent_id}: {e}"
                     )

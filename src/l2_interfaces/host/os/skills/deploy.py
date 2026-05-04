@@ -36,16 +36,14 @@ class HostOSDeploy:
 
     @skill()
     @require_access(HostOSAccessLevel.OPERATOR)
-    async def commit_deploy_session(self, test_path: str = "tests/src/test_builder.py tests/src/test_main.py", force: bool = False) -> SkillResult:
+    async def commit_deploy_session(self, test_path: str = "tests/unit/", force: bool = False) -> SkillResult:
         """
-        Завершает деплой-сессию. Физически проверяет код на синтаксические ошибки (SyntaxError) и запускает pytest.
-        Если синтаксис сломан — коммит отменяется и сгорает 1 попытка. 
-        При исчерпании попыток происходит автоматический Rollback файлов.
+        Завершает деплой-сессию. Физически проверяет код на синтаксические ошибки и запускает pytest.
+        По умолчанию запускается вся директория быстрых юнит-тестов (tests/unit/).
 
         Args:
-            test_path: Путь к тестам для проверки. По умолчанию проверяет только Smoke-тесты (базовый запуск). 
-            Если был изменен специфичный модуль - рекомендуется указать путь к его тестам для проверки работы (например, 'tests/src/l1/sql/').
-            force: Принудительный коммит. Установить True, если тесты падают из-за причин, не связанных с измененным кодом (например, флакающие моки сети). Устанавливать True только в крайнем случае.
+            test_path: Путь к тестам для проверки. По умолчанию "tests/unit/".
+            force: Принудительный коммит. Установить True, если тесты падают из-за причин, не связанных с измененным кодом. Применять в крайнем случае.
         """
 
         success, msg = await self.host_os.deploy_manager.commit_session(test_path=test_path, force=force)

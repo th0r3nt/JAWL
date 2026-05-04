@@ -9,7 +9,7 @@
 import openai
 import asyncio
 from typing import Dict, Any, List, Optional
-from pydantic import ValidationError
+import time
 
 import base64
 import re
@@ -266,26 +266,36 @@ class ReactLoop:
                     model=self.agent_state.llm_model,
                     messages=messages,
                     tools=self.tools,
-                    # tool_choice={
-                    #     "type": "function",
-                    #     "function": {"name": "execute_skill"},
-                    # },
                     temperature=self.agent_state.temperature,
-                    # max_tokens=60000,
                     timeout=120.0,
                 )
 
                 message_obj = response.choices[0].message
 
                 if message_obj.tool_calls:
-                    # Если модель вызвала функцию, берем СТРОГО её JSON-аргументы
                     raw_answer = str(message_obj.tool_calls[0].function.arguments)
                 else:
-                    # Иначе это просто текстовый ответ (или галлюцинация)
                     raw_answer = message_obj.content or ""
 
                 self.tracker.add_output_record(raw_answer)
                 return raw_answer
+
+            except RuntimeError as e:
+                # Отлавливаем ошибку ротатора (все ключи в бане)
+                if "исчерпали лимиты" in str(e):
+                    import re
+
+                    match = re.search(r"подождать (\d+) сек", str(e))
+                    wait_sec = int(match.group(1)) if match else 10
+                    system_logger.warning(
+                        f"[LLM] Все ключи в кулдауне. Ждем {wait_sec} сек."
+                    )
+                    await asyncio.sleep(wait_sec + 1)  # +1 сек для гарантии
+                    continue
+                else:
+                    system_logger.error(f"[LLM] Внутренняя ошибка API: {e}")
+                    self.agent_state.update_state(AgentStatus.ERROR)
+                    return None
 
             except (openai.APITimeoutError, asyncio.TimeoutError):
                 timeout_retries += 1
@@ -307,13 +317,44 @@ class ReactLoop:
                         f"[LLM] Квота исчерпана. Бан ключа {session.api_key[:8]} на 24ч"
                     )
                     self.llm.rotator.cooldown_key(session.api_key, 86400)
+                    await asyncio.sleep(5)
                 else:
-                    system_logger.info(
-                        f"[LLM] Рейт-лимит. Пауза 60с для {session.api_key[:8]}"
-                    )
-                    self.llm.rotator.cooldown_key(session.api_key, 60)
+                    # Динамический расчет кулдауна на основе заголовков API провайдера
+                    wait_time = 60
+                    if e.response is not None:
+                        headers = e.response.headers
+                        # Ищем заголовки OpenRouter / OpenAI / Anthropic
+                        retry_after = (
+                            headers.get("retry-after")
+                            or headers.get("x-ratelimit-reset")
+                            or headers.get("retry-after-ms")
+                        )
+                        if retry_after:
+                            try:
+                                if headers.get("retry-after-ms"):
+                                    wait_time = max(1, int(int(retry_after) / 1000))
+                                else:
+                                    wait_time = int(float(retry_after))
+                                # Если провайдер отдал timestamp в будущем
+                                if wait_time > time.time():
 
-                await asyncio.sleep(self.cooldown_sec)
+                                    wait_time = int(wait_time - time.time())
+                            except ValueError:
+                                pass
+
+                    wait_time = max(2, min(wait_time, 300))  # Ограничиваем от 2с до 5 минут
+
+                    system_logger.info(
+                        f"[LLM] Рейт-лимит (429). Пауза {wait_time}с для ключа {session.api_key[:8]}"
+                    )
+                    self.llm.rotator.cooldown_key(session.api_key, wait_time)
+
+                    # Если у нас всего 1 ключ, логичнее сразу подождать здесь
+                    if self.llm.rotator.total_keys() == 1:
+                        await asyncio.sleep(wait_time + 1)
+                    else:
+                        await asyncio.sleep(1)  # Быстрый переход к следующему ключу в пуле
+
                 continue
 
             except openai.AuthenticationError:
