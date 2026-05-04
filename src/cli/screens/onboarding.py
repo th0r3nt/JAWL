@@ -136,9 +136,10 @@ def run_onboarding_if_needed() -> bool:
 
     style = get_custom_style()
 
+    print("\n")
     # 1. Имя агента
     agent_name = questionary.text(
-        "\nКак назовем вашего агента? (Оставьте пустым для 'Agent'):", style=style
+        "Как назовем вашего агента? (Оставьте пустым для 'Agent'):", style=style
     ).ask()
     if agent_name is None:
         return False
