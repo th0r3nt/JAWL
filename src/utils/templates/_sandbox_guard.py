@@ -146,15 +146,15 @@ class PathChecker:
             # Если путь нерезолвится, real open упадёт сам с FileNotFoundError.
             return
 
+        if p.is_relative_to(self.sandbox_dir):
+            return
+
         if _is_system_python_path(p):
             return
 
-        if p.is_relative_to(self.framework_dir) and not p.is_relative_to(
-            self.sandbox_dir
-        ):
-            raise PermissionError(
-                f"[Sandbox Guard] Access Denied: Path Traversal попытка заблокирована. Доступ к '{file}' запрещен."
-            )
+        raise PermissionError(
+            f"[Sandbox Guard] Access Denied: Path Traversal попытка заблокирована. Доступ к '{file}' запрещен."
+        )
 
 
 # ----------------------------------------------------------------------
