@@ -7,6 +7,7 @@
 """
 
 import asyncio
+import re
 from pathlib import Path
 from src.l3_agent.skills.registry import skill, SkillResult
 from src.utils.event.bus import EventBus
@@ -33,6 +34,19 @@ class SubagentReport:
         self.reports_dir = sandbox_dir / "_system" / "subagents"
         self.reports_dir.mkdir(parents=True, exist_ok=True)
 
+    @staticmethod
+    def _safe_report_filename(subagent_id: str, role: str) -> str:
+        """Возвращает безопасное имя файла отчета без path traversal."""
+
+        safe_id = re.fullmatch(r"[A-Za-z0-9_-]{1,64}", subagent_id or "")
+        safe_role = re.fullmatch(r"[A-Za-z0-9_-]{1,64}", role or "")
+        if not safe_id or not safe_role:
+            raise ValueError(
+                "subagent_id и role могут содержать только A-Z, a-z, 0-9, '_' и '-'."
+            )
+
+        return f"{role}_{subagent_id}.md"
+
     @skill(hidden=True)
     async def submit_final_report(
         self, subagent_id: str, role: str, report: str
@@ -47,7 +61,15 @@ class SubagentReport:
             report: Детальный Markdown-отчет о выполненной задаче и результатах.
         """
 
-        file_path = self.reports_dir / f"{role}_{subagent_id}.md"
+        try:
+            filename = self._safe_report_filename(subagent_id, role)
+        except ValueError as e:
+            return SkillResult.fail(f"Небезопасное имя отчета субагента: {e}")
+
+        file_path = (self.reports_dir / filename).resolve()
+        reports_root = self.reports_dir.resolve()
+        if not file_path.is_relative_to(reports_root):
+            return SkillResult.fail("Небезопасный путь отчета субагента отклонен.")
 
         def _write() -> None:
             file_path.write_text(report, encoding="utf-8")
