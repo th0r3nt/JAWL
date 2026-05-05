@@ -217,6 +217,42 @@ def test_ctypes_libc_blocked(tmp_path: Path) -> None:
     assert "BLOCKED:" in res.stdout, res.stdout
 
 
+def test_ctypes_current_process_blocked(tmp_path: Path) -> None:
+    body = textwrap.dedent(
+        """
+        import ctypes
+        try:
+            ctypes.CDLL(None)
+            print("LEAK:LOADED")
+        except PermissionError as e:
+            print("BLOCKED:" + str(e))
+        """
+    )
+    res = run_in_sandbox(tmp_path, body)
+    assert "BLOCKED:" in res.stdout, res.stdout
+
+
+def test_ctypes_original_cdll_not_reachable_via_wrapper_closure(tmp_path: Path) -> None:
+    body = textwrap.dedent(
+        """
+        import ctypes
+        closure = getattr(ctypes.CDLL, "__closure__", None)
+        if closure:
+            for cell in closure:
+                obj = cell.cell_contents
+                if getattr(obj, "__name__", "") == "CDLL":
+                    print("LEAK:ORIGINAL_CDLL_REACHABLE")
+                    break
+            else:
+                print("BLOCKED:no-original")
+        else:
+            print("BLOCKED:no-closure")
+        """
+    )
+    res = run_in_sandbox(tmp_path, body)
+    assert "BLOCKED:" in res.stdout, res.stdout
+
+
 # ----------------------------------------------------------------------
 # importlib.reload un-patching
 # ----------------------------------------------------------------------

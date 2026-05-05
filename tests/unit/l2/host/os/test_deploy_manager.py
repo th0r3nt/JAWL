@@ -97,3 +97,35 @@ def test_deploy_rollback_session(deploy_manager, tmp_path):
     # Проверяем очистку
     assert deploy_manager.is_active is False
     assert not deploy_manager.backup_dir.exists()
+
+
+def test_deploy_rollback_ignores_absolute_manifest_entry(deploy_manager, tmp_path):
+    """Rollback не должен удалять файлы по абсолютным путям из manifest."""
+    deploy_manager.start_session()
+
+    victim = tmp_path / "victim.txt"
+    victim.write_text("do not delete", encoding="utf-8")
+
+    deploy_manager.manifest_file.write_text(str(victim) + "\n", encoding="utf-8")
+
+    success, _ = deploy_manager.rollback_session()
+
+    assert success is True
+    assert victim.exists()
+    assert victim.read_text(encoding="utf-8") == "do not delete"
+
+
+def test_deploy_rollback_ignores_traversal_manifest_entry(deploy_manager, tmp_path):
+    """Rollback не должен удалять файлы через ../ traversal из manifest."""
+    deploy_manager.start_session()
+
+    victim = tmp_path / "victim.txt"
+    victim.write_text("do not delete", encoding="utf-8")
+
+    deploy_manager.manifest_file.write_text("../victim.txt\n", encoding="utf-8")
+
+    success, _ = deploy_manager.rollback_session()
+
+    assert success is True
+    assert victim.exists()
+    assert victim.read_text(encoding="utf-8") == "do not delete"
