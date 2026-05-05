@@ -291,7 +291,16 @@ def _install_ctypes_guard() -> None:
 
     class _SafeCDLL:
         def __init__(self, name, *args, **kwargs):  # type: ignore[no-untyped-def]
-            lname = (name or "").lower()
+            if name is None:
+                raise PermissionError(
+                    "[Sandbox Guard] Access Denied: loading the current process via ctypes is blocked."
+                )
+
+            if isinstance(name, bytes):
+                lname = name.decode(errors="ignore").lower()
+            else:
+                lname = str(name).lower()
+
             if any(p in lname for p in banned_patterns):
                 raise PermissionError(
                     f"[Sandbox Guard] Access Denied: loading '{name}' via ctypes is blocked."
