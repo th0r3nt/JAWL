@@ -162,7 +162,7 @@ class SQLNotes:
             # Используем нашу глобальную утилиту для обрезки
             content = truncate_text(
                 content,
-                max_chars=150,
+                max_chars=500,
                 suffix="... [Обрезано]",
             )
 

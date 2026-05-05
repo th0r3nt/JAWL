@@ -69,7 +69,7 @@ def build_eisenhower_matrix(tasks: List[TaskTable], max_tasks: int, tz_offset: i
         for t in q_tasks:
             status_icon = STATUS_EMOJIS.get(t.status, t.status.upper())
             lines.append(
-                f"- [Task ID: `{t.id}`] {status_icon} | Progress: {t.progress}% | Title: {t.title}"
+                f"\n- [Task ID: `{t.id}`] {status_icon} | Progress: {t.progress}% | Title: {t.title}"
             )
             lines.append(f"  * Description: {t.description}")
 

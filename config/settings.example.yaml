@@ -87,8 +87,8 @@ system:
       # Подробнее: docs/yaml/settings/sql/drives.md
       drives:
         enabled: true
-        decay_rate: 5.0
-        decay_interval_sec: 540
+        decay_rate: 15.0
+        decay_interval_sec: 600
 
         max_reflections_history: 3
         max_custom_drives: 5
