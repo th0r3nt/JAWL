@@ -122,7 +122,7 @@ system:
   # Подробнее: docs/yaml/settings/tot.md
   tree_of_thoughts:
     enabled: false
-    model: unknown
+    llm_model: unknown
     mode: "hybrid"  # "manual", "auto", "hybrid"
     auto_interval_steps: 5
     branches: 3
