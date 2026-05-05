@@ -283,39 +283,29 @@ def _install_process_guards() -> None:
 
 
 def _install_ctypes_guard() -> None:
-    """Блокирует загрузку libc/msvcrt через ctypes (прямой syscall API)."""
+    """Блокирует ctypes loader API (прямой syscall / native-library escape)."""
 
-    banned_patterns = ("libc", "msvcrt", "ucrtbase", "kernel32", "libsystem")
+    class _BlockedLibraryLoader:
+        def __getattr__(self, name):  # type: ignore[no-untyped-def]
+            raise PermissionError(
+                "[Sandbox Guard] Access Denied: ctypes dynamic library loading is blocked."
+            )
 
-    orig_CDLL = ctypes.CDLL
+        def LoadLibrary(self, name):  # type: ignore[no-untyped-def]
+            raise PermissionError(
+                "[Sandbox Guard] Access Denied: ctypes dynamic library loading is blocked."
+            )
 
-    class _SafeCDLL:
-        def __init__(self, name, *args, **kwargs):  # type: ignore[no-untyped-def]
-            if name is None:
-                raise PermissionError(
-                    "[Sandbox Guard] Access Denied: loading the current process via ctypes is blocked."
-                )
-
-            if isinstance(name, bytes):
-                lname = name.decode(errors="ignore").lower()
-            else:
-                lname = str(name).lower()
-
-            if any(p in lname for p in banned_patterns):
-                raise PermissionError(
-                    f"[Sandbox Guard] Access Denied: loading '{name}' via ctypes is blocked."
-                )
-            self._real = orig_CDLL(name, *args, **kwargs)
-
-        def __getattr__(self, item):  # type: ignore[no-untyped-def]
-            return getattr(self._real, item)
-
-    ctypes.CDLL = _SafeCDLL  # type: ignore[assignment]
-    ctypes.cdll.LoadLibrary = _SafeCDLL  # type: ignore[assignment]
-
-    for name in ("WinDLL", "OleDLL", "PyDLL"):
+    for name in ("CDLL", "PyDLL", "WinDLL", "OleDLL"):
         if hasattr(ctypes, name):
-            setattr(ctypes, name, _SafeCDLL)
+            setattr(ctypes, name, _blocked_func)
+
+    for name in ("cdll", "pydll", "windll", "oledll", "pythonapi"):
+        if hasattr(ctypes, name):
+            setattr(ctypes, name, _BlockedLibraryLoader())
+
+    if hasattr(ctypes, "_dlopen"):
+        ctypes._dlopen = _blocked_func  # type: ignore[attr-defined]
 
 
 def _install_reload_guard() -> None:
