@@ -14,7 +14,8 @@ from src.l1_databases.sql.management.tasks import SQLTasks
 from src.l1_databases.sql.management.ticks import SQLTicks
 from src.l1_databases.sql.management.personality_traits import SQLPersonalityTraits
 from src.l1_databases.sql.management.mental_states import SQLMentalStates
-from src.l1_databases.sql.management.drives import SQLDrives
+from src.l1_databases.sql.management.drives.crud import SQLDrives
+from src.l1_databases.sql.management.notes import SQLNotes
 
 
 class SQLManager:
@@ -31,6 +32,8 @@ class SQLManager:
         max_traits: int = 10,
         # Tasks
         max_tasks: int = 15,
+        # Notes
+        notes_max_notes: int = 5,
         # Ticks
         ticks_limit: int = 30,
         # Детальные тики
@@ -49,6 +52,7 @@ class SQLManager:
         decay_interval_sec: int = 3600,
         max_history_drives: int = 3,
         max_custom_drives: int = 5,
+        fundamental_toggles: dict = None, 
         # Время
         timezone: int = 0,
     ) -> None:
@@ -64,6 +68,9 @@ class SQLManager:
 
         # Tasks
         self.tasks = SQLTasks(db=self.db, max_tasks=max_tasks)
+
+        # Notes
+        self.notes = SQLNotes(db=self.db, max_notes=notes_max_notes, tz_offset=timezone)
 
         # Ticks
         self.ticks = SQLTicks(
@@ -97,6 +104,7 @@ class SQLManager:
             max_history=max_history_drives,
             max_custom=max_custom_drives,
             tz_offset=timezone,
+            fundamental_toggles=fundamental_toggles or {},
         )
 
     async def connect(self) -> None:

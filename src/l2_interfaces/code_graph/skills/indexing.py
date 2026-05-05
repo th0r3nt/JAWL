@@ -46,7 +46,7 @@ class CodeGraphIndexing:
                     f"Ошибка: Путь не является директорией ({target_dir})."
                 )
 
-            project_id = project_id.strip().replace(" ", "_").lower()
+            project_id = project_id.strip().replace(" ", "_")
 
             system_logger.info(
                 f"[Code Graph] Запуск индексации проекта '{project_id}' в {safe_path.name}."

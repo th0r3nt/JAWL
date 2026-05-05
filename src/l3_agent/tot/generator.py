@@ -5,7 +5,6 @@
 
 import asyncio
 import time
-import datetime
 import openai
 from pathlib import Path
 from typing import Dict, Any, List, Optional
@@ -33,6 +32,7 @@ class ToTGenerator:
         agent_state: AgentState,
         token_tracker: TokenTracker,
         root_dir: Path,
+        timezone: int,
     ) -> None:
         self.llm = llm_client
         self.model_name = model_name
@@ -40,6 +40,7 @@ class ToTGenerator:
         self.context_registry = context_registry
         self.agent_state = agent_state
         self.tracker = token_tracker
+        self.timezone = timezone
 
         # ЛИЧНОСТЬ АГЕНТА
         personality_prompt = prompt_builder._gather_markdown("personality")
@@ -149,10 +150,9 @@ class ToTGenerator:
             return ""
     
         step = self.agent_state.current_step
-        time_str = datetime.datetime.now().strftime("%H:%M:%S")
 
         lines = ["## TREE OF THOUGHTS\n"]
-        lines.append(f"*Время генерации: Шаг {step} ({time_str})*\n")
+        lines.append(f"*Время генерации: Шаг {step}*\n")
 
         for i, branch in enumerate(tree.branches, 1):
             lines.append(f"**Ветка: {branch.name}**")

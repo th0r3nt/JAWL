@@ -66,11 +66,16 @@ system:
     sql:
       tasks: 
         enabled: true
-        max_tasks: 10
+        max_tasks: 5
+
+      # Подробнее: docs/yaml/settings/notes.md
+      notes:
+        enabled: true
+        max_notes: 5
 
       personality_traits:
         enabled: true
-        max_traits: 10
+        max_traits: 5
 
       mental_states:
         enabled: true
@@ -79,10 +84,16 @@ system:
       # Подробнее: docs/yaml/settings/drives.md
       drives:
         enabled: true
-        decay_rate: 10.0
-        decay_interval_sec: 900
+        decay_rate: 5.0
+        decay_interval_sec: 540
+        # (100/5.0 = 20 интервалов. 20 * 9 минут = 180 минут = 3 часа от 0 до 100% дефицита мотивации)
+
         max_reflections_history: 3
         max_custom_drives: 5
+        fundamental:
+          curiosity: true
+          social: true
+          mastery: true
 
     # Подробнее: docs/yaml/settings/graph_db.md
     graph:

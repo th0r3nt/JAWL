@@ -45,6 +45,24 @@ class TaskTable(Base):
     context: Mapped[Optional[str]] = mapped_column(default=None)  # Рабочие заметки агента
 
 
+class NoteTable(Base):
+    """
+    Таблица заметок (Working Memory / Scratchpad).
+    Предназначена для хранения оперативной информации, которая всегда
+    отображается в системном промпте агента.
+    """
+
+    __tablename__ = "notes"
+
+    id: Mapped[str] = mapped_column(primary_key=True)
+    content: Mapped[str]
+
+    # Автоматическое обновление времени при любых изменениях (onupdate)
+    updated_at: Mapped[datetime] = mapped_column(
+        default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc)
+    )
+
+
 class TickTable(Base):
     """
     Таблица тиков (логов) агента.

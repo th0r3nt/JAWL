@@ -23,6 +23,7 @@ class PromptBuilder:
         tasks_enabled: bool = False,
         traits_enabled: bool = False,
         mental_states_enabled: bool = False,
+        notes_enabled: bool = False,
         swarm_enabled: bool = False,
         tot_enabled: bool = False,
     ) -> None:
@@ -49,6 +50,7 @@ class PromptBuilder:
         self.tasks_enabled = tasks_enabled
         self.traits_enabled = traits_enabled
         self.mental_states_enabled = mental_states_enabled
+        self.notes_enabled = notes_enabled
         self.swarm_enabled = swarm_enabled
         self.tot_enabled = tot_enabled
 
@@ -82,6 +84,9 @@ class PromptBuilder:
         if not self.tasks_enabled:
             valid_files = [f for f in valid_files if f.name.upper() != "TASKS.md"]
 
+        if not self.notes_enabled:
+            valid_files = [f for f in valid_files if f.name.upper() != "NOTES.md"]
+
         if not self.traits_enabled:
             valid_files = [f for f in valid_files if f.name.upper() != "PERSONALITY_TRAITS.md"]
 
@@ -93,7 +98,7 @@ class PromptBuilder:
 
         if not self.tot_enabled:
             valid_files = [f for f in valid_files if f.name.upper() != "TREE_OF_THOUGHTS.md"]
-    
+
         def sort_key(path: Path):
             name = path.name.upper()
 

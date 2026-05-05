@@ -281,7 +281,7 @@ class ReactLoop:
         """
 
         timeout_retries = 0
-        max_timeout_retries = 3
+        max_timeout_retries = 2
 
         while True:
             try:

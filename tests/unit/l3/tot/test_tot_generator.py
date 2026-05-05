@@ -45,6 +45,7 @@ async def test_tot_generator_format_markdown():
         agent_state=AgentState(),
         token_tracker=MagicMock(),
         root_dir=Path("."),
+        timezone=3,
     )
 
     tree = TreeResponse(
@@ -91,6 +92,7 @@ async def test_tot_generator_call_llm_success():
         agent_state=AgentState(),
         token_tracker=MagicMock(),
         root_dir=Path("."),
+        timezone=3,
     )
 
     res = await generator._call_llm([{"role": "user", "content": "test"}])

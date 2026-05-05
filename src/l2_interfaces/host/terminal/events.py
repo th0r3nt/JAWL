@@ -42,12 +42,12 @@ class HostTerminalEvents:
                 if action == "_CONNECTION_OPENED":
                     await self.bus.publish(
                         Events.HOST_TERMINAL_OPENED,
-                        message="Пользователь открыл терминал чата и смотрит в него.",
+                        message="Терминал чата открыт.",
                     )
                 elif action == "_CONNECTION_CLOSED":
                     await self.bus.publish(
                         Events.HOST_TERMINAL_CLOSED,
-                        message="Пользователь закрыл терминал чата.",
+                        message="Терминал чата закрыт.",
                     )
                 elif action == "_MESSAGE":
                     await self.bus.publish(

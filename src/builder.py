@@ -119,6 +119,7 @@ class SystemBuilder:
 
         sys.sql = SQLManager(
             db_path=sys.local_data_dir / "sql" / "db" / "agent.db",
+            notes_max_notes=self.sys_cfg.db.sql.notes.max_notes,
             ticks_limit=self.sys_cfg.context_depth.ticks,
             detailed_ticks=self.sys_cfg.context_depth.detailed_ticks,
             tick_action_max_chars=self.sys_cfg.context_depth.tick_action_max_chars,
@@ -134,6 +135,7 @@ class SystemBuilder:
             decay_interval_sec=self.sys_cfg.db.sql.drives.decay_interval_sec,
             max_history_drives=self.sys_cfg.db.sql.drives.max_reflections_history,
             max_custom_drives=self.sys_cfg.db.sql.drives.max_custom_drives,
+            fundamental_toggles=self.sys_cfg.db.sql.drives.fundamental.model_dump(),
             timezone=self.sys_cfg.timezone,
         )
         await sys.sql.connect()
@@ -159,6 +161,13 @@ class SystemBuilder:
             register_instance(sys.sql.tasks)
             sys.context_registry.register_provider(
                 "sql_tasks", sys.sql.tasks.get_context_block, section=ContextSection.TASKS
+            )
+
+        # Notes
+        if self.sys_cfg.db.sql.notes.enabled:
+            register_instance(sys.sql.notes)
+            sys.context_registry.register_provider(
+                "sql_notes", sys.sql.notes.get_context_block, section=ContextSection.NOTES
             )
 
         # Mental States
@@ -246,6 +255,7 @@ class SystemBuilder:
             tasks_enabled=self.sys_cfg.db.sql.tasks.enabled,
             traits_enabled=self.sys_cfg.db.sql.personality_traits.enabled,
             mental_states_enabled=self.sys_cfg.db.sql.mental_states.enabled,
+            notes_enabled=self.sys_cfg.db.sql.notes.enabled,
             swarm_enabled=self.sys_cfg.swarm.enabled,
             tot_enabled=self.sys_cfg.tree_of_thoughts.enabled,
         )
@@ -291,13 +301,14 @@ class SystemBuilder:
         if self.sys_cfg.tree_of_thoughts.enabled:
             tot_generator = ToTGenerator(
                 llm_client=sys_obj.sub_llm_client, # Используем клиент субагентов для экономии (у него ротатор)
-                model_name=self.sys_cfg.tree_of_thoughts.model,
+                model_name=self.sys_cfg.tree_of_thoughts.llm_model,
                 branches_count=self.sys_cfg.tree_of_thoughts.branches,
                 prompt_builder=prompt_builder,
                 context_registry=sys_obj.context_registry,
                 agent_state=sys_obj.agent_state,
                 token_tracker=token_tracker,
                 root_dir=sys_obj.root_dir,
+                timezone=self.sys_cfg.timezone,
             )
             
             # Регистрируем ручной навык, если режим позволяет

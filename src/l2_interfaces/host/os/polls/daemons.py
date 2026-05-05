@@ -129,8 +129,8 @@ class DaemonsPoller:
             for d_name in dead_daemons:
                 await self.bus.publish(
                     Events.HOST_OS_SANDBOX_EVENT,
-                    message=f"Фоновый скрипт '{d_name}' завершил работу (успешно или упал).",
-                    log_hint="Рекомендуется проверить его лог-файл (sandbox/logs/daemon_*.log), чтобы узнать причину.",
+                    message=f"Фоновый скрипт '{d_name}' завершил работу.",
+                    log_hint="Рекомендуется проверить его лог-файл (sandbox/logs/*.log), чтобы узнать причину.",
                 )
 
         self.state.active_daemons = "\n".join(lines) if lines else "Нет запущенных демонов."

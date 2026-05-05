@@ -180,7 +180,7 @@ def run_onboarding_if_needed() -> bool:
 
     # 5. Настройка Swarm (Субагенты)
     print("\n")
-    print_info("Подсистема Swarm позволяет делегировать сложные задачи фоновым субагентам.")
+    print_info(" Подсистема Swarm позволяет делегировать сложные задачи фоновым субагентам.")
     enable_swarm = questionary.confirm(
         "Включить систему субагентов (Swarm)?", default=True, style=style
     ).ask()
@@ -225,7 +225,7 @@ def run_onboarding_if_needed() -> bool:
 
     # 6. Настройка Tree of Thoughts
     print("\n")
-    print_info("Подсистема Tree of Thoughts позволяет агенту генерировать и оценивать несколько стратегических вариантов перед выполнением действий, но при этом расходует больше токенов.")
+    print_info(" Подсистема Tree of Thoughts позволяет агенту генерировать и оценивать несколько стратегических вариантов перед выполнением действий, но при этом расходует больше токенов.")
     enable_tot = questionary.confirm(
         "Включить Tree of Thoughts?", default=True, style=style
     ).ask()
@@ -245,6 +245,7 @@ def run_onboarding_if_needed() -> bool:
         if not tot_model:
             return False
 
+        print("\n")
         tot_mode = questionary.select(
             "Выберите режим работы Tree of Thoughts:",
             choices=[
@@ -253,7 +254,8 @@ def run_onboarding_if_needed() -> bool:
                 questionary.Choice("Гибридный (автоматически каждые 5 шагов + по вызову навыка)", "hybrid"),
             ],
             style=style,
-            qmark=""
+            qmark="",
+            instruction=""
         ).ask()
         if not tot_mode:
             return False

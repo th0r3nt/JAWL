@@ -28,7 +28,8 @@ class HostOSReader:
         self, filepath: str, read_from: Literal["head", "tail"] = "head"
     ) -> SkillResult:
         """
-        Читает содержимое файла. Имеет встроенную защиту от огромных файлов.
+        Читает содержимое файла. 
+        Важно: путь указывается от корня фреймворка (напр. 'sandbox/file.txt').
 
         Args:
             read_from: 'head' - с начала, 'tail' - с конца.

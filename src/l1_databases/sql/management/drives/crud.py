@@ -10,13 +10,16 @@ from typing import TYPE_CHECKING, Any
 from datetime import datetime, timezone, timedelta
 from sqlalchemy import select, func
 
-from src.l3_agent.skills.registry import skill, SkillResult
 from src.utils.logger import system_logger
 from src.utils.dtime import format_datetime
+
 from src.l1_databases.sql.tables import DriveTable
+from src.l1_databases.sql.management.drives.semantics import DRIVES_SEMANTIC_MATRIX
 
 if TYPE_CHECKING:
     from src.l1_databases.sql.db import SQLDB
+
+from src.l3_agent.skills.registry import skill, SkillResult
 
 
 class SQLDrives:
@@ -30,6 +33,7 @@ class SQLDrives:
         max_history: int = 3,
         max_custom: int = 5,
         tz_offset: int = 0,
+        fundamental_toggles: dict = None,
     ) -> None:
         """
         Инициализирует контроллер мотиваторов.
@@ -41,6 +45,7 @@ class SQLDrives:
             max_history: Лимит хранимых рефлексий на один драйв.
             max_custom: Максимальное количество кастомных (созданных агентом) драйвов.
             tz_offset: Смещение временной зоны.
+            fundamental_toggles: состояние фундаментальных мотиваций (вкл/выкл).
         """
         self.db = db
         self.decay_rate = decay_rate
@@ -48,45 +53,52 @@ class SQLDrives:
         self.max_history = max_history
         self.max_custom = max_custom
         self.tz_offset = tz_offset
+        self.fundamental_toggles = fundamental_toggles or {}
 
     async def bootstrap_fundamental_drives(self) -> None:
         """
-        Проверяет наличие базовых (system-level) мотиваторов: Curiosity, Social, Mastery.
-        Если они отсутствуют (например, при первом запуске), создает их в базе данных.
-        Базовые драйвы не подлежат удалению агентом.
+        Синхронизирует базовые (system-level) мотиваторы с БД на основе настроек YAML.
+        Если драйв включен, но его нет - создает. Если выключен, но есть - удаляет.
         """
-
-        fundamental_drives = [
-            {
+        fundamental_defs = {
+            "curiosity": {
                 "name": "Curiosity",
                 "description": "Потребность в расширении информационной базы. Инициирует поиск неизвестных концепций, анализ внешних источников и пополнение семантической памяти.",
             },
-            {
+            "social": {
                 "name": "Social",
                 "description": "Потребность в коммуникации. Направлена на обработку входящих запросов, поддержание активного статуса в каналах связи и проактивную инициализацию диалога.",
             },
-            {
+            "mastery": {
                 "name": "Mastery",
                 "description": "Стремление к эффективности и порядку. Требует продвижения по долгосрочным задачам (TASKS), структурирования данных и диагностики.",
             },
-        ]
+        }
 
         async with self.db.session_factory() as session:
-            for d in fundamental_drives:
+            for key, drive_def in fundamental_defs.items():
+                is_enabled = self.fundamental_toggles.get(key, False)
                 res = await session.execute(
-                    select(DriveTable).where(DriveTable.name == d["name"])
+                    select(DriveTable).where(DriveTable.name == drive_def["name"])
                 )
-                if not res.scalar_one_or_none():
+                existing_drive = res.scalar_one_or_none()
+
+                if is_enabled and not existing_drive:
+                    # Драйв включен, но его нет -> создаем
                     new_drive = DriveTable(
                         id=str(uuid.uuid4())[:8],
-                        name=d["name"],
+                        name=drive_def["name"],
                         type="fundamental",
-                        description=d["description"],
+                        description=drive_def["description"],
                         decay_rate=self.decay_rate,
                         last_satisfied_at=datetime.now(timezone.utc),
                         recent_reflections=[],
                     )
                     session.add(new_drive)
+                elif not is_enabled and existing_drive:
+                    # Драйв выключен, но есть в БД -> удаляем
+                    await session.delete(existing_drive)
+
             await session.commit()
 
     @skill()
@@ -94,11 +106,17 @@ class SQLDrives:
         self, drive_name: str, amount: int, reflection_summary: str
     ) -> SkillResult:
         """
-        Снижает дефицит указанного мотиватора (Имитирует "насыщение" потребности).
+        Снижает дефицит указанного мотиватора (насыщение потребности).
 
         Args:
             drive_name: Точное имя мотиватора.
-            amount: На сколько процентов снизить дефицит (от 1 до 100).
+            amount: На сколько процентов снизить дефицит (от 1 до 100). Рекомендуется удовлетворять потребности итеративно.
+                    По умолчанию дефициты копятся часами, лучше снижать их медленно:
+                    1-5% - Поверхностные действия.
+                    10-15% - Значимые действия.
+                    15-25% - Крупные свершения.
+                    Важно: Снижать на 50-100% за один раз не рекомендуется.
+
             reflection_summary: Обоснование, как именно проделанная работа закрыла эту потребность.
         """
 
@@ -226,14 +244,38 @@ class SQLDrives:
         system_logger.debug(f"[SQL DB] Удален кастомный драйв '{drive_name}'.")
         return SkillResult.ok(f"Драйв '{drive_name}' удален.")
 
-    async def get_context_block(self, **kwargs: Any) -> str:
+    def _get_drive_semantic_state(self, name: str, deficit: int, description: str) -> str:
         """
-        Динамически вычисляет текущий дефицит всех драйвов на основе прошедшего времени
-        и формирует Markdown-блок для инъекции в системный промпт (ContextRegistry).
+        Переводит сухие проценты дефицита в утилитарное психологическое состояние.
+        Нужно, чтобы агент видел больше контекста для своего 'самоощущения'.
+        """
 
-        Returns:
-            Отформатированная Markdown строка со статусом драйвов.
-        """
+        # Определяем индекс ступени (0-6)
+        if deficit <= 15:
+            step = 0
+        elif deficit <= 30:
+            step = 1
+        elif deficit <= 45:
+            step = 2
+        elif deficit <= 60:
+            step = 3
+        elif deficit <= 75:
+            step = 4
+        elif deficit <= 90:
+            step = 5
+        else:
+            step = 6
+
+        # Выбираем текст из импортированной матрицы
+        if name in DRIVES_SEMANTIC_MATRIX:
+            state_text = DRIVES_SEMANTIC_MATRIX[name][step]
+        else:
+            state_text = f"{DRIVES_SEMANTIC_MATRIX['Custom'][step]} Базовое описание драйва: {description}"
+
+        return state_text
+
+    async def get_context_block(self, **kwargs: Any) -> str:
+        """Формирует Markdown-блок с семантическим самоощущением для системного промпта."""
 
         async with self.db.session_factory() as session:
             result = await session.execute(select(DriveTable))
@@ -243,9 +285,8 @@ class SQLDrives:
             return ""
 
         lines = [
-            "## DRIVES \nДолгосрочные векторы поведения. Рекомендуется снижать дефицит, когда он высокий.",
-            f"Длительность 1 интервала: {self.decay_interval_sec} сек.",
-            f"Лимит кастомных мотиваций: {self.max_custom}",
+            "## INTERNAL PSYCHOLOGICAL STATE\n\n",
+            "Внутренние самоощущения системы, сформированные на основе дефицита внутренних метрик:\n",
         ]
 
         now = datetime.now(timezone.utc)
@@ -261,32 +302,20 @@ class SQLDrives:
             deficit = min(100.0, intervals_passed * d.decay_rate)
             deficit_int = int(deficit)
 
-            if deficit_int >= 90:
-                status = "(Критический дефицит: приоритетная задача)"
-            elif deficit_int >= 70:
-                status = "(Высокий: требует внимания)"
-            elif deficit_int >= 50:
-                status = "(Растет: рекомендуется запланировать действия)"
-            elif deficit_int >= 30:
-                status = "(Лёгкий дефицит: не критично)"
-            else:
-                status = "(В норме: потребность удовлетворена)"
+            semantic_state = self._get_drive_semantic_state(d.name, deficit_int, d.description)
 
-            lines.append(f"\n[{d.type.upper()}] {d.name}")
-            lines.append(f"* Дефицит: {deficit_int}/100 {status}")
-            lines.append(f"* Рост дефицита: +{d.decay_rate}% за 1 интервал")
-            lines.append(f"* Описание: {d.description}")
+            # Выводим драйв в формате: * [CURIOSITY]: Текст состояния. (Дефицит: X%)
+            lines.append(f"* [{d.name}]: {semantic_state} (Дефицит: {deficit_int}%)")
 
+            # Оставляем историю рефлексий, чтобы LLM понимала, что она делала недавно для закрытия этой потребности
             if d.recent_reflections:
-                lines.append("* История удовлетворения:")
-                for ref in d.recent_reflections:
-                    # Жестко режем длинные рефлексии
-                    limit = 500
-                    short_ref = (
-                        ref if len(ref) <= limit else ref[:limit] + "... [Обрезано системой]"
-                    )
-                    lines.append(f"  - {short_ref}")
-            else:
-                lines.append("* История удовлетворения: Пусто")
+                lines.append("  *Последние уменьшения дефицита:*")
+                for ref in d.recent_reflections[
+                    :2
+                ]:  # Берем только 2 последних, чтобы не спамить
+                    limit = 200
+                    short_ref = ref if len(ref) <= limit else ref[:limit] + "... [Обрезано]"
+                    lines.append(f"    - {short_ref}")
+            lines.append("")  # Пустая строка
 
-        return "\n".join(lines)
+        return "\n".join(lines).strip()

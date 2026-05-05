@@ -24,6 +24,7 @@ class ContextSection(IntEnum):
     TRAITS = 20
     SKILLS = 30
     AGENT_STATE = 40
+    NOTES = 45
 
     # Универсальный блок для всех L2 интерфейсов
     INTERFACES = 50

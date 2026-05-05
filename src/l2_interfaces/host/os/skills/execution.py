@@ -369,7 +369,7 @@ class HostOSExecution:
             logs_dir = self.host_os.system_dir / "logs"
             logs_dir.mkdir(exist_ok=True)
 
-            log_path = logs_dir / f"daemon_{safe_name}.log"
+            log_path = logs_dir / f"{safe_name}.log"
             log_file = open(log_path, "a", encoding="utf-8")
 
             # Формируем изолированное окружение

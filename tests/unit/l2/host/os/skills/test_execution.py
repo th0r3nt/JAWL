@@ -188,43 +188,55 @@ async def test_sandbox_guard_blocks_os_spawn_and_exec_family(os_client, tmp_path
 import os
 
 # 1. os.spawnlp — раньше совсем не блокировался
-try:
-    os.spawnlp(os.P_WAIT, 'echo', 'echo', 'SPAWN_WORKED')
-    print("SPAWNLP_NOT_BLOCKED")
-except PermissionError as e:
-    print(f"SPAWNLP_BLOCKED: {e}")
-except Exception as e:
-    print(f"SPAWNLP_ERROR: {type(e).__name__}")
+if hasattr(os, 'spawnlp'):
+    try:
+        os.spawnlp(os.P_WAIT, 'echo', 'echo', 'SPAWN_WORKED')
+        print("SPAWNLP_NOT_BLOCKED")
+    except PermissionError as e:
+        print(f"SPAWNLP_BLOCKED: {e}")
+    except Exception as e:
+        print(f"SPAWNLP_ERROR: {type(e).__name__}")
+else:
+    print("SPAWNLP_BLOCKED: Missing on OS")
 
 # 2. os.posix_spawn — прямой syscall
-try:
-    os.posix_spawn('/bin/echo', ['echo', 'POSIX_WORKED'], os.environ)
-    print("POSIX_SPAWN_NOT_BLOCKED")
-except PermissionError as e:
-    print(f"POSIX_SPAWN_BLOCKED: {e}")
-except Exception as e:
-    print(f"POSIX_SPAWN_ERROR: {type(e).__name__}")
+if hasattr(os, 'posix_spawn'):
+    try:
+        os.posix_spawn('/bin/echo', ['echo', 'POSIX_WORKED'], os.environ)
+        print("POSIX_SPAWN_NOT_BLOCKED")
+    except PermissionError as e:
+        print(f"POSIX_SPAWN_BLOCKED: {e}")
+    except Exception as e:
+        print(f"POSIX_SPAWN_ERROR: {type(e).__name__}")
+else:
+    print("POSIX_SPAWN_BLOCKED: Missing on OS")
 
 # 3. os.execvp — замена текущего процесса; тестируем что хотя бы обёртка падает
-try:
-    os.execvp('echo', ['echo', 'EXEC_WORKED'])
-    print("EXECVP_NOT_BLOCKED")
-except PermissionError as e:
-    print(f"EXECVP_BLOCKED: {e}")
-except Exception as e:
-    print(f"EXECVP_ERROR: {type(e).__name__}")
+if hasattr(os, 'execvp'):
+    try:
+        os.execvp('echo', ['echo', 'EXEC_WORKED'])
+        print("EXECVP_NOT_BLOCKED")
+    except PermissionError as e:
+        print(f"EXECVP_BLOCKED: {e}")
+    except Exception as e:
+        print(f"EXECVP_ERROR: {type(e).__name__}")
+else:
+    print("EXECVP_BLOCKED: Missing on OS")
 
 # 4. os.fork
-try:
-    pid = os.fork()
-    if pid == 0:
-        # child
-        os._exit(0)
-    print("FORK_NOT_BLOCKED")
-except PermissionError as e:
-    print(f"FORK_BLOCKED: {e}")
-except Exception as e:
-    print(f"FORK_ERROR: {type(e).__name__}")
+if hasattr(os, 'fork'):
+    try:
+        pid = os.fork()
+        if pid == 0:
+            # child
+            os._exit(0)
+        print("FORK_NOT_BLOCKED")
+    except PermissionError as e:
+        print(f"FORK_BLOCKED: {e}")
+    except Exception as e:
+        print(f"FORK_ERROR: {type(e).__name__}")
+else:
+    print("FORK_BLOCKED: Missing on OS")
 """
     malicious_script = os_client.sandbox_dir / "evil_spawn.py"
     malicious_script.write_text(malicious_code, encoding="utf-8")
