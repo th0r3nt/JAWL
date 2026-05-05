@@ -182,7 +182,12 @@ class HostOSDeployManager:
                 new_files = f.read().splitlines()
             for nf in new_files:
                 if nf:
-                    target = self.framework_dir / nf
+                    target = self._resolve_manifest_target(nf)
+                    if target is None:
+                        system_logger.warning(
+                            f"[Deploy] Пропущена небезопасная запись manifest при rollback: {nf}"
+                        )
+                        continue
                     if target.exists():
                         if target.is_dir():
                             shutil.rmtree(target, ignore_errors=True)
@@ -195,6 +200,31 @@ class HostOSDeployManager:
             True,
             "Откат успешно выполнен. Системные файлы восстановлены до состояния начала сессии.",
         )
+
+    def _resolve_manifest_target(self, manifest_entry: str) -> Path | None:
+        """
+        Безопасно резолвит путь из .newfiles_manifest.
+
+        Манифест содержит относительные пути новых файлов внутри framework_dir.
+        Если туда попадет абсолютный путь или traversal через '..', старый код мог
+        удалить произвольный файл при rollback. Поэтому любые записи вне
+        framework_dir отклоняются.
+        """
+
+        entry = manifest_entry.strip()
+        if not entry:
+            return None
+
+        entry_path = Path(entry)
+        if entry_path.is_absolute():
+            return None
+
+        target = (self.framework_dir / entry_path).resolve()
+        framework_root = self.framework_dir.resolve()
+        if not target.is_relative_to(framework_root):
+            return None
+
+        return target
 
     def _cleanup(self) -> None:
         shutil.rmtree(self.backup_dir, ignore_errors=True)
