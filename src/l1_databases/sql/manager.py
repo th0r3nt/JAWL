@@ -10,10 +10,10 @@ from pathlib import Path
 from src.l1_databases.sql.db import SQLDB
 
 # Таблицы
-from src.l1_databases.sql.management.tasks import SQLTasks
+from src.l1_databases.sql.management.tasks.crud import SQLTasks
+from src.l1_databases.sql.management.mental_states.crud import SQLMentalStates
 from src.l1_databases.sql.management.ticks import SQLTicks
 from src.l1_databases.sql.management.personality_traits import SQLPersonalityTraits
-from src.l1_databases.sql.management.mental_states import SQLMentalStates
 from src.l1_databases.sql.management.drives.crud import SQLDrives
 from src.l1_databases.sql.management.notes import SQLNotes
 
@@ -114,6 +114,11 @@ class SQLManager:
         """
 
         await self.db.connect()
+
+        # Вызываем безопасную миграцию
+        await self.tasks.bootstrap_migrations()
+        await self.mental_states.bootstrap_migrations()
+
         if self.drives_enabled:
             await self.drives.bootstrap_fundamental_drives()  # Создает Фундаментальные мотивации, если их нет
 

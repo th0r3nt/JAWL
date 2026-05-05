@@ -2,10 +2,11 @@ import pytest
 import pytest_asyncio
 
 from src.l1_databases.sql.db import SQLDB
-from src.l1_databases.sql.management.tasks import SQLTasks
+
+from src.l1_databases.sql.management.tasks.crud import SQLTasks
+from src.l1_databases.sql.management.mental_states.crud import SQLMentalStates
 from src.l1_databases.sql.management.ticks import SQLTicks
 from src.l1_databases.sql.management.personality_traits import SQLPersonalityTraits
-from src.l1_databases.sql.management.mental_states import SQLMentalStates
 from src.l1_databases.sql.management.drives.crud import SQLDrives
 from src.l1_databases.sql.management.notes import SQLNotes
 

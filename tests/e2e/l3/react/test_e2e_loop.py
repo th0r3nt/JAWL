@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 from src.l0_state.agent.state import AgentState
 from src.l1_databases.sql.db import SQLDB
-from src.l1_databases.sql.management.tasks import SQLTasks
+from src.l1_databases.sql.management.tasks.crud import SQLTasks
 from src.l1_databases.sql.management.ticks import SQLTicks
 
 from src.l3_agent.prompt.builder import PromptBuilder
@@ -71,6 +71,7 @@ async def test_e2e_react_loop_creates_task_and_saves_tick(tmp_path: Path):
           "parameters": {
             "title": "E2E Интеграция",
             "description": "Проверить работу БД",
+            "quadrant": 1,
             "tags": ["type:routine"]
           }
         }

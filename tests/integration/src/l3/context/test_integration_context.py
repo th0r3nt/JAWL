@@ -29,6 +29,7 @@ async def test_integration_full_context_assembly():
     await sql.tasks.create_task(
         title="Интеграционный тест БД",
         description="Проверка сборки Markdown",
+        quadrant=1,
         tags=["type:routine"],
     )
 

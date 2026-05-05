@@ -1,80 +1,62 @@
 """
 CRUD-контроллер долгосрочных задач (Tasks).
-
-Обеспечивает декомпозицию глобальных целей на подзадачи с сохранением контекста
-и обработкой блокирующих зависимостей (Dependencies).
+Использует Матрицу Эйзенхауэра для распределения приоритетов.
 """
 
 import uuid
 import ast
 from datetime import datetime
 from typing import Optional, TYPE_CHECKING, Any, Literal
-from sqlalchemy import select, delete, func
+from sqlalchemy import select, delete, func, text
 
-from src.l3_agent.skills.registry import skill, SkillResult
 from src.utils.logger import system_logger
-from src.utils.dtime import get_timezone, format_timestamp
+from src.utils.dtime import get_timezone
+
 from src.l1_databases.sql.tables import TaskTable
+from src.l1_databases.sql.management.tasks.semantics import (
+    build_eisenhower_matrix,
+    ALLOWED_TAGS,
+    STATUS_EMOJIS,
+)
 
 if TYPE_CHECKING:
     from src.l1_databases.sql.db import SQLDB
 
-ALLOWED_TAGS = [
-    "priority:critical",
-    "priority:high",
-    "priority:low",
-    "domain:research",
-    "domain:code",
-    "domain:os",
-    "domain:social",
-    "type:feature",
-    "type:bugfix",
-    "type:routine",
-    "type:learning",
-]
-
-STATUS_EMOJIS = {
-    "todo": "TODO",
-    "in_progress": "IN_PROGRESS",
-    "blocked": "BLOCKED",
-    "done": "DONE",
-    "cancelled": "CANCELLED",
-}
+from src.l3_agent.skills.registry import skill, SkillResult
 
 
 class SQLTasks:
-    """CRUD для управления долгосрочными задачами агента."""
+    """CRUD для управления долгосрочными задачами агента (Eisenhower Matrix)."""
 
     def __init__(self, db: "SQLDB", max_tasks: int = 15, tz_offset: int = 0) -> None:
-        """
-        Инициализирует контроллер задач.
-
-        Args:
-            db: Подключение к SQLite.
-            max_tasks: Максимальное количество активных задач в памяти.
-            tz_offset: Смещение временной зоны.
-        """
         self.db = db
         self.max_tasks = max_tasks
         self.tz_offset = tz_offset
 
+    async def bootstrap_migrations(self) -> None:
+        """
+        Мягкая миграция для добавления колонки quadrant в старые базы данных.
+        """
+
+        async with self.db.engine.begin() as conn:
+            try:
+                await conn.execute(
+                    text("ALTER TABLE tasks ADD COLUMN quadrant INTEGER DEFAULT 2")
+                )
+                system_logger.info(
+                    "[SQL DB] Выполнена успешная миграция таблицы Tasks (добавлен quadrant)."
+                )
+            except Exception:
+                pass  # Колонка уже существует
+
     def _validate_tags(self, tags: Any) -> tuple[bool, str, list[str]]:
         """
-        Защитный парсер тегов.
-        Нивелирует галлюцинации LLM, если модель передает теги не массивом, а строкой,
-        и жестко фильтрует недопустимые значения против ALLOWED_TAGS.
-
-        Args:
-            tags (Any): Сырые данные от LLM (ожидается list[str], но может прийти str).
-
-        Returns:
-            tuple: (Успех валидации, Текст ошибки, Очищенный список тегов).
+        Защитный парсер тегов от галлюцинаций LLM.
         """
 
         if not tags:
             return True, "", []
 
-        # Защита от галлюцинаций LLM (когда она присылает строку "[tag1, tag2]")
         if isinstance(tags, str):
             tags = tags.strip()
             if tags.startswith("[") and tags.endswith("]"):
@@ -103,22 +85,27 @@ class SQLTasks:
         self,
         title: str,
         description: str,
+        quadrant: Literal[1, 2, 3, 4],
         tags: Optional[list[str]] = None,
         dependencies: Optional[list[str]] = None,
         subtasks: Optional[list[dict[str, Any]]] = None,
         due_date_str: Optional[str] = None,
     ) -> SkillResult:
         """
-        Создает новую долгосрочную задачу.
+        Создает новую долгосрочную задачу в матрице Эйзенхауэра.
 
         Args:
             title: Краткий заголовок.
-            description: Детальное описание того, что нужно сделать.
-            tags: Массив тегов из списка разрешенных (domain/priority/type).
+            description: Детальное описание.
+            quadrant: квадрант матрицы (1-4).
+            tags: Массив тегов из списка разрешенных.
             dependencies: Массив ID задач, без которых текущая не может быть выполнена.
             subtasks: Чек-лист внутренних микрозадач.
             due_date_str: Дедлайн в формате 'YYYY-MM-DD HH:MM'.
         """
+
+        if quadrant not in [1, 2, 3, 4]:
+            return SkillResult.fail("Ошибка: quadrant должен быть числом от 1 до 4.")
 
         task_id = str(uuid.uuid4())[:8]
         if tags is None:
@@ -139,9 +126,6 @@ class SQLTasks:
                     "Ошибка: Неверный формат due_date_str. Необходимо использовать 'YYYY-MM-DD HH:MM'."
                 )
 
-        safe_subtasks = subtasks or []
-        safe_deps = dependencies or []
-
         async with self.db.session_factory() as session:
             count_res = await session.execute(select(func.count(TaskTable.id)))
             if count_res.scalar_one() >= self.max_tasks:
@@ -155,16 +139,45 @@ class SQLTasks:
                 description=description,
                 status="todo",
                 progress=0,
+                quadrant=quadrant,
                 tags=clean_tags,
-                dependencies=safe_deps,
-                subtasks=safe_subtasks,
+                dependencies=dependencies or [],
+                subtasks=subtasks or [],
                 due_date=due_date_ts,
                 context=None,
             )
             session.add(new_task)
             await session.commit()
 
-        msg = f"Задача '{title}' создана. ID: {task_id}"
+        msg = f"Задача '{title}' создана (Квадрант {quadrant}). ID: {task_id}"
+        system_logger.debug(f"[SQL DB] {msg}")
+        return SkillResult.ok(msg)
+
+    @skill()
+    async def move_task_to_quadrant(self, task_id: str, new_quadrant: Literal[1, 2, 3, 4]) -> SkillResult:
+        """
+        Перемещает существующую задачу в другой квадрант матрицы Эйзенхауэра (реприоритизация).
+
+        Args:
+            task_id: ID задачи.
+            new_quadrant: Номер квадранта (1-4).
+        """
+
+        if new_quadrant not in [1, 2, 3, 4]:
+            return SkillResult.fail("Ошибка: quadrant должен быть числом от 1 до 4.")
+
+        async with self.db.session_factory() as session:
+            result = await session.execute(select(TaskTable).where(TaskTable.id == task_id))
+            task = result.scalar_one_or_none()
+
+            if not task:
+                return SkillResult.fail(f"Задача с ID {task_id} не найдена.")
+
+            old_quadrant = task.quadrant
+            task.quadrant = new_quadrant
+            await session.commit()
+
+        msg = f"Задача {task_id} перемещена из Квадранта {old_quadrant} в Квадрант {new_quadrant}."
         system_logger.debug(f"[SQL DB] {msg}")
         return SkillResult.ok(msg)
 
@@ -181,16 +194,12 @@ class SQLTasks:
         tags: Optional[list[str]] = None,
         dependencies: Optional[list[str]] = None,
         subtasks: Optional[list[dict[str, Any]]] = None,
-        due_date_str: Optional[str] = None,
         context: Optional[str] = None,
     ) -> SkillResult:
         """
-        Обновляет отдельные параметры существующей задачи.
-
-        Args:
-            task_id: ID редактируемой задачи.
-            title, description, status, progress, tags, dependencies, subtasks, due_date_str, context: Обновляемые поля.
+        Обновляет параметры существующей задачи.
         """
+
         if status and status not in STATUS_EMOJIS.keys():
             return SkillResult.fail(
                 f"Недопустимый статус. Варианты: {', '.join(STATUS_EMOJIS.keys())}"
@@ -211,40 +220,24 @@ class SQLTasks:
 
             if title is not None:
                 task.title = title
-
             if description is not None:
                 task.description = description
-
             if status is not None:
                 task.status = status
                 if status == "done":
                     task.progress = 100
-
             if progress is not None:
                 task.progress = max(0, min(100, progress))
                 if task.progress == 100 and task.status != "done":
                     task.status = "done"
-
             if clean_tags is not None:
                 task.tags = clean_tags
-
             if dependencies is not None:
                 task.dependencies = dependencies
-
             if subtasks is not None:
                 task.subtasks = subtasks
-
             if context is not None:
                 task.context = context
-
-            if due_date_str is not None:
-                try:
-                    tz = get_timezone(self.tz_offset)
-                    dt = datetime.strptime(due_date_str, "%Y-%m-%d %H:%M").replace(tzinfo=tz)
-                    task.due_date = dt.timestamp()
-
-                except ValueError:
-                    return SkillResult.fail("Ошибка: Неверный формат due_date_str.")
 
             await session.commit()
 
@@ -255,12 +248,9 @@ class SQLTasks:
     @skill()
     async def delete_task(self, task_id: str) -> SkillResult:
         """
-        Безвозвратно удаляет задачу из БД. Рекомендуется вызывать для выполненных
-        или отмененных задач в целях экономии памяти контекста.
-
-        Args:
-            task_id: ID удаляемой задачи.
+        Удаляет задачу из БД.
         """
+
         async with self.db.session_factory() as session:
             result = await session.execute(delete(TaskTable).where(TaskTable.id == task_id))
             await session.commit()
@@ -273,65 +263,11 @@ class SQLTasks:
 
     async def get_context_block(self, **kwargs: Any) -> str:
         """
-        Формирует блок активных задач для системного промпта.
-        Отслеживает зависимости, подсвечивая заблокированные задачи.
+        Формирует блок активных задач для системного промпта через матрицу Эйзенхауэра.
         """
+
         async with self.db.session_factory() as session:
             result = await session.execute(select(TaskTable))
             tasks = result.scalars().all()
 
-        if not tasks:
-            return f"## TASKS\nMax tasks allowed: {self.max_tasks}\nAllowed tags: {', '.join(ALLOWED_TAGS)}\n\nСписок задач пуст."
-
-        task_statuses = {t.id: t.status for t in tasks}
-        lines = [
-            "## TASKS",
-            f"Max tasks allowed: {self.max_tasks}",
-            f"Allowed tags: {', '.join(ALLOWED_TAGS)}",
-            "",
-        ]
-
-        for t in tasks:
-            status_icon = STATUS_EMOJIS.get(t.status, t.status.upper())
-            lines.append(f"[Task ID: `{t.id}`] {status_icon} | Progress: {t.progress}%")
-            lines.append(f"* Title: {t.title}")
-            lines.append(f"* Description: {t.description}")
-
-            tags_str = f"[{', '.join(t.tags)}]" if t.tags else "None"
-            lines.append(f"* Tags: {tags_str}")
-            deadline = (
-                format_timestamp(t.due_date, self.tz_offset, "%Y-%m-%d %H:%M")
-                if t.due_date
-                else "None"
-            )
-            lines.append(f"* Deadline: {deadline}")
-
-            if not t.dependencies:
-                lines.append("* Dependencies: None")
-
-            else:
-                deps_info = []
-
-                for dep_id in t.dependencies:
-                    d_stat = task_statuses.get(dep_id, "unknown")
-                    if d_stat not in ("done", "cancelled", "unknown"):
-                        deps_info.append(f"`{dep_id}` (⛔ Блокирует)")
-                    else:
-                        deps_info.append(f"`{dep_id}` (✓ {d_stat})")
-
-                lines.append(f"* Dependencies: {', '.join(deps_info)}")
-
-            if not t.subtasks:
-                lines.append("* Subtasks: None")
-
-            else:
-                lines.append("* Subtasks:")
-
-                for sub in t.subtasks:
-                    mark = "x" if sub.get("is_done") else " "
-                    lines.append(f"  [{mark}] {sub.get('title', 'unknown')}")
-
-            lines.append(f"* Context: {t.context if t.context else 'Пусто'}")
-            lines.append("")
-
-        return "\n".join(lines).strip()
+        return build_eisenhower_matrix(tasks, self.max_tasks, self.tz_offset)

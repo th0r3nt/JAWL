@@ -32,7 +32,7 @@ async def test_mental_states_crud(mental_states_manager):
     assert res_del.is_success is True
 
     res_get_empty = await mental_states_manager.get_mental_states()
-    assert "Список MentalState пуст" in res_get_empty.message
+    assert "Список сущностей пуст" in res_get_empty.message
 
 
 @pytest.mark.asyncio
@@ -65,3 +65,24 @@ async def test_update_mental_state_allows_clearing_description_and_status(
     assert " down" not in res_get.message
 
     await mental_states_manager.delete_mental_state(ms_id)
+
+
+@pytest.mark.asyncio
+async def test_mental_states_radar_relations_and_attitude(mental_states_manager):
+    res_create = await mental_states_manager.create_mental_state(
+        name="ServerX",
+        tier="high",
+        category="object",
+        description="A bad server",
+        status="Offline",
+        attitude="Hostile",
+        directives="Never deploy on Friday",
+        relations={"id_admin": "Hates the admin"},
+    )
+    assert res_create.is_success is True
+
+    res_get = await mental_states_manager.get_mental_states()
+    context = res_get.message
+    assert "Attitude: Hostile" in context
+    assert "Never deploy on Friday" in context
+    assert "Hates the admin" in context

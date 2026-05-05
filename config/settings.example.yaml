@@ -62,31 +62,33 @@ system:
       embedding_model: "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
       vector_size: 384
       
-    # Подробнее: docs/yaml/settings/sql_db.md
+    # Подробнее: docs/yaml/settings/sql/db.md
     sql:
+      # Подробнее: docs/yaml/settings/sql/tasks.md
       tasks: 
         enabled: true
         max_tasks: 5
 
-      # Подробнее: docs/yaml/settings/notes.md
+      # Подробнее: docs/yaml/settings/sql/notes.md
       notes:
         enabled: true
         max_notes: 5
 
+      # Подробнее: docs/yaml/settings/sql/personality_traits.md
       personality_traits:
         enabled: true
         max_traits: 5
 
+      # Подробнее: docs/yaml/settings/sql/mental_states.md
       mental_states:
         enabled: true
         max_entities: 10
 
-      # Подробнее: docs/yaml/settings/drives.md
+      # Подробнее: docs/yaml/settings/sql/drives.md
       drives:
         enabled: true
         decay_rate: 5.0
         decay_interval_sec: 540
-        # (100/5.0 = 20 интервалов. 20 * 9 минут = 180 минут = 3 часа от 0 до 100% дефицита мотивации)
 
         max_reflections_history: 3
         max_custom_drives: 5

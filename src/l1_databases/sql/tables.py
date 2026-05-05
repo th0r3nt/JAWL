@@ -16,7 +16,6 @@ class Base(DeclarativeBase):
 
     pass
 
-
 class TaskTable(Base):
     """
     Таблица долгосрочных задач (Tasks).
@@ -32,6 +31,9 @@ class TaskTable(Base):
         default="todo"
     )  # todo, in_progress, blocked, done, cancelled
     progress: Mapped[int] = mapped_column(default=0)  # 0-100%
+    
+    # Квадрант матрицы Эйзенхауэра (1-4)
+    quadrant: Mapped[int] = mapped_column(default=2)
 
     tags: Mapped[list[str]] = mapped_column(JSON, default=list)
     dependencies: Mapped[list[str]] = mapped_column(
@@ -111,7 +113,6 @@ class MentalStateTable(Base):
     tier: Mapped[str]  # high, medium, low, background
     category: Mapped[str]  # subject, object
 
-    # Автоматическое обновление времени при любых изменениях (onupdate)
     updated_at: Mapped[datetime] = mapped_column(
         default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc)
     )
@@ -120,6 +121,10 @@ class MentalStateTable(Base):
     status: Mapped[str]
     context: Mapped[Optional[str]]
     related_information: Mapped[Optional[str]]
+    
+    attitude: Mapped[str] = mapped_column(default="Neutral") # Отношение агента
+    directives: Mapped[str] = mapped_column(default="")      # Правила взаимодействия
+    relations: Mapped[dict[str, str]] = mapped_column(JSON, default=dict) # Связи {"ID_СУБЪЕКТА": "Причина"}
 
 
 class DriveTable(Base):
