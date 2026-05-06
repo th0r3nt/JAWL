@@ -122,12 +122,24 @@ class ReactLoop:
 
                 # =======================================================
                 # Генерация дерева мыслей
-                if self.tot_config and self.tot_config.enabled and self.tot_config.mode in ("auto", "hybrid"):
+                if (
+                    self.tot_config
+                    and self.tot_config.enabled
+                    and self.tot_config.mode in ("auto", "hybrid")
+                ):
                     # Генерируем на 1-м шаге, а затем каждые N шагов
-                    if (self.agent_state.current_step == 1) or \
-                       ((self.agent_state.current_step - 1) % self.tot_config.auto_interval_steps == 0):
-                        
-                        tree_md = await self.tot_generator.generate(event_name, payload, missed_events)
+                    if (self.agent_state.current_step == 1) or (
+                        (self.agent_state.current_step - 1)
+                        % self.tot_config.auto_interval_steps
+                        == 0
+                    ):
+
+                        tree_md = await self.tot_generator.generate(
+                            event_name,
+                            payload,
+                            missed_events,
+                            task_description="Автоматическая генерация древа мыслей для оценки текущего вектора.",
+                        )
                         if tree_md:
                             self.agent_state.current_thoughts_tree = tree_md
 
@@ -311,9 +323,7 @@ class ReactLoop:
 
                     match = re.search(r"подождать (\d+) сек", str(e))
                     wait_sec = int(match.group(1)) if match else 10
-                    system_logger.warning(
-                        f"[LLM] Все ключи в кулдауне. Ждем {wait_sec} сек."
-                    )
+                    system_logger.warning(f"[LLM] Все ключи в кулдауне. Ждем {wait_sec} сек.")
                     await asyncio.sleep(wait_sec + 1)  # +1 сек для гарантии
                     continue
                 else:

@@ -300,9 +300,11 @@ class SystemBuilder:
         tot_generator = None
         if self.sys_cfg.tree_of_thoughts.enabled:
             tot_generator = ToTGenerator(
-                llm_client=sys_obj.sub_llm_client, # Используем клиент субагентов для экономии (у него ротатор)
+                llm_client=sys_obj.sub_llm_client, 
                 model_name=self.sys_cfg.tree_of_thoughts.llm_model,
                 branches_count=self.sys_cfg.tree_of_thoughts.branches,
+                simulations_per_branch=self.sys_cfg.tree_of_thoughts.simulations_per_branch,
+                max_depth=self.sys_cfg.tree_of_thoughts.max_depth,
                 prompt_builder=prompt_builder,
                 context_registry=sys_obj.context_registry,
                 agent_state=sys_obj.agent_state,

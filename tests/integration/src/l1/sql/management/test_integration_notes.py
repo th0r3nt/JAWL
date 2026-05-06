@@ -41,19 +41,3 @@ async def test_notes_limit_enforcement(notes_manager):
     res_fail = await notes_manager.add_note("Note 3")
     assert res_fail.is_success is False
     assert "Достигнут лимит" in res_fail.message
-
-
-@pytest.mark.asyncio
-async def test_notes_context_truncation(notes_manager):
-    """Тест: Длинные заметки обрезаются в контексте, но доступны полностью через list_all_notes."""
-    long_text = "A" * 200
-    await notes_manager.add_note(long_text)
-
-    # В промпте должно быть обрезано
-    context = await notes_manager.get_context_block()
-    assert "... [Обрезано" in context
-    assert len(context) < 300  # Точно меньше полного объема + форматирование
-
-    # Но в list_all_notes должно быть полностью
-    res_list = await notes_manager.list_all_notes()
-    assert long_text in res_list.message

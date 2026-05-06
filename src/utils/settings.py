@@ -320,7 +320,11 @@ class TreeOfThoughtsConfig(BaseModel):
     llm_model: str = "unknown"
     mode: str = "hybrid"  # "manual", "auto", "hybrid"
     auto_interval_steps: int = 5
-    branches: int = 3  # Количество генерируемых путей (веток)
+    
+    # Настройки геометрии дерева мыслей (Осторожно: экспоненциальный рост)
+    branches: int = 3                # Количество макро-стратегий (Уровень 1)
+    simulations_per_branch: int = 2  # Количество вложенных сценариев на каждый узел
+    max_depth: int = 2               # Максимальная глубина вложенности (1 -> 1.1 -> 1.1.1)
 
 
 class SystemConfig(BaseModel):
