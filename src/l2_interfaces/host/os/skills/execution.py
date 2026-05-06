@@ -130,11 +130,16 @@ class HostOSExecution:
             if not safe_path.is_file():
                 return SkillResult.fail(f"Ошибка: Файл скрипта не найден ({safe_path.name}).")
 
+            ext = safe_path.suffix.lower()
+            if self.host_os.access_level < HostOSAccessLevel.OPERATOR and ext != ".py":
+                return SkillResult.fail(
+                    "Отказано в доступе: при текущем уровне прав разрешен запуск только Python-скриптов "
+                    "через sandbox guard. Shell/JS/native scripts требуют Access Level >= 2 (OPERATOR)."
+                )
+
             # Формируем изолированное окружение
             env = self._build_isolated_env()
             env["JAWL_TARGET_SCRIPT"] = str(safe_path)
-
-            ext = safe_path.suffix.lower()
 
             if ext == ".py":
                 # Внедряем безопасную обертку (Guard)

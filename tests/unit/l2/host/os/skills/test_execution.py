@@ -162,6 +162,23 @@ except PermissionError as e:
 
 
 @pytest.mark.asyncio
+async def test_execute_script_observer_blocks_non_python_scripts(os_client, tmp_path):
+    """OBSERVER не должен получать shell/RCE через .sh из sandbox/."""
+    os_client.access_level = HostOSAccessLevel.OBSERVER
+    executor = HostOSExecution(os_client)
+
+    victim = tmp_path / "observer_shell_rce.txt"
+    shell_script = os_client.sandbox_dir / "poc.sh"
+    shell_script.write_text(f"#!/bin/sh\necho PWNED > {victim}\n", encoding="utf-8")
+
+    res = await executor.execute_script("sandbox/poc.sh")
+
+    assert res.is_success is False
+    assert "Shell/JS/native scripts требуют Access Level >= 2" in res.message
+    assert not victim.exists()
+
+
+@pytest.mark.asyncio
 async def test_sandbox_guard_blocks_os_spawn_and_exec_family(os_client, tmp_path):
     """
     Раньше Sandbox Guard перезаписывал только subprocess.Popen/run/check_output/call
