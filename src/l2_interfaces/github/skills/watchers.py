@@ -1,7 +1,7 @@
 from src.l2_interfaces.github.client import GithubClient
 from src.l2_interfaces.github.events import GithubEvents
 from src.l3_agent.skills.registry import SkillResult, skill
-from src.utils.logger import system_logger
+from src.utils.logger import main_logger
 
 
 class GithubWatchers:
@@ -33,14 +33,14 @@ class GithubWatchers:
                         "PUT", f"/repos/{owner}/{repo}/subscription", body={"subscribed": True}
                     )
                 except Exception as sub_err:
-                    system_logger.debug(
+                    main_logger.debug(
                         f"[Github] Не удалось физически подписаться на {repo_name}: {sub_err}"
                     )
 
             self.client.state.tracked_repos[repo_name] = ""
             self.events.save_persisted_repos()
 
-            system_logger.info(f"[Github] Начато отслеживание репозитория: {repo_name}")
+            main_logger.info(f"[Github] Начато отслеживание репозитория: {repo_name}")
             return SkillResult.ok(f"Успешно. Репозиторий {repo_name} добавлен в Watchers.")
 
         except Exception as e:
@@ -69,7 +69,7 @@ class GithubWatchers:
             except Exception:
                 pass
 
-        system_logger.info(f"[Github] Прекращено отслеживание репозитория: {repo_name}")
+        main_logger.info(f"[Github] Прекращено отслеживание репозитория: {repo_name}")
         return SkillResult.ok(f"Успешно. Репозиторий {repo_name} удален из Watchers.")
 
     @skill()

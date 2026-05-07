@@ -38,13 +38,15 @@ system:
 
   # Подробнее: docs/yaml/settings/context.md
   context_depth:
-    ticks: 15
-    detailed_ticks: 4
-    tick_action_max_chars: 10000
-    tick_result_max_chars: 20000
+    ticks: 12
+    detailed_ticks: 3
+
+    tick_action_max_chars: 300
+    tick_result_max_chars: 10000
+
     tick_thoughts_short_max_chars: 1000
-    tick_action_short_max_chars: 100 
-    tick_result_short_max_chars: 500
+    tick_action_short_max_chars: 50
+    tick_result_short_max_chars: 200
 
     # Подробнее: docs/yaml/settings/rag.md
     rag:
@@ -125,8 +127,23 @@ system:
     llm_model: unknown
     mode: "hybrid"  # "manual", "auto", "hybrid"
     auto_interval_steps: 5
+    
+    branches: 3                # Количество макро-стратегий (Уровень 1)
+    simulations_per_branch: 3  # Количество вложенных сценариев на каждый узел
+    max_depth: 4               # Максимальная глубина вложенности (1 -> 1.1 -> 1.1.1)
 
-    # Симуляция веток растет экспоненциально, так что будьте осторожны с этими параметрами
-    branches: 2 # Начальное количество макро-стратегий
-    simulations_per_branch: 2 # Количество симуляций на каждую ветку. Например: ветка 1 > ветка 1.1 и ветка 1.2
-    max_depth: 2 # Максимальная глубина вложенности (1 -> 1.1, 1.2 -> 1.1.1, 1.1.2, 1.2.1, 1.2.2)
+
+  # Подробнее: docs/yaml/settings/subconscious.md
+  subconscious:
+      enabled: false
+      llm_model: unknown
+      patterns:
+        consolidation:
+          enabled: true
+          activation_limit_ticks: 20
+        reflection:
+          enabled: true
+          activation_limit_ticks: 20
+        forgetting:
+          enabled: true
+          activation_limit_ticks: 60

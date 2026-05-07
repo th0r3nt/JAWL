@@ -8,7 +8,7 @@
 import asyncio
 from typing import List, Any
 
-from src.utils.logger import system_logger
+from src.utils.logger import main_logger
 from src.utils._tools import truncate_text
 
 from src.l2_interfaces.web.search.client import WebSearchClient
@@ -25,7 +25,7 @@ class DeepResearch:
         self.searcher = searcher
         self.reader = reader
 
-    @skill(swarm_roles=[Subagents.WEB_RESEARCHER])
+    @skill(swarm=[Subagents.WEB_RESEARCHER])
     async def deep_research(self, queries: List[str]) -> SkillResult:
         """
         Массированный параллельный сбор фактов.
@@ -48,7 +48,7 @@ class DeepResearch:
             queries = queries[: cfg.max_queries]
 
         try:
-            system_logger.info(f"[Web] Запуск deep_research для {len(queries)} запросов.")
+            main_logger.info(f"[Web] Запуск deep_research для {len(queries)} запросов.")
 
             # Шаг 1: Параллельный поиск по всем запросам
             search_tasks = [
@@ -114,7 +114,7 @@ class DeepResearch:
             queries_str = ", ".join(queries)
             self.client.state.add_history(f"Deep Research: {queries_str}")
 
-            system_logger.info(
+            main_logger.info(
                 f"[Web] deep_research успешно завершен (прочитано {len(final_blocks)} страниц)."
             )
 

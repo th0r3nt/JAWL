@@ -14,7 +14,7 @@ from typing import Any, Optional, Union, Literal, Dict
 
 from src.__init__ import __version__
 
-from src.utils.logger import system_logger
+from src.utils.logger import main_logger
 from src.utils.settings import GithubConfig
 from src.l2_interfaces.github.state import GithubState
 
@@ -69,18 +69,18 @@ class GithubClient:
                 login = data.get("login", "Unknown") if isinstance(data, dict) else "Unknown"
                 self.state.account_info = f"Agent account online. Logged in as @{login}"
 
-                system_logger.info(f"[Github] Успешная авторизация как @{login}")
+                main_logger.info(f"[Github] Успешная авторизация как @{login}")
 
             except GithubHTTPError as e:
                 self.state.account_info = f"Auth Failed (HTTP {e.status}). Read-Only режим."
-                system_logger.error(f"[Github] Ошибка авторизации: {e}. Проверьте токен.")
+                main_logger.error(f"[Github] Ошибка авторизации: {e}. Проверьте токен.")
                 self.config.agent_account = False  # Фоллбэк
 
         else:
             auth_type = "token" if self.token else "No token (60 req/hr)"
             self.state.account_info = f"Agent account offline. Read-Only ({auth_type})"
 
-            system_logger.info("[Github] Инициализирован в Read-Only режиме.")
+            main_logger.info("[Github] Инициализирован в Read-Only режиме.")
 
     async def stop(self) -> None:
         """Останавливает клиент (помечает оффлайн)."""

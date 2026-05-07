@@ -7,7 +7,10 @@
 """
 
 from typing import Any, Dict, List
+
 from src.l0_state.agent.state import AgentState
+from src.utils.settings import SubconsciousConfig
+
 from src.l3_agent.context.registry import ContextRegistry, ContextSection
 from src.l3_agent.skills.registry import get_skills_library
 
@@ -22,6 +25,7 @@ class ContextBuilder:
         self,
         agent_state: AgentState,
         registry: ContextRegistry,
+        subconscious_config: SubconsciousConfig = None
     ) -> None:
         """
         Инициализирует сборщик и автоматически регистрирует обязательные системные блоки.
@@ -32,17 +36,11 @@ class ContextBuilder:
         """
         self.agent_state = agent_state
         self.registry = registry
+        self.subconscious_config = subconscious_config
 
-        # Регистрируем встроенные провайдеры напрямую (с нужным приоритетом)
-        self.registry.register_provider(
-            "skills", self._skills_provider, section=ContextSection.SKILLS
-        )
-        self.registry.register_provider(
-            "heartbeat", self._heartbeat_provider, section=ContextSection.HEARTBEAT
-        )
-        self.registry.register_provider(
-            "tree_of_thoughts", self._tot_provider, section=ContextSection.TREE_OF_THOUGHTS
-        )
+        self.registry.register_provider("skills", self._skills_provider, section=ContextSection.SKILLS)
+        self.registry.register_provider("heartbeat", self._heartbeat_provider, section=ContextSection.HEARTBEAT)
+        self.registry.register_provider("tree_of_thoughts", self._tot_provider, section=ContextSection.TREE_OF_THOUGHTS)
 
     async def build(
         self, event_name: str, payload: Dict[str, Any], missed_events: List[Dict[str, Any]]
@@ -78,7 +76,7 @@ class ContextBuilder:
         """
         Возвращает отформатированный блок контекста доступных скиллов для агента.
         """
-        return f"## SKILLS\n{get_skills_library()}"
+        return f"## SKILLS\n{get_skills_library(self.subconscious_config)}"
 
     async def _heartbeat_provider(
         self,

@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Any, Optional
 from playwright.async_api import async_playwright, Browser, BrowserContext, Page, Playwright
 
-from src.utils.logger import system_logger
+from src.utils.logger import main_logger
 from src.utils._tools import truncate_text
 from src.utils.settings import WebBrowserConfig
 from src.l2_interfaces.web.browser.state import WebBrowserState
@@ -55,7 +55,7 @@ class WebBrowserClient:
     async def start(self) -> None:
         """Вызывается при старте системы (браузер физически не запускается до первого обращения)."""
         self.state.is_online = True
-        system_logger.info("[Web Browser] Интерфейс готов.")
+        main_logger.info("[Web Browser] Интерфейс готов.")
 
     async def stop(self) -> None:
         """Штатно закрывает браузер при остановке системы."""
@@ -89,7 +89,7 @@ class WebBrowserClient:
                 except Exception as e:
                     # Если Playwright жалуется на отсутствие браузеров - качаем их сами
                     if "playwright install" in str(e):
-                        system_logger.info(
+                        main_logger.info(
                             "[Web Browser] Бинарники Chromium не найдены. Начата автоматическая загрузка (займет пару минут)."
                         )
 
@@ -104,7 +104,7 @@ class WebBrowserClient:
                         )
                         await proc.communicate()
 
-                        system_logger.info(
+                        main_logger.info(
                             "[Web Browser] Загрузка Chromium завершена. Запуск браузера."
                         )
 
@@ -131,7 +131,7 @@ class WebBrowserClient:
             # Устанавливаем дефолтный таймаут для всех действий (в мс)
             self.page.set_default_timeout(self.config.timeout_sec * 1000)
 
-            system_logger.info("[Web Browser] Запущен процесс Chromium.")
+            main_logger.info("[Web Browser] Запущен процесс Chromium.")
 
     async def save_session(self) -> None:
         """Сохраняет куки и Local Storage на диск (в state_file)."""
@@ -146,7 +146,7 @@ class WebBrowserClient:
 
             if self.browser:
                 await self.browser.close()
-                system_logger.info("[Web Browser] Процесс Chromium остановлен.")
+                main_logger.info("[Web Browser] Процесс Chromium остановлен.")
 
             self.browser = None
             self.context = None

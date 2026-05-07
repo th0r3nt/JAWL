@@ -14,10 +14,12 @@ from pathlib import Path
 from typing import Dict, List, Tuple, Optional
 import time
 
-from src.utils.logger import system_logger
+from src.utils.logger import main_logger, swarm_logger
 from src.utils.token_tracker import TokenTracker
+from src.utils._tools import dump_prompt_to_file
+
 from src.l3_agent.llm.client import LLMClient
-from src.l3_agent.skills.schema import AgentResponse, ActionCall, ACTION_SCHEMA
+from src.l3_agent.skills.schema import AgentResponse, ActionCall, ACTION_SCHEMA, parse_llm_json
 from src.l3_agent.skills.registry import call_skill
 from src.l3_agent.swarm.prompt.builder import SwarmPromptBuilder
 from src.l3_agent.swarm.context.builder import SwarmContextBuilder
@@ -80,13 +82,19 @@ class SubagentLoop:
         Главный оркестратор ReAct цикла субагента.
         Крутит цикл "Запрос к LLM -> Парсинг -> Выполнение", пока задача не завершится.
         """
-        system_logger.info(f"[Swarm] Запуск субагента {self.role.id}_{self.subagent_id}.")
+        log = f"[Swarm] Запуск субагента {self.role.id}_{self.subagent_id}."
+        main_logger.info(log)
+        swarm_logger.info(log)
+        
         prompt = self.prompt_builder.build(self.role)
 
         # Главный ReAct цикл
         step = 1
         while step <= self.max_steps and not self.is_done:
-            system_logger.info(f"[Subagent ReAct] Шаг {step}/{self.max_steps}.")
+            log = f"[Subagent ReAct] Шаг {step}/{self.max_steps}."
+            main_logger.info(log)
+            swarm_logger.info(log)
+
             messages = self._prepare_messages(prompt)
 
             # Сохраняем дамп для отладки
@@ -95,10 +103,10 @@ class SubagentLoop:
             # Вызов LLM
             raw_answer = await self._call_llm_with_retries(messages)
             if raw_answer is None:
-                # Фикс: Если модель недоступна (404), форсируем краш-репорт
-                system_logger.error(
-                    f"[Swarm] Критическая ошибка API у субагента {self.subagent_id}. Принудительное создание краш-репорта."
-                )
+                log = f"[Swarm] Критическая ошибка API у субагента {self.subagent_id}. Принудительное создание краш-репорта."
+                main_logger.error(log)
+                swarm_logger.error(log)
+
                 await call_skill(
                     "SubagentReport.submit_final_report",
                     {
@@ -132,10 +140,10 @@ class SubagentLoop:
             # Если нет действий
             if not actions:
                 if not self.report_submitted:
-                    # ЖЕСТКИЙ ГАРД: не даем субагенту умереть без отчета
-                    system_logger.warning(
-                        f"[Swarm] Субагент {self.subagent_id} попытался завершить работу без отчета. Принуждаем к действию."
-                    )
+                    log = f"[Swarm] Субагент {self.subagent_id} попытался завершить работу без отчета. Принуждаем к действию."
+                    main_logger.warning(log)
+                    swarm_logger.warning(log)
+
                     self.history.append(
                         {
                             "thoughts": thoughts,
@@ -146,9 +154,10 @@ class SubagentLoop:
                     step += 1
                     continue
                 else:
-                    system_logger.info(
-                        f"[Swarm] Субагент {self.role.id}_{self.subagent_id} передал пустой массив действий. Завершение."
-                    )
+                    log = f"[Swarm] Субагент {self.role.id}_{self.subagent_id} передал пустой массив действий. Завершение."
+                    main_logger.info(log)
+                    swarm_logger.info(log)
+
                     self.is_done = True
                     break
 
@@ -160,9 +169,10 @@ class SubagentLoop:
         # Если агент не смог выполнить задачу за макс. шагов
 
         if not self.is_done:
-            system_logger.warning(
-                f"[Swarm] Субагент {self.subagent_id} достиг лимита шагов ({self.max_steps}) и был убит."
-            )
+            log = f"[Swarm] Субагент {self.subagent_id} достиг лимита шагов ({self.max_steps}) и был убит."
+            main_logger.warning(log)
+            swarm_logger.warning(log)
+
             # Принудительно отправляем то, что успел накопать
             await call_skill(
                 "SubagentReport.submit_final_report",
@@ -185,26 +195,12 @@ class SubagentLoop:
             {"role": "system", "content": prompt},
             {"role": "user", "content": context},
         ]
-        self.tracker.add_input_record(messages, log_prefix="[Subagent LLM]")
+        self.tracker.add_input_record(messages, log_prefix="[Subagent LLM]", logger=swarm_logger)
         return messages
 
     def _dump_context_to_file(self, messages: List[Dict[str, str]], current_step: int) -> None:
-        try:
-            log_dir = Path("logs/subagents")
-            log_dir.mkdir(parents=True, exist_ok=True)
-
-            with open(log_dir / "last_sub_prompt.md", "w", encoding="utf-8") as f:
-                f.write("# SUBAGENT DUMP\n")
-                f.write(f"* **Role**: {self.role.name.upper()}\n")
-                f.write(f"* **Subagent ID**: {self.subagent_id}\n")
-                f.write(f"* **Step**: {current_step} / {self.max_steps}\n\n---\n\n")
-
-                for m in messages:
-                    role = m.get("role", "unknown")
-                    content = m.get("content", "")
-                    f.write(f"### Role: {role}\n{content}\n\n---\n")
-        except Exception as e:
-            system_logger.error(f"[Swarm] Не удалось сохранить дамп промпта: {e}")
+        meta = f"# SUBAGENT DUMP\n* **Role**: {self.role.name.upper()}\n* **Subagent ID**: {self.subagent_id}\n* **Step**: {current_step} / {self.max_steps}"
+        dump_prompt_to_file("logs/prompts/last_sub_prompt.md", messages, meta_header=meta)
 
     async def _call_llm_with_retries(self, messages: List[Dict[str, str]]) -> Optional[str]:
         for attempt in range(5):
@@ -222,7 +218,7 @@ class SubagentLoop:
                     if msg_obj.tool_calls
                     else msg_obj.content or ""
                 )
-                self.tracker.add_output_record(raw_answer, log_prefix="[Subagent LLM]")
+                self.tracker.add_output_record(raw_answer, log_prefix="[Subagent LLM]", logger=swarm_logger)
                 return raw_answer
 
             except RuntimeError as e:
@@ -231,11 +227,14 @@ class SubagentLoop:
 
                     match = re.search(r"подождать (\d+) сек", str(e))
                     wait_sec = int(match.group(1)) if match else 10
-                    system_logger.warning(
-                        f"[Swarm] Все ключи в кулдауне. Субагент {self.subagent_id} ждет {wait_sec}с."
-                    )
+
+                    log = f"[Swarm] Все ключи в кулдауне. Субагент {self.subagent_id} ждет {wait_sec}с."
+                    main_logger.warning(log)
+                    swarm_logger.warning(log)
+
                     await asyncio.sleep(wait_sec + 1)
                     continue
+
                 else:
                     return None
 
@@ -254,16 +253,18 @@ class SubagentLoop:
                                 wait_time = max(1, int(int(retry_after) / 1000))
                             else:
                                 wait_time = int(float(retry_after))
-                            
+
                             if wait_time > time.time():
                                 wait_time = int(wait_time - time.time())
                         except ValueError:
                             pass
 
                 wait_time = max(2, min(wait_time, 120))
-                system_logger.warning(
-                    f"[Swarm] Rate Limit (429) у субагента {self.subagent_id}. Кулдаун ключа на {wait_time}с."
-                )
+
+                log = f"[Swarm] Rate Limit (429) у субагента {self.subagent_id}. Кулдаун ключа на {wait_time}с."
+                main_logger.warning(log)
+                swarm_logger.warning(log)
+
                 self.llm.rotator.cooldown_key(session.api_key, wait_time)
 
                 if self.llm.rotator.total_keys() == 1:
@@ -274,9 +275,9 @@ class SubagentLoop:
 
             except Exception as e:
                 if attempt == 4:
-                    system_logger.error(
-                        f"[Swarm] LLM ошибка у субагента {self.subagent_id}: {e}"
-                    )
+                    log = f"[Swarm] LLM ошибка у субагента {self.subagent_id}: {e}"
+                    main_logger.error(log)
+                    swarm_logger.error(log)
                     return None
                 await asyncio.sleep(5)
 
@@ -285,40 +286,7 @@ class SubagentLoop:
     def _parse_response(
         self, raw_answer: str
     ) -> Tuple[Optional[AgentResponse], Optional[str]]:
-        clean_answer = raw_answer.strip()
-
-        import re
-
-        json_str = ""
-        json_match = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", clean_answer, re.DOTALL)
-
-        if json_match:
-            json_str = json_match.group(1)
-        else:
-            start_idx = clean_answer.find("{")
-            while start_idx != -1:
-                end_idx = clean_answer.rfind("}")
-                if end_idx > start_idx:
-                    candidate = clean_answer[start_idx : end_idx + 1]
-                    try:
-                        parsed = AgentResponse.model_validate_json(candidate)
-                        return parsed, None
-                    except Exception:
-                        start_idx = clean_answer.find("{", start_idx + 1)
-                else:
-                    break
-
-        if json_str:
-            try:
-                parsed = AgentResponse.model_validate_json(json_str)
-                return parsed, None
-            except Exception as e:
-                return None, f"Format Error: {e}"
-
-        return (
-            None,
-            "System Error: Invalid JSON format. Please use correct JSON tool_calls format.",
-        )
+        return parse_llm_json(raw_answer)
 
     async def _execute_and_log_actions(self, thoughts: str, actions: List[ActionCall]) -> None:
         results = []
@@ -336,7 +304,7 @@ class SubagentLoop:
                 continue
 
             try:
-                res = await call_skill(act.tool_name, act.parameters)
+                res = await call_skill(act.tool_name, act.parameters, logger=swarm_logger)
                 results.append(f"* Action [{act.tool_name}]: {res.message}")
 
                 if act.tool_name == "SubagentReport.submit_final_report" and res.is_success:

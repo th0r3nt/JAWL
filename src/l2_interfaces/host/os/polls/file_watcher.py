@@ -15,7 +15,7 @@ from watchdog.events import FileSystemEventHandler
 
 from src.utils.event.bus import EventBus
 from src.utils.event.registry import Events
-from src.utils.logger import system_logger
+from src.utils.logger import main_logger
 from src.utils.dtime import get_now_formatted
 
 from src.l2_interfaces.host.os.state import HostOSState
@@ -116,7 +116,7 @@ class FileWatcher:
             try:
                 self.track_path(p, save=False)
             except Exception as e:
-                system_logger.warning(
+                main_logger.warning(
                     f"[Host OS] Не удалось восстановить отслеживание для {p}: {e}"
                 )
 
@@ -186,7 +186,7 @@ class FileWatcher:
             except asyncio.CancelledError:
                 break
             except Exception as e:
-                system_logger.error(f"[Host OS] Ошибка в медленном цикле файлов: {e}")
+                main_logger.error(f"[Host OS] Ошибка в медленном цикле файлов: {e}")
             await asyncio.sleep(self.client.config.monitoring_interval_sec)
 
     async def handle_file_system_event(self, sys_event_config, filepath: str):
@@ -328,7 +328,7 @@ class FileWatcher:
 
         new_files = current_paths - self._last_sandbox_files
         if new_files:
-            system_logger.info(
+            main_logger.info(
                 f"[Host OS] В песочнице появились новые файлы/папки: {', '.join(new_files)}"
             )
 

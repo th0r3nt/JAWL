@@ -1,13 +1,14 @@
 import urllib.parse
 from typing import Literal, Optional
 
-from src.utils.logger import system_logger
+from src.utils.logger import main_logger
 from src.utils._tools import truncate_text
 
 from src.l2_interfaces.github.client import GithubClient
 
 from src.l3_agent.skills.registry import SkillResult, skill
 from src.l2_interfaces.github.decorators import require_agent_account
+
 
 class GithubIssues:
     """Навыки для работы с Issues и Pull Requests."""
@@ -17,7 +18,11 @@ class GithubIssues:
 
     @skill()
     async def list_issues(
-        self, owner: str, repo: str, state: Optional[Literal["open", "closed", "all"]] = "all", per_page: int = 10
+        self,
+        owner: str,
+        repo: str,
+        state: Optional[Literal["open", "closed", "all"]] = "all",
+        per_page: int = 10,
     ) -> SkillResult:
         """
         Возвращает список issues репозитория.
@@ -81,7 +86,7 @@ class GithubIssues:
             else:
                 lines.append("Нет комментариев.")
 
-            system_logger.info(f"[Github] Прочитан Issue #{issue_number} в {owner}/{repo}")
+            main_logger.info(f"[Github] Прочитан Issue #{issue_number} в {owner}/{repo}")
             return SkillResult.ok("\n".join(lines))
         except Exception as e:
             return SkillResult.fail(f"Ошибка при чтении issue: {e}")
@@ -108,7 +113,7 @@ class GithubIssues:
             )
             issue_num = data.get("number")
             self.client.state.add_history(f"create_issue: {owner}/{repo} #{issue_num}")
-            system_logger.info(f"[Github] Создан Issue #{issue_num} в {owner}/{repo}")
+            main_logger.info(f"[Github] Создан Issue #{issue_num} в {owner}/{repo}")
             return SkillResult.ok(f"Issue успешно создано. URL: {data.get('html_url')}")
         except Exception as e:
             return SkillResult.fail(f"Ошибка при создании issue: {e}")
@@ -134,7 +139,7 @@ class GithubIssues:
                 body={"body": body},
             )
             self.client.state.add_history(f"add_comment: {owner}/{repo} #{issue_number}")
-            system_logger.info(f"[Github] Оставлен коммент в #{issue_number} ({owner}/{repo})")
+            main_logger.info(f"[Github] Оставлен коммент в #{issue_number} ({owner}/{repo})")
             return SkillResult.ok(f"Комментарий успешно добавлен. URL: {data.get('html_url')}")
         except Exception as e:
             return SkillResult.fail(f"Ошибка при добавлении комментария: {e}")

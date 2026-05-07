@@ -10,7 +10,7 @@ import email
 from collections import OrderedDict
 from typing import List, Dict, Optional
 
-from src.utils.logger import system_logger
+from src.utils.logger import main_logger
 from src.utils.event.bus import EventBus
 from src.utils.event.registry import Events
 
@@ -55,7 +55,7 @@ class EmailEvents:
 
         self._is_running = True
         self._polling_task = asyncio.create_task(self._loop())
-        system_logger.info("[Email] Фоновый поллинг новых писем запущен.")
+        main_logger.info("[Email] Фоновый поллинг новых писем запущен.")
 
     async def stop(self) -> None:
         """Останавливает цикл."""
@@ -107,7 +107,7 @@ class EmailEvents:
                         )
                 return events_to_emit
         except Exception as e:
-            system_logger.error(f"[Email] Ошибка при проверке почты: {e}")
+            main_logger.error(f"[Email] Ошибка при проверке почты: {e}")
             return []
 
     async def _loop(self) -> None:
@@ -131,6 +131,6 @@ class EmailEvents:
             except asyncio.CancelledError:
                 break
             except Exception as e:
-                system_logger.error(f"[Email] Ошибка в цикле мониторинга почты: {e}")
+                main_logger.error(f"[Email] Ошибка в цикле мониторинга почты: {e}")
 
             await asyncio.sleep(self.interval)

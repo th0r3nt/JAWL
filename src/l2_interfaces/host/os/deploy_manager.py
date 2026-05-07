@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Tuple
 
 from src import __version__
-from src.utils.logger import system_logger
+from src.utils.logger import main_logger
 
 
 class HostOSDeployManager:
@@ -39,7 +39,7 @@ class HostOSDeployManager:
         if not self.manifest_file.exists():
             self.manifest_file.touch()
 
-        system_logger.info(
+        main_logger.info(
             f"[Deploy] Деплой-сессия успешно инициализирована (JAWL v{__version__})."
         )
         return (
@@ -66,11 +66,11 @@ class HostOSDeployManager:
 
             backup_path.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(filepath, backup_path)
-            system_logger.debug(f"[Deploy] Бэкап файла: {rel_path}")
+            main_logger.debug(f"[Deploy] Бэкап файла: {rel_path}")
         else:
             with open(self.manifest_file, "a", encoding="utf-8") as f:
                 f.write(f"{rel_path}\n")
-            system_logger.debug(f"[Deploy] Новый файл добавлен в манифест: {rel_path}")
+            main_logger.debug(f"[Deploy] Новый файл добавлен в манифест: {rel_path}")
 
     async def commit_session(
         self,
@@ -90,7 +90,9 @@ class HostOSDeployManager:
         if not self.is_active:
             return False, "Нет активной деплой-сессии."
 
-        system_logger.info(f"[Deploy] Запуск валидации изменений. (force={force}, target={test_path})")
+        main_logger.info(
+            f"[Deploy] Запуск валидации изменений. (force={force}, target={test_path})"
+        )
 
         # 1. Синтаксическая проверка (ОБЯЗАТЕЛЬНА)
         proc_syntax = await asyncio.create_subprocess_exec(
@@ -112,7 +114,7 @@ class HostOSDeployManager:
 
         # 2. Прогон всех Юнит-тестов (Pytest)
         test_args = test_path.split()
-        
+
         proc_tests = await asyncio.create_subprocess_exec(
             sys.executable,
             "-m",
@@ -131,16 +133,21 @@ class HostOSDeployManager:
         if proc_tests.returncode != 0:
             out_str = stdout_test.decode("utf-8", errors="replace")
             err_msg = out_str[-10000:] if len(out_str) > 10000 else out_str
-            
+
             if force:
-                system_logger.warning("[Deploy] Тесты провалены, но применен FORCE-коммит. Сохранение изменений.")
+                main_logger.warning(
+                    "[Deploy] Тесты провалены, но применен FORCE-коммит. Сохранение изменений."
+                )
                 self._cleanup()
-                return True, f"Внимание: Тесты провалены, но коммит принудительно сохранен (force=True). Лог:\n{err_msg}\n\nДеплой-сессия закрыта."
+                return (
+                    True,
+                    f"Внимание: Тесты провалены, но коммит принудительно сохранен (force=True). Лог:\n{err_msg}\n\nДеплой-сессия закрыта.",
+                )
             else:
                 return self._handle_failure(f"Тесты упали:\n{err_msg}")
 
         self._cleanup()
-        system_logger.info("[Deploy] Тесты пройдены. Изменения успешно зафиксированы.")
+        main_logger.info("[Deploy] Тесты пройдены. Изменения успешно зафиксированы.")
         return (
             True,
             "Тесты пройдены. Код зафиксирован, деплой-сессия закрыта. Рекомендуется инициировать перезагрузку системы для применения изменений.",
@@ -149,13 +156,13 @@ class HostOSDeployManager:
     def _handle_failure(self, error_report: str) -> Tuple[bool, str]:
         self.retries_left -= 1
         if self.retries_left > 0:
-            system_logger.warning(
+            main_logger.warning(
                 f"[Deploy] Тесты не пройдены. Осталось попыток: {self.retries_left}."
             )
             msg = f"Ошибка деплоя. \n{error_report} \n\nОсталось {self.retries_left} попыток исправить ошибку."
             return False, msg
         else:
-            system_logger.error("[Deploy] Попытки исчерпаны. Откат изменений.")
+            main_logger.error("[Deploy] Попытки исчерпаны. Откат изменений.")
             self.rollback_session()
             msg = f"Ошибка деплоя. \n{error_report} \n\nПопытки исчерпаны. Все изменения в коде фреймворка были автоматически удалены. Деплой-сессия закрыта."
             return False, msg
@@ -184,7 +191,7 @@ class HostOSDeployManager:
                 if nf:
                     target = self._resolve_manifest_target(nf)
                     if target is None:
-                        system_logger.warning(
+                        main_logger.warning(
                             f"[Deploy] Пропущена небезопасная запись manifest при rollback: {nf}"
                         )
                         continue
@@ -195,7 +202,7 @@ class HostOSDeployManager:
                             target.unlink(missing_ok=True)
 
         self._cleanup()
-        system_logger.info("[Deploy] Изменения успешно откачены (Rollback).")
+        main_logger.info("[Deploy] Изменения успешно откачены (Rollback).")
         return (
             True,
             "Откат успешно выполнен. Системные файлы восстановлены до состояния начала сессии.",

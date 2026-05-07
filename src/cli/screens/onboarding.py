@@ -278,6 +278,35 @@ def run_onboarding_if_needed() -> bool:
         settings_updates[("system", "tree_of_thoughts", "mode")] = tot_mode
         settings_updates[("system", "tree_of_thoughts", "branches")] = tot_branches
 
+    # 7. Настройка Подсознания (Subconscious)
+    print("\n")
+    print_info(" Подсистема Подсознания позволяет переложить рутинные операции по запоминанию фактов, рефлексии и забыванию неактуальных данных на фоновые микро-процессы.")
+    enable_subc = questionary.confirm(
+        "Включить Подсознание?", default=True, style=style
+    ).ask()
+    
+    if enable_subc is None:
+        return False
+        
+    if enable_subc:
+        # Предлагаем модель субагентов по умолчанию (Flash Lite / Mini)
+        default_subc_model = sub_model.strip() if enable_swarm and sub_model else main_model.strip()
+        
+        subc_model = questionary.text(
+            "Введите название LLM модели для Подсознания (рекомендуется самая дешевая и быстрая):",
+            default=default_subc_model,
+            style=style,
+        ).ask()
+        if not subc_model:
+            return False
+    
+        settings_updates[("system", "subconscious", "enabled")] = True
+        settings_updates[("system", "subconscious", "llm_model")] = subc_model.strip()
+        # По умолчанию включаем 3 основных паттерна
+        settings_updates[("system", "subconscious", "patterns", "consolidation", "enabled")] = True
+        settings_updates[("system", "subconscious", "patterns", "reflection", "enabled")] = True
+        settings_updates[("system", "subconscious", "patterns", "forgetting", "enabled")] = True
+
     # Сохраняем все данные
     _update_env_file(env_updates)
     _update_settings_yaml(settings_updates)

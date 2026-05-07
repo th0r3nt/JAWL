@@ -9,7 +9,7 @@ import asyncio
 from pathlib import Path
 import kuzu
 
-from src.utils.logger import system_logger
+from src.utils.logger import main_logger
 from src.l1_databases.graph.schema import (
     GRAPH_NODE_TABLE,
     GRAPH_EDGE_TABLES,
@@ -36,9 +36,9 @@ class GraphDB:
 
         try:
             await asyncio.to_thread(_init_db)
-            system_logger.info("[Graph DB] База данных Kuzu успешно инициализирована.")
+            main_logger.info("[Graph DB] База данных Kuzu успешно инициализирована.")
         except Exception as e:
-            system_logger.error(f"[Graph DB] Критическая ошибка при запуске Kuzu: {e}")
+            main_logger.error(f"[Graph DB] Критическая ошибка при запуске Kuzu: {e}")
             raise e
 
     def _init_schema(self) -> None:
@@ -123,4 +123,4 @@ class GraphDB:
             # В KuzuDB база освобождает блокировку файлов только при удалении объекта
             self.db = None
 
-        system_logger.info("[Graph DB] Подключение закрыто.")
+        main_logger.info("[Graph DB] Подключение закрыто.")

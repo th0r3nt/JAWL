@@ -4,7 +4,7 @@ from pathlib import Path
 from pydantic import BaseModel, ConfigDict, Field
 from yaml.constructor import ConstructorError
 
-from src.utils.logger import system_logger
+from src.utils.logger import main_logger
 
 # ==========================================
 # Модели для interfaces.yaml
@@ -320,11 +320,40 @@ class TreeOfThoughtsConfig(BaseModel):
     llm_model: str = "unknown"
     mode: str = "hybrid"  # "manual", "auto", "hybrid"
     auto_interval_steps: int = 5
-    
+
     # Настройки геометрии дерева мыслей (Осторожно: экспоненциальный рост)
-    branches: int = 3                # Количество макро-стратегий (Уровень 1)
+    branches: int = 3  # Количество макро-стратегий (Уровень 1)
     simulations_per_branch: int = 2  # Количество вложенных сценариев на каждый узел
-    max_depth: int = 2               # Максимальная глубина вложенности (1 -> 1.1 -> 1.1.1)
+    max_depth: int = 2  # Максимальная глубина вложенности (1 -> 1.1 -> 1.1.1)
+
+
+class SubconsciousPatternConfig(BaseModel):
+    enabled: bool = False
+    activation_limit_ticks: int = 30
+
+
+class SubconsciousPatternsConfig(BaseModel):
+    consolidation: SubconsciousPatternConfig = Field(
+        default_factory=lambda: SubconsciousPatternConfig(
+            enabled=True, activation_limit_ticks=30
+        )
+    )
+    reflection: SubconsciousPatternConfig = Field(
+        default_factory=lambda: SubconsciousPatternConfig(
+            enabled=True, activation_limit_ticks=60
+        )
+    )
+    forgetting: SubconsciousPatternConfig = Field(
+        default_factory=lambda: SubconsciousPatternConfig(
+            enabled=True, activation_limit_ticks=90
+        )
+    )
+
+
+class SubconsciousConfig(BaseModel):
+    enabled: bool = False
+    llm_model: str = "unknown"
+    patterns: SubconsciousPatternsConfig = Field(default_factory=SubconsciousPatternsConfig)
 
 
 class SystemConfig(BaseModel):
@@ -340,6 +369,7 @@ class SystemConfig(BaseModel):
     context_depth: ContextDepthConfig = Field(default_factory=ContextDepthConfig)
     swarm: SwarmConfig = Field(default_factory=SwarmConfig)
     tree_of_thoughts: TreeOfThoughtsConfig = Field(default_factory=TreeOfThoughtsConfig)
+    subconscious: SubconsciousConfig = Field(default_factory=SubconsciousConfig)
 
 
 class SettingsConfig(BaseModel):
@@ -404,7 +434,7 @@ def _log_missing_defaults(model: BaseModel, prefix: str = "", file_name: str = "
 
     if missing_keys:
         keys_str = ", ".join(f"'{prefix}{k}'" for k in missing_keys)
-        system_logger.debug(
+        main_logger.debug(
             f"[{file_name}] Отсутствуют настройки {keys_str}. Применены значения по умолчанию."
         )
 
@@ -444,7 +474,7 @@ def _sync_yaml_file(user_file: Path, example_file: Path) -> None:
 
     if not user_file.exists():
         shutil.copy(example_file, user_file)
-        system_logger.info(f"[Config] Создан базовый файл конфигурации {user_file.name}")
+        main_logger.info(f"[Config] Создан базовый файл конфигурации {user_file.name}")
         return
 
     # Загружаем через ruamel для сохранения комментариев
@@ -462,12 +492,12 @@ def _sync_yaml_file(user_file: Path, example_file: Path) -> None:
         if _deep_update_ruamel(example_data, user_data):
             with open(user_file, "w", encoding="utf-8") as f:
                 ryaml.dump(user_data, f)
-            system_logger.info(
+            main_logger.info(
                 f"[Config] Файл {user_file.name} автоматически обновлен (добавлены новые поля из шаблона)."
             )
 
     except Exception as e:
-        system_logger.error(f"[Config] Ошибка авто-обновления {user_file.name}: {e}")
+        main_logger.error(f"[Config] Ошибка авто-обновления {user_file.name}: {e}")
 
 
 def load_config() -> tuple[SettingsConfig, InterfacesConfig]:

@@ -3,7 +3,7 @@
 Позволяют агенту извлекать чистый контент (Summary/Description) без перехода на оригинальные сайты.
 """
 
-from src.utils.logger import system_logger
+from src.utils.logger import main_logger
 from src.utils._tools import truncate_text, clean_html
 from src.l3_agent.skills.registry import skill, SkillResult
 from src.l2_interfaces.web.rss.client import WebRSSClient
@@ -43,7 +43,7 @@ class WebRSSSkills:
             feed = await self.client.fetch_feed(url)
 
             if feed.bozo:
-                system_logger.warning(
+                main_logger.warning(
                     f"[Web] Лента {url} имеет ошибки формата, но будет распарсена частично."
                 )
 
@@ -68,7 +68,7 @@ class WebRSSSkills:
                     f"### {title}\n* Дата: {date}\n* URL: {link}\n* Summary: {summary}\n"
                 )
 
-            system_logger.info(
+            main_logger.info(
                 f"[Web] Прочитана лента '{url}' ({len(feed.entries[:limit])} записей)."
             )
             return SkillResult.ok("\n".join(lines))

@@ -29,61 +29,6 @@ TOT_SCHEMA = [
         "type": "function",
         "function": {
             "name": "submit_tree",
-            "description": "Отправляет сгенерированное рекурсивное дерево мыслей (стратегий) в систему.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "branches": {
-                        "type": "array",
-                        "description": "Список макро-стратегий (веток верхнего уровня).",
-                        "items": {"$ref": "#/$defs/ThoughtBranch"},
-                    }
-                },
-                "required": ["branches"],
-                "additionalProperties": False,
-                "$defs": {
-                    "ThoughtBranch": {
-                        "type": "object",
-                        "properties": {
-                            "name": {
-                                "type": "string",
-                                "description": "Короткое название стратегии/пути.",
-                            },
-                            "description": {
-                                "type": "string",
-                                "description": "Подробное описание логики или тактики.",
-                            },
-                            "pros": {
-                                "type": "array",
-                                "description": "Список плюсов и преимуществ этого пути.",
-                                "items": {"type": "string"},
-                            },
-                            "cons": {
-                                "type": "array",
-                                "description": "Список минусов, рисков и уязвимостей этого пути.",
-                                "items": {"type": "string"},
-                            },
-                            "sub_branches": {
-                                "type": "array",
-                                "description": "Вложенные сценарии (микро-тактики).",
-                                "items": {"$ref": "#/$defs/ThoughtBranch"},
-                            },
-                        },
-                        "required": ["name", "description", "pros", "cons"],
-                        "additionalProperties": False,
-                    }
-                },
-            },
-        },
-    }
-]
-
-
-TOT_SCHEMA = [
-    {
-        "type": "function",
-        "function": {
-            "name": "submit_tree",
             "description": "Отправляет сгенерированное рекурсивное дерево мыслей в систему.",
             "parameters": {
                 "type": "object",
@@ -124,7 +69,10 @@ TOT_SCHEMA = [
                                 "items": {"$ref": "#/$defs/ThoughtBranch"},
                             },
                         },
-                        "required": ["name", "description", "pros", "cons"],
+                        "required": [
+                            "name",
+                            "description",
+                        ],  # Убрали pros и cons из обязательных
                         "additionalProperties": False,
                     }
                 },

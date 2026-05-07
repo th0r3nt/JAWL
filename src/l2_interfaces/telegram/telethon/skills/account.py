@@ -20,7 +20,7 @@ from telethon.tl.types import (
 )
 
 from src.utils.dtime import format_datetime
-from src.utils.logger import system_logger
+from src.utils.logger import main_logger
 from src.utils._tools import format_size, validate_sandbox_path, parse_int_or_str
 
 from src.l2_interfaces.telegram.telethon.client import TelethonClient
@@ -171,7 +171,7 @@ class TelethonAccount:
 
             target_photo = photos[avatar_index]
 
-            system_logger.info(
+            main_logger.info(
                 f"[Telegram Telethon] Скачивание аватара (индекс {avatar_index})..."
             )
             downloaded_path = await client.download_media(target_photo, file=str(safe_path))
@@ -180,7 +180,7 @@ class TelethonAccount:
                 return SkillResult.fail("Не удалось скачать аватар (возможно нет доступа).")
 
             size_str = format_size(safe_path.stat().st_size)
-            system_logger.info(
+            main_logger.info(
                 f"[Telegram Telethon] Аватар скачан: {safe_path.name} ({size_str})"
             )
 

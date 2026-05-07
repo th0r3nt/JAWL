@@ -12,7 +12,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional, Dict
 
-from src.utils.logger import system_logger
+from src.utils.logger import main_logger
 from src.utils.event.bus import EventBus
 from src.utils.event.registry import Events
 from src.utils.dtime import format_datetime
@@ -68,7 +68,7 @@ class GithubEvents:
         self._load_persisted_repos()
         self._is_running = True
         self._polling_task = asyncio.create_task(self._loop())
-        system_logger.info("[Github] Фоновый поллинг запущен.")
+        main_logger.info("[Github] Фоновый поллинг запущен.")
 
     async def stop(self) -> None:
         """Останавливает цикл проверки."""
@@ -76,7 +76,7 @@ class GithubEvents:
         if self._polling_task:
             self._polling_task.cancel()
             self._polling_task = None
-        system_logger.info("[Github] Фоновый поллинг остановлен.")
+        main_logger.info("[Github] Фоновый поллинг остановлен.")
 
     # ==========================================================
     # PERSISTENCE (Сохранение на диск)
@@ -92,7 +92,7 @@ class GithubEvents:
                 if isinstance(data, dict):
                     self.state.tracked_repos = data
         except Exception as e:
-            system_logger.warning(f"[Github] Ошибка чтения tracked_repos.json: {e}")
+            main_logger.warning(f"[Github] Ошибка чтения tracked_repos.json: {e}")
 
     def save_persisted_repos(self) -> None:
         """Сохраняет текущий список отслеживаемых репозиториев (с ватермарками)."""
@@ -100,7 +100,7 @@ class GithubEvents:
             with open(self._persistence_file, "w", encoding="utf-8") as f:
                 json.dump(self.state.tracked_repos, f, indent=4)
         except Exception as e:
-            system_logger.error(f"[Github] Ошибка сохранения tracked_repos.json: {e}")
+            main_logger.error(f"[Github] Ошибка сохранения tracked_repos.json: {e}")
 
     def _format_gh_time(self, iso_str: str) -> str:
         """Форматирует ISO строку времени от GitHub в читаемый вид."""
@@ -129,7 +129,7 @@ class GithubEvents:
             except asyncio.CancelledError:
                 break
             except Exception as e:
-                system_logger.debug(f"[Github] Ошибка в цикле мониторинга: {e}")
+                main_logger.debug(f"[Github] Ошибка в цикле мониторинга: {e}")
 
             await asyncio.sleep(self.client.config.polling_interval_sec)
 
@@ -170,7 +170,7 @@ class GithubEvents:
                     self.state.unread_notifications = "\n".join(notif_lines)
 
         except Exception as e:
-            system_logger.debug(f"[Github] Ошибка фонового обновления профиля: {e}")
+            main_logger.debug(f"[Github] Ошибка фонового обновления профиля: {e}")
 
     async def _poll_watched_repos(self) -> None:
         """Мониторит список отслеживаемых репозиториев и генерирует системные события."""
@@ -251,7 +251,7 @@ class GithubEvents:
                     modified = True
 
             except Exception as e:
-                system_logger.debug(f"[Github] Ошибка поллинга репозитория {repo_name}: {e}")
+                main_logger.debug(f"[Github] Ошибка поллинга репозитория {repo_name}: {e}")
 
         if modified:
             self.save_persisted_repos()

@@ -4,7 +4,7 @@ from src.l2_interfaces.host.os.decorators import require_access
 from src.l2_interfaces.host.os.events import HostOSEvents
 
 from src.l3_agent.skills.registry import SkillResult, skill
-from src.utils.logger import system_logger
+from src.utils.logger import main_logger
 
 
 class HostOSMonitoring:
@@ -29,7 +29,7 @@ class HostOSMonitoring:
             if not success:
                 return SkillResult.ok(f"Директория {safe_path.name} уже отслеживается.")
 
-            system_logger.info(f"[Host OS] Начато отслеживание директории: {safe_path}")
+            main_logger.info(f"[Host OS] Начато отслеживание директории: {safe_path}")
             return SkillResult.ok(f"Успешно. Директория {safe_path} теперь отслеживается.")
 
         except ValueError as e:
@@ -57,7 +57,7 @@ class HostOSMonitoring:
                     f"Ошибка: Директория {safe_path.name} не отслеживается."
                 )
 
-            system_logger.info(f"[Host OS] Прекращено отслеживание директории: {safe_path}")
+            main_logger.info(f"[Host OS] Прекращено отслеживание директории: {safe_path}")
             return SkillResult.ok(f"Успешно. Директория {safe_path} больше не отслеживается.")
 
         except ValueError as e:

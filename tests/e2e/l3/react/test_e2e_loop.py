@@ -84,6 +84,9 @@ async def test_e2e_react_loop_creates_task_and_saves_tick(tmp_path: Path):
     llm_client.get_session.return_value = mock_session
 
     # 6. Собираем петлю
+    mock_bus = MagicMock()
+    mock_bus.publish = AsyncMock()
+
     loop = ReactLoop(
         llm_client=llm_client,
         prompt_builder=prompt_builder,
@@ -93,6 +96,7 @@ async def test_e2e_react_loop_creates_task_and_saves_tick(tmp_path: Path):
         vector_manager=vector_manager,
         token_tracker=token_tracker,
         tools=ACTION_SCHEMA,
+        event_bus=mock_bus,
     )
 
     # ==============================

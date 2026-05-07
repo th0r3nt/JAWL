@@ -22,7 +22,7 @@ def format_size(size_bytes: int) -> str:
     Returns:
         str: Отформатированная строка с подходящей единицей измерения.
     """
-    
+
     if size_bytes < 0:
         return f"-{format_size(-size_bytes)}"
 
@@ -252,3 +252,34 @@ def draw_image_grid(image_path: str | Path, step: int = 100) -> None:
         # Склеиваем слои и сохраняем
         combined = Image.alpha_composite(img.convert("RGBA"), overlay)
         combined.convert("RGB").save(image_path)
+
+
+def dump_prompt_to_file(filename: str, messages: list, meta_header: str = "") -> None:
+    """
+    Сохраняет контекст (prompts) в Markdown-файл для отладки.
+
+    Args:
+        filename: Путь к файлу (например 'logs/prompts/last_main_prompt.md').
+        messages: Массив сообщений (OpenAI формат).
+        meta_header: Опциональный заголовок для файла.
+    """
+    from src.utils.logger import main_logger
+
+    try:
+        file_path = Path(filename)
+        file_path.parent.mkdir(parents=True, exist_ok=True)
+
+        with open(file_path, "w", encoding="utf-8") as f:
+            if meta_header:
+                f.write(f"{meta_header}\n\n---\n\n")
+
+            for m in messages:
+                role = getattr(
+                    m, "role", m.get("role", "unknown") if isinstance(m, dict) else "unknown"
+                )
+                content = getattr(
+                    m, "content", m.get("content", "") if isinstance(m, dict) else ""
+                )
+                f.write(f"### Role: {role}\n{content}\n\n---\n")
+    except Exception as e:
+        main_logger.error(f"[System] Не удалось сохранить промпт в {filename}: {e}")

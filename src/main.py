@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 from typing import Optional, Any, TYPE_CHECKING
 
 from src.utils._tools import get_pid_file_path
-from src.utils.logger import system_logger, apply_logger_config
+from src.utils.logger import main_logger, apply_logger_config
 from src.utils.event.bus import EventBus
 from src.utils.event.registry import Events
 from src.utils.settings import load_config, SettingsConfig, InterfacesConfig
@@ -124,7 +124,7 @@ class System:
     ):
         """Читает конфиг, поднимает нужные интерфейсы и регистрирует их скиллы."""
 
-        system_logger.info("[System] Инициализация L2 Interfaces.")
+        main_logger.info("[System] Инициализация L2 Interfaces.")
 
         env_vars = {
             # Telethon
@@ -194,7 +194,7 @@ class System:
         pid_file.parent.mkdir(parents=True, exist_ok=True)
         pid_file.write_text(str(os.getpid()))
 
-        system_logger.info(f"[System] Инициализация JAWL v{__version__} (PID: {os.getpid()}).")
+        main_logger.info(f"[System] Инициализация JAWL v{__version__} (PID: {os.getpid()}).")
 
         try:
             # Сборка архитектуры через методы-обертки (инкапсулируют SystemBuilder)
@@ -234,13 +234,13 @@ class System:
                     await component.start()
                     started_components.append(component)
                 except Exception as e:
-                    system_logger.error(
+                    main_logger.error(
                         f"[System] Ошибка запуска {component.__class__.__name__}: {e}"
                     )
 
             self._lifecycle_components = started_components
 
-            system_logger.info(
+            main_logger.info(
                 f"[System] JAWL успешно запущен. Имя агента: {self.settings.identity.agent_name}"
             )
             await self.event_bus.publish(Events.SYSTEM_CORE_START, status="online")
@@ -259,7 +259,7 @@ class System:
             # Гарантированная очистка при любом исходе
             if pid_file.exists():
                 pid_file.unlink()
-                system_logger.info("[System] PID-файл удален.")
+                main_logger.info("[System] PID-файл удален.")
 
     async def _watch_for_stop_file(self):
         """Фоновая задача: ждет появления файла agent.stop от CLI для плавной остановки."""
@@ -276,7 +276,7 @@ class System:
         try:
             while True:
                 if stop_file.exists():
-                    system_logger.info(
+                    main_logger.info(
                         "[System] Получен сигнал от CLI (agent.stop). Запуск плавной остановки."
                     )
                     try:
@@ -299,7 +299,7 @@ class System:
         Остановка и очистка ресурсов.
         """
 
-        system_logger.info("[System] Инициирована остановка JAWL. Нанимаем киллеров.")
+        main_logger.info("[System] Инициирована остановка JAWL. Нанимаем киллеров.")
         await self.event_bus.publish(Events.SYSTEM_CORE_STOP, status="offline")
 
         if self.heartbeat:
@@ -309,7 +309,7 @@ class System:
             try:
                 await component.stop()
             except Exception as e:
-                system_logger.error(
+                main_logger.error(
                     f"[System] Ошибка при остановке {component.__class__.__name__}: {e}"
                 )
 
@@ -330,7 +330,7 @@ class System:
         if hasattr(self, "sub_llm_client") and self.sub_llm_client is not self.llm_client:
             await self.sub_llm_client.close()
 
-        system_logger.info("[System] Остановка завершена. Процесс выслежен и убит.")
+        main_logger.info("[System] Остановка завершена. Процесс выслежен и убит.")
 
 
 # ===================================================================
@@ -430,12 +430,12 @@ async def main() -> int:
         return 0
 
     except KeyboardInterrupt:
-        system_logger.info("[System] Получен сигнал прерывания.")
+        main_logger.info("[System] Получен сигнал прерывания.")
         return 0
 
     except BaseException as e:
-        system_logger.error(f"[System] Критическая ошибка: {type(e).__name__} - {e}")
-        system_logger.error(traceback.format_exc())
+        main_logger.error(f"[System] Критическая ошибка: {type(e).__name__} - {e}")
+        main_logger.error(traceback.format_exc())
         return 0
 
     finally:
@@ -449,7 +449,7 @@ if __name__ == "__main__":
             exit_code = asyncio.run(main())
 
             if exit_code == 1:
-                system_logger.info("[System] Инициализирована перезагрузка.")
+                main_logger.info("[System] Инициализирована перезагрузка.")
                 time.sleep(1)  # Даем ОС время на полное освобождение сокетов и дескрипторов
                 continue
             else:

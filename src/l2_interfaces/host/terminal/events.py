@@ -1,11 +1,11 @@
 """
 Оркестратор событий терминала.
-Выступает мостом (Consumer) между внутренней асинхронной очередью TCP-сервера 
+Выступает мостом (Consumer) между внутренней асинхронной очередью TCP-сервера
 и глобальной шиной событий (EventBus).
 """
 
 import asyncio
-from src.utils.logger import system_logger
+from src.utils.logger import main_logger
 from src.utils.event.bus import EventBus
 from src.utils.event.registry import Events
 from src.l2_interfaces.host.terminal.client import HostTerminalClient
@@ -57,4 +57,4 @@ class HostTerminalEvents:
             except asyncio.CancelledError:
                 break
             except Exception as e:
-                system_logger.error(f"[Host OS] Ошибка в обработке терминала: {e}")
+                main_logger.error(f"[Host OS] Ошибка в обработке терминала: {e}")

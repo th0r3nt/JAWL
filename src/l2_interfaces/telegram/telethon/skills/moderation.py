@@ -13,7 +13,7 @@ from telethon.tl.types import ChannelParticipantsKicked
 
 from src.l2_interfaces.telegram.telethon.client import TelethonClient
 from src.l3_agent.skills.registry import SkillResult, skill
-from src.utils.logger import system_logger
+from src.utils.logger import main_logger
 
 
 class TelethonModeration:
@@ -26,7 +26,7 @@ class TelethonModeration:
     async def ban_user(self, user_id: int, chat_id: Optional[int] = None) -> SkillResult:
         """
         Банит пользователя.
-        
+
         - Если chat_id НЕ передан: добавляет юзера в глобальный личный черный список (ЛС).
         - Если chat_id передан: исключает юзера из указанной группы/канала навсегда.
 
@@ -48,7 +48,7 @@ class TelethonModeration:
                     f"[Telegram Telethon] Пользователь {target_user} добавлен в глобальный ЧС."
                 )
 
-            system_logger.info(msg)
+            main_logger.info(msg)
             return SkillResult.ok(msg)
 
         except ValueError:
@@ -77,7 +77,7 @@ class TelethonModeration:
                     f"[Telegram Telethon] Пользователь {target_user} удален из глобального ЧС."
                 )
 
-            system_logger.info(msg)
+            main_logger.info(msg)
             return SkillResult.ok(msg)
 
         except ValueError:
@@ -99,7 +99,7 @@ class TelethonModeration:
             await client.kick_participant(target_chat, target_user)
 
             msg = f"[Telegram Telethon] Пользователь {target_user} выгнан (kick) из чата {target_chat}."
-            system_logger.info(msg)
+            main_logger.info(msg)
             return SkillResult.ok(msg)
 
         except ValueError:
@@ -138,7 +138,7 @@ class TelethonModeration:
                 f"на {duration_minutes} минут" if duration_minutes > 0 else "навсегда"
             )
             msg = f"[Telegram Telethon] Пользователь {target_user} замучен {duration_str} в чате {target_chat}."
-            system_logger.info(msg)
+            main_logger.info(msg)
             return SkillResult.ok(msg)
 
         except ValueError:

@@ -6,7 +6,7 @@
 """
 
 from typing import List, Any, TYPE_CHECKING
-from src.utils.logger import system_logger
+from src.utils.logger import main_logger
 from src.l3_agent.skills.registry import register_instance
 from src.l3_agent.context.registry import ContextSection
 
@@ -28,7 +28,7 @@ def setup_host_terminal(system: "System") -> List[Any]:
     Returns:
         List[Any]: Компоненты жизненного цикла (client, events).
     """
-    
+
     config = system.interfaces_config.host.terminal
 
     client = HostTerminalClient(
@@ -51,6 +51,6 @@ def setup_host_terminal(system: "System") -> List[Any]:
         section=ContextSection.INTERFACES,
     )
 
-    system_logger.info("[Host Terminal] Интерфейс загружен.")
+    main_logger.info("[Host Terminal] Интерфейс загружен.")
 
     return [client, events]

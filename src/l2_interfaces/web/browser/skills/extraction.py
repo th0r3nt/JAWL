@@ -1,5 +1,5 @@
 import asyncio
-from src.utils.logger import system_logger
+from src.utils.logger import main_logger
 from src.utils._tools import truncate_text, validate_sandbox_path, draw_image_grid
 from src.l3_agent.skills.registry import skill, SkillResult
 from src.l2_interfaces.web.browser.client import WebBrowserClient
@@ -47,7 +47,7 @@ class BrowserExtraction:
                 await asyncio.to_thread(draw_image_grid, safe_path, grid_step)
 
             self.client.state.add_history(f"Скриншот: {safe_path.name} (Grid: {with_grid})")
-            system_logger.info(f"[Web Browser] Сделан скриншот: {safe_path.name}")
+            main_logger.info(f"[Web Browser] Сделан скриншот: {safe_path.name}")
 
             marker = f"[SYSTEM_MARKER_IMAGE_ATTACHED: {safe_path.resolve()}]"
             return SkillResult.ok(

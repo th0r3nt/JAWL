@@ -10,7 +10,7 @@ import uuid
 from typing import TYPE_CHECKING, Any
 from sqlalchemy import select, delete, func
 
-from src.utils.logger import system_logger
+from src.utils.logger import main_logger
 from src.utils.dtime import format_datetime
 from src.utils._tools import truncate_text
 
@@ -67,7 +67,7 @@ class SQLNotes:
             await session.commit()
 
         msg = f"Заметка успешно создана (ID: {note_id})."
-        system_logger.debug(f"[SQL DB] {msg}")
+        main_logger.debug(f"[SQL DB] {msg}")
         return SkillResult.ok(msg)
 
     @skill()
@@ -94,7 +94,7 @@ class SQLNotes:
             await session.commit()
 
         msg = f"Заметка '{note_id}' успешно обновлена."
-        system_logger.debug(f"[SQL DB] {msg}")
+        main_logger.debug(f"[SQL DB] {msg}")
         return SkillResult.ok(msg)
 
     @skill()
@@ -113,7 +113,7 @@ class SQLNotes:
                 return SkillResult.fail(f"Заметка с ID '{note_id}' не найдена.")
 
         msg = f"Заметка '{note_id}' удалена."
-        system_logger.debug(f"[SQL DB] {msg}")
+        main_logger.debug(f"[SQL DB] {msg}")
         return SkillResult.ok(msg)
 
     @skill()

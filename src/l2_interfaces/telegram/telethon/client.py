@@ -10,7 +10,7 @@ from typing import Any, Optional
 from telethon import TelegramClient
 from telethon.tl.functions.users import GetFullUserRequest
 
-from src.utils.logger import system_logger
+from src.utils.logger import main_logger
 from src.l2_interfaces.telegram.telethon.state import TelethonState
 
 
@@ -69,7 +69,7 @@ class TelethonClient:
         Raises:
             Exception: При сетевых сбоях или фатальных ошибках MTProto.
         """
-        system_logger.info("[Telegram Telethon] Инициализация клиента.")
+        main_logger.info("[Telegram Telethon] Инициализация клиента.")
 
         try:
             self._client = TelegramClient(self.session_path, self.api_id, self.api_hash)
@@ -83,18 +83,18 @@ class TelethonClient:
             # Сразу после старта стягиваем полные данные о профиле
             await self.update_profile_state()
 
-            system_logger.info(f"[Telegram Telethon] Успешная авторизация как: @{name}")
+            main_logger.info(f"[Telegram Telethon] Успешная авторизация как: @{name}")
             self.state.is_online = True
 
         except Exception as e:
-            system_logger.error(f"[Telegram Telethon] Критическая ошибка при запуске: {e}")
+            main_logger.error(f"[Telegram Telethon] Критическая ошибка при запуске: {e}")
             raise e
 
     async def stop(self) -> None:
         """Корректно отключается от серверов Telegram."""
         if self._client and self._client.is_connected():
             await self._client.disconnect()
-            system_logger.info("[Telegram Telethon] Клиент отключен.")
+            main_logger.info("[Telegram Telethon] Клиент отключен.")
             self.state.is_online = False
 
     async def update_profile_state(self) -> None:
@@ -140,7 +140,7 @@ class TelethonClient:
                 f"Профиль: {name} ({username}) | Био: {bio}{channel_info}\n---"
             )
         except Exception as e:
-            system_logger.error(f"[Telegram Telethon] Ошибка обновления профиля: {e}")
+            main_logger.error(f"[Telegram Telethon] Ошибка обновления профиля: {e}")
             self.state.account_info = "Профиль: Ошибка загрузки данных\n---"
 
     async def get_context_block(self, **kwargs: Any) -> str:

@@ -14,7 +14,7 @@ from aiogram.types import Message
 
 from src.utils.event.bus import EventBus
 from src.utils.event.registry import Events
-from src.utils.logger import system_logger
+from src.utils.logger import main_logger
 
 from src.l2_interfaces.telegram.aiogram.state import AiogramState
 from src.l2_interfaces.telegram.aiogram.client import AiogramClient
@@ -80,7 +80,7 @@ class AiogramEvents:
         await bot.delete_webhook(drop_pending_updates=True)
 
         self._polling_task = asyncio.create_task(self.dp.start_polling(bot))
-        system_logger.info("[Telegram Aiogram] Фоновый поллинг запущен.")
+        main_logger.info("[Telegram Aiogram] Фоновый поллинг запущен.")
 
     async def stop(self) -> None:
         """Останавливает поллинг и корректно закрывает Dispatcher."""
@@ -93,7 +93,7 @@ class AiogramEvents:
         except RuntimeError:
             pass  # Игнорируем ошибку "Polling is not started"
 
-        system_logger.info("[Telegram Aiogram] Фоновый поллинг остановлен.")
+        main_logger.info("[Telegram Aiogram] Фоновый поллинг остановлен.")
 
     async def _update_state(self, message: Message) -> None:
         """

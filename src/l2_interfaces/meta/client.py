@@ -12,7 +12,7 @@ from ruamel.yaml import YAML
 
 from src.l0_state.agent.state import AgentState
 from src.utils.event.bus import EventBus
-from src.utils.logger import system_logger
+from src.utils.logger import main_logger
 
 
 class MetaClient:
@@ -80,7 +80,7 @@ class MetaClient:
 
             return True
         except Exception as e:
-            system_logger.error(f"[Meta] Ошибка обновления {file_path.name}: {e}")
+            main_logger.error(f"[Meta] Ошибка обновления {file_path.name}: {e}")
             return False
 
     def has_env_key(self, key_name: str) -> bool:
@@ -92,7 +92,7 @@ class MetaClient:
         Провайдер контекста для ContextRegistry.
         Отдает агенту список его мета-возможностей и текущий Access Level.
         """
-        
+
         access_levels_desc = (
             "Существующие уровни доступа: \n"
             "- 0/SAFE: Базовые настройки.\n"

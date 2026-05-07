@@ -12,7 +12,7 @@ import ast
 from pathlib import Path
 from typing import Dict, Any, Tuple
 
-from src.utils.logger import system_logger
+from src.utils.logger import main_logger
 from src.l3_agent.skills.registry import register_custom_callable, unregister_skill
 
 
@@ -48,7 +48,7 @@ class CustomSkillsRegistry:
                 self._create_and_register_proxy(skill_name, info)
 
         except Exception as e:
-            system_logger.error(f"[System] Ошибка загрузки кастомных скиллов: {e}")
+            main_logger.error(f"[System] Ошибка загрузки кастомных скиллов: {e}")
 
     def _create_and_register_proxy(self, skill_name: str, info: Dict[str, Any]) -> None:
         """

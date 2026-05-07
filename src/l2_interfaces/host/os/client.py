@@ -13,7 +13,7 @@ from pathlib import Path
 import shutil
 from typing import Union, Dict, Any
 
-from src.utils.logger import system_logger
+from src.utils.logger import main_logger
 from src.utils.settings import HostOSConfig
 from src.l2_interfaces.host.os.state import HostOSState
 
@@ -57,7 +57,7 @@ class HostOSClient:
         try:
             self.access_level = HostOSAccessLevel(self.config.access_level)
         except ValueError:
-            system_logger.warning(
+            main_logger.warning(
                 f"[Host OS] Неизвестный access_level: {self.config.access_level}. Сброс на SANDBOX (0)."
             )
             self.access_level = HostOSAccessLevel.SANDBOX
@@ -75,7 +75,7 @@ class HostOSClient:
         self.download_dir.mkdir(parents=True, exist_ok=True)
         self.events_dir.mkdir(parents=True, exist_ok=True)
 
-        system_logger.info(
+        main_logger.info(
             f"[Host OS] Клиент инициализирован (ОС: {self.os_platform}, Access Level: {self.access_level})."
         )
         self.state.is_online = True
@@ -266,7 +266,7 @@ class HostOSClient:
         if template_path.exists():
             shutil.copy2(template_path, api_path)
         else:
-            system_logger.warning("[Host OS] Шаблон framework_api.py не найден.")
+            main_logger.warning("[Host OS] Шаблон framework_api.py не найден.")
 
     def get_daemons_registry(self) -> Dict[str, Any]:
         """Возвращает информацию о запущенных фоновых скриптах."""
@@ -353,7 +353,7 @@ class HostOSClient:
                     pass
             workspace_block = "\n" + "\n".join(ws_lines) + "\n"
         else:
-             workspace_block = "Нет открытых вкладок."
+            workspace_block = "Нет открытых вкладок."
 
         # ===============================================
         # Сборка истории изменений
@@ -363,7 +363,7 @@ class HostOSClient:
             rc_lines = [""]
             rc_lines.extend(self.state.recent_file_changes)
             recent_changes_block = "" + "\n\n".join(rc_lines) + "\n"
-        else: 
+        else:
             recent_changes_block = "Нет последних изменений."
 
         # ===============================================

@@ -7,7 +7,7 @@ Stateful-клиент для работы с Telegram Bot API (через биб
 
 from typing import Any, Optional
 from aiogram import Bot
-from src.utils.logger import system_logger
+from src.utils.logger import main_logger
 from src.l2_interfaces.telegram.aiogram.state import AiogramState
 
 
@@ -61,20 +61,20 @@ class AiogramClient:
             Exception: При невалидном токене или сетевой ошибке.
         """
 
-        system_logger.info("[Telegram Aiogram] Инициализация Aiogram клиента.")
+        main_logger.info("[Telegram Aiogram] Инициализация Aiogram клиента.")
 
         try:
             self._bot = Bot(token=self.bot_token)
 
             # Делаем тестовый запрос для проверки токена
             me = await self._bot.get_me()
-            system_logger.info(
+            main_logger.info(
                 f"[Telegram Aiogram] Aiogram успешно авторизован как бот: @{me.username}"
             )
             self.state.is_online = True
 
         except Exception as e:
-            system_logger.error(
+            main_logger.error(
                 f"[Telegram Aiogram] Критическая ошибка при запуске Aiogram: {e}"
             )
             raise e
@@ -86,7 +86,7 @@ class AiogramClient:
 
         if self._bot:
             await self._bot.session.close()
-            system_logger.info("[Telegram Aiogram] Aiogram клиент отключен.")
+            main_logger.info("[Telegram Aiogram] Aiogram клиент отключен.")
             self.state.is_online = False
 
     async def get_context_block(self, **kwargs: Any) -> str:

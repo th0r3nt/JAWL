@@ -237,8 +237,15 @@ def setup_and_run() -> None:
         sys.exit(exit_code)
 
     # Если всё импортировалось успешно - проверяем флаги
-    if "--logs" in sys.argv:
-        logs_screen()
+    log_arg = next((arg for arg in sys.argv if arg.startswith("--logs")), None)
+    
+    if log_arg:
+        if "-" in log_arg:
+            # Парсим тип из флага --logs-agent -> agent
+            log_type = log_arg.split("-")[-1]
+            logs_screen(log_type)
+        else:
+            logs_screen("main")
 
     elif "--terminal" in sys.argv:
         _open_terminal_chat()

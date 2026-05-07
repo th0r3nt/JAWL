@@ -15,16 +15,16 @@ def test_react_dump_context_to_file(mock_dependencies):
         {"role": "user", "content": "Hello"},
     ]
 
-    # Мокаем встроенную функцию open
     with patch("builtins.open") as mock_open:
         mock_file = MagicMock()
         mock_open.return_value.__enter__.return_value = mock_file
 
         loop._dump_context_to_file(messages)
 
-        mock_open.assert_called_once_with("logs/last_main_prompt.md", "w", encoding="utf-8")
+        # Проверяем, что используется правильный унифицированный путь
+        args, kwargs = mock_open.call_args
+        assert str(args[0]).replace("\\", "/") == "logs/prompts/last_main_prompt.md"
 
-        # Проверяем, что все сообщения были записаны
         written_content = "".join([call[0][0] for call in mock_file.write.call_args_list])
         assert "### Role: system" in written_content
         assert "You are AI" in written_content
@@ -63,7 +63,6 @@ async def test_react_empty_actions_exit(
     assert deps["agent_state"].current_step == 1
 
 
-
 @pytest.mark.asyncio
 @patch("src.l3_agent.react.loop.execute_skill", new_callable=AsyncMock)
 async def test_react_max_steps_limit(
@@ -94,13 +93,13 @@ async def test_react_rate_limit(mock_dependencies, mock_openai_response):
 
     mock_session1 = AsyncMock()
     mock_session1.api_key = "key_1"
-    
-    # Явно создаем мок ответа с пустыми заголовками, 
+
+    # Явно создаем мок ответа с пустыми заголовками,
     # чтобы механизм вычисления кулдауна пошел по дефолтному пути (60 сек)
     mock_resp = MagicMock()
     mock_resp.headers = {}
     rate_limit_err = openai.RateLimitError("429", response=mock_resp, body={})
-    
+
     mock_session1.chat.completions.create.side_effect = rate_limit_err
 
     mock_session2 = AsyncMock()

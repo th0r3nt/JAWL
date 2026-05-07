@@ -1,5 +1,5 @@
 import logging
-from src.utils.logger import ColorFormatter, LogColors, update_log_level, system_logger
+from src.utils.logger import ColorFormatter, LogColors, update_log_level, main_logger
 
 
 def test_color_formatter_truncation_for_console():
@@ -45,5 +45,5 @@ def test_color_formatter_coloring():
 
 def test_update_log_level():
     update_log_level("DEBUG")
-    assert system_logger.level == logging.DEBUG
+    assert main_logger.level == logging.DEBUG
     update_log_level("INFO")

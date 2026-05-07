@@ -7,7 +7,7 @@
 
 from typing import Optional
 
-from src.utils.logger import system_logger
+from src.utils.logger import main_logger
 from src.l3_agent.skills.registry import skill, SkillResult
 from src.l3_agent.swarm.roles import Subagents
 
@@ -28,7 +28,7 @@ class CodeGraphNavigation:
         self.graph = graph_crud
         self.vector = vector_crud
 
-    @skill(swarm_roles=[Subagents.CODER, Subagents.QA_ENGINEER])
+    @skill(swarm=[Subagents.CODER, Subagents.QA_ENGINEER])
     async def search_code_semantic(
         self, project_id: str, query: str, limit: Optional[int] = None
     ) -> SkillResult:
@@ -48,7 +48,9 @@ class CodeGraphNavigation:
             )
 
         try:
-            search_limit = limit if limit is not None else self.client.config.max_search_results
+            search_limit = (
+                limit if limit is not None else self.client.config.max_search_results
+            )
             results = await self.vector.search(query, project_id, search_limit)
 
             if not results:
@@ -68,17 +70,17 @@ class CodeGraphNavigation:
                     f"- [{r['type']}] `{clean_id}` (Сходство: {r['score']:.2f})\n  Докстринг: {desc}"
                 )
 
-            system_logger.info(f"[Code Graph] Семантический поиск по '{query}' завершен.")
+            main_logger.info(f"[Code Graph] Семантический поиск по '{query}' завершен.")
             return SkillResult.ok("\n".join(lines))
 
         except Exception as e:
             return SkillResult.fail(f"Ошибка семантического поиска: {e}")
 
-    @skill(swarm_roles=[Subagents.CODER, Subagents.QA_ENGINEER])
+    @skill(swarm=[Subagents.CODER, Subagents.QA_ENGINEER])
     async def trace_dependencies(self, project_id: str, target_name: str) -> SkillResult:
         """
-        Поиск "радиуса поражения" (Blast Radius). Показывает, в каких файлах импортируется 
-        указанный файл, или какие функции находятся внутри класса. 
+        Поиск "радиуса поражения" (Blast Radius). Показывает, в каких файлах импортируется
+        указанный файл, или какие функции находятся внутри класса.
         Например: полезно перед рефакторингом, чтобы понять, какие тесты нужно обновить.
 
         Args:
@@ -105,7 +107,7 @@ class CodeGraphNavigation:
                     "CONTAINS": "Внутри него находится",
                     "DEFINES": "Он определяет",
                     "CALLS": "Он вызывает",
-                }
+                },
             }
             return mapping.get(direction, {}).get(rel_type, f"[{rel_type}] связано с")
 
@@ -116,22 +118,24 @@ class CodeGraphNavigation:
             deps = await self.graph.get_dependencies(node_id)
 
             if not usages and not deps:
-                return SkillResult.ok(f"Узел '{target_name}' не найден в графе или не имеет связей.")
+                return SkillResult.ok(
+                    f"Узел '{target_name}' не найден в графе или не имеет связей."
+                )
 
             lines = [f"Архитектурные связи для `{target_name}`:\n"]
-            
+
             if usages:
                 lines.append("Кто использует этот узел (Зависят от него):")
                 for u in usages:
-                    clean_id = u['id'].replace(f"{project_id}::", "")
-                    rel_text = format_relation(u['relation'], "in")
+                    clean_id = u["id"].replace(f"{project_id}::", "")
+                    rel_text = format_relation(u["relation"], "in")
                     lines.append(f"  - {rel_text}: {clean_id} ({u['type']})")
-                    
+
             if deps:
                 lines.append("\nЧто использует этот узел (Он зависит от них):")
                 for d in deps:
-                    clean_id = d['id'].replace(f"{project_id}::", "")
-                    rel_text = format_relation(d['relation'], "out")
+                    clean_id = d["id"].replace(f"{project_id}::", "")
+                    rel_text = format_relation(d["relation"], "out")
                     lines.append(f"  - {rel_text}: {clean_id} ({d['type']})")
 
             return SkillResult.ok("\n".join(lines))
@@ -139,7 +143,7 @@ class CodeGraphNavigation:
         except Exception as e:
             return SkillResult.fail(f"Ошибка поиска зависимостей: {e}")
 
-    @skill(swarm_roles=[Subagents.CODER, Subagents.QA_ENGINEER])
+    @skill(swarm=[Subagents.CODER, Subagents.QA_ENGINEER])
     async def get_file_structure(self, project_id: str, filepath: str) -> SkillResult:
         """
         Мгновенно возвращает "оглавление" файла (какие классы и методы в нем есть) без полного чтения кода.
@@ -172,8 +176,8 @@ class CodeGraphNavigation:
                     lines.append("- ... [Остальные элементы скрыты для экономии контекста]")
                     break
 
-                if item['relation'] == "CONTAINS":
-                    clean_name = item['id'].replace(f"{project_id}::{filepath}::", "")
+                if item["relation"] == "CONTAINS":
+                    clean_name = item["id"].replace(f"{project_id}::{filepath}::", "")
                     count += 1
                     lines.append(f"- [{item['type']}] {clean_name}")
 

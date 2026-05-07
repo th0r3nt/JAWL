@@ -11,7 +11,7 @@ import uuid
 import traceback
 from pathlib import Path
 
-from src.utils.logger import system_logger
+from src.utils.logger import main_logger, swarm_logger
 from src.utils.settings import SwarmConfig
 from src.utils.token_tracker import TokenTracker
 
@@ -58,7 +58,7 @@ class SwarmManager:
         self.active_roles: dict[str, SubagentRole] = {}  # role_id -> SubagentRole
 
         for skill_name, data in _REGISTRY.items():
-            for role_obj in data.get("swarm_roles", []):
+            for role_obj in data.get("swarm", []):
                 if role_obj.id not in self.role_skills:
                     self.role_skills[role_obj.id] = []
                 self.role_skills[role_obj.id].append(skill_name)
@@ -156,6 +156,6 @@ class SwarmManager:
 
                 await loop.run()
         except Exception:
-            system_logger.error(
-                f"[Swarm] Критическая ошибка в фоновой задаче субагента {role.id}_{subagent_id}:\n{traceback.format_exc()}"
-            )
+            log = f"[Swarm] Критическая ошибка в фоновой задаче субагента {role.id}_{subagent_id}:\n{traceback.format_exc()}"
+            main_logger.error(log)
+            swarm_logger.error(log)

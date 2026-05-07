@@ -10,14 +10,17 @@ import inspect
 import asyncio
 from dataclasses import dataclass
 from typing import Optional, Callable, Dict, Any, TypeVar, List
+import logging
 
 from pydantic import create_model, BaseModel, ValidationError
 
-from src.utils.logger import system_logger
+from src.utils.logger import main_logger, agent_logger
 from src.utils._tools import truncate_text
+from src.utils.settings import SubconsciousConfig
 
 from src.l3_agent.skills.schema import ActionCall
 from src.l3_agent.swarm.roles import SubagentRole
+from src.l3_agent.subconscious.schema import Pattern
 
 
 @dataclass
@@ -58,7 +61,7 @@ def _build_skill_name(
     """
     Генерирует чистое имя функции (убирая системные префиксы src.l2_interfaces...).
     """
-    
+
     if override:
         return override
 
@@ -99,7 +102,8 @@ def _register_callable(
     func: Callable[..., Any],
     override: Optional[str] = None,
     instance: Optional[Any] = None,
-    swarm_roles: Optional[List[SubagentRole]] = None,
+    swarm: Optional[List[SubagentRole]] = None,
+    subconscious: Optional[List[Pattern]] = None,
     hidden: bool = False,
 ) -> None:
     """
@@ -133,10 +137,13 @@ def _register_callable(
         "instance": instance,
         "doc_string": doc_str,
         "is_custom": False,
-        "swarm_roles": swarm_roles or [],
+        "swarm": swarm or [],
+        "subconscious": subconscious or [],
         "hidden": hidden,
     }
-    system_logger.info(f"[Skills] Зарегистрирован скилл: {skill_name}")
+    log = f"[Skills] Зарегистрирован скилл: {skill_name}"
+    main_logger.debug(log)
+    agent_logger.debug(log)
 
 
 def register_custom_callable(
@@ -164,10 +171,13 @@ def register_custom_callable(
         "instance": None,
         "doc_string": doc_str,
         "is_custom": True,
-        "swarm_roles": [],
+        "swarm": [],
+        "subconscious": [],
         "hidden": False,
     }
-    system_logger.info(f"[Skills] Зарегистрирован кастомный скилл: {skill_name}")
+    log = f"[Skills] Зарегистрирован кастомный скилл: {skill_name}"
+    main_logger.info(log)
+    agent_logger.info(log)
 
 
 F = TypeVar("F", bound=Callable[..., Any])
@@ -175,7 +185,8 @@ F = TypeVar("F", bound=Callable[..., Any])
 
 def skill(
     name_override: Optional[str] = None,
-    swarm_roles: Optional[List[SubagentRole]] = None,
+    swarm: Optional[List[SubagentRole]] = None,
+    subconscious: Optional[List[Pattern]] = None,
     hidden: bool = False,
 ) -> Callable[[F], F]:
     """
@@ -184,7 +195,8 @@ def skill(
 
     Args:
         name_override: Переопределение названия функции (по умолчанию берется 'Класс.имя_функции').
-        swarm_roles: Массив субагентов, которые могут использовать этот навык (RBAC).
+        swarm: Массив субагентов, которые могут использовать этот навык (RBAC).
+        subconscious: Массив паттернов подсознания, которые могут использовать этот навык.
         hidden: Если True - главный агент не будет видеть этот навык (полезно для системных функций).
     """
 
@@ -193,10 +205,13 @@ def skill(
         if "self" in sig.parameters:
             setattr(func, "__is_skill__", True)
             setattr(func, "__skill_name_override__", name_override)
-            setattr(func, "__swarm_roles__", swarm_roles)
+            setattr(func, "__swarm__", swarm)
+            setattr(func, "__subconscious__", subconscious)
             setattr(func, "__skill_hidden__", hidden)
             return func
-        _register_callable(func, name_override, swarm_roles=swarm_roles, hidden=hidden)
+        _register_callable(
+            func, name_override, swarm=swarm, subconscious=subconscious, hidden=hidden
+        )
         return func
 
     return decorator
@@ -208,22 +223,24 @@ def register_instance(instance: Any) -> None:
         method = getattr(instance, attr_name)
         if callable(method) and getattr(method, "__is_skill__", False):
             override = getattr(method, "__skill_name_override__", None)
-            swarm_roles = getattr(method, "__swarm_roles__", None)
+            swarm = getattr(method, "__swarm__", None)
+            subconscious = getattr(method, "__subconscious__", None)
             hidden = getattr(method, "__skill_hidden__", False)
             _register_callable(
-                method, override, instance, swarm_roles=swarm_roles, hidden=hidden
+                method,
+                override,
+                instance,
+                swarm=swarm,
+                subconscious=subconscious,
+                hidden=hidden,
             )
 
 
-def get_skills_library() -> str:
+def get_skills_library(subconscious_config: Optional[SubconsciousConfig] = None) -> str:
     """
-    Собирает и форматирует все доступные навыки (и их сигнатуры) для внедрения в системный промпт агента.
-    Автоматически скрывает навыки, которые требуют OS Access Level ВЫШЕ, чем текущий.
-
-    Returns:
-        Отформатированная Markdown строка библиотеки навыков.
+    Собирает все навыки. Автоматически скрывает навыки, если они делегированы
+    активному подсознательному паттерну, чтобы разгрузить контекст Оркестратора.
     """
-
     active_docs = []
     custom_docs = []
 
@@ -237,6 +254,22 @@ def get_skills_library() -> str:
             custom_docs.append(data["doc_string"])
             continue
 
+        # Dynamic Visibility для Подсознания
+        if subconscious_config and subconscious_config.enabled:
+            patterns_list = data.get("subconscious", [])
+            if patterns_list:
+                # Проверяем, включен ли хотя бы один паттерн, требующий этот навык
+                is_used_by_active_pattern = False
+                for p in patterns_list:
+                    p_cfg = getattr(subconscious_config.patterns, p.value, None)
+                    if p_cfg and p_cfg.enabled:
+                        is_used_by_active_pattern = True
+                        break
+
+                # Если навык обслуживает включенное подсознание - скрываем его от главного агента, чтобы не перегружать контекст
+                if is_used_by_active_pattern:
+                    continue
+
         func = data["func"]
         instance = data["instance"]
         doc = data["doc_string"]
@@ -247,7 +280,6 @@ def get_skills_library() -> str:
             if host_os is not None and host_os.access_level.value < req_level:
                 continue
 
-        # Динамическое сокрытие (например, скрытие GitHub навыков, если нет токена)
         visibility_check = getattr(func, "__visibility_check__", None)
         if visibility_check and instance is not None:
             try:
@@ -276,15 +308,15 @@ def get_skills_library() -> str:
     return base
 
 
-async def execute_skill(actions: List[ActionCall]) -> str:
+async def execute_skill(
+    actions: List[ActionCall], logger: logging.Logger = agent_logger
+) -> str:
     """
     Асинхронно и параллельно выполняет массив запрошенных агентом действий.
 
     Args:
         actions: Список объектов ActionCall.
-
-    Returns:
-        Скленный Markdown-отчет о выполнении всех действий.
+        logger: Логгер целевой подсистемы (по умолчанию agent_logger).
     """
     if not actions:
         return "Цикл завершен: действий не передано."
@@ -293,11 +325,8 @@ async def execute_skill(actions: List[ActionCall]) -> str:
     for act in actions:
         name = act.tool_name
         params = act.parameters
-        params_str = truncate_text(
-            str(params), max_chars=250, suffix="... [Параметры обрезаны]"
-        )
-        system_logger.info(f"[Agent Action] {name}({params_str})")
-        tasks.append(call_skill(name, params))
+        # Убрали ручное логирование [Agent Action] отсюда, оно теперь внутри call_skill
+        tasks.append(call_skill(name, params, logger=logger))
 
     results = await asyncio.gather(*tasks)
     report = [
@@ -306,22 +335,20 @@ async def execute_skill(actions: List[ActionCall]) -> str:
     return "\n".join(report)
 
 
-async def call_skill(name: str, params: Dict[str, Any]) -> SkillResult:
+async def call_skill(
+    name: str, params: Dict[str, Any], logger: logging.Logger = agent_logger
+) -> SkillResult:
     """
     Низкоуровневый вызов отдельного навыка с прогоном параметров через Pydantic Guard Layer.
-
-    Args:
-        name: Имя функции в реестре.
-        params: Сырые аргументы из JSON.
-
-    Returns:
-        Объект SkillResult (успех/провал и сообщение).
     """
-    
+    params_str = truncate_text(str(params), max_chars=250, suffix="... [Параметры обрезаны]")
+
+    logger.info(f"[Agent Action] {name}({params_str})")
+
     item = _REGISTRY.get(name)
     if not item:
         err_msg = f"Скилл '{name}' не найден."
-        system_logger.info(f"[Agent Action Result] {err_msg}")
+        logger.warning(f"[Agent Action Result] {err_msg}")
         return SkillResult.fail(err_msg)
 
     func = item["func"]
@@ -336,7 +363,7 @@ async def call_skill(name: str, params: Dict[str, Any]) -> SkillResult:
             for err in e.errors()
         ]
         err_msg = "Ошибка валидации параметров:\n" + "\n".join(errors)
-        system_logger.warning(f"[Guard] Отклонен вызов {name}: Ошибка типов.")
+        logger.warning(f"[Guard] Отклонен вызов {name}: Ошибка типов.")
         return SkillResult.fail(err_msg)
 
     try:
@@ -345,9 +372,9 @@ async def call_skill(name: str, params: Dict[str, Any]) -> SkillResult:
             str(result.message), max_chars=200, suffix="... [Результат обрезан для логов]"
         )
         status = "Success" if result.is_success else "Fail"
-        system_logger.info(f"[Agent Action Result] {name} ({status}): {res_msg}")
 
+        logger.info(f"[Agent Action Result] {name} ({status}): {res_msg}")
         return result
     except Exception as e:
-        system_logger.info(f"[Agent Action Result] Ошибка в скилле {name}: {str(e)}")
+        logger.error(f"[Agent Action Result] Ошибка в скилле {name}: {str(e)}")
         return SkillResult.fail(f"Внутренняя ошибка навыка: {str(e)}")

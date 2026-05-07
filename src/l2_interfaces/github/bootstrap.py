@@ -7,7 +7,7 @@
 
 from typing import List, Any, TYPE_CHECKING, Optional
 
-from src.utils.logger import system_logger
+from src.utils.logger import main_logger
 
 from src.l2_interfaces.github.client import GithubClient
 from src.l2_interfaces.github.events import GithubEvents
@@ -65,6 +65,6 @@ def setup_github(system: "System", token: Optional[str]) -> List[Any]:
         provider_func=client.get_context_block,
         section=ContextSection.INTERFACES,
     )
-    system_logger.info("[Github] Интерфейс загружен.")
+    main_logger.info("[Github] Интерфейс загружен.")
 
     return [client, events]

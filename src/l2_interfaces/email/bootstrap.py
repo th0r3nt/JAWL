@@ -6,7 +6,7 @@
 """
 
 from typing import List, Any, TYPE_CHECKING, Optional
-from src.utils.logger import system_logger
+from src.utils.logger import main_logger
 
 from src.l2_interfaces.email.client import EmailClient
 from src.l2_interfaces.email.events import EmailEvents
@@ -34,7 +34,7 @@ def setup_email(
         List[Any]: Компоненты жизненного цикла (client, events).
     """
     if not account or not password:
-        system_logger.error(
+        main_logger.error(
             "[Email] EMAIL_ACCOUNT или EMAIL_PASSWORD не найдены. Интерфейс отключен."
         )
         return []
@@ -56,7 +56,7 @@ def setup_email(
         name="email", provider_func=client.get_context_block, section=ContextSection.INTERFACES
     )
 
-    system_logger.info("[Email] Интерфейс загружен.")
+    main_logger.info("[Email] Интерфейс загружен.")
 
     # Возвращаем клиент (для тестовой авторизации при старте) и эвент (для поллинга)
     return [client, events]

@@ -6,7 +6,7 @@
 """
 
 from typing import List, Any, TYPE_CHECKING
-from src.utils.logger import system_logger
+from src.utils.logger import main_logger
 
 from src.l2_interfaces.web.http.client import WebHTTPClient
 from src.l2_interfaces.web.http.skills.requests import WebHTTPRequests
@@ -28,7 +28,7 @@ def setup_web_http(system: "System") -> List[Any]:
     Returns:
         List[Any]: Пустой список (нет фоновых задач).
     """
-    
+
     config = system.interfaces_config.web.http
 
     client = WebHTTPClient(state=system.web_http_state, config=config)
@@ -40,6 +40,6 @@ def setup_web_http(system: "System") -> List[Any]:
         provider_func=client.get_context_block,
         section=ContextSection.INTERFACES,
     )
-    system_logger.info("[Web HTTP] Интерфейс загружен.")
+    main_logger.info("[Web HTTP] Интерфейс загружен.")
 
     return []

@@ -6,7 +6,7 @@
 """
 
 from typing import List, Any, TYPE_CHECKING
-from src.utils.logger import system_logger
+from src.utils.logger import main_logger
 
 from src.l2_interfaces.web.rss.client import WebRSSClient
 from src.l2_interfaces.web.rss.events import WebRSSEvents
@@ -29,7 +29,7 @@ def setup_web_rss(system: "System") -> List[Any]:
     Returns:
         List[Any]: Фоновые задачи поллинга (events).
     """
-    
+
     config = system.interfaces_config.web.rss
 
     client = WebRSSClient(state=system.web_rss_state, config=config)
@@ -47,6 +47,6 @@ def setup_web_rss(system: "System") -> List[Any]:
         provider_func=client.get_context_block,
         section=ContextSection.INTERFACES,
     )
-    system_logger.info("[Web RSS] Интерфейс загружен.")
+    main_logger.info("[Web RSS] Интерфейс загружен.")
 
     return [events]

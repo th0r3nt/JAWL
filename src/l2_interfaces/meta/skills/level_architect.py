@@ -10,7 +10,7 @@ from typing import Literal
 from src.l2_interfaces.meta.client import MetaClient
 from src.l3_agent.skills.registry import SkillResult, skill
 from src.utils.event.registry import Events
-from src.utils.logger import system_logger
+from src.utils.logger import main_logger
 
 
 class MetaArchitect:
@@ -71,7 +71,7 @@ class MetaArchitect:
                 )
 
             if interface == "github" and not self.client.has_env_key("GITHUB_TOKEN"):
-                system_logger.warning(
+                main_logger.warning(
                     "[Meta] Github включается без токена (Read-Only режим с лимитом 60 запросов)."
                 )
 
@@ -92,7 +92,7 @@ class MetaArchitect:
         Args:
             reason: Причина выключения (останется в логах).
         """
-        system_logger.info(f"[Meta] Запрошено выключение системы. Причина: {reason}")
+        main_logger.info(f"[Meta] Запрошено выключение системы. Причина: {reason}")
         await self.client.bus.publish(Events.SYSTEM_SHUTDOWN_REQUESTED, reason=reason)
         return SkillResult.ok(
             "Команда на выключение принята. Инициирована остановка процессов."
@@ -106,7 +106,7 @@ class MetaArchitect:
         Args:
             reason: Причина перезагрузки.
         """
-        system_logger.info(f"[Meta] Запрошена перезагрузка системы. Причина: {reason}")
+        main_logger.info(f"[Meta] Запрошена перезагрузка системы. Причина: {reason}")
         await self.client.bus.publish(Events.SYSTEM_REBOOT_REQUESTED, reason=reason)
         return SkillResult.ok(
             "Команда на перезагрузку принята. Инициирован ребут. I'll be back."

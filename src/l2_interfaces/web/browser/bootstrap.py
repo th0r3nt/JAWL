@@ -6,7 +6,7 @@
 """
 
 from typing import List, Any, TYPE_CHECKING
-from src.utils.logger import system_logger
+from src.utils.logger import main_logger
 
 from src.l2_interfaces.web.browser.client import WebBrowserClient
 from src.l2_interfaces.web.browser.events import WebBrowserEvents
@@ -55,6 +55,6 @@ def setup_web_browser(system: "System") -> List[Any]:
         provider_func=client.get_context_block,
         section=ContextSection.INTERFACES,
     )
-    system_logger.info("[Web Browser] Интерфейс загружен. Готов к запуску Playwright.")
+    main_logger.info("[Web Browser] Интерфейс загружен. Готов к запуску Playwright.")
 
     return [client, events]

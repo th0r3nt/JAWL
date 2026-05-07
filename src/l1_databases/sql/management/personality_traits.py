@@ -9,8 +9,11 @@ import uuid
 from typing import Optional, TYPE_CHECKING, Any
 from sqlalchemy import select, delete, func
 
+from src.utils.logger import main_logger
+
 from src.l3_agent.skills.registry import skill, SkillResult
-from src.utils.logger import system_logger
+from src.l3_agent.subconscious.schema import Pattern
+
 from src.l1_databases.sql.tables import PersonalityTraitTable
 
 if TYPE_CHECKING:
@@ -31,7 +34,7 @@ class SQLPersonalityTraits:
         self.db = db
         self.max_traits = max_traits
 
-    @skill()
+    @skill(subconscious=[Pattern.REFLECTION])
     async def add_trait(
         self,
         name: str,
@@ -69,6 +72,7 @@ class SQLPersonalityTraits:
         msg = f"Черта личности '{name}' успешно добавлена. ID: {trait_id}"
         return SkillResult.ok(msg)
 
+    @skill(subconscious=[Pattern.REFLECTION])
     async def get_traits(self) -> SkillResult:
         """
         Возвращает список всех текущих приобретенных черт личности агента.
@@ -93,7 +97,7 @@ class SQLPersonalityTraits:
 
         return SkillResult.ok("\n".join(lines).strip())
 
-    @skill()
+    @skill(subconscious=[Pattern.REFLECTION])
     async def remove_trait(self, trait_id: str) -> SkillResult:
         """
         Удаляет черту личности по ID, если она больше не актуальна.
@@ -111,7 +115,7 @@ class SQLPersonalityTraits:
                 return SkillResult.fail(f"Черта личности с ID {trait_id} не найдена.")
 
         msg = f"Черта личности {trait_id} удалена."
-        system_logger.info(f"[SQL DB] {msg}")
+        main_logger.info(f"[SQL DB] {msg}")
         return SkillResult.ok(msg)
 
     async def get_context_block(self, **kwargs: Any) -> str:

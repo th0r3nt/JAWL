@@ -8,7 +8,7 @@
 
 from openai import AsyncOpenAI
 
-from src.utils.logger import system_logger
+from src.utils.logger import main_logger
 from src.l3_agent.llm.api_keys.rotator import APIKeyRotator
 
 
@@ -26,7 +26,7 @@ class LLMClient:
             api_url: Базовый URL для OpenAI API.
             api_keys_rotator: Менеджер API ключей (ротатор).
         """
-        
+
         self.api_url = api_url
         self.rotator = api_keys_rotator
 
@@ -41,9 +41,9 @@ class LLMClient:
                 self.api_url = f"https://{self.api_url}"
 
         if self.api_url:
-            system_logger.info(f"[LLM] Клиент инициализирован (URL: {self.api_url}).")
+            main_logger.info(f"[LLM] Клиент инициализирован (URL: {self.api_url}).")
         else:
-            system_logger.info("[LLM] Клиент инициализирован (Default OpenAI URL).")
+            main_logger.info("[LLM] Клиент инициализирован (Default OpenAI URL).")
 
     def get_session(self) -> AsyncOpenAI:
         """
@@ -77,4 +77,4 @@ class LLMClient:
             await session.close()
 
         self._sessions.clear()
-        system_logger.info("[LLM] Все HTTP-сессии закрыты.")
+        main_logger.info("[LLM] Все HTTP-сессии закрыты.")

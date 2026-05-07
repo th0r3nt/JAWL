@@ -6,7 +6,7 @@
 import asyncio
 from typing import Literal
 
-from src.utils.logger import system_logger
+from src.utils.logger import main_logger
 from src.utils._tools import format_size
 
 from src.l2_interfaces.host.os.client import HostOSClient, HostOSAccessLevel
@@ -22,13 +22,13 @@ class HostOSReader:
     def __init__(self, host_os_client: HostOSClient):
         self.host_os = host_os_client
 
-    @skill(swarm_roles=[Subagents.CODER, Subagents.QA_ENGINEER, Subagents.SYSADMIN])
+    @skill(swarm=[Subagents.CODER, Subagents.QA_ENGINEER, Subagents.SYSADMIN])
     @require_access(HostOSAccessLevel.SANDBOX)
     async def read_file(
         self, filepath: str, read_from: Literal["head", "tail"] = "head"
     ) -> SkillResult:
         """
-        Читает содержимое файла. 
+        Читает содержимое файла.
         Важно: путь указывается от корня фреймворка (напр. 'sandbox/file.txt').
 
         Args:
@@ -83,7 +83,7 @@ class HostOSReader:
                 else:
                     content = f"{content}\n...[Файл обрезан с конца. Показаны первые {max_chars} байт]..."
 
-            system_logger.info(
+            main_logger.info(
                 f"[Host OS] Прочитан файл ({read_from}): {safe_path.name} ({size_str})"
             )
             return SkillResult.ok(header + content)
@@ -94,7 +94,7 @@ class HostOSReader:
         except Exception as e:
             return SkillResult.fail(f"Ошибка при чтении файла: {e}")
 
-    @skill(swarm_roles=[Subagents.CODER, Subagents.QA_ENGINEER, Subagents.SYSADMIN])
+    @skill(swarm=[Subagents.CODER, Subagents.QA_ENGINEER, Subagents.SYSADMIN])
     @require_access(HostOSAccessLevel.SANDBOX)
     async def read_files_in_directory(
         self, path: str = ".", max_files: int = 10, recursive: bool = False
@@ -199,7 +199,7 @@ class HostOSReader:
             size_str = format_size(total_chars)
             header = f"[Прочитано файлов: {files_read} из директории {safe_path.name} | Общий объем: {size_str}]\n{'='*60}\n\n"
 
-            system_logger.info(
+            main_logger.info(
                 f"[Host OS] Массовое чтение {files_read} файлов из директории: {safe_path.name}"
             )
             return SkillResult.ok(header + "\n".join(results))

@@ -7,10 +7,11 @@
 """
 
 import tiktoken
+import logging
 from collections import deque
 from typing import Any, Dict, List
 
-from src.utils.logger import system_logger
+from src.utils.logger import main_logger
 
 
 class TokenTracker:
@@ -26,7 +27,7 @@ class TokenTracker:
         Args:
             maxlen (int): Количество последних записей о токенах для хранения в оперативной памяти.
         """
-        
+
         self.input_history: deque[Dict[str, Any]] = deque(maxlen=maxlen)
         self.output_history: deque[Dict[str, Any]] = deque(maxlen=maxlen)
 
@@ -90,14 +91,19 @@ class TokenTracker:
         num_tokens += 3  # Накладные расходы на ответ модели
         return num_tokens
 
-    def add_input_record(self, messages: List[Any], log_prefix: str = "[LLM]") -> int:
+    def add_input_record(
+        self,
+        messages: List[Any],
+        log_prefix: str = "[LLM]",
+        logger: logging.Logger = main_logger,
+    ) -> int:
         """
         Добавляет запись о расходе токенов на системный и пользовательский промпт.
 
         Args:
             messages (List[Any]): Входящий массив сообщений.
             log_prefix (str, optional): Префикс для логера (чтобы отличать Оркестратора от Субагентов).
-
+            logger (logging.Logger, optional): Логгер целевой подсистемы.
         Returns:
             int: Потребленное количество токенов.
         """
@@ -107,17 +113,22 @@ class TokenTracker:
 
         # Плюсуем в счетчик текущего тика
         self._current_tick_in += total_tokens
-        system_logger.info(f"{log_prefix} Input tokens: {total_tokens}.")
+
+        # Теперь пишем в переданный логгер
+        logger.info(f"{log_prefix} Input tokens: {total_tokens}.")
 
         return total_tokens
 
-    def add_output_record(self, output_text: str, log_prefix: str = "[LLM]") -> None:
+    def add_output_record(
+        self, output_text: str, log_prefix: str = "[LLM]", logger: logging.Logger = main_logger
+    ) -> None:
         """
         Добавляет запись о токенах, сгенерированных моделью (исходящих).
 
         Args:
             output_text (str): Сырой текст, возвращенный LLM.
             log_prefix (str, optional): Префикс для логера.
+            logger (logging.Logger, optional): Логгер целевой подсистемы.
         """
 
         output_tokens = self._approximate_tokens(output_text)
@@ -125,4 +136,6 @@ class TokenTracker:
 
         # Плюсуем в счетчик текущего тика
         self._current_tick_out += output_tokens
-        system_logger.info(f"{log_prefix} Output tokens: {output_tokens}.")
+
+        # Теперь пишем в переданный логгер
+        logger.info(f"{log_prefix} Output tokens: {output_tokens}.")

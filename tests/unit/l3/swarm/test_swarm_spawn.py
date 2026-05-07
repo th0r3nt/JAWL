@@ -9,9 +9,9 @@ from src.l3_agent.swarm.roles import Subagents
 def mock_registry():
     # Мокаем глобальный реестр, используя РЕАЛЬНЫЕ объекты ролей
     return {
-        "HostOSFiles.read_file": {"swarm_roles": [Subagents.CODER]},
-        "HostOSExecution.execute_script": {"swarm_roles": [Subagents.CODER]},
-        "DeepResearch.deep_research": {"swarm_roles": [Subagents.WEB_RESEARCHER]},
+        "HostOSFiles.read_file": {"swarm": [Subagents.CODER]},
+        "HostOSExecution.execute_script": {"swarm": [Subagents.CODER]},
+        "DeepResearch.deep_research": {"swarm": [Subagents.WEB_RESEARCHER]},
     }
 
 
@@ -79,9 +79,7 @@ def test_swarm_manager_dynamic_docstring(mock_registry):
         assert "web_researcher" in manager1.spawn_subagent.__doc__
 
     # Сценарий 2: Host OS выключен (нету скиллов для coder)
-    empty_registry = {
-        "DeepResearch.deep_research": {"swarm_roles": [Subagents.WEB_RESEARCHER]}
-    }
+    empty_registry = {"DeepResearch.deep_research": {"swarm": [Subagents.WEB_RESEARCHER]}}
     with patch("src.l3_agent.swarm.spawn._REGISTRY", empty_registry):
         manager2 = SwarmManager(MagicMock(), config, MagicMock(), MagicMock())
         assert "coder" not in manager2.spawn_subagent.__doc__

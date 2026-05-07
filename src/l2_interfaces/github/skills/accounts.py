@@ -2,7 +2,7 @@
 Навыки агента для работы с профилями и уведомлениями GitHub.
 """
 
-from src.utils.logger import system_logger
+from src.utils.logger import main_logger
 
 from src.l2_interfaces.github.client import GithubClient
 from src.l2_interfaces.github.decorators import require_agent_account
@@ -38,7 +38,7 @@ class GithubAccounts:
                 f"Подписчиков: {data.get('followers')} | Подписок: {data.get('following')}",
                 f"Компания: {data.get('company', 'Нет')} | Локация: {data.get('location', 'Нет')}",
             ]
-            system_logger.info(f"[Github] Прочитан профиль пользователя {username}")
+            main_logger.info(f"[Github] Прочитан профиль пользователя {username}")
             return SkillResult.ok("\n".join(lines))
         except Exception as e:
             return SkillResult.fail(f"Ошибка при получении профиля: {e}")
@@ -73,7 +73,7 @@ class GithubAccounts:
                 reason = n.get("reason", "unknown")
                 lines.append(f"- [{repo}] {n_type}: '{title}' (Причина: {reason})")
 
-            system_logger.info(f"[Github] Проверены уведомления (Найдено: {len(data)})")
+            main_logger.info(f"[Github] Проверены уведомления (Найдено: {len(data)})")
             return SkillResult.ok("\n".join(lines))
 
         except Exception as e:
@@ -86,7 +86,7 @@ class GithubAccounts:
         Помечает все текущие непрочитанные уведомления как прочитанные.
         Полезно вызывать после их прочтения, чтобы очистить инбокс.
         """
-        
+
         if not self.client.config.agent_account:
             return SkillResult.fail("Ошибка: Для этого действия нужен Agent Account.")
 
@@ -98,7 +98,7 @@ class GithubAccounts:
             # Мгновенно очищаем дашборд агента, не дожидаясь следующего тика фонового поллинга
             self.client.state.unread_notifications = "Нет новых уведомлений."
 
-            system_logger.info("[Github] Все уведомления агента помечены как прочитанные.")
+            main_logger.info("[Github] Все уведомления агента помечены как прочитанные.")
             return SkillResult.ok(
                 "Все уведомления успешно помечены как прочитанные (инбокс очищен)."
             )

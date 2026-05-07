@@ -169,22 +169,23 @@ async def test_subagent_timeout_forces_report(
     assert "Timeout Error" in forced_call[0][1]["report"]
 
 
-@pytest.mark.asyncio
-async def test_subagent_dump_context_to_file(mock_loop_deps, tmp_path):
+@patch("builtins.open")
+def test_subagent_dump_context_to_file(mock_open, mock_loop_deps):
     loop = SubagentLoop(**mock_loop_deps)
     messages = [{"role": "system", "content": "Hello"}]
 
-    with patch("src.l3_agent.swarm.loop.Path") as mock_path_class:
-        mock_dir = MagicMock()
-        mock_path_class.return_value = mock_dir
-        mock_dir.__truediv__.return_value = tmp_path / "last_sub_prompt.md"
+    mock_file = MagicMock()
+    mock_open.return_value.__enter__.return_value = mock_file
 
-        loop._dump_context_to_file(messages, current_step=1)
+    loop._dump_context_to_file(messages, current_step=1)
 
-        content = (tmp_path / "last_sub_prompt.md").read_text(encoding="utf-8")
-        assert "SUBAGENT DUMP" in content
-        assert "**Role**: SOFTWARE ENGINEER" in content  # Имя из объекта
-        assert "Hello" in content
+    args, kwargs = mock_open.call_args
+    assert str(args[0]).replace("\\", "/") == "logs/prompts/last_sub_prompt.md"
+
+    content = "".join([call[0][0] for call in mock_file.write.call_args_list])
+    assert "SUBAGENT DUMP" in content
+    assert "**Role**: SOFTWARE ENGINEER" in content
+    assert "Hello" in content
 
 
 def test_subagent_parse_response_robustness(mock_loop_deps):

@@ -8,11 +8,10 @@ import asyncio
 from typing import Any, List, Dict
 from ddgs import DDGS  # Важно: Импорт ddgs - единственно верный, иначе поиск сломается
 
-from src.utils.logger import system_logger
+from src.utils.logger import main_logger
 from src.l2_interfaces.web.search.client import WebSearchClient
 from src.l3_agent.skills.registry import skill, SkillResult
 from src.l3_agent.swarm.roles import Subagents
-
 
 # Количество попыток и базовая задержка Exponential Backoff.
 # Паузы между попытками: 1с, 2с (перед последней попыткой).
@@ -49,13 +48,11 @@ class DuckDuckGoSearch:
                         break
                     await asyncio.sleep(DDG_BACKOFF_BASE_SEC * (2**attempt))
 
-        system_logger.error(
-            f"[Web] DDG Rate Limit исчерпан для запроса '{query}': {last_err}"
-        )
+        main_logger.error(f"[Web] DDG Rate Limit исчерпан для запроса '{query}': {last_err}")
         assert last_err is not None  # логически недостижимо, но typechecker спит спокойнее
         raise last_err
 
-    @skill(swarm_roles=[Subagents.WEB_RESEARCHER])
+    @skill(swarm=[Subagents.WEB_RESEARCHER])
     async def search(self, query: str, max_results: int = 5) -> SkillResult:
         """
         Ищет информацию в интернете (через DuckDuckGo).
@@ -74,7 +71,7 @@ class DuckDuckGoSearch:
                 f"Title: {r.get('title')}\nURL: {r.get('href')}\nSnippet: {r.get('body')}"
                 for r in results
             ]
-            system_logger.info(f"[Web] Выполнен поиск (DDG) по запросу: '{query}'")
+            main_logger.info(f"[Web] Выполнен поиск (DDG) по запросу: '{query}'")
             self.client.state.add_history(f"Поиск DDG: '{query}'")
 
             return SkillResult.ok("\n\n".join(formatted))

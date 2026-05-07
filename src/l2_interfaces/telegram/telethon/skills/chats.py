@@ -22,7 +22,7 @@ from telethon.tl.functions.messages import (
     GetFullChatRequest,
 )
 
-from src.utils.logger import system_logger
+from src.utils.logger import main_logger
 from src.utils._tools import parse_int_or_str
 
 from src.l2_interfaces.telegram.telethon.client import TelethonClient
@@ -88,9 +88,7 @@ class TelethonChats:
                                 f"      ↳ Топик '{getattr(topic, 'title', 'Unknown')}' (ID: {topic.id}){t_unread}"
                             )
                     except Exception as e:
-                        system_logger.error(
-                            f"[TelethonChats] Ошибка при получении топиков: {e}"
-                        )
+                        main_logger.error(f"[TelethonChats] Ошибка при получении топиков: {e}")
 
                     if not topics_list and dialog.unread_count > 0:
                         topics_list.append(
@@ -260,7 +258,7 @@ class TelethonChats:
                         if getattr(topic, "unread_count", 0) > 0:
                             await self._mark_chat_read(client, target_entity, topic.id)
                 except Exception as e:
-                    system_logger.error(f"[TelethonChats] Ошибка при очистке топиков: {e}")
+                    main_logger.error(f"[TelethonChats] Ошибка при очистке топиков: {e}")
 
                 await self._mark_chat_read(client, target_entity)
             else:
@@ -306,7 +304,7 @@ class TelethonChats:
     @skill()
     async def get_chat_info(self, chat_id: Union[int, str]) -> SkillResult:
         """Получает расширенную информацию о чате (описание, кол-во участников/подписчиков)."""
-        
+
         try:
             client = self.tg_client.client()
             entity = await client.get_entity(parse_int_or_str(chat_id))
@@ -487,7 +485,7 @@ class TelethonChats:
             )
             return getattr(result, "topics", [])
         except Exception as e:
-            system_logger.error(f"[TelethonChats] Ошибка _get_topics: {e}")
+            main_logger.error(f"[TelethonChats] Ошибка _get_topics: {e}")
             return []
 
     async def _mark_chat_read(
@@ -511,4 +509,4 @@ class TelethonChats:
                     await client(ReadReactionsRequest(peer=target_entity))
 
         except Exception as e:
-            system_logger.debug(f"[TelethonChats] Ошибка при очистке реакций/меншнов: {e}")
+            main_logger.debug(f"[TelethonChats] Ошибка при очистке реакций/меншнов: {e}")

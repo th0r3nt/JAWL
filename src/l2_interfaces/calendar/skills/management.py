@@ -9,7 +9,7 @@ import uuid
 import time
 from datetime import datetime, timedelta
 
-from src.utils.logger import system_logger
+from src.utils.logger import main_logger
 from src.utils.dtime import get_timezone, format_timestamp
 
 from src.l2_interfaces.calendar.client import CalendarClient
@@ -45,9 +45,7 @@ class CalendarManagement:
                 {"id": ev_id, "title": title, "type": "one_time", "trigger_at": trigger_at}
             )
 
-            system_logger.info(
-                f"[Calendar] Добавлен разовый таймер '{title}' на {datetime_str}"
-            )
+            main_logger.info(f"[Calendar] Добавлен разовый таймер '{title}' на {datetime_str}")
             return SkillResult.ok(f"Разовый будильник успешно установлен (ID: {ev_id[:8]}).")
 
         except ValueError:
@@ -83,7 +81,7 @@ class CalendarManagement:
                 }
             )
 
-            system_logger.info(
+            main_logger.info(
                 f"[Calendar] Добавлен интервальный таймер '{title}' (каждые {interval_minutes} мин)"
             )
             return SkillResult.ok(f"Интервальный таймер успешно установлен (ID: {ev_id[:8]}).")
@@ -131,7 +129,7 @@ class CalendarManagement:
                 }
             )
 
-            system_logger.info(
+            main_logger.info(
                 f"[Calendar] Добавлен повторяющийся таймер '{title}' (в {time_str}, каждые {interval_days} дн.)"
             )
             return SkillResult.ok(
@@ -176,7 +174,7 @@ class CalendarManagement:
         Args:
             alarm_id: Уникальный ID таймера (или его первые 8 символов).
         """
-        
+
         events = self.client.get_all_events()
 
         filtered = [ev for ev in events if not ev["id"].startswith(alarm_id)]
@@ -185,5 +183,5 @@ class CalendarManagement:
             return SkillResult.fail(f"Будильник с ID {alarm_id} не найден.")
 
         self.client.update_events(filtered)
-        system_logger.info(f"[Calendar] Удален таймер ID: {alarm_id}")
+        main_logger.info(f"[Calendar] Удален таймер ID: {alarm_id}")
         return SkillResult.ok(f"Будильник {alarm_id} успешно удален.")

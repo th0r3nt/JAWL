@@ -5,7 +5,7 @@
 
 import asyncio
 
-from src.utils.logger import system_logger
+from src.utils.logger import main_logger
 
 from src.l2_interfaces.host.os.client import HostOSClient, HostOSAccessLevel
 from src.l2_interfaces.host.os.decorators import require_access
@@ -20,7 +20,7 @@ class HostOSEditor:
     def __init__(self, host_os_client: HostOSClient):
         self.host_os = host_os_client
 
-    @skill(swarm_roles=[Subagents.CODER, Subagents.QA_ENGINEER, Subagents.SYSADMIN])
+    @skill(swarm=[Subagents.CODER, Subagents.QA_ENGINEER, Subagents.SYSADMIN])
     @require_access(HostOSAccessLevel.SANDBOX)
     async def delete_lines_matching(
         self, filepath: str, match_string: str, exact_match: bool = False
@@ -64,7 +64,7 @@ class HostOSEditor:
             is_success, msg = await asyncio.to_thread(_delete)
 
             if is_success:
-                system_logger.info(f"[Host OS] Удалены строки в файле: {safe_path.name}")
+                main_logger.info(f"[Host OS] Удалены строки в файле: {safe_path.name}")
                 return SkillResult.ok(msg)
             else:
                 return SkillResult.fail(msg)
@@ -74,7 +74,7 @@ class HostOSEditor:
         except Exception as e:
             return SkillResult.fail(f"Ошибка при удалении строк: {e}")
 
-    @skill(swarm_roles=[Subagents.CODER, Subagents.QA_ENGINEER, Subagents.SYSADMIN])
+    @skill(swarm=[Subagents.CODER, Subagents.QA_ENGINEER, Subagents.SYSADMIN])
     @require_access(HostOSAccessLevel.SANDBOX)
     async def patch_file(
         self, filepath: str, search_block: str, replace_block: str
@@ -127,7 +127,7 @@ class HostOSEditor:
             is_success, msg = await asyncio.to_thread(_patch)
 
             if is_success:
-                system_logger.info(f"[Host OS] Пропатчен файл: {safe_path.name}")
+                main_logger.info(f"[Host OS] Пропатчен файл: {safe_path.name}")
                 return SkillResult.ok(msg)
             else:
                 return SkillResult.fail(msg)

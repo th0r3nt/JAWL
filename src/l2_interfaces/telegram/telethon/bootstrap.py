@@ -5,7 +5,7 @@
 
 from typing import List, Any, TYPE_CHECKING, Optional
 
-from src.utils.logger import system_logger
+from src.utils.logger import main_logger
 
 from src.l2_interfaces.telegram.telethon.client import TelethonClient
 from src.l2_interfaces.telegram.telethon.events import TelethonEvents
@@ -39,9 +39,9 @@ def setup_telethon(
     Returns:
         List[Any]: Компоненты с жизненным циклом (client, events).
     """
-    
+
     if not api_id or not api_hash:
-        system_logger.error(
+        main_logger.error(
             "[Telegram Telethon] TELETHON_API_ID или TELETHON_API_HASH не найдены в .env. Интерфейс отключен."
         )
         return []
@@ -84,5 +84,5 @@ def setup_telethon(
         section=ContextSection.INTERFACES,
     )
 
-    system_logger.info("[Telegram Telethon] Интерфейс загружен.")
+    main_logger.info("[Telegram Telethon] Интерфейс загружен.")
     return [client, events]

@@ -1,13 +1,14 @@
 import asyncio
 import trafilatura
 
-from src.utils.logger import system_logger
+from src.utils.logger import main_logger
 from src.utils._tools import truncate_text
 
 from src.l2_interfaces.web.search.client import WebSearchClient
 
 from src.l3_agent.skills.registry import skill, SkillResult
 from src.l3_agent.swarm.roles import Subagents
+
 
 class TrafilaturaReader:
     def __init__(self, client: WebSearchClient):
@@ -24,7 +25,7 @@ class TrafilaturaReader:
 
         return await asyncio.to_thread(_fetch)
 
-    @skill(swarm_roles=[Subagents.WEB_RESEARCHER])
+    @skill(swarm=[Subagents.WEB_RESEARCHER])
     async def read_webpage(self, url: str) -> SkillResult:
         """
         Читает текстовое содержимое веб-страницы по URL.
@@ -40,15 +41,13 @@ class TrafilaturaReader:
             total_len = len(text)
             if total_len > self.client.max_page_chars:
                 text = truncate_text(text, self.client.max_page_chars, "... [Текст обрезан]")
-                system_logger.info(
-                    f"[Web] Прочитана страница (Trafilatura, с обрезкой): {url}"
-                )
+                main_logger.info(f"[Web] Прочитана страница (Trafilatura, с обрезкой): {url}")
             else:
-                system_logger.info(f"[Web] Прочитана страница (Trafilatura, полностью): {url}")
+                main_logger.info(f"[Web] Прочитана страница (Trafilatura, полностью): {url}")
 
             header = f"[Веб-страница (Trafilatura) | Прочитано: {len(text)}/{total_len} симв.]\n{'='*40}\n"
             self.client.state.add_history(f"Чтение страницы: {url}")
             return SkillResult.ok(header + text)
-        
+
         except Exception as e:
             return SkillResult.fail(f"Ошибка парсинга страницы: {e}")

@@ -11,9 +11,10 @@ import json
 from typing import List, Optional
 from rapidfuzz import process, fuzz
 
-from src.utils.logger import system_logger
+from src.utils.logger import main_logger
 from src.l3_agent.skills.registry import skill, SkillResult
 from src.l3_agent.swarm.roles import Subagents
+from src.l3_agent.subconscious.schema import Pattern
 
 from src.l1_databases.graph.db import GraphDB
 from src.l1_databases.graph.schema import (
@@ -55,23 +56,26 @@ class GraphCRUD:
         # Используем processor, чтобы сравнивать строки в нижнем регистре.
         # Это спасет от боли, когда "Docker" и "docker" дают скор 83.3% и не проходят порог 85%
         match = process.extractOne(
-            entity_name.strip(), 
-            existing_nodes, 
+            entity_name.strip(),
+            existing_nodes,
             processor=lambda x: x.lower() if isinstance(x, str) else x,
-            scorer=fuzz.WRatio
+            scorer=fuzz.WRatio,
         )
 
         if match:
             best_name, score, _ = match
             if score >= threshold:
-                system_logger.debug(
+                main_logger.debug(
                     f"[Graph DB] Fuzzy Match: '{entity_name}' -> '{best_name}' (Score: {score:.1f})"
                 )
                 return best_name
 
         return entity_name.strip()
 
-    @skill(swarm_roles=[Subagents.ARCHIVIST, Subagents.WEB_RESEARCHER])
+    @skill(
+        swarm=[Subagents.ARCHIVIST, Subagents.WEB_RESEARCHER],
+        subconscious=[Pattern.CONSOLIDATION],
+    )
     async def add_concept(
         self, name: str, description: str, category: ConceptCategory = "CONCEPT"
     ) -> SkillResult:
@@ -120,12 +124,15 @@ class GraphCRUD:
             try:
                 final_name = await asyncio.to_thread(_sync_manage)
                 msg = f"Концепт '{final_name}' (Тип: {category}) сохранен в граф."
-                system_logger.info(f"[Graph DB] {msg}")
+                main_logger.info(f"[Graph DB] {msg}")
                 return SkillResult.ok(msg)
             except Exception as e:
                 return SkillResult.fail(f"Ошибка БД: {e}")
 
-    @skill(swarm_roles=[Subagents.ARCHIVIST, Subagents.WEB_RESEARCHER])
+    @skill(
+        swarm=[Subagents.ARCHIVIST, Subagents.WEB_RESEARCHER],
+        subconscious=[Pattern.CONSOLIDATION],
+    )
     async def link_concepts(
         self, source_name: str, target_name: str, relation: RelationType, description: str = ""
     ) -> SkillResult:
@@ -189,12 +196,15 @@ class GraphCRUD:
             try:
                 link_str = await asyncio.to_thread(_sync_link)
                 msg = f"Связь обновлена: {link_str}"
-                system_logger.info(f"[Graph DB] {msg}")
+                main_logger.info(f"[Graph DB] {msg}")
                 return SkillResult.ok(msg)
             except Exception as e:
                 return SkillResult.fail(f"Ошибка связывания: {e}")
 
-    @skill(swarm_roles=[Subagents.ARCHIVIST, Subagents.WEB_RESEARCHER])
+    @skill(
+        swarm=[Subagents.ARCHIVIST, Subagents.WEB_RESEARCHER],
+        subconscious=[Pattern.CONSOLIDATION, Pattern.REFLECTION],
+    )
     async def get_concept_neighborhood(self, name: str) -> SkillResult:
         """
         Ищет узел и возвращает все его связи.
@@ -255,7 +265,9 @@ class GraphCRUD:
         except Exception as e:
             return SkillResult.fail(f"Ошибка исследования графа: {e}")
 
-    @skill(swarm_roles=[Subagents.ARCHIVIST])
+    @skill(
+        swarm=[Subagents.ARCHIVIST], subconscious=[Pattern.FORGETTING, Pattern.CONSOLIDATION]
+    )
     async def remove_link(
         self, source_name: str, target_name: str, relation: Optional[RelationType] = None
     ) -> SkillResult:
@@ -291,12 +303,12 @@ class GraphCRUD:
 
             try:
                 msg = await asyncio.to_thread(_sync_remove_link)
-                system_logger.info(f"[Graph DB] {msg}")
+                main_logger.info(f"[Graph DB] {msg}")
                 return SkillResult.ok(msg)
             except Exception as e:
                 return SkillResult.fail(f"Ошибка удаления связи: {e}")
 
-    @skill(swarm_roles=[Subagents.ARCHIVIST])
+    @skill(swarm=[Subagents.ARCHIVIST], subconscious=[Pattern.FORGETTING])
     async def erase_concept(self, name: str) -> SkillResult:
         """
         Полностью стирает узел и его связи из базы данных.
@@ -342,12 +354,12 @@ class GraphCRUD:
 
             try:
                 msg = await asyncio.to_thread(_sync_erase)
-                system_logger.info(f"[Graph DB] {msg}")
+                main_logger.info(f"[Graph DB] {msg}")
                 return SkillResult.ok(msg)
             except Exception as e:
                 return SkillResult.fail(f"Ошибка жесткого удаления: {e}")
 
-    @skill(swarm_roles=[Subagents.ARCHIVIST])
+    @skill(swarm=[Subagents.ARCHIVIST], subconscious=[Pattern.FORGETTING])
     async def archive_concept(self, name: str) -> SkillResult:
         """
         Мягкое удаление. Скрывает узел из поиска и графа связей, но оставляет в базе.

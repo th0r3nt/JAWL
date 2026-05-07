@@ -1,6 +1,7 @@
 import pytest
 from unittest.mock import AsyncMock, MagicMock
 from src.l0_state.agent.state import AgentState
+from src.utils.event.bus import EventBus
 
 
 @pytest.fixture
@@ -44,7 +45,7 @@ def mock_dependencies():
     vector_manager = MagicMock()
 
     token_tracker = MagicMock()
-    tools = [{"type": "function", "function": {"name": "execute_skill"}}]
+    tools =[{"type": "function", "function": {"name": "execute_skill"}}]
     cooldown_sec = 0.2
 
     return {
@@ -57,4 +58,5 @@ def mock_dependencies():
         "token_tracker": token_tracker,
         "tools": tools,
         "cooldown_sec": cooldown_sec,
+        "event_bus": MagicMock(spec=EventBus),
     }

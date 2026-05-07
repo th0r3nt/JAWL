@@ -6,7 +6,7 @@
 from typing import Optional
 from src.l2_interfaces.telegram.aiogram.client import AiogramClient
 from src.l3_agent.skills.registry import SkillResult, skill
-from src.utils.logger import system_logger
+from src.utils.logger import main_logger
 
 
 class AiogramMessages:
@@ -36,7 +36,7 @@ class AiogramMessages:
                 reply_to_message_id=int(reply_to_message_id) if reply_to_message_id else None,
             )
 
-            system_logger.info(f"[Telegram Aiogram] Отправлено сообщение в {chat_id}")
+            main_logger.info(f"[Telegram Aiogram] Отправлено сообщение в {chat_id}")
             return SkillResult.ok(f"Сообщение успешно отправлено. ID: {msg.message_id}")
 
         except ValueError:
@@ -61,9 +61,7 @@ class AiogramMessages:
             bot = self.client.bot()
             await bot.delete_message(chat_id=int(chat_id), message_id=int(message_id))
 
-            system_logger.info(
-                f"[Telegram Aiogram] Удалено сообщение {message_id} в {chat_id}"
-            )
+            main_logger.info(f"[Telegram Aiogram] Удалено сообщение {message_id} в {chat_id}")
             return SkillResult.ok(f"Сообщение {message_id} успешно удалено.")
 
         except Exception as e:
@@ -85,7 +83,7 @@ class AiogramMessages:
                 chat_id=int(chat_id), message_id=int(message_id), text=new_text
             )
 
-            system_logger.info(f"[Telegram Aiogram] Сообщение {message_id} отредактировано")
+            main_logger.info(f"[Telegram Aiogram] Сообщение {message_id} отредактировано")
             return SkillResult.ok(f"Текст сообщения {message_id} успешно изменен.")
 
         except Exception as e:
@@ -110,7 +108,7 @@ class AiogramMessages:
                 chat_id=int(chat_id), message_id=int(message_id), disable_notification=False
             )
 
-            system_logger.info(
+            main_logger.info(
                 f"[Telegram Aiogram] Сообщение {message_id} закреплено в {chat_id}"
             )
             return SkillResult.ok(f"Сообщение {message_id} успешно закреплено.")
@@ -130,7 +128,7 @@ class AiogramMessages:
             bot = self.client.bot()
             await bot.unpin_chat_message(chat_id=int(chat_id), message_id=int(message_id))
 
-            system_logger.info(
+            main_logger.info(
                 f"[Telegram Aiogram] Сообщение {message_id} откреплено в {chat_id}"
             )
             return SkillResult.ok(f"Сообщение {message_id} успешно откреплено.")

@@ -16,9 +16,13 @@ import re
 import copy
 from pathlib import Path
 
-from src.utils.logger import system_logger
+from src.utils.logger import main_logger, agent_logger
 from src.utils.settings import TreeOfThoughtsConfig
 from src.utils.token_tracker import TokenTracker
+from src.utils._tools import dump_prompt_to_file
+
+from src.utils.event.bus import EventBus
+from src.utils.event.registry import Events
 
 from src.l0_state.agent.state import AgentState, AgentStatus
 
@@ -32,7 +36,7 @@ from src.l3_agent.context.builder import ContextBuilder
 from src.l3_agent.tot.generator import ToTGenerator
 
 from src.l3_agent.skills.registry import execute_skill
-from src.l3_agent.skills.schema import AgentResponse, ActionCall
+from src.l3_agent.skills.schema import AgentResponse, ActionCall, parse_llm_json
 
 
 class ReactLoop:
@@ -51,6 +55,7 @@ class ReactLoop:
         vector_manager: VectorManager,
         token_tracker: TokenTracker,
         tools: list,
+        event_bus: EventBus,
         cooldown_sec: int = 30,
         tot_config: Optional[TreeOfThoughtsConfig] = None,
         tot_generator: Optional[ToTGenerator] = None,
@@ -85,6 +90,8 @@ class ReactLoop:
         self.tools = tools
         self.cooldown_sec = cooldown_sec
 
+        self.event_bus = event_bus
+
         self.tot_config = tot_config
         self.tot_generator = tot_generator
 
@@ -107,9 +114,10 @@ class ReactLoop:
 
         try:
             self.agent_state.reset_step()
-            system_logger.info(
-                f"[ReAct] Цикл инициирован. Причина: {event_name} (LLM Model: {self.agent_state.llm_model})."
-            )
+
+            log = f"[ReAct] Цикл инициирован. Причина: {event_name} (LLM Model: {self.agent_state.llm_model})."
+            main_logger.info(log)
+            agent_logger.info(log)
 
             prompt = self.prompt_builder.build()
 
@@ -164,7 +172,9 @@ class ReactLoop:
                 actions = parsed_response.actions
 
                 if thoughts:
-                    system_logger.info(f"[Thoughts]:\n{thoughts}\n")
+                    log = f"[Thoughts]:\n{thoughts}\n"
+                    main_logger.info(log)
+                    agent_logger.info(log)
 
                 # =======================================================
                 # Проверка на завершение цикла
@@ -211,7 +221,7 @@ class ReactLoop:
             {"role": "user", "content": context},
         ]
 
-        input_tokens = self.tracker.add_input_record(messages=messages)
+        input_tokens = self.tracker.add_input_record(messages=messages, logger=agent_logger)
         self.agent_state.last_input_tokens = input_tokens
 
         messages = copy.deepcopy(messages)
@@ -222,9 +232,9 @@ class ReactLoop:
         # Асинхронно дампим контекст, чтобы не блокировать Event Loop при записи файла
         await asyncio.to_thread(self._dump_context_to_file, messages)
 
-        system_logger.info(
-            f"[ReAct] Шаг {self.agent_state.current_step}/{self.agent_state.max_react_steps}."
-        )
+        log = f"[ReAct] Шаг {self.agent_state.current_step}/{self.agent_state.max_react_steps}."
+        main_logger.info(log)
+        agent_logger.info (log)
 
         return messages
 
@@ -261,6 +271,7 @@ class ReactLoop:
                 "max_steps": self.agent_state.max_react_steps,
             },
         )
+        await self.event_bus.publish(Events.REACT_TICK_SAVED)
 
     async def _handle_completion(self, thoughts: str) -> None:
         """
@@ -270,7 +281,10 @@ class ReactLoop:
             thoughts: Последняя мысль агента перед уходом в сон.
         """
 
-        system_logger.info("[ReAct] Передан пустой массив действий. Завершение.")
+        log = "[ReAct] Передан пустой массив действий. Завершение."
+        main_logger.info(log)
+        agent_logger.info(log)
+
         await self.sql_ticks.save_tick(
             thoughts=thoughts,
             actions=[],
@@ -280,6 +294,7 @@ class ReactLoop:
                 "max_steps": self.agent_state.max_react_steps,
             },
         )
+        await self.event_bus.publish(Events.REACT_TICK_SAVED)
 
     async def _call_llm_with_retries(self, messages: List[Dict[str, Any]]) -> Optional[str]:
         """
@@ -313,7 +328,7 @@ class ReactLoop:
                 else:
                     raw_answer = message_obj.content or ""
 
-                self.tracker.add_output_record(raw_answer)
+                self.tracker.add_output_record(raw_answer, logger=agent_logger)
                 return raw_answer
 
             except RuntimeError as e:
@@ -323,33 +338,44 @@ class ReactLoop:
 
                     match = re.search(r"подождать (\d+) сек", str(e))
                     wait_sec = int(match.group(1)) if match else 10
-                    system_logger.warning(f"[LLM] Все ключи в кулдауне. Ждем {wait_sec} сек.")
+
+                    log = f"[LLM] Все ключи в кулдауне. Ждем {wait_sec} сек."
+                    main_logger.warning(log)
+                    agent_logger.warning(log)
+
                     await asyncio.sleep(wait_sec + 1)  # +1 сек для гарантии
                     continue
                 else:
-                    system_logger.error(f"[LLM] Внутренняя ошибка API: {e}")
+                    log = f"[LLM] Внутренняя ошибка API: {e}"
+                    main_logger.error(log)
+                    agent_logger.error(log)
+
                     self.agent_state.update_state(AgentStatus.ERROR)
                     return None
 
             except (openai.APITimeoutError, asyncio.TimeoutError):
                 timeout_retries += 1
                 if timeout_retries >= max_timeout_retries:
-                    system_logger.error(
-                        f"[LLM] API недоступно после {max_timeout_retries} таймаутов. Прерывание цикла."
-                    )
+                    log = f"[LLM] API недоступно после {max_timeout_retries} таймаутов. Прерывание цикла."
+                    main_logger.error(log)
+                    agent_logger.error(log)
+
                     self.agent_state.update_state(AgentStatus.ERROR)
                     return None
-                system_logger.warning(
-                    f"[LLM] Таймаут ответа API. Повтор ({timeout_retries}/{max_timeout_retries})."
-                )
+                
+                log = f"[LLM] Таймаут ответа API. Повтор ({timeout_retries}/{max_timeout_retries})."
+                main_logger.warning(log)
+                agent_logger.warning(log)
                 continue
 
             except openai.RateLimitError as e:
                 err_code = getattr(e.body, "get", lambda x: None)("code")
                 if err_code == "insufficient_quota" or "billing" in str(e).lower():
-                    system_logger.error(
-                        f"[LLM] Квота исчерпана. Бан ключа {session.api_key[:8]} на 24ч"
-                    )
+
+                    log = f"[LLM] Квота исчерпана. Бан ключа {session.api_key[:8]} на 24ч"
+                    main_logger.error(log)
+                    agent_logger.error(log)
+
                     self.llm.rotator.cooldown_key(session.api_key, 86400)
                     await asyncio.sleep(5)
                 else:
@@ -378,9 +404,10 @@ class ReactLoop:
 
                     wait_time = max(2, min(wait_time, 300))  # Ограничиваем от 2с до 5 минут
 
-                    system_logger.info(
-                        f"[LLM] Рейт-лимит (429). Пауза {wait_time}с для ключа {session.api_key[:8]}"
-                    )
+                    log = f"[LLM] Рейт-лимит (429). Пауза {wait_time}с для ключа {session.api_key[:8]}"
+                    main_logger.info(log)
+                    agent_logger.info(log)
+
                     self.llm.rotator.cooldown_key(session.api_key, wait_time)
 
                     # Если у нас всего 1 ключ, логичнее сразу подождать здесь
@@ -392,12 +419,18 @@ class ReactLoop:
                 continue
 
             except openai.AuthenticationError:
-                system_logger.warning("[LLM] Ключ невалиден (401). Удаляем из пула.")
+                log = "[LLM] Ключ невалиден (401). Удаляем из пула."
+                main_logger.warning(log)
+                agent_logger.warning(log)
+
                 self.llm.rotator.ban_key(session.api_key)
                 continue
 
             except Exception as e:
-                system_logger.error(f"[LLM] Ошибка API: {e}")
+                log = f"[LLM] Ошибка API: {e}"
+                main_logger.error(log)
+                agent_logger.error(log)
+
                 self.agent_state.update_state(AgentStatus.ERROR)
                 return None
 
@@ -406,51 +439,32 @@ class ReactLoop:
         Парсит JSON-ответ агента.
         В случае ошибки возвращает None и записывает Traceback (ошибку) в БД.
         """
-        clean_answer = raw_answer.strip()
+        parsed_response, error_msg = parse_llm_json(raw_answer)
 
-        # Умный парсинг JSON (защита от мусора и markdown)
-        json_str = ""
-        json_match = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", clean_answer, re.DOTALL)
-
-        if json_match:
-            json_str = json_match.group(1)
-        else:
-            # Fallback: ищем валидную JSON структуру перебором (откидывая мусор до и после)
-            start_idx = clean_answer.find("{")
-            while start_idx != -1:
-                end_idx = clean_answer.rfind("}")
-                if end_idx > start_idx:
-                    candidate = clean_answer[start_idx : end_idx + 1]
-                    try:
-                        return AgentResponse.model_validate_json(candidate)
-                    except Exception:
-                        # Если не распарсилось, ищем следующую открывающую скобку
-                        start_idx = clean_answer.find("{", start_idx + 1)
-                else:
-                    break
-
-        if json_str:
-            try:
-                parsed_response = AgentResponse.model_validate_json(json_str)
-                return parsed_response
-            except Exception as e:
-                system_logger.warning("[ReAct] Ошибка структуры JSON.")
-                err_msg = f"Format Error: {e}"
-
-                await self.sql_ticks.save_tick(
-                    thoughts="[System: LLM provided invalid JSON format]",
-                    actions=[{"tool_name": "unknown", "parameters": {"raw": json_str[:500]}}],
-                    results={
-                        "execution_report": err_msg,
-                        "step": self.agent_state.current_step,
-                        "max_steps": self.agent_state.max_react_steps,
-                    },
-                )
-                self.agent_state.last_actions_result = err_msg
-                return None
+        if parsed_response is not None:
+            return parsed_response
 
         # Если { } не найдено вообще, значит LLM просто решила поболтать текстом
-        return AgentResponse(thoughts=clean_answer, actions=[])
+        if "System Error" in error_msg and "{" not in raw_answer:
+            return AgentResponse(thoughts=raw_answer.strip(), actions=[])
+
+        # Ошибка структуры
+        log = "[ReAct] Ошибка структуры JSON."
+        main_logger.warning(log)
+        agent_logger.warning(log)
+
+        await self.sql_ticks.save_tick(
+            thoughts="[System: LLM provided invalid JSON format]",
+            actions=[{"tool_name": "unknown", "parameters": {"raw": raw_answer[:500]}}],
+            results={
+                "execution_report": f"Format Error: {error_msg}",
+                "step": self.agent_state.current_step,
+                "max_steps": self.agent_state.max_react_steps,
+            },
+        )
+        await self.event_bus.publish(Events.REACT_TICK_SAVED)
+        self.agent_state.last_actions_result = f"Format Error: {error_msg}"
+        return None
 
     def add_realtime_event(self, event_data: Dict[str, Any]) -> None:
         """
@@ -470,20 +484,9 @@ class ReactLoop:
             messages: Массив сообщений (system и user) OpenAI формата.
         """
 
-        try:
-            with open("logs/last_main_prompt.md", "w", encoding="utf-8") as f:
-                for m in messages:
-                    role = getattr(
-                        m,
-                        "role",
-                        m.get("role", "unknown") if isinstance(m, dict) else "unknown",
-                    )
-                    content = getattr(
-                        m, "content", m.get("content", "") if isinstance(m, dict) else ""
-                    )
-                    f.write(f"### Role: {role}\n{content}\n\n---\n")
-        except Exception as e:
-            system_logger.error(f"[System] Не удалось сохранить промпт: {e}")
+        dump_prompt_to_file(
+            "logs/prompts/last_main_prompt.md", messages, meta_header="# MAIN AGENT DUMP"
+        )
 
     def _encode_image(self, image_path: str) -> str:
         """Кодирует картинку с диска в Base64."""
@@ -535,11 +538,15 @@ class ReactLoop:
                                 "image_url": {"url": f"data:{mime};base64,{base64_data}"},
                             }
                         )
-                        system_logger.info(
-                            f"[ReAct] Изображение {path_obj.name} успешно инжектировано."
-                        )
+
+                        log = f"[ReAct] Изображение {path_obj.name} успешно инжектировано."
+                        main_logger.info(log)
+                        agent_logger.info(log)
+
                 except Exception as e:
-                    system_logger.error(f"[ReAct] Ошибка инжектирования Base64: {e}")
+                    log = f"[ReAct] Ошибка инжектирования Base64: {e}"
+                    main_logger.error(f"[ReAct] Ошибка инжектирования Base64: {e}")
+                    agent_logger.error(log)
 
             user_msg["content"] = new_content
 

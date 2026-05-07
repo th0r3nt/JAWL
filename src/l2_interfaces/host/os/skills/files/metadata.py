@@ -4,7 +4,7 @@
 
 import asyncio
 
-from src.utils.logger import system_logger
+from src.utils.logger import main_logger
 
 from src.l2_interfaces.host.os.client import HostOSClient, HostOSAccessLevel
 from src.l2_interfaces.host.os.decorators import require_access
@@ -37,7 +37,7 @@ class HostOSMetadata:
 
             await asyncio.to_thread(self.host_os.set_file_metadata, rel_path, clean_desc)
 
-            system_logger.info(f"[Host OS] Добавлено описание для файла: {safe_path.name}")
+            main_logger.info(f"[Host OS] Добавлено описание для файла: {safe_path.name}")
             return SkillResult.ok(f"Описание успешно привязано к файлу {safe_path.name}.")
 
         except PermissionError as e:

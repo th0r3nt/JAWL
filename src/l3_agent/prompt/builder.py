@@ -26,6 +26,7 @@ class PromptBuilder:
         notes_enabled: bool = False,
         swarm_enabled: bool = False,
         tot_enabled: bool = False,
+        subconscious_enabled: bool = False,
     ) -> None:
         """
         Инициализирует билдер.
@@ -53,6 +54,7 @@ class PromptBuilder:
         self.notes_enabled = notes_enabled
         self.swarm_enabled = swarm_enabled
         self.tot_enabled = tot_enabled
+        self.subconscious_enabled = subconscious_enabled
 
     def _gather_markdown(self, sub_folder: Literal["personality", "system", "custom"]) -> str:
         """
@@ -99,6 +101,9 @@ class PromptBuilder:
         if not self.tot_enabled:
             valid_files = [f for f in valid_files if f.name.upper() != "TREE_OF_THOUGHTS.md"]
 
+        if not self.subconscious_enabled:
+            valid_files =[f for f in valid_files if f.name.upper() != "SUBCONSCIOUS.md"]
+
         def sort_key(path: Path):
             name = path.name.upper()
 
@@ -120,7 +125,7 @@ class PromptBuilder:
             except Exception as e:
                 raise RuntimeError(f"Ошибка чтения файла промпта {file_path}: {e}")
 
-        return "\n\n".join(parts)
+        return "\n\n\n".join(parts)
 
     def build(self) -> str:
         """

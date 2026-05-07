@@ -12,7 +12,7 @@
 
 from typing import List, Any, TYPE_CHECKING, Optional
 
-from src.utils.logger import system_logger
+from src.utils.logger import main_logger
 from src.l3_agent.skills.registry import register_instance  # noqa: F401
 from src.l3_agent.context.registry import ContextSection  # noqa: F401
 
@@ -40,7 +40,7 @@ def setup_example(system: "System", api_key: Optional[str] = None) -> List[Any]:
     """
 
     if not api_key:
-        system_logger.error("[Example] Ключ API не найден. Интерфейс принудительно отключен.")
+        main_logger.error("[Example] Ключ API не найден. Интерфейс принудительно отключен.")
         return []
 
     # 1. Получаем стейт (приборную панель).
@@ -64,7 +64,7 @@ def setup_example(system: "System", api_key: Optional[str] = None) -> List[Any]:
     #     section=ContextSection.INTERFACES,
     # )
 
-    system_logger.info("[Example] Пользовательский интерфейс загружен.")
+    main_logger.info("[Example] Пользовательский интерфейс загружен.")
 
     # Обязательно возвращаем объекты, у которых есть async def start() и async def stop()
     # return [client, events]

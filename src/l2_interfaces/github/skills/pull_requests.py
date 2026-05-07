@@ -3,7 +3,7 @@
 """
 
 from src.utils._tools import truncate_text
-from src.utils.logger import system_logger
+from src.utils.logger import main_logger
 
 from src.l2_interfaces.github.client import GithubClient
 
@@ -24,7 +24,7 @@ class GithubPullRequests:
         """
         Возвращает список Pull Requests репозитория (state: open/closed/all).
         """
-        
+
         try:
             params = {"state": state, "per_page": per_page}
             data = await self.client.request(
@@ -53,7 +53,7 @@ class GithubPullRequests:
     ) -> SkillResult:
         """
         Запрашивает Diff (добавленные/удаленные строки) конкретного Pull Request'а.
-        
+
         Args:
             owner: Владелец репозитория.
             repo: Название репозитория.
@@ -114,7 +114,7 @@ class GithubPullRequests:
 
             pr_num = data.get("number")
             self.client.state.add_history(f"create_pr: {owner}/{repo} #{pr_num}")
-            system_logger.info(f"[Github] Создан Pull Request #{pr_num} в {owner}/{repo}")
+            main_logger.info(f"[Github] Создан Pull Request #{pr_num} в {owner}/{repo}")
 
             return SkillResult.ok(f"Pull Request успешно создан. URL: {data.get('html_url')}")
 

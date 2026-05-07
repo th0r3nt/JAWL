@@ -40,7 +40,7 @@ async def test_integration_swarm_full_cycle(tmp_path: Path):
     # Регистрируем фиктивный навык для субагента,
     # чтобы SwarmManager при инициализации увидел, что роль CODER активна (RBAC)
     class DummySkill:
-        @skill(swarm_roles=[Subagents.CODER])
+        @skill(swarm=[Subagents.CODER])
         async def dummy_func(self) -> SkillResult:
             return SkillResult.ok("OK")
 

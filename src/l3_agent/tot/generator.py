@@ -9,10 +9,14 @@ import openai
 from pathlib import Path
 from typing import Dict, Any, List, Optional
 
-from src.utils.logger import system_logger
+from src.utils.logger import main_logger, tot_logger
 from src.utils.token_tracker import TokenTracker
+from src.utils._tools import dump_prompt_to_file
 
 from src.l0_state.agent.state import AgentState
+
+from src.l1_databases.sql.management.ticks import SQLTicks
+
 from src.l3_agent.llm.client import LLMClient
 from src.l3_agent.prompt.builder import PromptBuilder
 from src.l3_agent.context.registry import ContextRegistry, ContextSection
@@ -29,6 +33,7 @@ class ToTGenerator:
         prompt_builder: PromptBuilder,
         context_registry: ContextRegistry,
         agent_state: AgentState,
+        sql_ticks: SQLTicks,
         token_tracker: TokenTracker,
         root_dir: Path,
         timezone: int,
@@ -41,24 +46,22 @@ class ToTGenerator:
         self.model_name = model_name
         self.context_registry = context_registry
         self.agent_state = agent_state
+        self.sql_ticks = sql_ticks
+
         self.tracker = token_tracker
         self.timezone = timezone
 
-        # Настройка дерева
         self.branches_count = branches_count
         self.simulations_per_branch = simulations_per_branch
         self.max_depth = max_depth
 
-        # Личность агента
         personality_prompt = prompt_builder._gather_markdown("personality")
 
-        # Системные инструкции
         prompt_path = root_dir / "src" / "l3_agent" / "tot" / "prompt" / "INSTRUCTIONS.md"
         tot_instructions = (
             prompt_path.read_text(encoding="utf-8").strip() if prompt_path.exists() else ""
         )
 
-        # Общий промпт
         self.system_prompt = f"{personality_prompt}\n\n\n{tot_instructions}".strip()
 
     async def generate(
@@ -72,12 +75,9 @@ class ToTGenerator:
         Генерирует Markdown блок с деревом мыслей на основе текущей ситуации.
         """
 
-        system_logger.info(
-            f"[Tree of Thoughts] Запуск генерации дерева мыслей (Модель: {self.model_name})."
-        )
-
-        # =================================================
-        # КОНТЕКСТ
+        log = f"[Tree of Thoughts] Запуск генерации дерева мыслей (Модель: {self.model_name})."
+        main_logger.info(log)
+        tot_logger.info(log)
 
         context = await self._build_filtered_context(event_name, payload, missed_events)
 
@@ -89,32 +89,34 @@ class ToTGenerator:
         context += f"\n\n# CURRENT TASK / FOCUS \n{target_focus}"
 
         context += "\n\n# DIRECTIVE \n"
-        context += f"1. Сгенерировать ровно {self.branches_count} макро-стратегий (веток верхнего уровня).\n"
-        context += f"2. Требуемая глубина вложенности симуляции: {self.max_depth} (где макро-стратегия - это уровень 1).\n"
-        context += f"3. Если ветка не достигла максимальной глубины, она обязана содержать строго {self.simulations_per_branch} вложенных сценария развития в поле `sub_branches`.\n"
+        context += f"1. Рекомендовано сгенерировать ~{self.branches_count} макро-стратегий (веток верхнего уровня).\n"
+        context += f"2. Рекомендованная глубина вложенности симуляции: ~{self.max_depth} (где макро-стратегия - 1).\n"
+        context += f"3. Ветви сценарии динамически: в среднем по {self.simulations_per_branch} подварианта, но система должна сама решать, где нужно углубиться, а где ветка тупиковая или привела к логическому финалу (в таких случаях оставлять `sub_branches` пустым).\n"
+        context += "4. Поля минусов и плюсов путей/сценариев необязательны. Рекомендуется заполнять их только там, где действительно имеет смысл проводить Cost-Benefit анализ.\n"
+
         messages = [
             {"role": "system", "content": self.system_prompt},
             {"role": "user", "content": context},
         ]
 
-        self.tracker.add_input_record(messages, log_prefix="[Tree of Thoughts LLM]")
+        self.tracker.add_input_record(
+            messages, log_prefix="[Tree of Thoughts LLM]", logger=tot_logger
+        )
         await asyncio.to_thread(self._dump_context_to_file, messages)
-
-        # =================================================
-        # ВЫЗОВ LLM
 
         raw_json = await self._call_llm(messages)
         if not raw_json:
             return None
 
-        # =================================================
-        # ПАРСИНГ И ФОРМАТИРОВАНИЕ
-
         try:
             parsed = TreeResponse.model_validate_json(raw_json)
             return self._format_markdown(parsed)
+
         except Exception as e:
-            system_logger.error(f"[Tree of Thoughts] Ошибка парсинга дерева мыслей: {e}")
+            log = f"[Tree of Thoughts] Ошибка парсинга дерева мыслей: {e}"
+            main_logger.error(log)
+            tot_logger.erro(log)
+
             return None
 
     # ====================================================================================
@@ -124,10 +126,6 @@ class ToTGenerator:
     async def _build_filtered_context(
         self, event_name: str, payload: Dict[str, Any], missed_events: List[Dict[str, Any]]
     ) -> str:
-        """
-        Собирает контекст, исключая тяжелые скиллы и лишние данные.
-        """
-
         allowed_sections = {
             ContextSection.AGENT_STATE,
             ContextSection.DRIVES,
@@ -135,7 +133,6 @@ class ToTGenerator:
             ContextSection.MENTAL_STATES,
             ContextSection.TASKS,
             ContextSection.RAG_MEMORIES,
-            ContextSection.RECENT_TICKS,
             ContextSection.HEARTBEAT,
         }
 
@@ -157,69 +154,74 @@ class ToTGenerator:
             if section in allowed_sections and name in all_blocks:
                 filtered_blocks.append(all_blocks[name])
 
+        full_ticks_block = await self.sql_ticks.get_full_context_block(limit=self.agent_state.context_ticks)
+        filtered_blocks.insert(-1, full_ticks_block)
+
         return "\n\n\n".join(filtered_blocks).strip()
 
     def _format_markdown(self, tree: TreeResponse) -> str:
         """
-        Превращает рекурсивный объект в Markdown с иерархической нумерацией и тэгами.
+        Превращает рекурсивный объект в классическое ASCII-дерево.
         """
         if not tree.branches:
             return ""
-    
+
         step = self.agent_state.current_step
         lines = [
             "## TREE OF THOUGHTS",
-            "Симуляция стратегических веток для глубокого анализа и планирования.",
-            f"*Время генерации: Шаг {step}*\n"
+            "Подсознательная симуляция стратегических веток для глубокого анализа и планирования.",
+            f"*Время генерации: Шаг {step}*\n```text",
         ]
 
-        def _render_branch(branch: ThoughtBranch, depth: int, prefix: str):
-            # Отступ для визуальной иерархии (4 пробела на уровень глубины)
-            indent = "    " * depth
-            
-            # Определяем семантический тег
+        def _render_branch(
+            branch: ThoughtBranch, depth: int, prefix: str, is_last: bool, indent_prefix: str
+        ):
+            connector = "└── " if is_last else "├── "
+
+            # Формирование названия узла
             if depth == 0:
-                tag = "[макро-стратегия]"
+                node_title = f'Макро-стратегия №{prefix}: "{branch.name}"'
+            elif depth == 1:
+                node_title = f"Микро-симуляция №{prefix}: {branch.name}"
             else:
-                # Получаем префикс родителя (например, у ветки "1.2.1" родителем является "1.2")
-                parent_prefix = prefix.rsplit('.', 1)[0]
-                tag = f"[микро-симуляция ветки {parent_prefix}]"
-            
-            # Формируем заголовок с номером
-            lines.append(f"{indent}### Ветка {prefix}: {branch.name} {tag}")
-            
-            # Отступ для контента (добавляем 2 пробела относительно заголовка)
-            content_indent = indent + "  "
-            lines.append(f"{content_indent}* Описание: {branch.description}")
-            
+                node_title = f"{prefix}: {branch.name}"
+
+            if branch.description and branch.description != branch.name:
+                node_title += f" -> {branch.description}"
+
+            lines.append(f"{indent_prefix}{connector}{node_title}")
+
+            child_indent = indent_prefix + ("    " if is_last else "│   ")
+
             if branch.pros:
                 pros_str = " ".join(f"[+] {p}" for p in branch.pros)
-                lines.append(f"{content_indent}* Плюсы: {pros_str}")
-            
+                lines.append(f"{child_indent}* Плюсы: {pros_str}")
+
             if branch.cons:
                 cons_str = " ".join(f"[-] {c}" for c in branch.cons)
-                lines.append(f"{content_indent}* Минусы: {cons_str}")
-            
-            # Рекурсивно рендерим детей, если они есть
+                lines.append(f"{child_indent}* Минусы: {cons_str}")
+
             if branch.sub_branches:
-                lines.append("")  # Пустая строка перед началом вложенных веток
-                for idx, sub in enumerate(branch.sub_branches, 1):
-                    new_prefix = f"{prefix}.{idx}"
-                    _render_branch(sub, depth + 1, new_prefix)
-            
-            # Добавляем пустую строку после каждой макро-ветки (уровень 0)
-            if depth == 0:
-                lines.append("")
+                total_subs = len(branch.sub_branches)
+                for idx, sub in enumerate(branch.sub_branches):
+                    new_prefix = f"{prefix}.{idx + 1}"
+                    is_sub_last = idx == total_subs - 1
+                    _render_branch(sub, depth + 1, new_prefix, is_sub_last, child_indent)
 
-        # Запускаем рекурсию для корневых веток
-        for i, branch in enumerate(tree.branches, 1):
-            _render_branch(branch, 0, str(i))
+        total_branches = len(tree.branches)
+        for i, branch in enumerate(tree.branches):
+            is_last = i == total_branches - 1
+            _render_branch(branch, 0, str(i + 1), is_last, "")
+            if not is_last:
+                lines.append("│")
+                lines.append("│")
 
-        return "\n".join(lines).strip()
+        lines.append("```")
+        result = "\n".join(lines).strip()
+        tot_logger.info(result)
+        return result
 
     async def _call_llm(self, messages: List[Dict[str, Any]]) -> Optional[str]:
-        """Обрабатывает запросы к LLM, ротацию ключей и кулдауны."""
-
         for _ in range(3):
             try:
                 session = self.llm.get_session()
@@ -234,7 +236,7 @@ class ToTGenerator:
                 if msg_obj.tool_calls:
                     raw_answer = str(msg_obj.tool_calls[0].function.arguments)
                     self.tracker.add_output_record(
-                        raw_answer, log_prefix="[Tree of Thoughts LLM]"
+                        raw_answer, log_prefix="[Tree of Thoughts LLM]", logger=tot_logger
                     )
                     return raw_answer
                 return None
@@ -245,9 +247,11 @@ class ToTGenerator:
 
                     match = re.search(r"подождать (\d+) сек", str(e))
                     wait_sec = int(match.group(1)) if match else 10
-                    system_logger.warning(
-                        f"[Tree of Thoughts] Все ключи в кулдауне. Ждем {wait_sec}с."
-                    )
+
+                    log = f"[Tree of Thoughts] Все ключи в кулдауне. Ждем {wait_sec}с."
+                    main_logger.warning(log)
+                    tot_logger.warning(log)
+
                     await asyncio.sleep(wait_sec + 1)
                     continue
                 return None
@@ -271,9 +275,11 @@ class ToTGenerator:
                         except ValueError:
                             pass
                 wait_time = max(2, min(wait_time, 120))
-                system_logger.warning(
-                    f"[Tree of Thoughts] Rate Limit (429). Кулдаун ключа на {wait_time}с."
-                )
+
+                log = f"[Tree of Thoughts] Rate Limit (429). Кулдаун ключа на {wait_time}с."
+                main_logger.warning(log)
+                tot_logger.warning(log)
+
                 self.llm.rotator.cooldown_key(session.api_key, wait_time)
 
                 if self.llm.rotator.total_keys() == 1:
@@ -283,28 +289,16 @@ class ToTGenerator:
 
                 continue
             except Exception as e:
-                system_logger.error(f"[Tree of Thoughts] LLM ошибка: {e}")
+                log = f"[Tree of Thoughts] LLM ошибка: {e}"
+                main_logger.error(log)
+                tot_logger.error(log)
+
                 await asyncio.sleep(2)
                 continue
 
         return None
 
     def _dump_context_to_file(self, messages: List[Dict[str, Any]]) -> None:
-        """Сохраняет промпт подсознания для отладки."""
-        try:
-            log_dir = Path("logs")
-            log_dir.mkdir(parents=True, exist_ok=True)
-            with open(log_dir / "last_tot_prompt.md", "w", encoding="utf-8") as f:
-                f.write("# TREE OF THOUGHTS DUMP\n\n---\n\n")
-                for m in messages:
-                    role = getattr(
-                        m,
-                        "role",
-                        m.get("role", "unknown") if isinstance(m, dict) else "unknown",
-                    )
-                    content = getattr(
-                        m, "content", m.get("content", "") if isinstance(m, dict) else ""
-                    )
-                    f.write(f"### Role: {role}\n{content}\n\n---\n")
-        except Exception as e:
-            system_logger.error(f"[Tree of Thoughts] Не удалось сохранить промпт: {e}")
+        dump_prompt_to_file(
+            "logs/prompts/last_tot_prompt.md", messages, meta_header="# TREE OF THOUGHTS DUMP"
+        )

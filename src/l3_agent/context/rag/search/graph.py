@@ -8,7 +8,7 @@ import json
 import asyncio
 from typing import List, Dict, Any
 
-from src.utils.logger import system_logger
+from src.utils.logger import main_logger
 from src.l1_databases.graph.manager import GraphManager
 from src.l1_databases.graph.schema import GRAPH_NODE_TABLE, GRAPH_EDGE_TABLES
 
@@ -43,7 +43,7 @@ class GraphSearchWrapper:
                 while res.has_next():
                     names.append(res.get_next()[0])
             except Exception as e:
-                system_logger.error(f"[GraphRAG] Ошибка получения узлов графа: {e}")
+                main_logger.error(f"[GraphRAG] Ошибка получения узлов графа: {e}")
             return names
 
         # Запускаем в отдельном потоке, так как KuzuDB может блокировать GIL
@@ -71,7 +71,7 @@ class GraphSearchWrapper:
                 }, ...
             ]
         """
-        
+
         if not self.graph.db.conn or not node_names:
             return []
 
@@ -127,7 +127,7 @@ class GraphSearchWrapper:
                     results.append(node_data)
 
                 except Exception as e:
-                    system_logger.error(
+                    main_logger.error(
                         f"[GraphRAG] Ошибка извлечения соседей для '{name}': {e}"
                     )
 

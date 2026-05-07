@@ -1,6 +1,6 @@
 import asyncio
 
-from src.utils.logger import system_logger
+from src.utils.logger import main_logger
 from src.utils.event.bus import EventBus
 from src.utils.event.registry import Events
 from src.utils._tools import clean_html
@@ -31,7 +31,7 @@ class WebRSSEvents:
 
         self._is_running = True
         self._polling_task = asyncio.create_task(self._loop())
-        system_logger.info(
+        main_logger.info(
             f"[Web RSS] Фоновый поллинг RSS-лент запущен (Интервал: {self.client.config.polling_interval_sec}с)."
         )
 
@@ -52,7 +52,7 @@ class WebRSSEvents:
             except asyncio.CancelledError:
                 break
             except Exception as e:
-                system_logger.error(f"[Web RSS] Ошибка в цикле мониторинга RSS: {e}")
+                main_logger.error(f"[Web RSS] Ошибка в цикле мониторинга RSS: {e}")
 
     async def _poll_feeds(self, is_first_run: bool):
         all_latest_entries = []
@@ -94,7 +94,7 @@ class WebRSSEvents:
                     self._seen_entries = set(list(self._seen_entries)[-limit:])
 
             except Exception as e:
-                system_logger.debug(f"[Web RSS] Ошибка поллинга ленты {feed_cfg.name}: {e}")
+                main_logger.debug(f"[Web RSS] Ошибка поллинга ленты {feed_cfg.name}: {e}")
 
         # Обновляем приборную панель
         if all_latest_entries:

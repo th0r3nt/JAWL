@@ -11,7 +11,7 @@
 
 from typing import List, Dict, Any, Set
 
-from src.utils.logger import system_logger
+from src.utils.logger import main_logger, agent_logger
 from src.utils.settings import RAGConfig
 
 from src.l1_databases.vector.embedding import EmbeddingModel
@@ -70,9 +70,9 @@ class GraphRAGOrchestrator:
             current_vector_queries.update(self.extractor.extract_vector_queries(text))
             current_graph_nodes.update(self.extractor.extract_graph_nodes(text))
 
-        system_logger.info(
-            f"[GraphRAG] Старт цикла. Извлечено: {len(current_vector_queries)} векторных якорей, {len(current_graph_nodes)} графовых узлов."
-        )
+        log = f"[GraphRAG] Старт цикла. Извлечено: {len(current_vector_queries)} векторных якорей, {len(current_graph_nodes)} графовых узлов."
+        main_logger.info(log)
+        agent_logger.info(log)
 
         # Главный цикл семантического резолвинга
         for depth in range(self.config.depth_limit):
@@ -81,7 +81,7 @@ class GraphRAGOrchestrator:
             current_graph_nodes -= visited_graph_nodes
 
             if not current_vector_queries and not current_graph_nodes:
-                system_logger.debug(
+                main_logger.debug(
                     f"[GraphRAG] Early Exit на глубине {depth} (нет новых якорей)."
                 )
                 break

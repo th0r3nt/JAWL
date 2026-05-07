@@ -28,7 +28,6 @@ RelationType = Literal[
     "IS_A", "PART_OF", "REQUIRES", "CAUSES", "OWNS", "PRODUCES", "CONFLICTS_WITH", "RELATES_TO"
 ]
 
-# Строгий список категорий узлов
 ConceptCategory = Literal[
     "PERSON",  # Субъекты: Конкретные люди, пользователи, агенты, авторы
     "ORGANIZATION",  # Группы: Компании, сообщества, команды
@@ -42,7 +41,7 @@ ConceptCategory = Literal[
 ]
 
 # ================================================================
-# Схема для Code Graph (AST-граф кодовой базы)
+# Схема для Code Graph
 # ================================================================
 
 CODE_NODE_TABLE = "CodeNode"

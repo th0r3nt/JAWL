@@ -9,7 +9,7 @@
 import math
 import time
 from typing import List, Dict
-from src.utils.logger import system_logger
+from src.utils.logger import main_logger
 
 
 class APIKeyRotator:
@@ -28,9 +28,9 @@ class APIKeyRotator:
         Raises:
             ValueError: Если список ключей пуст.
         """
-        
+
         if not keys:
-            system_logger.error("[System] Передан пустой список ключей для LLM.")
+            main_logger.error("[System] Передан пустой список ключей для LLM.")
             raise ValueError("LLM API keys not found. Check your .env file.")
 
         self.keys = keys
@@ -38,7 +38,7 @@ class APIKeyRotator:
         self._cooldowns: Dict[str, float] = {k: 0.0 for k in self.keys}
         self._current_index: int = 0
 
-        system_logger.info(
+        main_logger.info(
             f"[LLM] APIKeyRotator инициализирован. Ключей в пуле: {len(self.keys)}."
         )
 
@@ -95,7 +95,7 @@ class APIKeyRotator:
 
             # Маскируем для логов
             masked = key[:6] + "***" if len(key) > 6 else "***"
-            system_logger.warning(f"[LLM] Ключ {masked} удален из пула (Dead, помянем).")
+            main_logger.warning(f"[LLM] Ключ {masked} удален из пула (Dead, помянем).")
 
             if self.keys:
                 self._current_index = self._current_index % len(self.keys)
@@ -114,7 +114,7 @@ class APIKeyRotator:
             masked = key[:6] + "***" if len(key) > 6 else "***"
 
             reason = "Quota Exceeded" if seconds > 3600 else "Rate Limit"
-            system_logger.warning(
+            main_logger.warning(
                 f"[LLM] Ключ {masked} ушел в кулдаун на {seconds} сек ({reason})."
             )
 

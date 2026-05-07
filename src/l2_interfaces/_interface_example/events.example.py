@@ -9,7 +9,7 @@
 import asyncio
 from typing import Optional, Any
 
-from src.utils.logger import system_logger
+from src.utils.logger import main_logger
 from src.utils.event.bus import EventBus
 
 # В реальном коде вам нужно зарегистрировать свой ивент (например EXAMPLE_INCOMING)
@@ -33,7 +33,7 @@ class ExampleEvents:
 
         self._is_running = True
         self._polling_task = asyncio.create_task(self._loop())
-        system_logger.info("[Example] Фоновый воркер запущен.")
+        main_logger.info("[Example] Фоновый воркер запущен.")
 
     async def stop(self) -> None:
         """Останавливает фоновый процесс."""
@@ -41,7 +41,7 @@ class ExampleEvents:
         if self._polling_task:
             self._polling_task.cancel()
             self._polling_task = None
-        system_logger.info("[Example] Фоновый воркер остановлен.")
+        main_logger.info("[Example] Фоновый воркер остановлен.")
 
     async def _loop(self) -> None:
         """
@@ -68,7 +68,7 @@ class ExampleEvents:
             except asyncio.CancelledError:
                 break
             except Exception as e:
-                system_logger.error(f"[Example] Ошибка в фоновом цикле: {e}")
+                main_logger.error(f"[Example] Ошибка в фоновом цикле: {e}")
 
             # Обязательно делаем паузу, чтобы к чертям не заблочить главный Event Loop
             await asyncio.sleep(60)

@@ -9,7 +9,7 @@ import os
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 
 from src.l1_databases.sql.tables import Base
-from src.utils.logger import system_logger
+from src.utils.logger import main_logger
 
 
 class SQLDB:
@@ -52,9 +52,9 @@ class SQLDB:
             async with self.engine.begin() as conn:
                 await conn.run_sync(Base.metadata.create_all)
 
-            system_logger.info("[SQL DB] База данных успешно инициализирована.")
+            main_logger.info("[SQL DB] База данных успешно инициализирована.")
         except Exception as e:
-            system_logger.error(f"[SQL DB] Критическая ошибка при запуске базы данных: {e}")
+            main_logger.error(f"[SQL DB] Критическая ошибка при запуске базы данных: {e}")
             raise e
 
     async def disconnect(self) -> None:
@@ -65,4 +65,4 @@ class SQLDB:
 
         if self.engine:
             await self.engine.dispose()
-            system_logger.info("[SQL DB] Подключение к базе данных закрыто.")
+            main_logger.info("[SQL DB] Подключение к базе данных закрыто.")

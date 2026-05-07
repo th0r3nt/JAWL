@@ -21,7 +21,7 @@ from telethon.tl.functions.messages import EditChatAboutRequest, EditChatPhotoRe
 from telethon.tl.types import InputChatUploadedPhoto, InputPeerChannel, InputPeerChat
 
 from src.utils._tools import validate_sandbox_path, parse_int_or_str
-from src.utils.logger import system_logger
+from src.utils.logger import main_logger
 from src.l2_interfaces.telegram.telethon.client import TelethonClient
 from src.l3_agent.skills.registry import SkillResult, skill
 
@@ -59,7 +59,7 @@ class TelethonAdmin:
             chat_type = "Супергруппа" if is_megagroup else "Канал"
 
             msg = f"{chat_type} '{title}' успешно создан. ID: {chat_id}"
-            system_logger.info(f"[Telegram Telethon] {msg}")
+            main_logger.info(f"[Telegram Telethon] {msg}")
             return SkillResult.ok(msg)
 
         except Exception as e:
@@ -87,14 +87,14 @@ class TelethonAdmin:
             await client(UpdateUsernameRequest(channel=entity, username=clean_username))
 
             if clean_username:
-                system_logger.info(
+                main_logger.info(
                     f"[Telegram Telethon] Канал {chat_id} стал публичным (@{clean_username})"
                 )
                 return SkillResult.ok(
                     f"Успешно. Канал теперь публичный: t.me/{clean_username}"
                 )
             else:
-                system_logger.info(f"[Telegram Telethon] Канал {chat_id} стал приватным")
+                main_logger.info(f"[Telegram Telethon] Канал {chat_id} стал приватным")
                 return SkillResult.ok("Успешно. Юзернейм удален, канал стал приватным.")
 
         except ValueError:
@@ -134,7 +134,7 @@ class TelethonAdmin:
 
             action_str = "привязана к каналу" if group_id else "отвязана от канала"
             msg = f"Супергруппа успешно {action_str} {channel_id}."
-            system_logger.info(f"[Telegram Telethon] {msg}")
+            main_logger.info(f"[Telegram Telethon] {msg}")
 
             return SkillResult.ok(msg)
 
@@ -156,7 +156,7 @@ class TelethonAdmin:
             except Exception:
                 await client(EditChatTitleRequest(chat_id=entity.id, title=new_title))
 
-            system_logger.info(
+            main_logger.info(
                 f"[Telegram Telethon] Название чата {chat_id} изменено на '{new_title}'"
             )
             return SkillResult.ok(f"Название чата успешно изменено на '{new_title}'.")
@@ -178,9 +178,7 @@ class TelethonAdmin:
 
             await client(EditChatAboutRequest(peer=entity, about=new_description))
 
-            system_logger.info(
-                f"[Telegram Telethon] Описание чата {chat_id} успешно изменено."
-            )
+            main_logger.info(f"[Telegram Telethon] Описание чата {chat_id} успешно изменено.")
             return SkillResult.ok("Описание чата успешно изменено.")
         except ValueError:
             return SkillResult.fail("Ошибка: Некорректный ID чата.")
@@ -215,7 +213,7 @@ class TelethonAdmin:
             else:
                 return SkillResult.fail("Ошибка: Этот тип чата не поддерживает смену аватара.")
 
-            system_logger.info(
+            main_logger.info(
                 f"[Telegram Telethon] Аватар чата {chat_id} изменен на {safe_path.name}"
             )
             return SkillResult.ok("Аватар чата успешно изменен.")
@@ -348,7 +346,7 @@ class TelethonAdmin:
                 entity=parse_int_or_str(chat_id), message=int(message_id), notify=notify
             )
 
-            system_logger.info(
+            main_logger.info(
                 f"[Telegram Telethon] Сообщение {message_id} закреплено в {chat_id}"
             )
             return SkillResult.ok(f"Сообщение {message_id} успешно закреплено.")
@@ -365,7 +363,7 @@ class TelethonAdmin:
                 entity=parse_int_or_str(chat_id), message=int(message_id)
             )
 
-            system_logger.info(
+            main_logger.info(
                 f"[Telegram Telethon] Сообщение {message_id} откреплено в {chat_id}"
             )
             return SkillResult.ok(f"Сообщение {message_id} успешно откреплено.")
@@ -406,12 +404,12 @@ class TelethonAdmin:
                 )
 
             msg = f"Топик '{title}' успешно создан. ID топика: {topic_id}"
-            system_logger.info(f"[Telegram Telethon] {msg} (чат {chat_id})")
+            main_logger.info(f"[Telegram Telethon] {msg} (чат {chat_id})")
             return SkillResult.ok(msg)
 
         except ValueError:
             return SkillResult.fail("Ошибка: Некорректный ID чата.")
-        
+
         except Exception as e:
             if "CHAT_NOT_MODIFIED" in str(e) or "not a forum" in str(e).lower():
                 return SkillResult.fail(

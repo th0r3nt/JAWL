@@ -26,14 +26,15 @@ class CodeGraphClient:
             return "### CODE GRAPH [OFF]\nИнтерфейс отключен."
 
         if not self.state.active_indexes:
-            return "### CODE GRAPH [ON]\nАктивных графов нет."
+            return "### CODE GRAPH [ON]\nАктивных графов кодовых баз не обнаружено."
 
-        lines = ["Активные графы проектов:"]
+        lines = ["Загруженные архитектурные индексы проектов:"]
         for pid, path in self.state.active_indexes.items():
-            lines.append(f"- [ID: `{pid}`] Путь: {path}")
+            # Делаем явный упор на связь ID и Директории
+            lines.append(f"* Index ID: '{pid}' -> указывает на директорию: '{path}'")
 
         return (
             "### CODE GRAPH [ON]\n"
+            "Для семантического поиска и навигации по коду - использовать Index ID.\n\n"
             + "\n".join(lines)
-            + "\nДля навигации необходимо указывать ID проекта в навыках."
         )

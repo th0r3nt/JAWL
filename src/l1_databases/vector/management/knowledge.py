@@ -11,11 +11,12 @@ from typing import TYPE_CHECKING, Any, Literal, List, Optional
 from qdrant_client import models
 
 from src.utils.dtime import safe_format_timestamp
-from src.utils.logger import system_logger
+from src.utils.logger import main_logger
 from src.utils._tools import truncate_text
 
 from src.l3_agent.skills.registry import skill, SkillResult
 from src.l3_agent.swarm.roles import Subagents
+from src.l3_agent.subconscious.schema import Pattern
 
 if TYPE_CHECKING:
     from src.l1_databases.vector.db import VectorDB
@@ -67,7 +68,9 @@ class VectorKnowledge:
         self.similarity_threshold = similarity_threshold
         self.timezone = timezone
 
-    @skill(swarm_roles=[Subagents.ARCHIVIST])
+    @skill(
+        swarm=[Subagents.ARCHIVIST], subconscious=[Pattern.CONSOLIDATION, Pattern.FORGETTING]
+    )
     async def save_knowledge(
         self,
         knowledge_text: str,
@@ -110,15 +113,18 @@ class VectorKnowledge:
             )
 
             msg = f"[Vector DB] Знание успешно сохранено в базе данных (ID: {point_id}). Теги: {tags}"
-            system_logger.info(msg)
+            main_logger.info(msg)
             return SkillResult.ok(msg)
 
         except Exception as e:
             msg = f"[Vector DB] Ошибка при сохранении знания в базе данных: {e}"
-            system_logger.error(msg)
+            main_logger.error(msg)
             return SkillResult.fail(msg)
 
-    @skill(swarm_roles=[Subagents.ARCHIVIST])
+    @skill(
+        swarm=[Subagents.ARCHIVIST],
+        subconscious=[Pattern.CONSOLIDATION, Pattern.REFLECTION, Pattern.FORGETTING],
+    )
     async def search_knowledge(
         self, query: str, limit: int = 5, tags_filter: Optional[List[VectorTag]] = None
     ) -> SkillResult:
@@ -164,11 +170,11 @@ class VectorKnowledge:
 
             if not points:
                 msg = "[Vector DB] Поиск знаний не дал результатов."
-                system_logger.debug(msg)
+                main_logger.debug(msg)
                 return SkillResult.ok(msg)
 
             short_query = truncate_text(query_str.replace("\n", " "), 50, "... [Обрезано]")
-            system_logger.info(
+            main_logger.info(
                 f"[Vector DB] Знания: найдено {len(points)} записей по запросу '{short_query}'"
             )
 
@@ -203,10 +209,12 @@ class VectorKnowledge:
 
         except Exception as e:
             msg = f"[Vector DB] Ошибка при поиске знаний: {e}"
-            system_logger.error(msg)
+            main_logger.error(msg)
             return SkillResult.fail(msg)
 
-    @skill(swarm_roles=[Subagents.ARCHIVIST])
+    @skill(
+        swarm=[Subagents.ARCHIVIST], subconscious=[Pattern.FORGETTING, Pattern.CONSOLIDATION]
+    )
     async def delete_knowledge(self, point_id: str) -> SkillResult:
         """
         Безвозвратно удаляет фрагмент знаний по его ID.
@@ -221,15 +229,17 @@ class VectorKnowledge:
                 wait=True,
             )
             msg = f"[Vector DB] Знание успешно удалено из базы данных (ID: {point_id})."
-            system_logger.debug(msg)
+            main_logger.debug(msg)
             return SkillResult.ok(msg)
 
         except Exception as e:
             msg = f"[Vector DB] Ошибка при удалении знания: {e}"
-            system_logger.error(msg)
+            main_logger.error(msg)
             return SkillResult.fail(msg)
 
-    @skill(swarm_roles=[Subagents.ARCHIVIST])
+    @skill(
+        swarm=[Subagents.ARCHIVIST], subconscious=[Pattern.FORGETTING, Pattern.CONSOLIDATION]
+    )
     async def get_all_knowledge(
         self, limit: int = 50, tags_filter: Optional[List[VectorTag]] = None
     ) -> SkillResult:
@@ -265,7 +275,7 @@ class VectorKnowledge:
 
             if not records:
                 msg = "[Vector DB] База знаний пуста (или нет записей с указанными тегами)."
-                system_logger.debug(msg)
+                main_logger.debug(msg)
                 return SkillResult.ok(msg)
 
             formatted_results = []
@@ -297,5 +307,5 @@ class VectorKnowledge:
 
         except Exception as e:
             msg = f"[Vector DB] Ошибка при чтении базы знаний: {e}"
-            system_logger.error(msg)
+            main_logger.error(msg)
             return SkillResult.fail(msg)

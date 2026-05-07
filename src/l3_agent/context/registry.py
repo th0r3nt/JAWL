@@ -10,7 +10,7 @@ import asyncio
 from enum import IntEnum
 from typing import Callable, Awaitable, Any, Dict, List
 
-from src.utils.logger import system_logger
+from src.utils.logger import main_logger, agent_logger
 
 
 class ContextSection(IntEnum):
@@ -61,11 +61,12 @@ class ContextRegistry:
             provider_func: Ссылка на метод (корутину).
             section: Позиция в иерархии (ContextSection).
         """
-        
+
         self._providers[name] = {"func": provider_func, "section": section}
-        system_logger.debug(
-            f"[System] Зарегистрирован провайдер контекста: {name} (Секция: {section.name})"
-        )
+
+        log = f"[System] Зарегистрирован провайдер контекста: {name} (Секция: {section.name})"
+        main_logger.debug(log)
+        agent_logger.debug(log)
 
     async def gather_all(
         self,
@@ -110,9 +111,9 @@ class ContextRegistry:
         context_blocks = {}
         for name, res in zip(sorted_names, results):
             if isinstance(res, Exception):
-                system_logger.error(
-                    f"[System] Ошибка сборки контекста в модуле '{name}': {res}"
-                )
+                log = f"[System] Ошибка сборки контекста в модуле '{name}': {res}"
+                main_logger.error(log)
+                agent_logger.error(log)
                 continue
 
             if res and isinstance(res, str):

@@ -12,7 +12,7 @@ from pathlib import Path
 from src.l3_agent.skills.registry import skill, SkillResult
 from src.utils.event.bus import EventBus
 from src.utils.event.registry import Events
-from src.utils.logger import system_logger
+from src.utils.logger import main_logger, swarm_logger
 
 
 class SubagentReport:
@@ -29,7 +29,7 @@ class SubagentReport:
             event_bus: Глобальная шина событий (для пробуждения главного агента).
             sandbox_dir: Папка песочницы, куда будут сохраняться сырые MD-отчеты.
         """
-        
+
         self.bus = event_bus
         self.reports_dir = sandbox_dir / "_system" / "subagents"
         self.reports_dir.mkdir(parents=True, exist_ok=True)
@@ -76,9 +76,9 @@ class SubagentReport:
 
         await asyncio.to_thread(_write)
 
-        system_logger.info(
-            f"[Swarm] Субагент {role}_{subagent_id} завершил работу. Отчет сформирован."
-        )
+        log = f"[Swarm] Субагент {role}_{subagent_id} завершил работу. Отчет сформирован."
+        main_logger.info(log)
+        swarm_logger.info(log)
 
         # Сигнализируем главному агенту, что раб закончил
         await self.bus.publish(

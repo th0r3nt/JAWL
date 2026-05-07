@@ -9,7 +9,7 @@ import urllib.request
 import urllib.error
 from typing import Any, List, Dict
 
-from src.utils.logger import system_logger
+from src.utils.logger import main_logger
 from src.l2_interfaces.web.search.client import WebSearchClient
 from src.l3_agent.skills.registry import skill, SkillResult
 from src.l3_agent.swarm.roles import Subagents
@@ -57,7 +57,7 @@ class TavilySearch:
 
         return await asyncio.to_thread(_do_search)
 
-    @skill(swarm_roles=[Subagents.WEB_RESEARCHER])
+    @skill(swarm=[Subagents.WEB_RESEARCHER])
     async def search(self, query: str, max_results: int = 5) -> SkillResult:
         """
         Ищет информацию в интернете (Tavily AI Search).
@@ -75,7 +75,7 @@ class TavilySearch:
             formatted = [
                 f"Title: {r['title']}\nURL: {r['href']}\nSnippet: {r['body']}" for r in results
             ]
-            system_logger.info(f"[Web] Выполнен поиск (Tavily) по запросу: '{query}'")
+            main_logger.info(f"[Web] Выполнен поиск (Tavily) по запросу: '{query}'")
             self.client.state.add_history(f"Поиск Tavily: '{query}'")
             return SkillResult.ok("\n\n".join(formatted))
 

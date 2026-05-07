@@ -5,7 +5,7 @@
 
 from typing import List, Any, TYPE_CHECKING, Optional
 
-from src.utils.logger import system_logger
+from src.utils.logger import main_logger
 
 from src.l2_interfaces.telegram.aiogram.client import AiogramClient
 from src.l2_interfaces.telegram.aiogram.events import AiogramEvents
@@ -31,9 +31,9 @@ def setup_aiogram(system: "System", bot_token: Optional[str]) -> List[Any]:
     Returns:
         List[Any]: Список компонентов (client, events), требующих вызова start()/stop() в главном цикле.
     """
-    
+
     if not bot_token:
-        system_logger.error("[System] AIOGRAM_BOT_TOKEN не найден в .env. Aiogram отключен.")
+        main_logger.error("[System] AIOGRAM_BOT_TOKEN не найден в .env. Aiogram отключен.")
         return []
 
     client = AiogramClient(bot_token=bot_token, state=system.aiogram_state)
@@ -55,6 +55,6 @@ def setup_aiogram(system: "System", bot_token: Optional[str]) -> List[Any]:
         section=ContextSection.INTERFACES,
     )
 
-    system_logger.info("[Telegram Aiogram] Интерфейс загружен.")
+    main_logger.info("[Telegram Aiogram] Интерфейс загружен.")
 
     return [client, events]

@@ -14,7 +14,7 @@ import subprocess
 import uuid
 import traceback
 
-from src.utils.logger import system_logger
+from src.utils.logger import main_logger
 from src.utils._tools import truncate_text
 
 from src.l2_interfaces.host.os.client import HostOSClient, HostOSAccessLevel
@@ -102,7 +102,7 @@ class HostOSExecution:
         env["PYTHONPATH"] = os.pathsep.join(paths_to_add)
         return env
 
-    @skill(swarm_roles=[Subagents.CODER, Subagents.QA_ENGINEER, Subagents.SYSADMIN])
+    @skill(swarm=[Subagents.CODER, Subagents.QA_ENGINEER, Subagents.SYSADMIN])
     @require_access(HostOSAccessLevel.OBSERVER)
     async def execute_script(self, filepath: str) -> SkillResult:
         """
@@ -197,9 +197,7 @@ class HostOSExecution:
             )
 
             exit_code = process.returncode
-            system_logger.info(
-                f"[Host OS] Выполнен скрипт {safe_path.name} (Код: {exit_code})"
-            )
+            main_logger.info(f"[Host OS] Выполнен скрипт {safe_path.name} (Код: {exit_code})")
 
             report = f"Скрипт завершился с кодом {exit_code}."
             if stdout_str:
@@ -215,10 +213,10 @@ class HostOSExecution:
 
         except Exception as e:
             err_msg = f"Критическая ошибка при запуске скрипта: {e}\n\nTraceback:\n{traceback.format_exc()}"
-            system_logger.error(f"[Host OS] {err_msg}")
+            main_logger.error(f"[Host OS] {err_msg}")
             return SkillResult.fail(err_msg)
 
-    @skill(swarm_roles=[Subagents.CODER, Subagents.QA_ENGINEER, Subagents.SYSADMIN])
+    @skill(swarm=[Subagents.CODER, Subagents.QA_ENGINEER, Subagents.SYSADMIN])
     @require_access(HostOSAccessLevel.ROOT)
     async def execute_shell_command(self, command: str) -> SkillResult:
         """
@@ -253,7 +251,7 @@ class HostOSExecution:
             )
 
             exit_code = process.returncode
-            system_logger.info(f"[Host OS] Выполнена shell-команда (Код: {exit_code})")
+            main_logger.info(f"[Host OS] Выполнена shell-команда (Код: {exit_code})")
 
             report = f"Команда завершилась с кодом {exit_code}."
             if stdout_str:
@@ -265,12 +263,12 @@ class HostOSExecution:
 
         except Exception as e:
             return SkillResult.fail(f"Ошибка выполнения shell-команды: {e}")
-        
-    @skill(swarm_roles=[Subagents.CODER, Subagents.QA_ENGINEER])
+
+    @skill(swarm=[Subagents.CODER, Subagents.QA_ENGINEER])
     @require_access(HostOSAccessLevel.OBSERVER)
     async def run_pytest(self, target_path: str = "tests/") -> SkillResult:
         """
-        Рабочий запуск тестирования (pytest) для проверки архитектуры 
+        Рабочий запуск тестирования (pytest) для проверки архитектуры
         или запуска написанных тестов. Выполняется в нативном окружении ОС (без ограничений песочницы).
 
         Args:
@@ -278,47 +276,55 @@ class HostOSExecution:
         """
         try:
             safe_path = self.host_os.validate_path(target_path, is_write=False)
-            
+
             if not safe_path.exists():
                 return SkillResult.fail(f"Путь не найден: {safe_path.name}")
 
             cmd = [sys.executable, "-m", "pytest", str(safe_path), "-v", "--disable-warnings"]
-            
+
             process = await asyncio.create_subprocess_exec(
                 *cmd,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
-                cwd=str(self.host_os.framework_dir)
+                cwd=str(self.host_os.framework_dir),
             )
-            
+
             try:
                 stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=120)
             except asyncio.TimeoutError:
                 self._kill_process_tree(process.pid)
-                return SkillResult.fail("Тесты выполнялись дольше 120 секунд и были прерваны (Таймаут).")
+                return SkillResult.fail(
+                    "Тесты выполнялись дольше 120 секунд и были прерваны (Таймаут)."
+                )
 
             # Pytest часто пишет полезный вывод и в stdout, и в stderr. Собираем всё
             out_str = stdout.decode("utf-8", errors="replace").strip()
             err_str = stderr.decode("utf-8", errors="replace").strip()
-            
+
             full_log = f"{out_str}\n{err_str}".strip()
             # Берем хвост лога, так как там самая важная сводка (Traceback)
             clean_log = full_log[-4000:] if len(full_log) > 4000 else full_log
-            
+
             exit_code = process.returncode
-            system_logger.info(f"[Host OS] Выполнен run_pytest для {safe_path.name} (Код: {exit_code})")
+            main_logger.info(
+                f"[Host OS] Выполнен run_pytest для {safe_path.name} (Код: {exit_code})"
+            )
 
             if exit_code == 0:
-                return SkillResult.ok(f"Тесты успешно пройдены.\n\nЛог:\n```\n{clean_log}\n```")
+                return SkillResult.ok(
+                    f"Тесты успешно пройдены.\n\nЛог:\n```\n{clean_log}\n```"
+                )
             else:
-                return SkillResult.fail(f"Тесты провалены (Код {exit_code}).\n\nЛог (последние строки):\n```\n{clean_log}\n```")
+                return SkillResult.fail(
+                    f"Тесты провалены (Код {exit_code}).\n\nЛог (последние строки):\n```\n{clean_log}\n```"
+                )
 
         except PermissionError as e:
             return SkillResult.fail(str(e))
         except Exception as e:
             return SkillResult.fail(f"Критическая ошибка при запуске pytest: {e}")
 
-    @skill(swarm_roles=[Subagents.SYSADMIN])
+    @skill(swarm=[Subagents.SYSADMIN])
     @require_access(HostOSAccessLevel.ROOT)
     async def kill_process(self, pid: int) -> SkillResult:
         """
@@ -332,7 +338,7 @@ class HostOSExecution:
             process.terminate()
             process.wait(timeout=3)
 
-            system_logger.info(f"[Host OS] Убит процесс {pid} ({process_name})")
+            main_logger.info(f"[Host OS] Убит процесс {pid} ({process_name})")
             return SkillResult.ok(f"Процесс {pid} ({process_name}) успешно завершен.")
 
         except psutil.NoSuchProcess:
@@ -352,7 +358,7 @@ class HostOSExecution:
         except Exception as e:
             return SkillResult.fail(f"Ошибка при попытке завершить процесс: {e}")
 
-    @skill(swarm_roles=[Subagents.SYSADMIN])
+    @skill(swarm=[Subagents.SYSADMIN])
     @require_access(HostOSAccessLevel.OBSERVER)
     async def start_daemon(self, filepath: str, name: str, description: str) -> SkillResult:
         """
@@ -420,7 +426,7 @@ class HostOSExecution:
             }
             self.host_os.set_daemons_registry(registry)
 
-            system_logger.info(f"[Host OS] Запущен фоновый демон '{name}' (PID: {pid})")
+            main_logger.info(f"[Host OS] Запущен фоновый демон '{name}' (PID: {pid})")
 
             return SkillResult.ok(
                 f"Демон '{name}' успешно запущен (PID: {pid}).\n"
@@ -433,7 +439,7 @@ class HostOSExecution:
         except Exception as e:
             return SkillResult.fail(f"Ошибка при запуске демона: {e}")
 
-    @skill(swarm_roles=[Subagents.SYSADMIN])
+    @skill(swarm=[Subagents.SYSADMIN])
     @require_access(HostOSAccessLevel.OBSERVER)
     async def stop_daemon(self, pid: int) -> SkillResult:
         """
@@ -465,7 +471,7 @@ class HostOSExecution:
             del registry[pid_str]
             self.host_os.set_daemons_registry(registry)
 
-            system_logger.info(f"[Host OS] Остановлен фоновый демон '{name}' (PID: {pid})")
+            main_logger.info(f"[Host OS] Остановлен фоновый демон '{name}' (PID: {pid})")
             return SkillResult.ok(f"Демон '{name}' (PID: {pid}) успешно остановлен вручную.")
 
         except Exception as e:
@@ -580,7 +586,7 @@ class HostOSExecution:
                     report.append(
                         f"Возвращенный результат (Return):\n```json\n{json.dumps(result_data, ensure_ascii=False, indent=2)}\n```"
                     )
-                    system_logger.info(
+                    main_logger.info(
                         f"[Host OS] RPC-шлюз успешно выполнил функцию '{func_name}' из {safe_path.name}"
                     )
                     return SkillResult.ok("\n\n".join(report))
@@ -604,5 +610,5 @@ class HostOSExecution:
 
         except Exception as e:
             err_msg = f"Внутренняя ошибка RPC: {e}\n\nTraceback:\n{traceback.format_exc()}"
-            system_logger.error(f"[Host OS] {err_msg}")
+            main_logger.error(f"[Host OS] {err_msg}")
             return SkillResult.fail(err_msg)

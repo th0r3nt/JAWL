@@ -58,6 +58,10 @@ class AgentState(BaseModel):
     last_action_error: str = ""
     last_actions_result: str = ""  # Результат последних выполненных действий
 
+    # Подсознание (Strict nested dictionary typing)
+    subconscious_enabled: bool = False
+    subconscious_counters: dict[str, dict[str, int]] = Field(default_factory=dict)
+
     def reset_step(self) -> None:
         """
         Сбрасывает шаг ReAct-цикла и кратковременную память.
@@ -66,7 +70,7 @@ class AgentState(BaseModel):
         self.current_step = 1
         self.last_thoughts = ""
         self.current_thoughts_tree = ""
-        
+
         self.last_action_args.clear()
         self.last_action_error = ""
         self.last_actions_result = ""
@@ -96,13 +100,12 @@ class AgentState(BaseModel):
     async def get_context_block(self, **kwargs) -> str:
         """
         Провайдер контекста.
-        Отдает отформатированный Markdown-блок с метаданными агента для инъекции в системный промпт.
+        Отдает отформатированный Markdown-блок с метаданными агента и подсознания для инъекции в системный промпт.
 
         Returns:
-            str: Статистика агента, лимиты, версия системы и аптайм.
+            str: Статистика агента, лимиты, версия системы, аптайм и состояние подсознания.
         """
-        
-        return f"""
+        base_info = f"""
 ### AGENT STATE
 * JAWL Version: {__version__}
 * Uptime: {self.get_uptime()}
@@ -117,3 +120,30 @@ class AgentState(BaseModel):
 * ReAct Step: {self.current_step}/{self.max_react_steps}
 * Input Tokens (current step): {self.last_input_tokens}
         """.strip()
+
+        if self.subconscious_enabled and self.subconscious_counters:
+            subc_lines = [
+                "\n\n### SUBCONSCIOUS STATE",
+                "Когнитивные фоновые процессы, работающие параллельно с основным ReAct-циклом. Они автоматически консолидируют память, адаптируют характер и проводят информационную очистку баз данных.\n",
+            ]
+
+            descriptions = {
+                "consolidation": "Автоматический перенос краткосрочного операционного опыта (логов действий и мыслей) в долгосрочную семантическую память и структурированные связи. Позволяет кристаллизовать извлеченные факты, правила и знания, предотвращая амнезию.",
+                "reflection": "Когнитивная переоценка недавних коммуникаций и паттернов взаимодействия. Обновляет CRM-систему (Mental States) - модулирует отношение (Attitude) к внешним субъектам, фиксирует новые директивы общения и адаптирует характер (Personality Traits).",
+                "forgetting": "Информационная гигиена и деградация неактуальных воспоминаний. Сканирует векторную и графовую базы, вычищая битые данные, дубликаты, случайный системный мусор и логи ошибок. Поддерживает высокую семантическую плотность RAG, защищая контекст.",
+            }
+
+            for pattern_name, data in sorted(self.subconscious_counters.items()):
+                current = data.get("current", 0)
+                limit = data.get("limit", 0)
+                desc = descriptions.get(pattern_name, "Фоновый когнитивный процесс.")
+
+                display_name = pattern_name.capitalize()
+
+                subc_lines.append(f"* {display_name}")
+                subc_lines.append(f"  - until the next launch: {current}/{limit} ticks")
+                subc_lines.append(f"  - description: {desc}")
+
+            base_info += "\n".join(subc_lines)
+
+        return base_info

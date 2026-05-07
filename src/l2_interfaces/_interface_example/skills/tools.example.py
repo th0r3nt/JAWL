@@ -37,10 +37,10 @@ class ExampleSkills:
         """Инжектим клиент, через который мы будем делать реальные запросы к API."""
         self.client = client
 
-    # Аргумент swarm_roles=[...] разрешает вызывать этот навык только определенным субагентам.
-    # Если swarm_roles не передан, субагенты не увидят этот навык вообще. Главный оркестратор видит всё всегда (если не поставить hidden=True).
+    # Аргумент swarm=[...] разрешает вызывать этот навык только определенным субагентам.
+    # Если swarm не передан, субагенты не увидят этот навык вообще. Главный оркестратор видит всё всегда (если не поставить hidden=True).
 
-    # @skill(swarm_roles=[Subagents.CODER, Subagents.WEB_RESEARCHER])
+    # @skill(swarm=[Subagents.CODER, Subagents.WEB_RESEARCHER])
     @skill()
     async def my_custom_tool(self, text_param: str, count: Optional[int] = 1) -> SkillResult:
         """

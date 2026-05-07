@@ -1,125 +1,140 @@
 import time
 from pathlib import Path
 from collections import deque
-
 from rich.panel import Panel
 from rich.text import Text
 from src.cli.widgets.ui import console, print_error, print_info, clear_screen, set_window_title
 
-LOG_FILE = Path(__file__).resolve().parent.parent.parent.parent / "logs" / "system.log"
+LOG_DIR = Path("logs")
 
-# Маппинг цветов для интерфейса (аналог LogColors из logger.py, но в формате rich)
+# Карта соответствия типов логов и имен файлов
+LOG_FILES = {
+    "main": "main.log",
+    "agent": "agent.log",
+    "swarm": "subagents.log",
+    "tot": "tot.log",
+    "subconscious": "subconscious.log",
+}
+
+# Маппинг цветов
 PREFIX_COLORS = {
     "[Heartbeat]": "bright_magenta",
     "[ReAct]": "bright_cyan",
     "[Thoughts]": "magenta",
     "[Agent Action]": "bright_green",
-    "[Agent Action Result]": "dim",  # gray
-    "[Skills]": "dim",
+    "[Agent Action Result]": "dim",
     "[LLM]": "bright_blue",
-    "[Host OS]": "green",
-    "[Web]": "magenta",
-    "[Telegram Telethon]": "cyan",
-    "[Telegram Aiogram]": "blue",
-    "[Meta]": "white",
-    "[Multimodality]": "bright_yellow",
-    "[SQL DB]": "yellow",
-    "[Vector DB]": "yellow",
-    "[EventBus]": "dim",
+    "[Swarm]": "bright_yellow",
+    "[Subagent ReAct]": "yellow",
+    "[Tree of Thoughts]": "cyan",
+    "[Subconscious]": "bright_magenta",
     "[System]": "bright_white",
 }
 
-# Инициализируем глобальную переменную до её использования
 _current_log_color = ""
 
 
 def _colorize_log_line(line: str) -> Text:
-    """
-    Раскрашивает чистую текстовую строку лога на лету.
-    Запоминает последний цвет, чтобы корректно красить многострочные логи.
-    """
     global _current_log_color
-
     clean_line = line.rstrip("\n")
     text = Text(clean_line)
 
     if " - ERROR - " in clean_line or " - CRITICAL - " in clean_line:
         _current_log_color = "bold red"
-        text.stylize(_current_log_color)
-        return text
-
-    if " - WARNING - " in clean_line:
+    elif " - WARNING - " in clean_line:
         _current_log_color = "bold yellow"
-        text.stylize(_current_log_color)
-        return text
+    else:
+        for prefix, color in PREFIX_COLORS.items():
+            if prefix in clean_line:
+                _current_log_color = color
+                break
 
-    # Красим по префиксу
-    for prefix, color in PREFIX_COLORS.items():
-        if prefix in clean_line:
-            _current_log_color = color
-            text.stylize(color)
-            return text
-
-    # Если префикса нет (это многострочный блок), красим в цвет предыдущей строки
     if _current_log_color:
         text.stylize(_current_log_color)
-
     return text
 
 
-def logs_screen() -> None:
+def logs_screen(log_type: str = "main") -> None:
     """
-    Экран потокового вывода логов в реальном времени.
-    Выводит последние 200 строк и переходит в режим tail -f.
+    Экран потокового вывода логов с защитой от FileLock на ОС Windows.
+    Умеет на лету подхватывать файлы при их ротации (RotatingFileHandler).
     """
 
-    set_window_title("JAWL - Системные логи")
+    file_name = LOG_FILES.get(log_type, "main.log")
+    log_path = LOG_DIR / file_name
 
-    if not LOG_FILE.exists():
-        print_error(f"Файл логов не найден: {LOG_FILE.name}")
-        print_info(" Возможно, агент еще ни разу не запускался.")
-        console.print("\n[dim]Нажмите Enter для возврата в меню.[/dim]")
+    set_window_title(f"JAWL Logs - {log_type.upper()}")
+
+    if not log_path.exists():
+        clear_screen()
+        print_error(f"Файл логов '{file_name}' еще не создан.")
+        print_info("Возможно, эта подсистема еще не запускалась.")
+        console.print("\n[dim]Нажмите Enter для возврата.[/dim]")
         input()
         return
 
     clear_screen()
     console.print(
         Panel(
-            "[bold green]Стриминг system.log в реальном времени[/bold green]\n"
-            "[dim]Нажмите Ctrl+C для возврата в главное меню[/dim]",
+            f"[bold green]Стриминг: {file_name}[/bold green]\n"
+            f"[dim]Тип: {log_type.upper()} | Ctrl+C для выхода[/dim]",
             border_style="green",
             expand=False,
         )
     )
 
+    last_pos = 0
+    curr_inode = -1
+
     try:
-        with open(LOG_FILE, "r", encoding="utf-8", errors="replace") as f:
-            # 1. Выводим предысторию (последние 200 строк)
-            # deque работает на C, поэтому это супер быстро и не жрет память
-            for line in deque(f, maxlen=200):
-                console.print(_colorize_log_line(line))
+        # Первичное чтение хвоста лога для контекста
+        try:
+            with open(log_path, "r", encoding="utf-8", errors="replace") as f:
+                lines = list(deque(f, maxlen=150))
+                for line in lines:
+                    console.print(_colorize_log_line(line))
+                last_pos = f.tell()
+                curr_inode = log_path.stat().st_ino
+        except (PermissionError, FileNotFoundError):
+            pass
 
-            # 2. Режим tail -f
-            last_size = LOG_FILE.stat().st_size if LOG_FILE.exists() else 0
-            while True:
-                line = f.readline()
-                if not line:
-                    time.sleep(0.1)
+        # Бесконечный цикл стриминга (без удержания файлового дескриптора)
+        while True:
+            time.sleep(0.2)
+            if not log_path.exists():
+                continue
 
-                    if LOG_FILE.exists():
-                        current_size = LOG_FILE.stat().st_size
-                        # Если размер файла резко уменьшился — произошла ротация
-                        if current_size < last_size:
-                            f.seek(0)
+            try:
+                stat = log_path.stat()
+                new_inode = stat.st_ino
+                current_size = stat.st_size
 
-                        # Обновляем last_size в любом случае (файл мог вырасти)
-                        last_size = current_size
+                # Проверка на ротацию логером или ручную очистку юзером
+                if new_inode != curr_inode or current_size < last_pos:
+                    last_pos = 0
+                    curr_inode = new_inode
+                    console.print(
+                        Panel(
+                            "[dim yellow]Лог-файл был ротирован или очищен. Чтение нового потока.[/dim yellow]"
+                        )
+                    )
 
-                    continue
+                with open(log_path, "r", encoding="utf-8", errors="replace") as f:
+                    f.seek(last_pos)
+                    new_data = f.read()
+                    last_pos = f.tell()
 
-                console.print(_colorize_log_line(line))
+                if new_data:
+                    # Избегаем лишних пустых строк в консоли при сплите
+                    if new_data.endswith("\n"):
+                        new_data = new_data[:-1]
+
+                    for line in new_data.split("\n"):
+                        console.print(_colorize_log_line(line))
+
+            except (PermissionError, FileNotFoundError):
+                # Файл в данный момент заблокирован ротатором для переименования, просто ждем
+                pass
 
     except KeyboardInterrupt:
-        print_info(" Выход из режима просмотра логов.")
-        time.sleep(1)
         return

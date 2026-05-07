@@ -82,7 +82,7 @@ class Subagents:
 ```python
 from src.l3_agent.swarm.roles import Subagents
 
-@skill(swarm_roles=[Subagents.CODER, Subagents.DATA_ANALYST])
+@skill(swarm=[Subagents.CODER, Subagents.DATA_ANALYST])
 @require_access(HostOSAccessLevel.SANDBOX)
 async def read_file(self, filepath: str, read_from: Literal["head", "tail"] = "head") -> SkillResult:
     # ... логика навыка ...

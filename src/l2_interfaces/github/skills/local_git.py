@@ -8,7 +8,7 @@ import asyncio
 from pathlib import Path
 from typing import Tuple
 
-from src.utils.logger import system_logger
+from src.utils.logger import main_logger
 from src.utils._tools import truncate_text, validate_sandbox_path
 
 from src.l2_interfaces.github.client import GithubClient
@@ -65,7 +65,7 @@ class GithubLocalGit:
             await process.wait()
             raise TimeoutError("Таймаут выполнения команды git (> 60 сек).")
 
-    @skill(swarm_roles=[Subagents.CODER])
+    @skill(swarm=[Subagents.CODER])
     async def git_clone_repository(
         self, owner: str, repo: str, dest_folder: str
     ) -> SkillResult:
@@ -108,7 +108,7 @@ class GithubLocalGit:
             await self._run_git_command(safe_path, "config", "user.email", "agent@jawl.local")
 
             self.github.state.add_history(f"git_clone: {owner}/{repo}")
-            system_logger.info(
+            main_logger.info(
                 f"[Github] Склонирован репозиторий {owner}/{repo} в {safe_path.name}"
             )
 
@@ -123,7 +123,7 @@ class GithubLocalGit:
         except Exception as e:
             return SkillResult.fail(f"Ошибка при клонировании: {e}")
 
-    @skill(swarm_roles=[Subagents.CODER])
+    @skill(swarm=[Subagents.CODER])
     async def git_checkout_branch(
         self, repo_folder: str, branch_name: str, create_new: bool = False
     ) -> SkillResult:
@@ -160,7 +160,7 @@ class GithubLocalGit:
         except Exception as e:
             return SkillResult.fail(f"Ошибка git checkout: {e}")
 
-    @skill(swarm_roles=[Subagents.CODER])
+    @skill(swarm=[Subagents.CODER])
     @require_github_token()
     async def git_commit_and_push(
         self, repo_folder: str, commit_message: str, branch_name: str
@@ -210,7 +210,7 @@ class GithubLocalGit:
             if code != 0:
                 return SkillResult.fail(f"Ошибка git push:\n{push_err or push_out}")
 
-            system_logger.info(
+            main_logger.info(
                 f"[Github] Сделан коммит и пуш в ветку {branch_name} (Папка: {safe_path.name})"
             )
 

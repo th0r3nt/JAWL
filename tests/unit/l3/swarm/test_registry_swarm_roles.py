@@ -12,10 +12,10 @@ def clean_reg():
     _REGISTRY.update(original)
 
 
-def test_skill_decorator_stores_swarm_roles():
+def test_skill_decorator_stores_swarm():
     """Тест: декоратор @skill корректно сохраняет объекты ролей в глобальный реестр."""
 
-    @skill(swarm_roles=[Subagents.CODER, Subagents.WEB_RESEARCHER])
+    @skill(swarm=[Subagents.CODER, Subagents.WEB_RESEARCHER])
     def my_cool_func():
         pass
 
@@ -26,6 +26,6 @@ def test_skill_decorator_stores_swarm_roles():
     skill_data = _REGISTRY[skill_name]
 
     assert "my_cool_func" in skill_name
-    assert len(skill_data["swarm_roles"]) == 2
-    assert Subagents.CODER in skill_data["swarm_roles"]
-    assert Subagents.WEB_RESEARCHER in skill_data["swarm_roles"]
+    assert len(skill_data["swarm"]) == 2
+    assert Subagents.CODER in skill_data["swarm"]
+    assert Subagents.WEB_RESEARCHER in skill_data["swarm"]

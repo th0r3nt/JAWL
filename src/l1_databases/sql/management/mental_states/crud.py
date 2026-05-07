@@ -2,9 +2,11 @@ import uuid
 from typing import Optional, TYPE_CHECKING, Literal, Any, Dict
 from sqlalchemy import select, delete, func, text
 
-from src.utils.logger import system_logger
+from src.utils.logger import main_logger
 from src.l3_agent.skills.registry import skill, SkillResult
 from src.l3_agent.swarm.roles import Subagents
+from src.l3_agent.subconscious.schema import Pattern
+
 from src.l1_databases.sql.tables import MentalStateTable
 from src.l1_databases.sql.management.mental_states.semantics import build_mental_states_radar
 
@@ -35,13 +37,13 @@ class SQLMentalStates:
                 await conn.execute(
                     text("ALTER TABLE mental_states ADD COLUMN relations JSON DEFAULT '{}'")
                 )
-                system_logger.info(
+                main_logger.info(
                     "[SQL DB] Выполнена успешная миграция таблицы MentalStates (добавлены CRM колонки)."
                 )
             except Exception:
                 pass  # Колонки уже существуют
 
-    @skill(swarm_roles=[Subagents.ARCHIVIST])
+    @skill(swarm=[Subagents.ARCHIVIST], subconscious=[Pattern.REFLECTION])
     async def create_mental_state(
         self,
         name: str,
@@ -101,10 +103,10 @@ class SQLMentalStates:
             await session.commit()
 
         msg = f"Сущность '{name}' добавлена в Active CRM. ID: {state_id}"
-        system_logger.debug(f"[SQL DB] {msg}")
+        main_logger.debug(f"[SQL DB] {msg}")
         return SkillResult.ok(msg)
 
-    @skill(swarm_roles=[Subagents.ARCHIVIST])
+    @skill(swarm=[Subagents.ARCHIVIST], subconscious=[Pattern.REFLECTION])
     async def get_mental_states(self) -> SkillResult:
         """
         Возвращает список всех сущностей, их отношения и связи.
@@ -116,7 +118,7 @@ class SQLMentalStates:
 
         return SkillResult.ok(build_mental_states_radar(states, self.max_entities))
 
-    @skill(swarm_roles=[Subagents.ARCHIVIST])
+    @skill(swarm=[Subagents.ARCHIVIST], subconscious=[Pattern.REFLECTION])
     async def update_mental_state(
         self,
         state_id: str,
@@ -172,10 +174,10 @@ class SQLMentalStates:
             await session.commit()
 
         msg = f"Сущность '{state.name}' (ID: {state_id}) обновлена."
-        system_logger.debug(f"[SQL DB] {msg}")
+        main_logger.debug(f"[SQL DB] {msg}")
         return SkillResult.ok(msg)
 
-    @skill(swarm_roles=[Subagents.ARCHIVIST])
+    @skill(swarm=[Subagents.ARCHIVIST], subconscious=[Pattern.FORGETTING])
     async def delete_mental_state(self, state_id: str) -> SkillResult:
         """
         Удаляет сущность из БД.
@@ -190,7 +192,7 @@ class SQLMentalStates:
                 return SkillResult.fail(f"Сущность с ID {state_id} не найдена.")
 
         msg = f"Сущность с ID {state_id} удалена из радара."
-        system_logger.debug(f"[SQL DB] {msg}")
+        main_logger.debug(f"[SQL DB] {msg}")
         return SkillResult.ok(msg)
 
     async def get_context_block(self, **kwargs: Any) -> str:

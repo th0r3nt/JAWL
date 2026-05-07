@@ -9,7 +9,7 @@ from datetime import datetime
 from typing import Optional, TYPE_CHECKING, Any, Literal
 from sqlalchemy import select, delete, func, text
 
-from src.utils.logger import system_logger
+from src.utils.logger import main_logger
 from src.utils.dtime import get_timezone
 
 from src.l1_databases.sql.tables import TaskTable
@@ -43,7 +43,7 @@ class SQLTasks:
                 await conn.execute(
                     text("ALTER TABLE tasks ADD COLUMN quadrant INTEGER DEFAULT 2")
                 )
-                system_logger.info(
+                main_logger.info(
                     "[SQL DB] Выполнена успешная миграция таблицы Tasks (добавлен quadrant)."
                 )
             except Exception:
@@ -150,11 +150,13 @@ class SQLTasks:
             await session.commit()
 
         msg = f"Задача '{title}' создана (Квадрант {quadrant}). ID: {task_id}"
-        system_logger.debug(f"[SQL DB] {msg}")
+        main_logger.debug(f"[SQL DB] {msg}")
         return SkillResult.ok(msg)
 
     @skill()
-    async def move_task_to_quadrant(self, task_id: str, new_quadrant: Literal[1, 2, 3, 4]) -> SkillResult:
+    async def move_task_to_quadrant(
+        self, task_id: str, new_quadrant: Literal[1, 2, 3, 4]
+    ) -> SkillResult:
         """
         Перемещает существующую задачу в другой квадрант матрицы Эйзенхауэра (реприоритизация).
 
@@ -178,7 +180,7 @@ class SQLTasks:
             await session.commit()
 
         msg = f"Задача {task_id} перемещена из Квадранта {old_quadrant} в Квадрант {new_quadrant}."
-        system_logger.debug(f"[SQL DB] {msg}")
+        main_logger.debug(f"[SQL DB] {msg}")
         return SkillResult.ok(msg)
 
     @skill()
@@ -242,7 +244,7 @@ class SQLTasks:
             await session.commit()
 
         msg = f"Задача {task_id} успешно обновлена."
-        system_logger.debug(f"[SQL DB] {msg}")
+        main_logger.debug(f"[SQL DB] {msg}")
         return SkillResult.ok(msg)
 
     @skill()
@@ -258,7 +260,7 @@ class SQLTasks:
                 return SkillResult.fail(f"Задача с ID {task_id} не найдена.")
 
         msg = f"Задача {task_id} удалена."
-        system_logger.debug(f"[SQL DB] {msg}")
+        main_logger.debug(f"[SQL DB] {msg}")
         return SkillResult.ok(msg)
 
     async def get_context_block(self, **kwargs: Any) -> str:

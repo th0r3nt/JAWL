@@ -7,7 +7,7 @@
 
 from typing import List, Any, TYPE_CHECKING
 
-from src.utils.logger import system_logger
+from src.utils.logger import main_logger
 
 from src.l2_interfaces.host.os.client import HostOSClient
 from src.l2_interfaces.multimodality.client import MultimodalityClient
@@ -31,7 +31,7 @@ def setup_multimodality(system: "System") -> List[Any]:
         List[Any]: Пустой список.
     """
     if not getattr(system.settings.llm, "is_multimodal", False):
-        system_logger.warning(
+        main_logger.warning(
             "[Multimodality] Интерфейс включен (multimodality: true), но модель "
             "не поддерживает зрение (llm.is_multimodal: false). Интерфейс принудительно отключен."
         )
@@ -56,6 +56,6 @@ def setup_multimodality(system: "System") -> List[Any]:
         section=ContextSection.INTERFACES,
     )
 
-    system_logger.info("[Multimodality] Интерфейс загружен. Агент прозрел.")
+    main_logger.info("[Multimodality] Интерфейс загружен. Агент прозрел.")
 
     return []

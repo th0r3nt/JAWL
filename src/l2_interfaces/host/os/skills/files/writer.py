@@ -7,7 +7,7 @@ import shutil
 import asyncio
 from typing import Union, List
 
-from src.utils.logger import system_logger
+from src.utils.logger import main_logger
 from src.utils._tools import format_size
 
 from src.l2_interfaces.host.os.client import HostOSClient, HostOSAccessLevel
@@ -23,7 +23,7 @@ class HostOSWriter:
     def __init__(self, host_os_client: HostOSClient):
         self.host_os = host_os_client
 
-    @skill(swarm_roles=[Subagents.CODER, Subagents.QA_ENGINEER, Subagents.SYSADMIN])
+    @skill(swarm=[Subagents.CODER, Subagents.QA_ENGINEER, Subagents.SYSADMIN])
     @require_access(HostOSAccessLevel.SANDBOX)
     async def write_file(
         self, filepath: str, content: str, description: str = None
@@ -61,7 +61,7 @@ class HostOSWriter:
                     desc_msg = f" (Не удалось сохранить метаданные: {e})"
 
             size_str = format_size(safe_path.stat().st_size)
-            system_logger.info(f"[Host OS] Перезаписан файл: {safe_path.name} ({size_str})")
+            main_logger.info(f"[Host OS] Перезаписан файл: {safe_path.name} ({size_str})")
             return SkillResult.ok(
                 f"Файл {safe_path.name} успешно перезаписан. Записано: {len(content)} симв. Размер: {size_str}.{desc_msg}"
             )
@@ -72,7 +72,7 @@ class HostOSWriter:
         except Exception as e:
             return SkillResult.fail(f"Ошибка при перезаписи файла: {e}")
 
-    @skill(swarm_roles=[Subagents.CODER, Subagents.QA_ENGINEER, Subagents.SYSADMIN])
+    @skill(swarm=[Subagents.CODER, Subagents.QA_ENGINEER, Subagents.SYSADMIN])
     @require_access(HostOSAccessLevel.SANDBOX)
     async def append_to_file(self, filepath: str, content: str) -> SkillResult:
         """
@@ -102,7 +102,7 @@ class HostOSWriter:
             await asyncio.to_thread(_append)
 
             size_str = format_size(safe_path.stat().st_size)
-            system_logger.info(f"[Host OS] Дополнен файл (append): {safe_path.name}")
+            main_logger.info(f"[Host OS] Дополнен файл (append): {safe_path.name}")
             return SkillResult.ok(
                 f"Текст успешно добавлен в конец файла {safe_path.name}. Размер: {size_str}."
             )
@@ -132,7 +132,7 @@ class HostOSWriter:
             size_str = format_size(safe_path.stat().st_size)
             safe_path.unlink()
 
-            system_logger.info(f"[Host OS] Удален файл: {safe_path.name} ({size_str})")
+            main_logger.info(f"[Host OS] Удален файл: {safe_path.name} ({size_str})")
             return SkillResult.ok(f"Файл {safe_path.name} ({size_str}) успешно удален.")
 
         except PermissionError as e:
@@ -165,7 +165,7 @@ class HostOSWriter:
                 )
 
             await asyncio.to_thread(shutil.rmtree, safe_path)
-            system_logger.info(f"[Host OS] Удалена директория: {safe_path.name}")
+            main_logger.info(f"[Host OS] Удалена директория: {safe_path.name}")
             return SkillResult.ok(
                 f"Директория {safe_path.name} и всё её содержимое успешно удалены."
             )
@@ -176,7 +176,7 @@ class HostOSWriter:
         except Exception as e:
             return SkillResult.fail(f"Ошибка при удалении директории: {e}")
 
-    @skill(swarm_roles=[Subagents.CODER, Subagents.QA_ENGINEER, Subagents.SYSADMIN])
+    @skill(swarm=[Subagents.CODER, Subagents.QA_ENGINEER, Subagents.SYSADMIN])
     @require_access(HostOSAccessLevel.SANDBOX)
     async def create_directories(self, paths: Union[str, List[str]]) -> SkillResult:
         """Создает одну или несколько директорий (папок)."""
@@ -215,7 +215,7 @@ class HostOSWriter:
         if errors:
             msg += "\n\nНо возникли ошибки с этими путями:\n" + "\n".join(errors)
 
-        system_logger.info(f"[Host OS] Созданы директории: {', '.join(created)}")
+        main_logger.info(f"[Host OS] Созданы директории: {', '.join(created)}")
 
         return SkillResult.ok(msg)
 
@@ -242,7 +242,7 @@ class HostOSWriter:
 
             await asyncio.to_thread(_move)
 
-            system_logger.info(
+            main_logger.info(
                 f"[Host OS] Перемещен/переименован объект: {safe_src.name} -> {safe_dst.name}"
             )
             return SkillResult.ok(f"Успешно. Объект перемещен по пути: {safe_dst.as_posix()}")

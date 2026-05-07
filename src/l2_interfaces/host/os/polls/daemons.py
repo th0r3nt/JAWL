@@ -9,7 +9,7 @@ import time
 import json
 import psutil
 
-from src.utils.logger import system_logger
+from src.utils.logger import main_logger
 from src.utils.dtime import seconds_to_duration_str
 from src.utils.event.bus import EventBus
 from src.utils.event.registry import Events
@@ -52,7 +52,7 @@ class DaemonsPoller:
                 break
 
             except Exception as e:
-                system_logger.error(f"[Host OS] Ошибка в поллере демонов: {e}")
+                main_logger.error(f"[Host OS] Ошибка в поллере демонов: {e}")
 
             await asyncio.sleep(1)
 
@@ -83,7 +83,7 @@ class DaemonsPoller:
                     )
 
             except Exception as e:
-                system_logger.error(f"[Host OS] Ошибка чтения события из песочницы: {e}")
+                main_logger.error(f"[Host OS] Ошибка чтения события из песочницы: {e}")
 
             finally:
                 try:

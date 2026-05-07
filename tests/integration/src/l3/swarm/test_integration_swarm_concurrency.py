@@ -17,7 +17,7 @@ from src.l3_agent.swarm.roles import Subagents
 def mock_registry_for_concurrency():
     """Мокает реестр, чтобы роли были активны."""
     return {
-        "DummySkill": {"swarm_roles": [Subagents.CODER]},
+        "DummySkill": {"swarm": [Subagents.CODER]},
     }
 
 

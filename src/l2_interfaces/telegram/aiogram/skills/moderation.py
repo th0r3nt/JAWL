@@ -8,7 +8,7 @@
 
 from src.l2_interfaces.telegram.aiogram.client import AiogramClient
 from src.l3_agent.skills.registry import SkillResult, skill
-from src.utils.logger import system_logger
+from src.utils.logger import main_logger
 
 
 class AiogramModeration:
@@ -34,7 +34,7 @@ class AiogramModeration:
             await bot.ban_chat_member(chat_id=int(chat_id), user_id=int(user_id))
 
             msg = f"Пользователь {user_id} забанен в чате {chat_id} (Aiogram)."
-            system_logger.info(f"[Telegram Aiogram] {msg}")
+            main_logger.info(f"[Telegram Aiogram] {msg}")
             return SkillResult.ok(msg)
 
         except ValueError:
@@ -58,7 +58,7 @@ class AiogramModeration:
             await bot.unban_chat_member(chat_id=int(chat_id), user_id=int(user_id))
 
             msg = f"Пользователь {user_id} разбанен в чате {chat_id} (Aiogram)."
-            system_logger.info(f"[Telegram Aiogram] {msg}")
+            main_logger.info(f"[Telegram Aiogram] {msg}")
             return SkillResult.ok(msg)
 
         except Exception as e:

@@ -12,7 +12,7 @@ import uuid
 from typing import Optional
 from aiohttp import web
 
-from src.utils.logger import system_logger
+from src.utils.logger import main_logger
 from src.utils.event.bus import EventBus
 from src.utils.event.registry import Events
 from src.utils.dtime import get_now_formatted
@@ -50,9 +50,7 @@ class WebHooksEvents:
             return
 
         if not self.client.secret_token:
-            system_logger.error(
-                "[Web Hooks] WEBHOOK_SECRET не задан в .env. Сервер не запущен."
-            )
+            main_logger.error("[Web Hooks] WEBHOOK_SECRET не задан в .env. Сервер не запущен.")
             return
 
         try:
@@ -62,12 +60,12 @@ class WebHooksEvents:
             await site.start()
 
             self.state.is_online = True
-            system_logger.info(
+            main_logger.info(
                 f"[Web Hooks] Сервер запущен на http://{self.client.config.host}:{self.client.config.port}"
             )
 
         except Exception as e:
-            system_logger.error(f"[Web Hooks] Ошибка запуска сервера: {e}")
+            main_logger.error(f"[Web Hooks] Ошибка запуска сервера: {e}")
 
             # Убираем за собой мусор, если бинд порта упал
             if self.runner:
@@ -81,7 +79,7 @@ class WebHooksEvents:
         self.state.is_online = False
         if self.runner:
             await self.runner.cleanup()
-            system_logger.info("[Web Hooks] Сервер остановлен.")
+            main_logger.info("[Web Hooks] Сервер остановлен.")
 
     async def handle_webhook(self, request: web.Request) -> web.Response:
         """
@@ -108,7 +106,7 @@ class WebHooksEvents:
         if not self.client.secret_token or not hmac.compare_digest(
             token or "", self.client.secret_token
         ):
-            system_logger.warning(
+            main_logger.warning(
                 f"[Web Hooks] Несанкционированная попытка доступа с IP {request.remote} (входящий токен невалиден)"
             )
             return web.json_response(
@@ -138,7 +136,7 @@ class WebHooksEvents:
             preview = preview[:limit] + "... [Обрезано]"
 
         self.state.add_hook(hook_id, source, time_str, payload, preview)
-        system_logger.info(f"[Web Hooks] Принят вебхук от '{source}' (ID: {hook_id})")
+        main_logger.info(f"[Web Hooks] Принят вебхук от '{source}' (ID: {hook_id})")
 
         # Проброс события в ядро агента
         await self.bus.publish(

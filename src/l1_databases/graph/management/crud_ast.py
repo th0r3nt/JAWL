@@ -2,7 +2,7 @@ import asyncio
 import json
 from typing import List, Dict, Any
 
-from src.utils.logger import system_logger
+from src.utils.logger import main_logger
 from src.l1_databases.graph.db import GraphDB
 from src.l1_databases.graph.schema import (
     CODE_NODE_TABLE,
@@ -154,6 +154,6 @@ class GraphASTCRUD:
                     f"MATCH (n:{CODE_NODE_TABLE} {{project_id: {s_proj}}}) DELETE n"
                 )
 
-                system_logger.info(f"[Graph DB] Проект AST '{project_id}' полностью удален.")
+                main_logger.info(f"[Graph DB] Проект AST '{project_id}' полностью удален.")
 
             await asyncio.to_thread(_sync)

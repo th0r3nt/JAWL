@@ -1,5 +1,5 @@
 from src.utils.event.bus import EventBus
-from src.utils.logger import system_logger
+from src.utils.logger import main_logger
 
 from src.l2_interfaces.host.os.state import HostOSState
 from src.l2_interfaces.host.os.client import HostOSClient
@@ -33,7 +33,7 @@ class HostOSEvents:
         self.telemetry.start()
         self.daemons.start()
         self.files.start()
-        system_logger.info("[Host OS] Мониторинги запущены.")
+        main_logger.info("[Host OS] Мониторинги запущены.")
 
     async def stop(self) -> None:
         """
@@ -44,7 +44,7 @@ class HostOSEvents:
         self.daemons.stop()
         await self.files.stop()
 
-        system_logger.info("[Host OS] Мониторинг остановлен.")
+        main_logger.info("[Host OS] Мониторинг остановлен.")
         self.state.is_online = False
 
     # ==========================================================

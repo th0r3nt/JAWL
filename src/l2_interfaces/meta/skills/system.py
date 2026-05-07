@@ -8,7 +8,7 @@
 from src.l2_interfaces.meta.client import MetaClient
 from src.l3_agent.skills.registry import SkillResult, skill
 from src.utils.event.registry import Events
-from src.utils.logger import system_logger
+from src.utils.logger import main_logger
 
 
 class MetaSystem:
@@ -22,7 +22,7 @@ class MetaSystem:
         """
         Завершает работу агента и полностью выключает систему.
         """
-        system_logger.info(f"[Meta] Запрошено выключение системы. Причина: {reason}")
+        main_logger.info(f"[Meta] Запрошено выключение системы. Причина: {reason}")
 
         await self.client.bus.publish(Events.SYSTEM_SHUTDOWN_REQUESTED, reason=reason)
         return SkillResult.ok(
@@ -34,7 +34,7 @@ class MetaSystem:
         """
         Выполняет полную перезагрузку системы.
         """
-        system_logger.info(f"[Meta] Запрошена перезагрузка системы. Причина: {reason}")
+        main_logger.info(f"[Meta] Запрошена перезагрузка системы. Причина: {reason}")
 
         await self.client.bus.publish(Events.SYSTEM_REBOOT_REQUESTED, reason=reason)
         return SkillResult.ok(

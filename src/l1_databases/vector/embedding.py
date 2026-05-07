@@ -11,7 +11,7 @@ import shutil
 import asyncio
 from fastembed import TextEmbedding
 
-from src.utils.logger import system_logger
+from src.utils.logger import main_logger
 
 
 class EmbeddingModel:
@@ -39,7 +39,7 @@ class EmbeddingModel:
         self.model_path = model_path
         self.model_name = model_name
 
-        system_logger.info(
+        main_logger.info(
             f"[Vector DB] Инициализация локальной embedding модели: {self.model_name}."
         )
 
@@ -49,7 +49,7 @@ class EmbeddingModel:
 
         except Exception as e:
             # Если словили ошибку (например ONNXRuntimeError: NO_SUCHFILE), значит кэш поврежден
-            system_logger.warning(
+            main_logger.warning(
                 f"[Vector DB] Обнаружено повреждение файлов модели эмбеддингов ({e}). "
                 "Очистка кэша и повторная загрузка."
             )
@@ -60,7 +60,7 @@ class EmbeddingModel:
             # Пробуем инициализировать (и скачать) заново
             self.model = TextEmbedding(model_name=self.model_name, cache_dir=self.model_path)
 
-        system_logger.info(
+        main_logger.info(
             f"[Vector DB] Embedding модель готова к работе (путь: {self.model_path})."
         )
 
@@ -104,7 +104,7 @@ class EmbeddingModel:
         Raises:
             RuntimeError: Если модель не инициализирована.
         """
-        
+
         if not self.model:
             raise RuntimeError("Ошибка: модель не инициализирована.")
 

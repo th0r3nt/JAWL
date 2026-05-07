@@ -10,7 +10,7 @@ import asyncio
 from pathlib import Path
 from typing import Dict
 
-from src.utils.logger import system_logger
+from src.utils.logger import main_logger
 from src.l3_agent.skills.registry import skill, SkillResult
 from src.l3_agent.swarm.roles import Subagents
 
@@ -29,7 +29,7 @@ class CodeGraphIndexing:
         self.graph = graph_crud
         self.vector = vector_crud
 
-    @skill(swarm_roles=[Subagents.CODER, Subagents.QA_ENGINEER])
+    @skill(swarm=[Subagents.CODER, Subagents.QA_ENGINEER])
     async def index_codebase(self, target_dir: str, project_id: str) -> SkillResult:
         """
         Сканирует директорию с кодом и строит граф архитектуры.
@@ -48,7 +48,7 @@ class CodeGraphIndexing:
 
             project_id = project_id.strip().replace(" ", "_")
 
-            system_logger.info(
+            main_logger.info(
                 f"[Code Graph] Запуск индексации проекта '{project_id}' в {safe_path.name}."
             )
 
@@ -65,7 +65,7 @@ class CodeGraphIndexing:
                 f"Найдено: {stats['files']} файлов, {stats['classes']} классов, {stats['functions']} функций.\n"
                 f"Теперь его можно изучить подробнее с помощью соответствующих навыков."
             )
-            system_logger.info(f"[Code Graph] Индексация '{project_id}' завершена.")
+            main_logger.info(f"[Code Graph] Индексация '{project_id}' завершена.")
             return SkillResult.ok(msg)
 
         except PermissionError as e:
@@ -74,7 +74,7 @@ class CodeGraphIndexing:
         except Exception as e:
             return SkillResult.fail(f"Критическая ошибка при индексации: {e}")
 
-    @skill(swarm_roles=[Subagents.CODER])
+    @skill(swarm=[Subagents.CODER])
     async def delete_index(self, project_id: str) -> SkillResult:
         """
         Удаляет граф проекта из баз данных.
@@ -182,7 +182,7 @@ class CodeGraphIndexing:
                                 )
 
                 except Exception as e:
-                    system_logger.debug(f"[Code Graph] Ошибка парсинга {filepath.name}: {e}")
+                    main_logger.debug(f"[Code Graph] Ошибка парсинга {filepath.name}: {e}")
 
         # 2-й проход: Строим связи импортов
         async def _process_imports():

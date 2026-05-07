@@ -10,7 +10,7 @@ import email
 from email.message import EmailMessage
 from typing import Tuple
 
-from src.utils.logger import system_logger
+from src.utils.logger import main_logger
 from src.utils._tools import truncate_text
 
 from src.l2_interfaces.email.client import EmailClient
@@ -58,7 +58,7 @@ class EmailSkills:
         try:
             success, text = await asyncio.to_thread(_read)
             if success:
-                system_logger.info(f"[Email] Прочитано письмо UID: {uid}")
+                main_logger.info(f"[Email] Прочитано письмо UID: {uid}")
                 return SkillResult.ok(text)
 
             return SkillResult.fail(text)

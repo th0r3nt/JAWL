@@ -13,7 +13,7 @@ from contextlib import contextmanager
 import asyncio
 from typing import Iterator, Any
 
-from src.utils.logger import system_logger
+from src.utils.logger import main_logger
 from src.l2_interfaces.email.state import EmailState
 from src.l2_interfaces.email.utils import decode_mime_header
 
@@ -70,7 +70,7 @@ class EmailClient:
 
         provider = self.PROVIDERS.get(domain)
         if not provider:
-            system_logger.error(
+            main_logger.error(
                 f"[Email] Неизвестный домен '{domain}'. Пожалуйста, используйте стандартные почтовики (Gmail, Yandex, Mail.ru)."
             )
             return
@@ -86,14 +86,14 @@ class EmailClient:
 
             self.state.is_online = True
             self.state.account_info = f"{self.account} (IMAP/SMTP настроены автоматически)"
-            system_logger.info(f"[Email] Успешная авторизация в ящике {self.account}")
+            main_logger.info(f"[Email] Успешная авторизация в ящике {self.account}")
 
             # Сразу обновляем дашборд
             await asyncio.to_thread(self.update_state_view)
 
         except Exception as e:
             self.state.account_info = "Ошибка авторизации (Неверный пароль приложения?)"
-            system_logger.error(f"[Email] Ошибка авторизации {self.account}: {e}")
+            main_logger.error(f"[Email] Ошибка авторизации {self.account}: {e}")
 
     async def stop(self) -> None:
         """Останавливает клиент (сессии IMAP/SMTP закрываются сами в context managers)."""
@@ -199,7 +199,7 @@ class EmailClient:
                 self.state.mailbox_preview = preview_text
 
         except Exception as e:
-            system_logger.error(f"[Email] Ошибка обновления дашборда: {e}")
+            main_logger.error(f"[Email] Ошибка обновления дашборда: {e}")
 
     async def get_context_block(self, **kwargs: Any) -> str:
         """Формирует Markdown-блок для приборной панели агента."""

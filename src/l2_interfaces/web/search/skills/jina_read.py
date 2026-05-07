@@ -9,7 +9,7 @@ import urllib.error
 from typing import Optional
 
 from src import __version__
-from src.utils.logger import system_logger
+from src.utils.logger import main_logger
 from src.utils._tools import truncate_text
 
 from src.l2_interfaces.web.search.client import WebSearchClient
@@ -36,7 +36,7 @@ class JinaReader:
 
         return await asyncio.to_thread(_fetch)
 
-    @skill(swarm_roles=[Subagents.WEB_RESEARCHER])
+    @skill(swarm=[Subagents.WEB_RESEARCHER])
     async def read_webpage(self, url: str) -> SkillResult:
         """
         Читает текстовое содержимое веб-страницы по указанному URL (возвращает чистый Markdown).
@@ -54,9 +54,9 @@ class JinaReader:
             total_len = len(text)
             if total_len > self.client.max_page_chars:
                 text = truncate_text(text, self.client.max_page_chars, "... [Текст обрезан]")
-                system_logger.info(f"[Web] Прочитана страница (Jina, с обрезкой): {url}")
+                main_logger.info(f"[Web] Прочитана страница (Jina, с обрезкой): {url}")
             else:
-                system_logger.info(f"[Web] Прочитана страница (Jina, полностью): {url}")
+                main_logger.info(f"[Web] Прочитана страница (Jina, полностью): {url}")
 
             header = (
                 f"[Веб-страница (Jina) | Прочитано: {len(text)}/{total_len} симв.]\n{'='*40}\n"

@@ -8,7 +8,7 @@ import uuid
 from typing import TYPE_CHECKING, List, Dict, Any
 from qdrant_client import models
 
-from src.utils.logger import system_logger
+from src.utils.logger import main_logger
 
 if TYPE_CHECKING:
     from src.l1_databases.vector.db import VectorDB
@@ -118,4 +118,4 @@ class VectorCodeAST:
                 )
             ),
         )
-        system_logger.info(f"[Vector DB] Вектора проекта AST '{project_id}' удалены.")
+        main_logger.info(f"[Vector DB] Вектора проекта AST '{project_id}' удалены.")

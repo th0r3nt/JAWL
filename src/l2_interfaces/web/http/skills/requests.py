@@ -12,7 +12,7 @@ import urllib.error
 from typing import Optional, Tuple
 
 from src import __version__
-from src.utils.logger import system_logger
+from src.utils.logger import main_logger
 from src.utils._tools import truncate_text, validate_sandbox_path
 
 from src.l2_interfaces.web.http.client import WebHTTPClient
@@ -40,7 +40,7 @@ class WebHTTPRequests:
     def __init__(self, client: WebHTTPClient) -> None:
         self.client = client
 
-    @skill(swarm_roles=[Subagents.WEB_RESEARCHER])
+    @skill(swarm=[Subagents.WEB_RESEARCHER])
     async def request(
         self, url: str, method: str = "GET", headers: Optional[dict] = None
     ) -> SkillResult:
@@ -52,7 +52,7 @@ class WebHTTPRequests:
             method: HTTP метод (GET, POST и т.д.).
             headers: Словарь кастомных HTTP-заголовков.
         """
-        
+
         limit = self.client.config.max_response_chars
 
         scheme_error = _ensure_http_scheme(url)
@@ -78,7 +78,7 @@ class WebHTTPRequests:
 
         try:
             status_code, content = await asyncio.to_thread(_make_request)
-            system_logger.info(
+            main_logger.info(
                 f"[Web HTTP] {method.upper()} запрос к {url} (Статус: {status_code})"
             )
 
@@ -122,7 +122,7 @@ class WebHTTPRequests:
 
             await asyncio.to_thread(_download)
 
-            system_logger.info(f"[Web HTTP] Файл {safe_path.name} скачан из {url}")
+            main_logger.info(f"[Web HTTP] Файл {safe_path.name} скачан из {url}")
             self.client.state.add_history(f"Download: {url} -> {safe_path.name}")
             return SkillResult.ok(
                 f"Файл успешно скачан и сохранен по пути: sandbox/{safe_path.name}"

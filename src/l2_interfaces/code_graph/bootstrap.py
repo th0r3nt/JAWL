@@ -6,7 +6,7 @@
 """
 
 from typing import List, Any, TYPE_CHECKING
-from src.utils.logger import system_logger
+from src.utils.logger import main_logger
 
 from src.l2_interfaces.host.os.client import HostOSClient
 from src.l2_interfaces.code_graph.client import CodeGraphClient
@@ -55,5 +55,5 @@ def setup_code_graph(system: "System") -> List[Any]:
         section=ContextSection.INTERFACES,
     )
 
-    system_logger.info("[Code Graph] Интерфейс загружен.")
+    main_logger.info("[Code Graph] Интерфейс загружен.")
     return []

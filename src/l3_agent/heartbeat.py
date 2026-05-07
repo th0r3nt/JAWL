@@ -11,7 +11,7 @@ import time
 from collections import deque
 from typing import Optional, Dict, Any, TYPE_CHECKING
 
-from src.utils.logger import system_logger
+from src.utils.logger import main_logger, agent_logger
 from src.utils.event.registry import EventLevel
 from src.utils.dtime import get_now_formatted
 
@@ -116,15 +116,18 @@ class Heartbeat:
         if is_awake:
             # Пробрасываем событие прямо в активный цикл
             self.react_loop.add_realtime_event(event_data)
-            system_logger.info(
-                f"[Heartbeat] Входящее событие '{event_name}' ({level.name}) получено во время работы агента. Данные добавлены в контекст текущего цикла."
-            )
+
+            log = f"[Heartbeat] Входящее событие '{event_name}' ({level.name}) получено во время работы агента. Данные добавлены в контекст текущего цикла."
+
+            main_logger.info(log)
+            agent_logger.info(log)
 
             # Если множитель 0.0 - это жесткое прерывание текущего процесса
             if multiplier <= 0.01:
-                system_logger.warning(
-                    f"[Heartbeat] Прерывание текущего ReAct-цикла из-за события: {event_name} ({level.name})"
-                )
+                log = f"[Heartbeat] Прерывание текущего ReAct-цикла из-за события: {event_name} ({level.name})"
+                main_logger.warning(log)
+                agent_logger.warning(log)
+
                 self._wake_reason = event_name
                 self._wake_payload = payload
                 self._wake_level = level.value
@@ -162,21 +165,22 @@ class Heartbeat:
             if new_remaining <= 0.01:
                 # Перезаписываем главную причину, только если новое событие важнее или такое же
                 if level.value >= self._wake_level:
-                    system_logger.info(
-                        f"[Heartbeat] Входящее событие: '{event_name}' ({level.name}). Инициализация вызова LLM."
-                    )
+                    log = f"[Heartbeat] Входящее событие: '{event_name}' ({level.name}). Инициализация вызова LLM."
+                    main_logger.info(log)
+                    agent_logger.info(log)
+
                     self._wake_reason = event_name
                     self._wake_payload = payload
                     self._wake_level = level.value
                 else:
-                    system_logger.info(
-                        f"[Heartbeat] Входящее событие: '{event_name}' ({level.name}). Сон уже прерван более приоритетным событием."
-                    )
+                    log = f"[Heartbeat] Входящее событие: '{event_name}' ({level.name}). Сон уже прерван более приоритетным событием."
+                    main_logger.info(log)
+                    agent_logger.info(log)
             else:
                 if safe_remaining > 0:
-                    system_logger.info(
-                        f"[Heartbeat] Входящее событие: '{event_name}' ({level.name}). Следующий вызов LLM сокращен на {reduced_by:.1f} сек. До пробуждения: {new_remaining:.1f} сек."
-                    )
+                    log = f"[Heartbeat] Входящее событие: '{event_name}' ({level.name}). Следующий вызов LLM сокращен на {reduced_by:.1f} сек. До пробуждения: {new_remaining:.1f} сек."
+                    main_logger.info(log)
+                    agent_logger.info(log)
 
     async def start(self) -> None:
         """
@@ -188,7 +192,9 @@ class Heartbeat:
             return
 
         self._is_running = True
-        system_logger.info("[Heartbeat] Агент переведен в автономный режим.")
+        log = "[Heartbeat] Агент переведен в автономный режим."
+        main_logger.info(log)
+        agent_logger.info(log)
 
         if self._next_tick_time == 0.0:
             self._next_tick_time = time.time() + self.heartbeat_interval
@@ -249,13 +255,16 @@ class Heartbeat:
                 except asyncio.CancelledError:
                     if self._is_interrupted:
                         # Отмена инициирована нами (answer_to_event). Глотаем ошибку и идем на новый круг
-                        system_logger.info("[System] Текущий ReAct-цикл успешно прерван.")
+                        main_logger.info("[System] Текущий ReAct-цикл успешно прерван.")
                         self._is_interrupted = False
                     else:
                         raise
 
                 except Exception as e:
-                    system_logger.error(f"[System] Критическая ошибка в ReAct-цикле: {e}")
+                    log = f"[System] Критическая ошибка в ReAct-цикле: {e}"
+                    main_logger.error(log)
+                    agent_logger.error(log)
+
                     # При краше сбрасываем таймер заново, чтобы не уйти в бесконечный луп ошибок
                     self._next_tick_time = time.time() + self.heartbeat_interval
                     self._wake_reason = "HEARTBEAT"
@@ -271,7 +280,10 @@ class Heartbeat:
         if self._active_react_task and not self._active_react_task.done():
             self._is_interrupted = True
             self._active_react_task.cancel()
-        system_logger.info("[Heartbeat] Остановка завершена.")
+
+        log = "[Heartbeat] Остановка завершена."
+        main_logger.info(log)
+        agent_logger.info(log)
 
     def update_config(self, key: str, value: Any) -> None:
         """
@@ -283,12 +295,14 @@ class Heartbeat:
         """
         if key == "heartbeat_interval":
             self.heartbeat_interval = int(value)
-            system_logger.info(
-                f"[System] Heartbeat обновил интервал на {self.heartbeat_interval} сек."
-            )
+
+            log = f"[System] Heartbeat обновил интервал на {self.heartbeat_interval} сек."
+            main_logger.info(log)
+            agent_logger.info(log)
 
         elif key == "continuous_cycle":
             self.continuous_cycle = bool(value)
-            system_logger.info(
-                f"[System] Heartbeat обновил continuous_cycle на {self.continuous_cycle}."
-            )
+
+            log = f"[System] Heartbeat обновил continuous_cycle на {self.continuous_cycle}."
+            main_logger.info(log)
+            agent_logger.info(log)

@@ -3,7 +3,7 @@ import asyncio
 from datetime import datetime, timedelta, timezone
 from typing import Optional, Literal
 
-from src.utils.logger import system_logger
+from src.utils.logger import main_logger
 from src.utils._tools import truncate_text, validate_sandbox_path, format_size
 
 from src.l2_interfaces.github.client import GithubClient
@@ -19,7 +19,7 @@ class GithubRepositories:
     def __init__(self, client: GithubClient):
         self.client = client
 
-    @skill(swarm_roles=[Subagents.CODER])
+    @skill(swarm=[Subagents.CODER])
     async def search_repositories(
         self,
         query: str,
@@ -59,13 +59,13 @@ class GithubRepositories:
                     f"- [{repo_name}] ({stars}⭐ | {lang}) - {clean_desc}\n  URL: {url}"
                 )
 
-            system_logger.info(f"[Github] Выполнен поиск репозиториев: '{query}'")
+            main_logger.info(f"[Github] Выполнен поиск репозиториев: '{query}'")
             return SkillResult.ok("\n".join(lines))
 
         except Exception as e:
             return SkillResult.fail(f"Ошибка при поиске репозиториев: {e}")
 
-    @skill(swarm_roles=[Subagents.CODER])
+    @skill(swarm=[Subagents.CODER])
     async def get_trending_repositories(
         self,
         period: Optional[Literal["daily", "weekly", "monthly"]],
@@ -128,15 +128,13 @@ class GithubRepositories:
                     f"- [{repo_name}] (+{stars}⭐ | {lang_val}) - {clean_desc}\n  URL: {url}"
                 )
 
-            system_logger.info(
-                f"[Github] Запрошены тренды: {period}, lang: {language or 'all'}"
-            )
+            main_logger.info(f"[Github] Запрошены тренды: {period}, lang: {language or 'all'}")
             return SkillResult.ok("\n".join(lines))
 
         except Exception as e:
             return SkillResult.fail(f"Ошибка при получении трендов: {e}")
 
-    @skill(swarm_roles=[Subagents.CODER])
+    @skill(swarm=[Subagents.CODER])
     async def get_repo_info(self, owner: str, repo: str) -> SkillResult:
         """
         Возвращает метаданные репозитория.
@@ -183,12 +181,12 @@ class GithubRepositories:
                     f"- [{repo_name}] {item.get('path')} (URL: {item.get('html_url')})"
                 )
 
-            system_logger.info(f"[Github] Выполнен поиск кода: '{query}'")
+            main_logger.info(f"[Github] Выполнен поиск кода: '{query}'")
             return SkillResult.ok("\n".join(lines))
         except Exception as e:
             return SkillResult.fail(f"Ошибка при поиске кода: {e}")
 
-    @skill(swarm_roles=[Subagents.CODER])
+    @skill(swarm=[Subagents.CODER])
     async def read_file_content(
         self, owner: str, repo: str, path: str, ref: Optional[str] = None
     ) -> SkillResult:
@@ -213,13 +211,13 @@ class GithubRepositories:
             )
 
             self.client.state.add_history(f"read_file: {owner}/{repo}:{path}")
-            system_logger.info(f"[Github] Прочитан файл {path} из {owner}/{repo}")
+            main_logger.info(f"[Github] Прочитан файл {path} из {owner}/{repo}")
 
             return SkillResult.ok(f"Содержимое {path}:\n```\n{content}\n```")
         except Exception as e:
             return SkillResult.fail(f"Ошибка при чтении файла: {e}")
 
-    @skill(swarm_roles=[Subagents.CODER])
+    @skill(swarm=[Subagents.CODER])
     async def list_recent_commits(
         self, owner: str, repo: str, per_page: int = 10
     ) -> SkillResult:
@@ -249,7 +247,7 @@ class GithubRepositories:
         except Exception as e:
             return SkillResult.fail(f"Ошибка при получении коммитов: {e}")
 
-    @skill(swarm_roles=[Subagents.CODER])
+    @skill(swarm=[Subagents.CODER])
     async def download_repository(
         self, owner: str, repo: str, dest_filename: str, ref: Optional[str] = None
     ) -> SkillResult:
@@ -284,7 +282,7 @@ class GithubRepositories:
 
             size_str = format_size(safe_path.stat().st_size)
             self.client.state.add_history(f"download_repo: {owner}/{repo}")
-            system_logger.info(
+            main_logger.info(
                 f"[Github] Репозиторий {owner}/{repo} скачан в {safe_path.name} ({size_str})"
             )
 
@@ -297,7 +295,7 @@ class GithubRepositories:
         except Exception as e:
             return SkillResult.fail(f"Ошибка при скачивании репозитория: {e}")
 
-    @skill(swarm_roles=[Subagents.CODER])
+    @skill(swarm=[Subagents.CODER])
     async def get_commit_details(self, owner: str, repo: str, commit_sha: str) -> SkillResult:
         """
         Возвращает детальную информацию о коммите, включая точные пути всех измененных файлов.
@@ -332,7 +330,7 @@ class GithubRepositories:
                     dels = f.get("deletions", 0)
                     lines.append(f"- [{status.upper()}] {filename} (+{adds} / -{dels})")
 
-            system_logger.info(
+            main_logger.info(
                 f"[Github] Прочитаны детали коммита {commit_sha[:7]} в {owner}/{repo}"
             )
             return SkillResult.ok("\n".join(lines))
@@ -340,7 +338,7 @@ class GithubRepositories:
         except Exception as e:
             return SkillResult.fail(f"Ошибка при получении деталей коммита: {e}")
 
-    @skill(swarm_roles=[Subagents.CODER])
+    @skill(swarm=[Subagents.CODER])
     async def list_repo_directory(
         self, owner: str, repo: str, path: str = "", ref: Optional[str] = None
     ) -> SkillResult:
@@ -378,7 +376,7 @@ class GithubRepositories:
                 size_str = f" ({format_size(size)})" if item.get("type") == "file" else ""
                 lines.append(f"- {i_type}: {name}{size_str}")
 
-            system_logger.info(f"[Github] Прочитана директория /{path} в {owner}/{repo}")
+            main_logger.info(f"[Github] Прочитана директория /{path} в {owner}/{repo}")
             return SkillResult.ok("\n".join(lines))
 
         except Exception as e:
@@ -397,7 +395,7 @@ class GithubRepositories:
         try:
             await self.client.request("PUT", f"/user/starred/{owner}/{repo}")
             self.client.state.add_history(f"star: {owner}/{repo}")
-            system_logger.info(f"[Github] Поставлена звезда репозиторию {owner}/{repo}")
+            main_logger.info(f"[Github] Поставлена звезда репозиторию {owner}/{repo}")
             return SkillResult.ok(f"Звезда успешно поставлена репозиторию {owner}/{repo}.")
         except Exception as e:
             return SkillResult.fail(f"Ошибка при постановке звезды: {e}")
@@ -415,12 +413,12 @@ class GithubRepositories:
         try:
             await self.client.request("DELETE", f"/user/starred/{owner}/{repo}")
             self.client.state.add_history(f"unstar: {owner}/{repo}")
-            system_logger.info(f"[Github] Убрана звезда с репозитория {owner}/{repo}")
+            main_logger.info(f"[Github] Убрана звезда с репозитория {owner}/{repo}")
             return SkillResult.ok(f"Звезда успешно убрана с репозитория {owner}/{repo}.")
         except Exception as e:
             return SkillResult.fail(f"Ошибка при удалении звезды: {e}")
 
-    @skill(swarm_roles=[Subagents.CODER])
+    @skill(swarm=[Subagents.CODER])
     async def list_branches(self, owner: str, repo: str, per_page: int = 30) -> SkillResult:
         """
         Возвращает список веток репозитория.
@@ -472,7 +470,7 @@ class GithubRepositories:
             repo_full_name = data.get("full_name")
             url = data.get("html_url")
 
-            system_logger.info(f"[Github] Создан репозиторий {repo_full_name}")
+            main_logger.info(f"[Github] Создан репозиторий {repo_full_name}")
             return SkillResult.ok(
                 f"Репозиторий '{repo_full_name}' успешно создан.\nURL: {url}"
             )
@@ -498,7 +496,7 @@ class GithubRepositories:
             fork_name = data.get("full_name")
             url = data.get("html_url")
 
-            system_logger.info(f"[Github] Сделан форк {owner}/{repo} -> {fork_name}")
+            main_logger.info(f"[Github] Сделан форк {owner}/{repo} -> {fork_name}")
             return SkillResult.ok(
                 f"Форк успешно создан: '{fork_name}'. Теперь его можно клонировать локально.\nURL: {url}"
             )
@@ -529,7 +527,7 @@ class GithubRepositories:
             self.client.state.add_history("create_gist")
 
             url = data.get("html_url")
-            system_logger.info(f"[Github] Создан Gist: {filename}")
+            main_logger.info(f"[Github] Создан Gist: {filename}")
 
             return SkillResult.ok(f"Gist успешно создан.\nURL: {url}")
 

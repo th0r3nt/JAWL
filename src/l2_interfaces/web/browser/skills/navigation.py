@@ -1,4 +1,4 @@
-from src.utils.logger import system_logger
+from src.utils.logger import main_logger
 from src.l3_agent.skills.registry import skill, SkillResult
 from src.l2_interfaces.web.browser.client import WebBrowserClient
 
@@ -14,7 +14,7 @@ class BrowserNavigation:
     @skill()
     async def navigate(self, url: str) -> SkillResult:
         """
-        Переходит по указанному URL (или обновляет страницу). 
+        Переходит по указанному URL (или обновляет страницу).
         Запускает браузер, если он был закрыт.
         """
 
@@ -29,7 +29,7 @@ class BrowserNavigation:
             await self.client.update_state_view()
 
             self.client.state.add_history(f"Переход на: {url}")
-            system_logger.info(f"[Web Browser] Переход по ссылке: {url}")
+            main_logger.info(f"[Web Browser] Переход по ссылке: {url}")
 
             return SkillResult.ok(
                 "Страница загружена. Изучите контекст интерфейса для просмотра элементов."

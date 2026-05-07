@@ -3,7 +3,7 @@ import inspect
 from typing import Any, Callable
 
 from src.utils.event.registry import EventConfig
-from src.utils.logger import system_logger
+from src.utils.logger import main_logger
 
 
 class EventBus:
@@ -12,7 +12,7 @@ class EventBus:
     Позволяет модулям общаться друг с другом без жесткой связности (Loose Coupling).
     Поддерживает как синхронные, так и асинхронные обработчики.
     """
-    
+
     def __init__(self):
         self.listeners: dict[str, list[Callable[..., Any]]] = {}
         self.background_tasks: set[asyncio.Task] = set()
@@ -22,7 +22,7 @@ class EventBus:
 
         for res in results:
             if isinstance(res, Exception):
-                system_logger.error(
+                main_logger.error(
                     f"[System] Ошибка в обработчике события '{event_name}': {res}"
                 )
 
@@ -33,13 +33,13 @@ class EventBus:
             self.listeners[event.name] = []
 
         self.listeners[event.name].append(handler)
-        system_logger.debug(f"[System] Подписка: '{handler.__name__}' -> '{event.name}'")
+        main_logger.debug(f"[System] Подписка: '{handler.__name__}' -> '{event.name}'")
 
     async def publish(self, event: EventConfig, *args: Any, **kwargs: Any) -> None:
         """Публикует событие."""
 
         if event.name not in self.listeners:
-            system_logger.debug(f"[System] На событие '{event.name}' никто не подписан.")
+            main_logger.debug(f"[System] На событие '{event.name}' никто не подписан.")
             return
 
         handlers = self.listeners[event.name]

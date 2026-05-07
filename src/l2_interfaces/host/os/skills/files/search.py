@@ -5,7 +5,7 @@
 import asyncio
 from pathlib import Path
 
-from src.utils.logger import system_logger
+from src.utils.logger import main_logger
 from src.utils._tools import format_size
 
 from src.l2_interfaces.host.os.client import HostOSClient, HostOSAccessLevel
@@ -21,7 +21,7 @@ class HostOSSearch:
     def __init__(self, host_os_client: HostOSClient):
         self.host_os = host_os_client
 
-    @skill(swarm_roles=[Subagents.CODER, Subagents.QA_ENGINEER, Subagents.SYSADMIN])
+    @skill(swarm=[Subagents.CODER, Subagents.QA_ENGINEER, Subagents.SYSADMIN])
     @require_access(HostOSAccessLevel.SANDBOX)
     async def list_directory(self, path: str = ".", max_depth: int = 1) -> SkillResult:
         """
@@ -131,7 +131,7 @@ class HostOSSearch:
             if len(lines) == 1:
                 lines.append("└── (Пустая директория)")
 
-            system_logger.info(f"[Host OS] Просмотр директории (дерево): {safe_path.name}")
+            main_logger.info(f"[Host OS] Просмотр директории (дерево): {safe_path.name}")
             return SkillResult.ok("\n".join(lines))
 
         except PermissionError as e:
@@ -140,7 +140,7 @@ class HostOSSearch:
         except Exception as e:
             return SkillResult.fail(f"Ошибка при чтении директории: {e}")
 
-    @skill(swarm_roles=[Subagents.CODER, Subagents.QA_ENGINEER, Subagents.SYSADMIN])
+    @skill(swarm=[Subagents.CODER, Subagents.QA_ENGINEER, Subagents.SYSADMIN])
     @require_access(HostOSAccessLevel.SANDBOX)
     async def search_files(self, pattern: str, path: str = ".") -> SkillResult:
         """Поиск файлов по маске (например, '*.py', 'log_*.txt') во вложенных папках."""
@@ -192,7 +192,7 @@ class HostOSSearch:
             if not found:
                 return SkillResult.ok(f"По маске '{pattern}' ничего не найдено.")
 
-            system_logger.info(f"[Host OS] Поиск файлов '{pattern}' в {safe_path.name}")
+            main_logger.info(f"[Host OS] Поиск файлов '{pattern}' в {safe_path.name}")
             return SkillResult.ok("\n".join(found))
 
         except PermissionError as e:
@@ -201,7 +201,7 @@ class HostOSSearch:
         except Exception as e:
             return SkillResult.fail(f"Ошибка при поиске файлов: {e}")
 
-    @skill(swarm_roles=[Subagents.CODER, Subagents.QA_ENGINEER, Subagents.SYSADMIN])
+    @skill(swarm=[Subagents.CODER, Subagents.QA_ENGINEER, Subagents.SYSADMIN])
     @require_access(HostOSAccessLevel.SANDBOX)
     async def search_content_in_files(
         self,
@@ -300,7 +300,7 @@ class HostOSSearch:
                     f"Совпадений по строке '{search_string}' в '{safe_path.name}' не найдено."
                 )
 
-            system_logger.info(
+            main_logger.info(
                 f"[Host OS] Выполнен глобальный поиск текста '{search_string}' в {safe_path.name}"
             )
             return SkillResult.ok(

@@ -1,6 +1,6 @@
 import json
 
-from src.utils.logger import system_logger
+from src.utils.logger import main_logger
 from src.l3_agent.skills.registry import skill, SkillResult
 from src.l2_interfaces.web.hooks.client import WebHooksClient
 
@@ -28,7 +28,7 @@ class WebHooksSkills:
                         f"Полные данные вебхука `{hook_id}`:\n```text\n{payload}\n```"
                     )
 
-                system_logger.info(f"[Web Hooks] Прочитаны полные данные вебхука: {hook_id}")
+                main_logger.info(f"[Web Hooks] Прочитаны полные данные вебхука: {hook_id}")
                 return SkillResult.ok(result_text)
 
         return SkillResult.fail(
@@ -45,7 +45,7 @@ class WebHooksSkills:
         self.client.state.recent_hooks.clear()
         self.client.state.preview_lines.clear()
 
-        system_logger.info(f"[Web Hooks] История очищена ({count} записей удалено).")
+        main_logger.info(f"[Web Hooks] История очищена ({count} записей удалено).")
         return SkillResult.ok(f"История вебхуков успешно очищена. Удалено {count} записей.")
 
     @skill()

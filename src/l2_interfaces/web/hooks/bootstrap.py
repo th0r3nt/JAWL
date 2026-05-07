@@ -7,7 +7,7 @@
 """
 
 from typing import List, Any, TYPE_CHECKING, Optional
-from src.utils.logger import system_logger
+from src.utils.logger import main_logger
 
 from src.l2_interfaces.web.hooks.client import WebHooksClient
 from src.l2_interfaces.web.hooks.events import WebHooksEvents
@@ -32,7 +32,7 @@ def setup_web_hooks(system: "System", secret_token: Optional[str]) -> List[Any]:
         List[Any]: Компоненты жизненного цикла (events - aiohttp сервер).
     """
     if not secret_token:
-        system_logger.error(
+        main_logger.error(
             "[Web Hooks] WEBHOOK_SECRET не задан в .env. Интерфейс принудительно отключен."
         )
         return []
@@ -58,6 +58,6 @@ def setup_web_hooks(system: "System", secret_token: Optional[str]) -> List[Any]:
         section=ContextSection.INTERFACES,
     )
 
-    system_logger.info("[Web Hooks] Интерфейс загружен.")
+    main_logger.info("[Web Hooks] Интерфейс загружен.")
 
     return [events]

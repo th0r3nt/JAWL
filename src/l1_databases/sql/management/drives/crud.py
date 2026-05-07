@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING, Any
 from datetime import datetime, timezone, timedelta
 from sqlalchemy import select, func
 
-from src.utils.logger import system_logger
+from src.utils.logger import main_logger
 from src.utils.dtime import format_datetime
 
 from src.l1_databases.sql.tables import DriveTable
@@ -166,7 +166,7 @@ class SQLDrives:
 
             await session.commit()
 
-        system_logger.debug(f"[SQL DB] Дефицит драйва '{drive.name}' снижен на {amount}%.")
+        main_logger.debug(f"[SQL DB] Дефицит драйва '{drive.name}' снижен на {amount}%.")
         return SkillResult.ok(
             f"Дефицит драйва '{drive.name}' успешно снижен на {amount}%. Текущий остаток: {int(new_deficit)}/100"
         )
@@ -212,7 +212,7 @@ class SQLDrives:
             session.add(new_drive)
             await session.commit()
 
-        system_logger.debug(f"[SQL DB] Создан кастомный драйв '{name}'.")
+        main_logger.debug(f"[SQL DB] Создан кастомный драйв '{name}'.")
         return SkillResult.ok(f"Кастомный драйв '{name}' успешно создан.")
 
     @skill()
@@ -241,7 +241,7 @@ class SQLDrives:
             await session.delete(drive)
             await session.commit()
 
-        system_logger.debug(f"[SQL DB] Удален кастомный драйв '{drive_name}'.")
+        main_logger.debug(f"[SQL DB] Удален кастомный драйв '{drive_name}'.")
         return SkillResult.ok(f"Драйв '{drive_name}' удален.")
 
     def _get_drive_semantic_state(self, name: str, deficit: int, description: str) -> str:
@@ -285,7 +285,7 @@ class SQLDrives:
             return ""
 
         lines = [
-            "## INTERNAL PSYCHOLOGICAL STATE\n\n",
+            "## INTERNAL PSYCHOLOGICAL STATE",
             "Внутренние самоощущения системы, сформированные на основе дефицита внутренних метрик:\n",
         ]
 

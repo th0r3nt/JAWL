@@ -59,6 +59,9 @@ async def test_e2e_react_loop_with_tot_auto():
     mock_sql_ticks = MagicMock()
     mock_sql_ticks.save_tick = AsyncMock()
 
+    mock_bus = MagicMock()
+    mock_bus.publish = AsyncMock()
+
     loop = ReactLoop(
         llm_client=mock_main_llm,
         prompt_builder=MagicMock(),
@@ -68,6 +71,7 @@ async def test_e2e_react_loop_with_tot_auto():
         vector_manager=MagicMock(),
         token_tracker=MagicMock(),
         tools=[],
+        event_bus=mock_bus,
         tot_config=tot_config,
         tot_generator=mock_tot_generator,
     )

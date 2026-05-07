@@ -11,7 +11,7 @@ import json
 from pathlib import Path
 from typing import Any, Optional
 
-from src.utils.logger import system_logger
+from src.utils.logger import main_logger
 from src.utils.dtime import get_now_formatted
 from src.utils.settings import HostTerminalConfig
 from src.l2_interfaces.host.terminal.state import HostTerminalState
@@ -78,7 +78,7 @@ class HostTerminalClient:
         self.port_file.write_text(str(actual_port))
         self.state.is_online = True
 
-        system_logger.info(f"[Host OS] Терминал-сервер запущен ({self.host}:{actual_port})")
+        main_logger.info(f"[Host OS] Терминал-сервер запущен ({self.host}:{actual_port})")
 
     async def stop(self) -> None:
         """Штатно закрывает все активные сокеты."""
@@ -99,7 +99,7 @@ class HostTerminalClient:
             self.server.close()
             await self.server.wait_closed()
 
-        system_logger.info("[Host OS] Терминал-сервер остановлен.")
+        main_logger.info("[Host OS] Терминал-сервер остановлен.")
 
     async def _handle_client(
         self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter
@@ -127,7 +127,7 @@ class HostTerminalClient:
 
         if not self.state.is_ui_connected:
             self.state.is_ui_connected = True
-            system_logger.info("[Host OS] CLI-чат подключен к терминалу.")
+            main_logger.info("[Host OS] CLI-чат подключен к терминалу.")
             await self.incoming_queue.put(("_CONNECTION_OPENED", ""))
 
         try:
@@ -154,7 +154,7 @@ class HostTerminalClient:
             pass
 
         except Exception as e:
-            system_logger.warning(f"[Host OS] Ошибка соединения терминала: {e}")
+            main_logger.warning(f"[Host OS] Ошибка соединения терминала: {e}")
 
         finally:
             self.active_writers.discard(writer)
@@ -162,7 +162,7 @@ class HostTerminalClient:
             # Проверяем, не осталось ли еще активных сессий
             if not self.active_writers and self.state.is_ui_connected:
                 self.state.is_ui_connected = False
-                system_logger.info("[Host OS] CLI-чат отключен от терминала.")
+                main_logger.info("[Host OS] CLI-чат отключен от терминала.")
                 await self.incoming_queue.put(("_CONNECTION_CLOSED", ""))
 
             try:

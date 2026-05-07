@@ -9,7 +9,7 @@ from src.utils.settings import (
     load_config,
     HostOSConfig,
     _log_missing_defaults,
-    SystemConfig
+    SystemConfig,
 )
 
 
@@ -94,7 +94,7 @@ def test_log_missing_defaults():
     # Имитируем, что юзер передал только timezone, остальное (например, heartbeat_interval) встанет по дефолту
     partial_config = SystemConfig.model_validate({"timezone": 3})
 
-    with patch("src.utils.settings.system_logger.debug") as mock_debug:
+    with patch("src.utils.settings.main_logger.debug") as mock_debug:
         _log_missing_defaults(partial_config, prefix="", file_name="settings.yaml")
 
         # Проверяем, что логгер сработал

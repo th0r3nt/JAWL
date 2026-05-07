@@ -24,11 +24,11 @@ async def test_code_graph_client_context(cg_client):
 
     # Онлайн, но пусто
     cg_client.state.is_online = True
-    assert "Активных графов нет" in await cg_client.get_context_block()
+    assert "Активных графов кодовых баз не обнаружено." in await cg_client.get_context_block()
 
     # Онлайн с проектами
     cg_client.state.active_indexes["my_api"] = "sandbox/api"
     ctx = await cg_client.get_context_block()
     assert "[ON]" in ctx
-    assert "`my_api`" in ctx
+    assert "'my_api'" in ctx
     assert "sandbox/api" in ctx

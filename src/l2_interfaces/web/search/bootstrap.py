@@ -6,7 +6,7 @@
 """
 
 from typing import List, Any, TYPE_CHECKING, Optional
-from src.utils.logger import system_logger
+from src.utils.logger import main_logger
 
 from src.l2_interfaces.web.search.client import WebSearchClient
 from src.l2_interfaces.web.search.skills.duckduckgo_search import DuckDuckGoSearch
@@ -47,28 +47,28 @@ def setup_web_search(system: "System", tavily_api_key: Optional[str]) -> List[An
     if config.search_engine == "tavily":
         if tavily_api_key:
             active_searcher = TavilySearch(client=client, api_key=tavily_api_key)
-            system_logger.info("[Web] Инициализация клиента поиска веб-страниц: Tavily")
+            main_logger.info("[Web] Инициализация клиента поиска веб-страниц: Tavily")
         else:
-            system_logger.warning(
+            main_logger.warning(
                 "[Web] TAVILY_API_KEY не найден в .env. Применяется Fallback на DuckDuckGo."
             )
 
     # Fallback, если Tavily не прошел проверки или юзер выбрал DDG
     if active_searcher is None:
         active_searcher = DuckDuckGoSearch(client=client)
-        system_logger.info("[Web] Инициализация клиента поиска веб-страниц: DuckDuckGo")
+        main_logger.info("[Web] Инициализация клиента поиска веб-страниц: DuckDuckGo")
 
     # Сборка читалки страниц
     if config.reader_engine == "jina":
         active_reader = JinaReader(client=client)
-        system_logger.info("[Web] Инициализация клиента чтения веб-страниц: Jina Reader")
+        main_logger.info("[Web] Инициализация клиента чтения веб-страниц: Jina Reader")
     else:
         if config.reader_engine != "trafilatura":
-            system_logger.warning(
+            main_logger.warning(
                 f"[Web] Неизвестный клиент чтения веб-страниц '{config.reader_engine}'. Fallback на Trafilatura."
             )
         active_reader = TrafilaturaReader(client=client)
-        system_logger.info("[Web] Инициализация клиента чтения веб-страниц: Trafilatura")
+        main_logger.info("[Web] Инициализация клиента чтения веб-страниц: Trafilatura")
 
     # Инъекция в DeepResearch (Оркестратор параллельного сбора фактов)
     deep_research = DeepResearch(client=client, searcher=active_searcher, reader=active_reader)
@@ -83,6 +83,6 @@ def setup_web_search(system: "System", tavily_api_key: Optional[str]) -> List[An
         provider_func=client.get_context_block,
         section=ContextSection.INTERFACES,
     )
-    system_logger.info("[Web Search] Интерфейс загружен.")
+    main_logger.info("[Web Search] Интерфейс загружен.")
 
     return []

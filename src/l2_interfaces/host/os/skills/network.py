@@ -8,13 +8,14 @@ import platform
 import socket
 import psutil
 
-from src.utils.logger import system_logger
+from src.utils.logger import main_logger
 
 from src.l2_interfaces.host.os.client import HostOSClient, HostOSAccessLevel
 from src.l2_interfaces.host.os.decorators import require_access
 
 from src.l3_agent.skills.registry import SkillResult, skill
 from src.l3_agent.swarm.roles import Subagents
+
 
 class HostOSNetwork:
     """
@@ -24,7 +25,7 @@ class HostOSNetwork:
     def __init__(self, host_os_client: HostOSClient):
         self.host_os = host_os_client
 
-    @skill(swarm_roles=[Subagents.SYSADMIN])
+    @skill(swarm=[Subagents.SYSADMIN])
     @require_access(HostOSAccessLevel.OBSERVER)
     async def ping_host(self, host: str, count: int = 4) -> SkillResult:
         """
@@ -52,7 +53,7 @@ class HostOSNetwork:
 
             output = stdout.decode("utf-8", errors="replace").strip()
 
-            system_logger.info(f"[Host OS] Пинг узла {clean_host} (Код: {exit_code})")
+            main_logger.info(f"[Host OS] Пинг узла {clean_host} (Код: {exit_code})")
 
             if exit_code == 0:
                 return SkillResult.ok(f"Узел {clean_host} доступен.\nВывод:\n{output}")
@@ -72,7 +73,7 @@ class HostOSNetwork:
         except Exception as e:
             return SkillResult.fail(f"Ошибка выполнения ping: {e}")
 
-    @skill(swarm_roles=[Subagents.SYSADMIN])
+    @skill(swarm=[Subagents.SYSADMIN])
     @require_access(HostOSAccessLevel.OBSERVER)
     async def check_port(self, host: str, port: int, timeout: int = 3) -> SkillResult:
         """
@@ -86,7 +87,7 @@ class HostOSNetwork:
             writer.close()
             await writer.wait_closed()
 
-            system_logger.info(f"[Host OS] Проверен порт {host}:{port} (Открыт)")
+            main_logger.info(f"[Host OS] Проверен порт {host}:{port} (Открыт)")
             return SkillResult.ok(
                 f"Порт {port} на хосте {host} открыт и принимает соединения."
             )
@@ -102,7 +103,7 @@ class HostOSNetwork:
         except Exception as e:
             return SkillResult.fail(f"Ошибка при проверке порта {host}:{port}: {e}")
 
-    @skill(swarm_roles=[Subagents.SYSADMIN])
+    @skill(swarm=[Subagents.SYSADMIN])
     @require_access(HostOSAccessLevel.OBSERVER)
     async def list_active_connections(self, state: str = "LISTEN") -> SkillResult:
         """
@@ -123,7 +124,7 @@ class HostOSNetwork:
                 pid_info = f" (PID: {conn.pid})" if conn.pid else ""
                 lines.append(f"- Локальный: {laddr} | Удаленный: {raddr}{pid_info}")
 
-            system_logger.info(f"[Host OS] Запрошены активные соединения ({state})")
+            main_logger.info(f"[Host OS] Запрошены активные соединения ({state})")
             return SkillResult.ok("\n".join(lines))
 
         except psutil.AccessDenied:
@@ -134,7 +135,7 @@ class HostOSNetwork:
         except Exception as e:
             return SkillResult.fail(f"Ошибка при получении соединений: {e}")
 
-    @skill(swarm_roles=[Subagents.SYSADMIN])
+    @skill(swarm=[Subagents.SYSADMIN])
     @require_access(HostOSAccessLevel.OBSERVER)
     async def resolve_dns(self, domain: str) -> SkillResult:
         """
@@ -145,7 +146,7 @@ class HostOSNetwork:
             # socket.gethostbyname_ex возвращает: (hostname, aliaslist, ipaddrlist)
             _, aliases, ips = await asyncio.to_thread(socket.gethostbyname_ex, domain)
 
-            system_logger.info(f"[Host OS] DNS запрос для {domain}")
+            main_logger.info(f"[Host OS] DNS запрос для {domain}")
 
             report = f"DNS записи для '{domain}':\n- IP адреса: {', '.join(ips)}"
             if aliases:

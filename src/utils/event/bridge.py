@@ -8,7 +8,7 @@
 
 from typing import TYPE_CHECKING
 
-from src.utils.logger import system_logger
+from src.utils.logger import main_logger
 from src.utils.event.registry import Events
 
 if TYPE_CHECKING:
@@ -71,7 +71,7 @@ class EventBridge:
                     elif module == "drives_custom":
                         self.system.sql.drives.max_custom = val
 
-                system_logger.info(f"[System] Рантайм-обновление лимита для {module}: {val}")
+                main_logger.info(f"[System] Рантайм-обновление лимита для {module}: {val}")
 
             # Глубина контекста
             elif key == "context_depth":
@@ -79,7 +79,7 @@ class EventBridge:
                     self.system.sql.ticks.ticks_limit = kwargs.get("total_ticks")
                     self.system.sql.ticks.detailed_ticks = kwargs.get("detailed_ticks")
 
-                system_logger.info(
+                main_logger.info(
                     f"[System] Рантайм-обновление контекста: {kwargs.get('total_ticks')} тиков"
                 )
 

@@ -1,3 +1,4 @@
+# ФАЙЛ: src/l1_databases/sql/management/ticks.py
 """
 Сборщик и форматировщик истории действий агента (Ticks).
 
@@ -12,7 +13,7 @@ import uuid
 from typing import TYPE_CHECKING, Any, List
 from sqlalchemy import select, desc
 
-from src.utils.logger import system_logger
+from src.utils.logger import main_logger
 from src.utils.dtime import format_datetime
 from src.l1_databases.sql.tables import TickTable
 
@@ -23,6 +24,8 @@ if TYPE_CHECKING:
 class SQLTicks:
     """
     CRUD-функции для взаимодействия с таблицей логгирования тиков агента.
+    Обеспечивает сохранение, извлечение и динамическое форматирование истории
+    в зависимости от целевой подсистемы (Главный агент или Фоновые процессы).
     """
 
     def __init__(
@@ -88,7 +91,7 @@ class SQLTicks:
             session.add(new_tick)
             await session.commit()
 
-        system_logger.debug(f"[SQL DB] Тик сохранен (ID: {tick_id[:8]}).")
+        main_logger.debug(f"[SQL DB] Тик сохранен (ID: {tick_id[:8]}).")
         return tick_id
 
     async def get_ticks(self, limit: int = 5) -> List[TickTable]:
@@ -109,11 +112,114 @@ class SQLTicks:
             ticks = result.scalars().all()
             return list(reversed(ticks))
 
+    def _format_tick_entry(self, t: TickTable, is_detailed: bool) -> str:
+        """
+        Внутренний утилитарный метод для форматирования одного тика.
+        Реализует инкапсулированную логику умного сжатия (Type Coercion и Truncation),
+        чтобы избежать дублирования кода между провайдерами контекста.
+
+        Args:
+            t: Объект таблицы тиков (TickTable).
+            is_detailed: Флаг детальности. Если True, применяются 'max_chars' лимиты,
+                         если False - жесткие 'short_max_chars' лимиты.
+
+        Returns:
+            Отформатированная Markdown-строка с мыслями, действиями и результатами.
+        """
+        # ===============================================================================
+        # ПАРСИНГ МЫСЛЕЙ
+        # ===============================================================================
+
+        thoughts_str = t.thoughts
+        if not is_detailed and len(thoughts_str) > self.thoughts_short_max_chars:
+            thoughts_str = (
+                thoughts_str[: self.thoughts_short_max_chars]
+                + " ... [Мысли обрезаны системой]"
+            )
+
+        # ===============================================================================
+        # ПАРСИНГ ДЕЙСТВИЙ
+        # ===============================================================================
+
+        action_limit = self.action_max_chars if is_detailed else self.action_short_max_chars
+        actions_list = []
+
+        actions_raw = t.actions
+        if isinstance(actions_raw, dict):
+            actions_raw = [actions_raw]
+        elif not isinstance(actions_raw, list):
+            actions_raw = [actions_raw]
+
+        for a in actions_raw:
+            if isinstance(a, dict):
+                t_name = a.get("tool_name", "unknown")
+                params = a.get("parameters", {})
+                act_str = f"`{t_name}`({json.dumps(params, ensure_ascii=False)})"
+            else:
+                act_str = str(a)
+
+            if len(act_str) > action_limit:
+                act_str = act_str[:action_limit] + " ...[Параметры обрезаны]"
+
+            actions_list.append(act_str)
+
+        actions_str = "\n".join(actions_list) if actions_list else "None"
+
+        # ===============================================================================
+        # ПАРСИНГ РЕЗУЛЬТАТОВ ДЕЙСТВИЙ
+        # ===============================================================================
+
+        res_limit = self.result_max_chars if is_detailed else self.result_short_max_chars
+
+        if t.results and isinstance(t.results, dict) and "execution_report" in t.results:
+            raw_report = str(t.results["execution_report"])
+            parts = re.split(r"(?=^Action \[[^\]]+\]: )", raw_report, flags=re.MULTILINE)
+
+            formatted_parts = []
+            for part in parts:
+                part = part.strip()
+                if not part:
+                    continue
+
+                if len(part) > res_limit:
+                    formatted_parts.append(
+                        part[:res_limit] + f"\n...[Результат обрезан. Лимит {res_limit} симв.]"
+                    )
+                else:
+                    formatted_parts.append(part)
+
+            res_str = "\n".join(formatted_parts)
+
+        elif t.results:
+            res_str = json.dumps(t.results, ensure_ascii=False, indent=2)
+            if len(res_str) > res_limit:
+                res_str = (
+                    res_str[:res_limit] + f"\n...[Результат обрезан. Лимит {res_limit} симв.]"
+                )
+        else:
+            res_str = "None"
+
+        time_str = format_datetime(t.created_at, self.tz_offset)
+
+        step_str = ""
+        if t.results and "step" in t.results and "max_steps" in t.results:
+            step_str = f"ReAct Step: {t.results['step']}/{t.results['max_steps']}\n"
+
+        return (
+            f"#### [Tick] {time_str}\n"
+            f"{step_str}"
+            f"*Thoughts*: '{thoughts_str}'\n\n"
+            f"*Actions*:\n{actions_str}\n\n"
+            f"*Result*:\n```\n{res_str}\n```"
+        )
+
     async def get_context_block(self, **kwargs: Any) -> str:
         """
         Извлекает последние N тиков из базы и динамически сжимает их объем.
         Последние 'detailed_ticks' отдаются почти полностью, остальные жестко обрезаются
         до 'short_max_chars' для предотвращения переполнения контекстного окна LLM.
+
+        Предназначено для использования Главным Агентом (Оркестратором).
 
         Returns:
             Готовый Markdown блок 'RECENT TICKS' для инъекции в промпт.
@@ -129,97 +235,33 @@ class SQLTicks:
 
         for i, t in enumerate(ticks):
             is_detailed = i >= total_ticks - self.detailed_ticks
-
-            # ===============================================================================
-            # ПАРСИНГ МЫСЛЕЙ
-            # ===============================================================================
-
-            thoughts_str = t.thoughts
-            if not is_detailed and len(thoughts_str) > self.thoughts_short_max_chars:
-                thoughts_str = (
-                    thoughts_str[: self.thoughts_short_max_chars]
-                    + " ... [Мысли обрезаны системой]"
-                )
-
-            # ===============================================================================
-            # ПАРСИНГ ДЕЙСТВИЙ
-            # ===============================================================================
-
-            action_limit = (
-                self.action_max_chars if is_detailed else self.action_short_max_chars
-            )
-            actions_list = []
-
-            actions_raw = t.actions
-            if isinstance(actions_raw, dict):
-                actions_raw = [actions_raw]
-
-            elif not isinstance(actions_raw, list):
-                actions_raw = [actions_raw]
-
-            for a in actions_raw:
-                if isinstance(a, dict):
-                    t_name = a.get("tool_name", "unknown")
-                    params = a.get("parameters", {})
-                    act_str = f"`{t_name}`({json.dumps(params, ensure_ascii=False)})"
-                else:
-                    act_str = str(a)
-
-                if len(act_str) > action_limit:
-                    act_str = act_str[:action_limit] + " ...[Параметры обрезаны]"
-
-                actions_list.append(act_str)
-
-            actions_str = "\n".join(actions_list) if actions_list else "None"
-
-            # ===============================================================================
-            # ПАРСИНГ РЕЗУЛЬТАТОВ ДЕЙСТВИЙ
-            # ===============================================================================
-
-            res_limit = self.result_max_chars if is_detailed else self.result_short_max_chars
-
-            if t.results and isinstance(t.results, dict) and "execution_report" in t.results:
-                raw_report = str(t.results["execution_report"])
-                parts = re.split(r"(?=^Action \[[^\]]+\]: )", raw_report, flags=re.MULTILINE)
-
-                formatted_parts = []
-                for part in parts:
-                    part = part.strip()
-                    if not part:
-                        continue
-
-                    if len(part) > res_limit:
-                        formatted_parts.append(
-                            part[:res_limit]
-                            + f"\n...[Результат обрезан. Лимит {res_limit} симв.]"
-                        )
-                    else:
-                        formatted_parts.append(part)
-
-                res_str = "\n".join(formatted_parts)
-
-            elif t.results:
-                res_str = json.dumps(t.results, ensure_ascii=False, indent=2)
-                if len(res_str) > res_limit:
-                    res_str = (
-                        res_str[:res_limit]
-                        + f"\n...[Результат обрезан. Лимит {res_limit} симв.]"
-                    )
-            else:
-                res_str = "None"
-
-            time_str = format_datetime(t.created_at, self.tz_offset)
-
-            step_str = ""
-            if t.results and "step" in t.results and "max_steps" in t.results:
-                step_str = f"ReAct Step: {t.results['step']}/{t.results['max_steps']}\n"
-
-            blocks.append(
-                f"#### [Tick] {time_str}\n"
-                f"{step_str}"
-                f"*Thoughts*: '{thoughts_str}'\n\n"
-                f"*Actions*:\n{actions_str}\n\n"
-                f"*Result*:\n```\n{res_str}\n```"
-            )
+            blocks.append(self._format_tick_entry(t, is_detailed))
 
         return "## RECENT TICKS\n" + "\n\n\n".join(blocks)
+
+    async def get_full_context_block(self, limit: int = 10) -> str:
+        """
+        Извлекает последние N тиков из базы БЕЗ применения жесткого исторического сжатия.
+        Все запрошенные тики трактуются как 'detailed', что позволяет моделям видеть
+        реальные результаты выполнения (results), а не только мысли.
+
+        Предназначено для фоновых когнитивных процессов (Subconscious, Tree of Thoughts),
+        которым критически важно видеть полные причинно-следственные связи.
+
+        Args:
+            limit: Максимальное количество извлекаемых тиков.
+
+        Returns:
+            Отформатированный Markdown лог действий.
+        """
+
+        ticks = await self.get_ticks(limit=limit)
+
+        if not ticks:
+            return "История тиков пуста."
+
+        blocks = []
+        for t in ticks:
+            blocks.append(self._format_tick_entry(t, is_detailed=True))
+
+        return "## RECENT ACTIONS LOG\n" + "\n\n\n".join(blocks)

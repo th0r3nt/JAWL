@@ -11,7 +11,7 @@ from typing import Optional, Union
 from telethon.tl.functions.messages import SaveDraftRequest
 
 from src.utils._tools import format_size, validate_sandbox_path, parse_int_or_str
-from src.utils.logger import system_logger
+from src.utils.logger import main_logger
 
 from src.l2_interfaces.telegram.telethon.client import TelethonClient
 from src.l2_interfaces.telegram.telethon.utils._message_parser import TelethonMessageParser
@@ -83,7 +83,7 @@ class TelethonMessages:
         except ValueError:
             return SkillResult.fail("Ошибка: Некорректный ID или Username.")
         except Exception as e:
-            system_logger.error(f"Ошибка при отправке сообщения: {e}")
+            main_logger.error(f"Ошибка при отправке сообщения: {e}")
             return SkillResult.fail(f"Ошибка при отправке сообщения: {e}")
 
     @skill()
@@ -109,7 +109,7 @@ class TelethonMessages:
 
             await client.send_file(entity, file=str(safe_path), caption=caption)
 
-            system_logger.info(
+            main_logger.info(
                 f"[Telegram Telethon] Файл {safe_path.name} отправлен в {chat_id}"
             )
             return SkillResult.ok(f"Файл {safe_path.name} ({size_str}) успешно отправлен.")
@@ -144,7 +144,7 @@ class TelethonMessages:
             if not msg or not msg.media:
                 return SkillResult.fail("Ошибка: Сообщение не найдено или не содержит медиа.")
 
-            system_logger.info(
+            main_logger.info(
                 f"[Telegram Telethon] Скачивание файла из сообщения {message_id}..."
             )
 
@@ -155,9 +155,7 @@ class TelethonMessages:
                 )
 
             size_str = format_size(safe_path.stat().st_size)
-            system_logger.info(
-                f"[Telegram Telethon] Файл скачан: {safe_path.name} ({size_str})"
-            )
+            main_logger.info(f"[Telegram Telethon] Файл скачан: {safe_path.name} ({size_str})")
 
             return SkillResult.ok(
                 f"Файл успешно скачан и сохранен: sandbox/{safe_path.name} ({size_str})"

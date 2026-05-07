@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import List
 from qdrant_client import AsyncQdrantClient, models
 
-from src.utils.logger import system_logger
+from src.utils.logger import main_logger
 
 
 class VectorDB:
@@ -49,7 +49,7 @@ class VectorDB:
 
         except Exception as e:
             if "ValidationError" in str(type(e)) or "CreateCollection" in str(e):
-                system_logger.warning(
+                main_logger.warning(
                     "[Vector DB] Обнаружена несовместимость версий или повреждение локальной БД. "
                     "Инициировано автоматическое восстановление."
                 )
@@ -57,7 +57,7 @@ class VectorDB:
                 self.db_path.mkdir(parents=True, exist_ok=True)
                 self.client = AsyncQdrantClient(path=str(self.db_path))
             else:
-                system_logger.error(
+                main_logger.error(
                     f"[Vector DB] Критическая ошибка при запуске базы данных: {e}"
                 )
                 raise e
@@ -72,7 +72,7 @@ class VectorDB:
                         distance=models.Distance.COSINE,
                     ),
                 )
-                system_logger.info(f"[Vector DB] Создана коллекция: {coll}")
+                main_logger.info(f"[Vector DB] Создана коллекция: {coll}")
 
             # Создаем KEYWORD индекс для тегов (Qdrant игнорирует вызов, если индекс уже существует)
             # Это гарантирует, что поиск по tags_filter будет работать за O(1), а не O(N)
@@ -83,14 +83,14 @@ class VectorDB:
                     field_schema=models.PayloadSchemaType.KEYWORD,
                 )
             except Exception as idx_err:
-                system_logger.debug(
+                main_logger.debug(
                     f"[Vector DB] Индекс для 'tags' в '{coll}' уже существует или произошла ошибка: {idx_err}"
                 )
 
-        system_logger.info(f"[Vector DB] База данных инициализирована по пути: {self.db_path}")
+        main_logger.info(f"[Vector DB] База данных инициализирована по пути: {self.db_path}")
 
     async def disconnect(self) -> None:
         """Корректно закрывает базу данных при выключении системы."""
         if self.client:
             self.client = None
-            system_logger.info("[Vector DB] Подключение к базе данных закрыто.")
+            main_logger.info("[Vector DB] Подключение к базе данных закрыто.")

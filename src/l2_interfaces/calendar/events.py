@@ -10,7 +10,7 @@ import time
 import asyncio
 from typing import Optional
 
-from src.utils.logger import system_logger
+from src.utils.logger import main_logger
 from src.utils.event.bus import EventBus
 from src.utils.event.registry import Events
 
@@ -58,7 +58,7 @@ class CalendarEvents:
         self.client.update_state_view()  # Дергаем обновленный метод из клиента
 
         self._polling_task = asyncio.create_task(self._loop())
-        system_logger.info("[Calendar] Фоновый мониторинг времени запущен.")
+        main_logger.info("[Calendar] Фоновый мониторинг времени запущен.")
 
     async def stop(self) -> None:
         """Останавливает фоновый поллинг событий календаря."""
@@ -68,7 +68,7 @@ class CalendarEvents:
             self._polling_task = None
 
         self.client.state.is_online = False
-        system_logger.info("[Calendar] Фоновый мониторинг времени остановлен.")
+        main_logger.info("[Calendar] Фоновый мониторинг времени остановлен.")
 
     async def _loop(self) -> None:
         """Бесконечный цикл проверки таймеров."""
@@ -113,6 +113,6 @@ class CalendarEvents:
             except asyncio.CancelledError:
                 break
             except Exception as e:
-                system_logger.error(f"[Calendar] Ошибка в цикле мониторинга: {e}")
+                main_logger.error(f"[Calendar] Ошибка в цикле мониторинга: {e}")
 
             await asyncio.sleep(self.polling_interval)

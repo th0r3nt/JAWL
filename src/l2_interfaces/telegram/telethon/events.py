@@ -17,7 +17,7 @@ from telethon.tl.functions.messages import GetFullChatRequest, GetPeerDialogsReq
 from telethon.errors import FloodWaitError
 
 from src.utils._tools import truncate_text
-from src.utils.logger import system_logger
+from src.utils.logger import main_logger
 from src.utils.event.bus import EventBus
 from src.utils.event.registry import Events
 
@@ -83,11 +83,11 @@ class TelethonEvents:
         client.add_event_handler(self._on_reaction, events.Raw())
         client.add_event_handler(self._on_outgoing_message, events.NewMessage(outgoing=True))
 
-        system_logger.info("[Telegram Telethon] Слушатели событий успешно запущены.")
+        main_logger.info("[Telegram Telethon] Слушатели событий успешно запущены.")
 
     async def stop(self) -> None:
         """Останавливает обработку событий."""
-        system_logger.info("[Telegram Telethon] Слушатели событий успешно остановлены.")
+        main_logger.info("[Telegram Telethon] Слушатели событий успешно остановлены.")
 
     # ==========================================================
     # STATE DASHBOARD BUILDERS (L0 State)
@@ -150,7 +150,7 @@ class TelethonEvents:
             )
 
         except Exception as e:
-            system_logger.error(f"[Telethon] Ошибка обновления стейта: {e}")
+            main_logger.error(f"[Telethon] Ошибка обновления стейта: {e}")
 
     async def _get_entity_description(self, client: Any, entity: Any) -> str:
         """Извлекает и кэширует описание группы/канала."""
@@ -205,7 +205,7 @@ class TelethonEvents:
                         msg_lines.append(indented)
                     unread_block = block + "\n\n" + "\n\n".join(msg_lines)
             except Exception as e:
-                system_logger.debug(f"[Telethon] Ошибка загрузки истории для {dialog.id}: {e}")
+                main_logger.debug(f"[Telethon] Ошибка загрузки истории для {dialog.id}: {e}")
 
         return overview_line, unread_block
 
@@ -519,7 +519,7 @@ class TelethonEvents:
             return "\n" + "\n\n".join(lines)
 
         except Exception as e:
-            system_logger.error(f"[Telegram Telethon] Не удалось подтянуть предысторию: {e}")
+            main_logger.error(f"[Telegram Telethon] Не удалось подтянуть предысторию: {e}")
             return ""
 
     async def _get_unread_count(self, peer: Any) -> int:
@@ -530,7 +530,7 @@ class TelethonEvents:
             if peer_dialogs and peer_dialogs.dialogs:
                 return peer_dialogs.dialogs[0].unread_count
         except Exception as e:
-            system_logger.debug(f"[TelethonEvents] Ошибка получения unread_count: {e}")
+            main_logger.debug(f"[TelethonEvents] Ошибка получения unread_count: {e}")
         return 0
 
     async def _get_topics(self, client: Any, entity: Any, limit: int = 100) -> list:
@@ -538,7 +538,7 @@ class TelethonEvents:
         try:
             from telethon.tl.functions.channels import GetForumTopicsRequest
         except ImportError:
-            system_logger.debug("[TelethonChats] GetForumTopicsRequest недоступен.")
+            main_logger.debug("[TelethonChats] GetForumTopicsRequest недоступен.")
             return []
 
         try:
@@ -554,5 +554,5 @@ class TelethonEvents:
             )
             return getattr(result, "topics", [])
         except Exception as e:
-            system_logger.error(f"[TelethonChats] Ошибка _get_topics: {e}")
+            main_logger.error(f"[TelethonChats] Ошибка _get_topics: {e}")
             return []

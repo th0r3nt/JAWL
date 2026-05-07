@@ -9,8 +9,9 @@ import uuid
 from typing import TYPE_CHECKING, Any, Literal, List, Optional
 from qdrant_client import models
 
+from src.l3_agent.subconscious.schema import Pattern
 from src.utils.dtime import safe_format_timestamp
-from src.utils.logger import system_logger
+from src.utils.logger import main_logger
 from src.utils._tools import truncate_text
 
 from src.l3_agent.skills.registry import skill, SkillResult
@@ -63,7 +64,7 @@ class VectorThoughts:
         self.similarity_threshold = similarity_threshold
         self.timezone = timezone
 
-    @skill(swarm_roles=[Subagents.ARCHIVIST])
+    @skill(swarm=[Subagents.ARCHIVIST])
     async def save_thought(self, thought_text: str, tags: List[VectorTag]) -> SkillResult:
         """
         Векторизует и сохраняет мысль или логический паттерн во внутреннюю память.
@@ -89,15 +90,17 @@ class VectorThoughts:
             )
 
             msg = f"[Vector DB] Мысль успешно сохранена в базу данных (ID: {point_id}). Теги: {tags}"
-            system_logger.info(msg)
+            main_logger.info(msg)
             return SkillResult.ok(msg)
 
         except Exception as e:
             msg = f"[Vector DB] Ошибка при сохранении мысли: {e}"
-            system_logger.error(msg)
+            main_logger.error(msg)
             return SkillResult.fail(msg)
 
-    @skill(swarm_roles=[Subagents.ARCHIVIST])
+    @skill(
+        swarm=[Subagents.ARCHIVIST], subconscious=[Pattern.FORGETTING, Pattern.CONSOLIDATION]
+    )
     async def search_thoughts(
         self, query: str, limit: int = 5, tags_filter: Optional[List[VectorTag]] = None
     ) -> SkillResult:
@@ -141,11 +144,11 @@ class VectorThoughts:
 
             if not points:
                 msg = "[Vector DB] Поиск мыслей не дал результатов."
-                system_logger.debug(msg)
+                main_logger.debug(msg)
                 return SkillResult.ok(msg)
 
             short_query = truncate_text(query_str.replace("\n", " "), 50, "... [Обрезано]")
-            system_logger.info(
+            main_logger.info(
                 f"[Vector DB] Мысли: найдено {len(points)} записей по запросу '{short_query}'"
             )
 
@@ -176,10 +179,10 @@ class VectorThoughts:
 
         except Exception as e:
             msg = f"[Vector DB] Ошибка при поиске мыслей: {e}"
-            system_logger.error(msg)
+            main_logger.error(msg)
             return SkillResult.fail(msg)
 
-    @skill(swarm_roles=[Subagents.ARCHIVIST])
+    @skill(swarm=[Subagents.ARCHIVIST])
     async def delete_thought(self, point_id: str) -> SkillResult:
         """
         Безвозвратно удаляет мысль из базы данных по ID.
@@ -194,14 +197,14 @@ class VectorThoughts:
                 wait=True,
             )
             msg = f"[Vector DB] Мысль успешно удалена в базе данных (ID: {point_id})."
-            system_logger.info(msg)
+            main_logger.info(msg)
             return SkillResult.ok(msg)
         except Exception as e:
             msg = f"[Vector DB] Ошибка при удалении мысли: {e}"
-            system_logger.error(msg)
+            main_logger.error(msg)
             return SkillResult.fail(msg)
 
-    @skill(swarm_roles=[Subagents.ARCHIVIST])
+    @skill(swarm=[Subagents.ARCHIVIST])
     async def get_all_thoughts(
         self, limit: int = 50, tags_filter: Optional[List[VectorTag]] = None
     ) -> SkillResult:
@@ -237,7 +240,7 @@ class VectorThoughts:
 
             if not records:
                 msg = "[Vector DB] Векторная коллекция мыслей пуста (или нет записей с указанными тегами)."
-                system_logger.debug(msg)
+                main_logger.debug(msg)
                 return SkillResult.ok(msg)
 
             formatted_results = []
@@ -266,5 +269,5 @@ class VectorThoughts:
 
         except Exception as e:
             msg = f"[Vector DB] Ошибка при получении мыслей: {e}"
-            system_logger.error(msg)
+            main_logger.error(msg)
             return SkillResult.fail(msg)

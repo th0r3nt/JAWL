@@ -7,7 +7,8 @@ System Builder.
 
 from typing import TYPE_CHECKING
 
-from src.utils.logger import system_logger
+from src.l3_agent.subconscious.orchestrator import SubconsciousOrchestrator
+from src.utils.logger import main_logger
 from src.utils.token_tracker import TokenTracker
 
 from src.l0_state.agent.state import AgentState
@@ -36,9 +37,11 @@ from src.l3_agent.llm.client import LLMClient
 from src.l3_agent.llm.api_keys.rotator import APIKeyRotator
 
 from src.l3_agent.prompt.builder import PromptBuilder
+
 from src.l3_agent.context.builder import ContextBuilder
 from src.l3_agent.context.registry import ContextSection
 from src.l3_agent.context.rag.memories import RAGMemories
+from src.l3_agent.context.rag.skills import MemoryRecallSkill
 
 from src.l3_agent.react.loop import ReactLoop
 from src.l3_agent.heartbeat import Heartbeat
@@ -66,7 +69,7 @@ class SystemBuilder:
     def build_l0_state(self) -> None:
         """Создает стейты (приборную панель)."""
 
-        system_logger.info("[System] Инициализация L0 State.")
+        main_logger.info("[System] Инициализация L0 State.")
         sys = self.system
 
         sys.agent_state = AgentState(
@@ -78,6 +81,7 @@ class SystemBuilder:
             proactive_guidance=self.sys_cfg.proactive_guidance,
             context_ticks=self.sys_cfg.context_depth.ticks,
             context_detailed_ticks=self.sys_cfg.context_depth.detailed_ticks,
+            subconscious_enabled=self.sys_cfg.subconscious.enabled,
         )
 
         sys.os_state = HostOSState()
@@ -111,7 +115,7 @@ class SystemBuilder:
     async def build_l1_databases(self) -> None:
         """Поднимает базы данных и регистрирует их CRUD-скиллы."""
 
-        system_logger.info("[System] Инициализация L1 Databases.")
+        main_logger.info("[System] Инициализация L1 Databases.")
         sys = self.system
 
         # =================================================================
@@ -219,14 +223,14 @@ class SystemBuilder:
     def build_l2_interfaces(self, env_vars: dict) -> None:
         """Читает конфиг, поднимает нужные интерфейсы и регистрирует их скиллы."""
 
-        system_logger.info("[System] Инициализация L2 Interfaces.")
+        main_logger.info("[System] Инициализация L2 Interfaces.")
         components = initialize_l2_interfaces(self.system, env_vars)
         self.system._lifecycle_components.extend(components)
 
     def build_l3_agent(self, env_vars: dict) -> None:
         """Сборка мозга агента."""
 
-        system_logger.info("[System] Инициализация L3 Agent.")
+        main_logger.info("[System] Инициализация L3 Agent.")
         sys_obj = self.system
 
         llm_api_keys = env_vars.get("LLM_API_KEYS", [])
@@ -238,7 +242,7 @@ class SystemBuilder:
         sys_obj.llm_client = LLMClient(api_url=llm_api_url, api_keys_rotator=rotator)
 
         if sub_llm_api_keys:
-            system_logger.info("[System] Обнаружены выделенные ключи для субагентов (Swarm).")
+            main_logger.info("[System] Обнаружены выделенные ключи для субагентов (Swarm).")
             sub_rotator = APIKeyRotator(keys=sub_llm_api_keys)
             sys_obj.sub_llm_client = LLMClient(
                 api_url=sub_llm_api_url or "", api_keys_rotator=sub_rotator
@@ -258,6 +262,7 @@ class SystemBuilder:
             notes_enabled=self.sys_cfg.db.sql.notes.enabled,
             swarm_enabled=self.sys_cfg.swarm.enabled,
             tot_enabled=self.sys_cfg.tree_of_thoughts.enabled,
+            subconscious_enabled=self.sys_cfg.subconscious.enabled,
         )
 
         # ======================================================================
@@ -282,11 +287,15 @@ class SystemBuilder:
             section=ContextSection.INTERFACES,
         )
 
+        register_instance(MemoryRecallSkill(rag_memories.orchestrator))
+
         # ======================================================================
         # Context Builder
 
         context_builder = ContextBuilder(
-            agent_state=sys_obj.agent_state, registry=sys_obj.context_registry
+            agent_state=sys_obj.agent_state,
+            registry=sys_obj.context_registry,
+            subconscious_config=self.sys_cfg.subconscious,
         )
 
         # ======================================================================
@@ -300,7 +309,7 @@ class SystemBuilder:
         tot_generator = None
         if self.sys_cfg.tree_of_thoughts.enabled:
             tot_generator = ToTGenerator(
-                llm_client=sys_obj.sub_llm_client, 
+                llm_client=sys_obj.sub_llm_client,
                 model_name=self.sys_cfg.tree_of_thoughts.llm_model,
                 branches_count=self.sys_cfg.tree_of_thoughts.branches,
                 simulations_per_branch=self.sys_cfg.tree_of_thoughts.simulations_per_branch,
@@ -308,14 +317,36 @@ class SystemBuilder:
                 prompt_builder=prompt_builder,
                 context_registry=sys_obj.context_registry,
                 agent_state=sys_obj.agent_state,
+                sql_ticks=sys_obj.sql.ticks,
                 token_tracker=token_tracker,
                 root_dir=sys_obj.root_dir,
                 timezone=self.sys_cfg.timezone,
             )
-            
+
             # Регистрируем ручной навык, если режим позволяет
             if self.sys_cfg.tree_of_thoughts.mode in ("manual", "hybrid"):
                 register_instance(DeepThinkSkill(tot_generator))
+
+        # ======================================================================
+        # Subconscious (Подсознание)
+
+        if self.sys_cfg.subconscious.enabled:
+            subc_orch = SubconsciousOrchestrator(
+                config=self.sys_cfg.subconscious,
+                llm_client=sys_obj.sub_llm_client, # Используем дешевую модель, как у Swarm
+                sql_manager=sys_obj.sql,
+                vector_manager=sys_obj.vector,
+                graph_manager=sys_obj.graph,
+                sql_ticks=sys_obj.sql.ticks,
+                token_tracker=token_tracker,
+                event_bus=sys_obj.event_bus,
+                agent_state=sys_obj.agent_state,
+                root_dir=sys_obj.root_dir
+            )
+            # Подписываем на ивенты
+            subc_orch.setup_routing()
+            # Опционально можно сохранить ссылку в sys_obj, если понадобится вызывать напрямую
+            sys_obj.subconscious_orchestrator = subc_orch
 
         # ======================================================================
         # ReactLoop
@@ -329,6 +360,7 @@ class SystemBuilder:
             vector_manager=sys_obj.vector,
             token_tracker=token_tracker,
             tools=ACTION_SCHEMA,
+            event_bus=sys_obj.event_bus,
             tot_config=self.sys_cfg.tree_of_thoughts,
             tot_generator=tot_generator,
         )

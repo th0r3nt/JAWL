@@ -9,7 +9,7 @@ import zipfile
 import tarfile
 from pathlib import Path
 
-from src.utils.logger import system_logger
+from src.utils.logger import main_logger
 
 from src.l2_interfaces.host.os.client import HostOSClient, HostOSAccessLevel
 from src.l2_interfaces.host.os.decorators import require_access
@@ -99,7 +99,7 @@ class HostOSArchive:
 
             # Проверка на ZIP Slip перед распаковкой
             if not await asyncio.to_thread(self._is_safe_archive, safe_archive, safe_dest):
-                system_logger.warning(
+                main_logger.warning(
                     f"[Security] Заблокирована распаковка {safe_archive.name}: обнаружена уязвимость ZIP Slip."
                 )
                 return SkillResult.fail(
@@ -110,7 +110,7 @@ class HostOSArchive:
             # shutil поддерживает большинство популярных форматов "из коробки"
             await asyncio.to_thread(shutil.unpack_archive, str(safe_archive), str(safe_dest))
 
-            system_logger.info(
+            main_logger.info(
                 f"[Host OS] Архив {safe_archive.name} распакован в {safe_dest.name}"
             )
 

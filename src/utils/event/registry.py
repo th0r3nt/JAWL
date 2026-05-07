@@ -256,6 +256,17 @@ class Events:
     )
 
     # ============================================
+    # Subconscious
+    # ============================================
+
+    SUBCONSCIOUS_TRIGGERED = EventConfig(
+        name="SUBCONSCIOUS_TRIGGERED",
+        description="Триггер подсознательной модели.",
+        level=EventLevel.BACKGROUND,
+        requires_attention=False,
+    )
+
+    # ============================================
     # Общие системные события
     # ============================================
 
@@ -284,6 +295,13 @@ class Events:
         name="SYSTEM_REBOOT_REQUESTED",
         description="Агент запросил перезагрузку системы.",
         level=EventLevel.CRITICAL,
+        requires_attention=False,
+    )
+
+    REACT_TICK_SAVED = EventConfig(
+        name="REACT_TICK_SAVED",
+        description="Агент успешно завершил Tick.",
+        level=EventLevel.INFO,
         requires_attention=False,
     )
 

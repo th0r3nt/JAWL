@@ -6,7 +6,7 @@
 """
 
 from typing import List, Any, TYPE_CHECKING
-from src.utils.logger import system_logger
+from src.utils.logger import main_logger
 from src.l2_interfaces.meta.client import MetaClient
 
 from src.l2_interfaces.meta.skills.level_safe import MetaSafe
@@ -67,7 +67,7 @@ def setup_meta(system: "System") -> List[Any]:
         if meta_config.custom_skills_enabled:
             register_instance(MetaCreator(client, custom_registry))
         else:
-            system_logger.info(
+            main_logger.info(
                 "[Meta] Access Level 3 (CREATOR) активен, но кастомные навыки отключены в settings.yaml."
             )
 
@@ -75,7 +75,5 @@ def setup_meta(system: "System") -> List[Any]:
         name="meta", provider_func=client.get_context_block, section=ContextSection.INTERFACES
     )
 
-    system_logger.info(
-        f"[Meta] Интерфейс загружен (Access Level: {meta_config.access_level})."
-    )
+    main_logger.info(f"[Meta] Интерфейс загружен (Access Level: {meta_config.access_level}).")
     return []

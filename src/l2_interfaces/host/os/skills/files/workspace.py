@@ -3,7 +3,7 @@
 Реализует концепцию "вкладок редактора", которые постоянно инжектятся в системный промпт.
 """
 
-from src.utils.logger import system_logger
+from src.utils.logger import main_logger
 
 from src.l2_interfaces.host.os.client import HostOSClient, HostOSAccessLevel
 from src.l2_interfaces.host.os.decorators import require_access
@@ -47,7 +47,7 @@ class HostOSWorkspace:
                 )
 
             self.host_os.state.opened_workspace_files.add(rel_path)
-            system_logger.info(f"[Host OS] Файл '{rel_path}' открыт в рабочей среде.")
+            main_logger.info(f"[Host OS] Файл '{rel_path}' открыт в рабочей среде.")
 
             return SkillResult.ok(
                 f"Файл '{rel_path}' открыт. Теперь его содержимое будет всегда перед глазами."
@@ -75,7 +75,7 @@ class HostOSWorkspace:
 
             if rel_path in self.host_os.state.opened_workspace_files:
                 self.host_os.state.opened_workspace_files.remove(rel_path)
-                system_logger.info(f"[Host OS] Файл '{rel_path}' закрыт.")
+                main_logger.info(f"[Host OS] Файл '{rel_path}' закрыт.")
                 return SkillResult.ok(f"Файл '{rel_path}' закрыт и убран из рабочей среды.")
             else:
                 return SkillResult.ok(f"Файл '{rel_path}' и так не был открыт.")
@@ -184,7 +184,7 @@ class HostOSWorkspace:
                     msg += f" Пропущено из-за лимита: {skipped_limit} файлов."
                 return SkillResult.ok(msg)
 
-            system_logger.info(
+            main_logger.info(
                 f"[Host OS] Массово открыты файлы из '{safe_path.name}' в рабочей среде (рекурсивно: {recursive})."
             )
 
