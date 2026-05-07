@@ -97,7 +97,7 @@ async def test_tot_generator_rules_injection():
     # Проверяем инъекцию новых "мягких" правил
     assert "Особая задача" in user_prompt
     assert "примерно ~4 макро-стратегий" in user_prompt
-    assert "Рекомендованная глубина вложенности симуляции: 3" in user_prompt
+    assert "Рекомендованная глубина вложенности симуляции: ~3" in user_prompt
     assert "Ветви сценарии динамически: в среднем по 3" in user_prompt
 
 
