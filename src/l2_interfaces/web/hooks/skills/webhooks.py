@@ -14,8 +14,9 @@ class WebHooksSkills:
     @skill()
     async def read_webhook_payload(self, hook_id: str) -> SkillResult:
         """
-        Читает полную полезную нагрузку (payload) входящего вебхука по его ID.
+        Читает полный payload входящего вебхука.
         """
+
         for hook in self.client.state.recent_hooks:
             if hook["id"] == hook_id:
                 payload = hook["payload"]
@@ -38,7 +39,7 @@ class WebHooksSkills:
     @skill()
     async def clear_webhooks_history(self) -> SkillResult:
         """
-        Полностью очищает историю входящих вебхуков в контексте.
+        Очищает историю входящих вебхуков в системном промпте.
         """
 
         count = len(self.client.state.recent_hooks)

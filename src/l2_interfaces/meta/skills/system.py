@@ -20,8 +20,9 @@ class MetaSystem:
     @skill()
     async def off_system(self, reason: str = "Без причины") -> SkillResult:
         """
-        Завершает работу агента и полностью выключает систему.
+        Завершает работу и полностью выключает систему.
         """
+
         main_logger.info(f"[Meta] Запрошено выключение системы. Причина: {reason}")
 
         await self.client.bus.publish(Events.SYSTEM_SHUTDOWN_REQUESTED, reason=reason)
@@ -34,6 +35,7 @@ class MetaSystem:
         """
         Выполняет полную перезагрузку системы.
         """
+
         main_logger.info(f"[Meta] Запрошена перезагрузка системы. Причина: {reason}")
 
         await self.client.bus.publish(Events.SYSTEM_REBOOT_REQUESTED, reason=reason)

@@ -14,7 +14,7 @@ class GithubWatchers:
     @skill()
     async def track_repository(self, owner: str, repo: str) -> SkillResult:
         """
-        Начинает отслеживание активности в указанном репозитории (коммиты, issues, PR).
+        Начинает отслеживание активности в указанном репозитории.
         """
 
         repo_name = f"{owner}/{repo}"

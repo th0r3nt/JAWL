@@ -112,10 +112,13 @@ def _extract_json_array(text: str) -> Optional[str]:
     return None
 
 
-def parse_llm_json(raw_answer: str) -> Tuple[Optional[AgentResponse], Optional[str]]:
+def parse_llm_json(
+    raw_answer: str, _depth: int = 0
+) -> Tuple[Optional[AgentResponse], Optional[str]]:
     """
     Универсальный парсер ответов LLM с многоуровневым Fallback механизмом.
     Ищет валидный JSON, игнорируя markdown и словесный мусор.
+    Включает защиту Anti-Inception от двойной вложенности действий.
     """
     clean_answer = raw_answer.strip()
     json_str = ""
@@ -126,10 +129,9 @@ def parse_llm_json(raw_answer: str) -> Tuple[Optional[AgentResponse], Optional[s
         json_str = json_match.group(1)
     else:
         # Попытка 2: Ищем внешние границы JSON объекта
-        # Сначала ищем начало реального Payload'а, чтобы отсечь случайные скобки перед ним
         start_idx = clean_answer.find('{"thoughts"')
         if start_idx == -1:
-            start_idx = clean_answer.find("{")  # Fallback, если вдруг LLM поставила пробелы
+            start_idx = clean_answer.find("{")
 
         end_idx = clean_answer.rfind("}")
         if start_idx != -1 and end_idx > start_idx:
@@ -140,27 +142,23 @@ def parse_llm_json(raw_answer: str) -> Tuple[Optional[AgentResponse], Optional[s
 
     if json_str:
         try:
-            # json.loads(strict=False) прощает неэкранированные \n внутри строк (частая беда)
             data = json.loads(json_str, strict=False)
             parsed_response = AgentResponse(**data)
         except Exception as e:
             error_msg = str(e)
 
-    # Попытка 3: Эвристический Fallback (Грязный парсинг)
-    # Запускаем, если JSON сломан ИЛИ если модель засунула действия в строку thoughts (то есть actions пуст, но tool_name есть в тексте)
+    # Попытка 3: Эвристический Fallback
     if parsed_response is None or (
         not parsed_response.actions and '"tool_name"' in raw_answer
     ):
         try:
             actions_raw = _extract_json_array(clean_answer)
             if actions_raw:
-                # Если модель засунула массив в строку "thoughts": "[...]", кавычки будут экранированы. Чистим их.
                 clean_actions = (
                     actions_raw.replace('\\"', '"').replace("\\'", "'").replace("\\n", "\n")
                 )
                 actions_list = json.loads(clean_actions, strict=False)
 
-                # Пытаемся вытянуть мысли. Если не вышло - ставим заглушку.
                 thoughts_text = "Извлечено эвристическим парсером (Форматирование ответа LLM было повреждено)."
                 thoughts_match = re.search(
                     r'["\']thoughts["\']\s*:\s*["\'](.*?)["\']\s*,', clean_answer, re.DOTALL
@@ -169,11 +167,11 @@ def parse_llm_json(raw_answer: str) -> Tuple[Optional[AgentResponse], Optional[s
                     thoughts_text = thoughts_match.group(1).strip()
 
                 parsed_response = AgentResponse(thoughts=thoughts_text, actions=actions_list)
-                error_msg = None  # Ошибка исправлена эвристикой
+                error_msg = None
         except Exception as e:
             error_msg = f"Heuristic parse failed: {e}"
 
-    # Если вообще не найдено даже следов JSON, но есть текст
+    # Если вообще не найдено следов JSON
     if (
         parsed_response is None
         and "System Error" in (error_msg or "")
@@ -181,7 +179,31 @@ def parse_llm_json(raw_answer: str) -> Tuple[Optional[AgentResponse], Optional[s
     ):
         return AgentResponse(thoughts=raw_answer.strip(), actions=[]), None
 
+    # =========================================================================
+    # ANTI-INCEPTION (Защита от JSON внутри Thoughts)
+    # =========================================================================
+    
     if parsed_response is not None:
+        thoughts_str = parsed_response.thoughts.strip()
+
+        # Если внутри "thoughts" лежит строка с ключами "thoughts" и "actions"
+        if (
+            _depth < 3
+            and ('"actions"' in thoughts_str or "'actions'" in thoughts_str)
+            and ('"thoughts"' in thoughts_str or "'thoughts'" in thoughts_str)
+            and (thoughts_str.startswith("{") or "```json" in thoughts_str)
+        ):
+
+            # Пытаемся распарсить вложенную матрешку
+            inner_parsed, _ = parse_llm_json(thoughts_str, _depth=_depth + 1)
+
+            # Если внутри оказался валидный объект, и либо внешний массив действий пуст,
+            # либо у внутреннего есть реальные действия - доверяем внутреннему (разворачиваем матрешку).
+            if inner_parsed is not None and (
+                inner_parsed.actions or not parsed_response.actions
+            ):
+                parsed_response = inner_parsed
+
         return parsed_response, None
 
     return None, f"System Error: Invalid JSON format. Details: {error_msg}"

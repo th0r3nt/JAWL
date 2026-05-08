@@ -106,12 +106,10 @@ class HostOSExecution:
     @require_access(HostOSAccessLevel.OBSERVER)
     async def execute_script(self, filepath: str) -> SkillResult:
         """
-        Запускает скрипт (.py, .sh, .bat, .js) в изолированном окружении.
-        Автоматически перехватывает STDOUT и STDERR. При превышении execution_timeout_sec
-        жестко убивает всё дерево порожденных процессов (включая зомби).
+        Запускает скрипт в изолированном окружении.
+        Автоматически перехватывает STDOUT и STDERR.
 
-        Args:
-            filepath: Относительный или абсолютный путь к скрипту.
+        filepath: Относительный или абсолютный путь.
         """
 
         timeout = self.host_os.config.execution_timeout_sec
@@ -220,7 +218,7 @@ class HostOSExecution:
     @require_access(HostOSAccessLevel.ROOT)
     async def execute_shell_command(self, command: str) -> SkillResult:
         """
-        [3/ROOT] Запускает сырую bash/cmd команду в терминале ОС.
+        Запускает сырую bash/cmd команду в терминале OS.
         """
 
         timeout = self.host_os.config.execution_timeout_sec
@@ -268,11 +266,9 @@ class HostOSExecution:
     @require_access(HostOSAccessLevel.OBSERVER)
     async def run_pytest(self, target_path: str = "tests/") -> SkillResult:
         """
-        Рабочий запуск тестирования (pytest) для проверки архитектуры
-        или запуска написанных тестов. Выполняется в нативном окружении ОС (без ограничений песочницы).
+        Запуск тестирования pytest для указанных тестов.
 
-        Args:
-            target_path: Путь к конкретному файлу или директории (по умолчанию 'tests/').
+        target_path: Путь к конкретному файлу или директории (по умолчанию 'tests/').
         """
         try:
             safe_path = self.host_os.validate_path(target_path, is_write=False)
@@ -328,7 +324,7 @@ class HostOSExecution:
     @require_access(HostOSAccessLevel.ROOT)
     async def kill_process(self, pid: int) -> SkillResult:
         """
-        [3/ROOT] Принудительно завершает процесс ОС по его PID.
+        Принудительно завершает процесс OS.
         """
 
         try:
@@ -362,7 +358,7 @@ class HostOSExecution:
     @require_access(HostOSAccessLevel.OBSERVER)
     async def start_daemon(self, filepath: str, name: str, description: str) -> SkillResult:
         """
-        [1/OBSERVER] Запускает Python-скрипт как фоновый процесс (демон).
+        Запускает Python-скрипт как демон.
         """
 
         try:
@@ -443,7 +439,7 @@ class HostOSExecution:
     @require_access(HostOSAccessLevel.OBSERVER)
     async def stop_daemon(self, pid: int) -> SkillResult:
         """
-        [1/OBSERVER] Останавливает работающий фоновый демон по его PID.
+        Останавливает работающий фоновый демон.
         """
         try:
             registry = self.host_os.get_daemons_registry()

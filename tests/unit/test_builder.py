@@ -24,8 +24,10 @@ def mock_system(tmp_path: Path) -> System:
     sys_mock.interfaces_config = InterfacesConfig()
 
     # Настраиваем нужные параметры
-    sys_mock.settings.system.context_depth.ticks = 15
-    sys_mock.settings.system.context_depth.detailed_ticks = 3
+    sys_mock.settings.system.context_depth.high_ticks = 3
+    sys_mock.settings.system.context_depth.medium_ticks = 7
+    sys_mock.settings.system.context_depth.low_ticks = 20
+    
     sys_mock.settings.system.heartbeat_interval = 60
     sys_mock.settings.llm.main_model = "test-model"
 

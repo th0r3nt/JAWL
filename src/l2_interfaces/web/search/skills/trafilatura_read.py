@@ -28,7 +28,7 @@ class TrafilaturaReader:
     @skill(swarm=[Subagents.WEB_RESEARCHER])
     async def read_webpage(self, url: str) -> SkillResult:
         """
-        Читает текстовое содержимое веб-страницы по URL.
+        Читает содержимое веб-страницы.
         """
 
         try:

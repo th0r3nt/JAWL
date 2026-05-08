@@ -76,12 +76,16 @@ class EventBridge:
             # Глубина контекста
             elif key == "context_depth":
                 if self.system.sql:
-                    self.system.sql.ticks.ticks_limit = kwargs.get("total_ticks")
-                    self.system.sql.ticks.detailed_ticks = kwargs.get("detailed_ticks")
+                    self.system.sql.ticks.high_ticks = kwargs.get("high_ticks")
+                    self.system.sql.ticks.medium_ticks = kwargs.get("medium_ticks")
+                    self.system.sql.ticks.low_ticks = kwargs.get("low_ticks")
 
-                main_logger.info(
-                    f"[System] Рантайм-обновление контекста: {kwargs.get('total_ticks')} тиков"
+                total = (
+                    kwargs.get("high_ticks", 0)
+                    + kwargs.get("medium_ticks", 0)
+                    + kwargs.get("low_ticks", 0)
                 )
+                main_logger.info(f"[System] Рантайм-обновление контекста: {total} тиков")
 
         async def handle_dashboard_update(**kwargs):
             name = kwargs.get("name")

@@ -19,13 +19,7 @@ class TelethonReactions:
     @skill()
     async def set_reaction(self, chat_id: int, message_id: int, reaction: str) -> SkillResult:
         """
-        Ставит эмодзи-реакцию (например, '👍', '🔥', '❤') на указанное сообщение.
-        Если ваша реакция уже стоит, она будет заменена на новую.
-
-        Args:
-            chat_id: ID чата.
-            message_id: ID сообщения.
-            reaction: Эмодзи-символ.
+        Ставит эмодзи-реакцию на сообщение.
         """
         try:
             client = self.tg_client.client()
@@ -54,8 +48,9 @@ class TelethonReactions:
     @skill()
     async def remove_reaction(self, chat_id: int, message_id: int) -> SkillResult:
         """
-        Убирает вашу текущую реакцию с сообщения.
+        Убирает реакцию с сообщения.
         """
+
         try:
             client = self.tg_client.client()
 

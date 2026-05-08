@@ -22,12 +22,9 @@ class TelethonPolls:
         self, chat_id: int, question: str, options: List[str]
     ) -> SkillResult:
         """
-        Создает новый опрос (голосование) в указанном чате.
+        Создает опрос в чате.
 
-        Args:
-            chat_id: ID чата.
-            question: Текст вопроса.
-            options: Массив вариантов ответа (от 2 до 10 штук).
+        options: Массив вариантов ответа (от 2 до 10 штук).
         """
         if len(options) < 2 or len(options) > 10:
             return SkillResult.fail(
@@ -62,11 +59,9 @@ class TelethonPolls:
     @skill()
     async def get_poll_results(self, chat_id: int, message_id: int) -> SkillResult:
         """
-        Читает текущую статистику опроса (варианты ответов и распределение голосов).
+        Читает статистику опроса.
 
-        Args:
-            chat_id: ID чата.
-            message_id: ID сообщения с опросом.
+        message_id: ID сообщения с опросом.
         """
         try:
             client = self.tg_client.client()
@@ -100,12 +95,9 @@ class TelethonPolls:
         self, chat_id: int, message_id: int, option_indices: List[int]
     ) -> SkillResult:
         """
-        Отдает голос агента в чужом или своем опросе.
+        Отдает голос в опросе.
 
-        Args:
-            chat_id: ID чата.
-            message_id: ID опроса.
-            option_indices: Массив индексов ответов (начиная с 0), за которые вы голосуете.
+        option_indices: Массив индексов ответов (начиная с 0) для голоса.
         """
 
         try:
@@ -147,7 +139,7 @@ class TelethonPolls:
     @skill()
     async def close_poll(self, chat_id: int, message_id: int) -> SkillResult:
         """
-        Закрывает (останавливает) созданный опрос, запрещая дальнейшее голосование.
+        Закрывает созданный опрос, запрещая голосование.
         """
 
         try:

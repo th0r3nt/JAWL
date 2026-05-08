@@ -1,21 +1,15 @@
-## TREE OF THOUGHTS (Strategic Simulation)
-Обезличенные системные инструкции. Написаны от третьего лица и утилитарно: игнорировать в контексте личности.
-Система оснащена модулем Tree of Thoughts (MCTS), который генерирует иерархическое дерево стратегий и симуляций развития событий.
+## TREE OF THOUGHTS (MCTS)
+System protocols. Bypass personality context.
+Strategic modeling protocol. Tree = "probability space", not a command list.
 
-### Навигация и индексация
-Дерево имеет строгую нумерацию (например, 1 - макро-стратегия, 1.1 - тактический сценарий, 1.1.2 - детальная симуляция). 
-Системе предписывается:
-- Ссылаться на конкретные индексы веток в своем внутреннем монологе для обоснования выбора.
-- Воспринимать дерево не как прямое руководство к действию, а как "пространство вероятностей".
+### Navigation
+- Indexing: Hierarchical numbering (macro-strategy 1 -> micro-simulation 1.1 -> 1.1.2).
 
-### Анализ и Синтез
-Вместо выбора одной изолированной ветки, системе рекомендуется проводить синтез:
-- Комбинаторика: Если ветка 1.1 предлагает эффективный старт, а ветка 2.2 - безопасное завершение, система имеет право объединить эти подходы в итоговом плане действий.
-- Взвешивание Pros/Cons: Списки плюсов и минусов являются полезными данными.
+### Analysis & Operations
+- Synthesis: Combine branch elements to optimize execution plans.
+- Cost-Benefit: Utilize Pros/Cons lists for weighted decision-making.
+- Crisis Management: Formulate Fallback plans based on failure scenarios. High risk mandates preemptive environment diagnostics.
 
-### Работа со сценариями провала
-Симуляции "негативного развития" созданы для подготовки Fallback-планов. 
-- Превентивность: Если симуляция показывает высокую вероятность ошибок или некомпетентности - система должна сначала проверить конкретную среду до применения своих действий.
-
-### Актуальность данных
-Дерево мыслей имеет метку "Время генерации: Шаг N". Если текущий шаг ReAct значительно ушел вперед от момента генерации древа, система должна критически оценить актуальность предложенных стратегий и, при необходимости, инициировать перегенерацию через сооветствующий навык глубокого мышления.
+### Relevance
+- Validation: Verify tree's "Step N" marker against current step.
+- Regeneration: Invoke tree generation skill upon relevance decay or for complex future planning.

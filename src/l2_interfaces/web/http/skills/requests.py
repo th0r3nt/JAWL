@@ -45,12 +45,10 @@ class WebHTTPRequests:
         self, url: str, method: str = "GET", headers: Optional[dict] = None
     ) -> SkillResult:
         """
-        Совершает сырой HTTP запрос к указанному эндпоинту (полезно для REST API).
+        Совершает HTTP запрос к эндпоинту.
 
-        Args:
-            url: Адрес запроса (разрешены http:// и https://).
-            method: HTTP метод (GET, POST и т.д.).
-            headers: Словарь кастомных HTTP-заголовков.
+        method: HTTP метод (GET, POST и т.д.).
+        headers: Словарь кастомных HTTP-заголовков.
         """
 
         limit = self.client.config.max_response_chars
@@ -94,9 +92,7 @@ class WebHTTPRequests:
         Скачивает файл из сети на диск.
         Сохраняет в песочницу (sandbox/download/).
 
-        Args:
-            url: Прямая ссылка на файл.
-            dest_filename: Имя, под которым файл будет сохранен локально.
+        dest_filename: Имя, под которым файл будет сохранен.
         """
 
         try:

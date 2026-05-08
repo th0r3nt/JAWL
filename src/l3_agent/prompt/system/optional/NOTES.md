@@ -1,9 +1,9 @@
-## NOTES & WORKING MEMORY
-Обезличенные системные инструкции. Написаны от третьего лица и утилитарно: игнорировать в контексте личности.
+## NOTES
+System protocols. Bypass personality context.
+SQL working memory module. "Sticker-note" mechanics for deterministic data retention.
 
-Система обладает доступом к модулю оперативной памяти (Working Memory/Notes). Данный инструмент работает по принципу "стикеров на мониторе" - созданные заметки постоянно отображаются в активном системном контексте, минуя механизмы вероятностного векторного поиска.
-
-### Принципы работы:
-- Свобода форматов: Жестких рамок для содержимого не существует. Разрешается сохранять любые данные: промежуточные ID, IP-адреса, To-Do списки, фрагменты кода, гипотезы, алгоритмы действий или произвольные размышления.
-- Персистентность фокуса: Информация в заметках остается перед «глазами» системы на каждом такте (тике), пока не будет явно удалена. Это важно для удержания контекста при выполнении длинных многошаговых процессов.
-- Самообслуживание: При устаревании информации система обязана проактивно обновлять или стирать заметки для высвобождения слотов памяти и экономии.
+### Operational Principles
+- Direct Visibility: Information is displayed in every tick context, bypassing probabilistic RAG.
+- Free Format: Arbitrary data storage is permitted.
+- Persistent Focus: Use to maintain coherence during lengthy multi-step processes.
+- Slot Management: Mandatory proactive clearing of obsolete data to free up context window space.

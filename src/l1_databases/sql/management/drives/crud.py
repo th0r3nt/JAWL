@@ -28,6 +28,7 @@ class SQLDrives:
     def __init__(
         self,
         db: "SQLDB",
+        dynamic_reduction: bool = True,
         decay_rate: float = 2.5,
         decay_interval_sec: int = 3600,
         max_history: int = 3,
@@ -48,12 +49,16 @@ class SQLDrives:
             fundamental_toggles: состояние фундаментальных мотиваций (вкл/выкл).
         """
         self.db = db
+
+        self.dynamic_reduction = dynamic_reduction
         self.decay_rate = decay_rate
         self.decay_interval_sec = decay_interval_sec
+
         self.max_history = max_history
         self.max_custom = max_custom
-        self.tz_offset = tz_offset
         self.fundamental_toggles = fundamental_toggles or {}
+
+        self.tz_offset = tz_offset
 
     async def bootstrap_fundamental_drives(self) -> None:
         """
@@ -107,17 +112,11 @@ class SQLDrives:
     ) -> SkillResult:
         """
         Снижает дефицит указанного мотиватора (насыщение потребности).
+        Рекомендуется удовлетворять потребности итеративно.
 
-        Args:
-            drive_name: Точное имя мотиватора.
-            amount: На сколько процентов снизить дефицит (от 1 до 100). Рекомендуется удовлетворять потребности итеративно.
-                    По умолчанию дефициты копятся часами, лучше снижать их медленно:
-                    1-5% - Поверхностные действия.
-                    10-15% - Значимые действия.
-                    15-25% - Крупные свершения.
-                    Важно: Снижать на 50-100% за один раз не рекомендуется.
-
-            reflection_summary: Обоснование, как именно проделанная работа закрыла эту потребность.
+        1-5% - Поверхностные действия.
+        10-15% - Значимые действия.
+        15-25% - Крупные свершения.
         """
 
         amount = max(1, min(100, amount))
@@ -146,16 +145,15 @@ class SQLDrives:
                     f"Ожидается положительное число. Пересоздайте драйв с корректным decay_rate."
                 )
 
-            # Высчитываем текущий дефицит
-            intervals_passed = (now - last_sat).total_seconds() / self.decay_interval_sec
-            current_deficit = min(100.0, intervals_passed * drive.decay_rate)
+            # Высчитываем текущий дефицит через нелинейную модель
+            current_deficit = self._calculate_deficit(last_sat, now, drive.decay_rate)
 
             # Считаем новый дефицит после удовлетворения
             new_deficit = max(0.0, current_deficit - amount)
 
-            # Высчитываем время, когда дефицит был бы равен new_deficit
-            seconds_ago = (new_deficit / drive.decay_rate) * self.decay_interval_sec
-            drive.last_satisfied_at = now - timedelta(seconds=seconds_ago)
+            # Высчитываем время (intervals), когда дефицит был бы равен new_deficit
+            intervals_ago = self._calculate_intervals_for_deficit(new_deficit, drive.decay_rate)
+            drive.last_satisfied_at = now - timedelta(seconds=intervals_ago * self.decay_interval_sec)
 
             time_str = format_datetime(now, self.tz_offset, "%m-%d %H:%M")
             entry = f"[{time_str}] Снижен на {amount}%: {reflection_summary}"
@@ -176,12 +174,7 @@ class SQLDrives:
         self, name: str, description: str, decay_rate: float = 2.5
     ) -> SkillResult:
         """
-        Создает новую кастомную потребность (мотиватор) агента.
-
-        Args:
-            name: Короткое имя новой потребности.
-            description: Развернутое описание того, в каких случаях она должна удовлетворяться.
-            decay_rate: На сколько процентов растет дефицит за 1 интервал. Должно быть > 0.
+        Создает новую кастомную потребность-мотиватор.
         """
 
         # decay_rate упадет в деление в satisfy_drive, поэтому корень валидации здесь.
@@ -218,10 +211,7 @@ class SQLDrives:
     @skill()
     async def delete_custom_drive(self, drive_name: str) -> SkillResult:
         """
-        Удаляет пользовательский мотиватор из базы данных.
-
-        Args:
-            drive_name: Имя удаляемой потребности.
+        Удаляет кастомный мотиватор.
         """
 
         async with self.db.session_factory() as session:
@@ -298,8 +288,7 @@ class SQLDrives:
                 else d.last_satisfied_at
             )
 
-            intervals_passed = (now - last_sat).total_seconds() / self.decay_interval_sec
-            deficit = min(100.0, intervals_passed * d.decay_rate)
+            deficit = self._calculate_deficit(last_sat, now, d.decay_rate)
             deficit_int = int(deficit)
 
             semantic_state = self._get_drive_semantic_state(d.name, deficit_int, d.description)
@@ -319,3 +308,50 @@ class SQLDrives:
             lines.append("")  # Пустая строка
 
         return "\n".join(lines).strip()
+
+    # =======================================================================================
+    # СЛУЖЕБНЫЕ МЕТОДЫ
+    # =======================================================================================
+
+    def _calculate_deficit(
+        self, last_sat: datetime, now: datetime, decay_rate: float
+    ) -> float:
+        """
+        Прямая математика: вычисляет текущий процент дефицита от прошедшего времени.
+        """
+
+        intervals = (now - last_sat).total_seconds() / self.decay_interval_sec
+
+        if not self.dynamic_reduction:
+            return min(100.0, intervals * decay_rate)
+
+        # Вычисляем время (в интервалах) для прохождения каждой ступени
+        t50 = 50.0 / decay_rate
+        t80 = t50 + 30.0 / (decay_rate * 0.5)
+
+        if intervals <= t50:
+            deficit = intervals * decay_rate
+        elif intervals <= t80:
+            deficit = 50.0 + (intervals - t50) * (decay_rate * 0.5)
+        else:
+            deficit = 80.0 + (intervals - t80) * (decay_rate * 0.2)
+
+        return min(100.0, deficit)
+
+    def _calculate_intervals_for_deficit(self, deficit: float, decay_rate: float) -> float:
+        """
+        Обратная математика: переводит процент дефицита обратно в потраченные интервалы.
+        """
+
+        if not self.dynamic_reduction:
+            return deficit / decay_rate
+
+        t50 = 50.0 / decay_rate
+        t80 = t50 + 30.0 / (decay_rate * 0.5)
+
+        if deficit <= 50.0:
+            return deficit / decay_rate
+        elif deficit <= 80.0:
+            return t50 + (deficit - 50.0) / (decay_rate * 0.5)
+        else:
+            return t80 + (deficit - 80.0) / (decay_rate * 0.2)

@@ -35,11 +35,8 @@ class CodeGraphNavigation:
         """
         Семантический поиск по докстрингам классов и функций проекта.
         Полезно, если нет информации о названии функции, но есть информация о том, что она должна делать.
-        Например: 'где сохраняются логи тиков'
 
-        Args:
-            project_id: ID проиндексированного графа.
-            query: Смысловой текстовый запрос.
+        query: Смысловой текстовый запрос.
         """
 
         if project_id not in self.client.state.active_indexes:
@@ -81,11 +78,8 @@ class CodeGraphNavigation:
         """
         Поиск "радиуса поражения" (Blast Radius). Показывает, в каких файлах импортируется
         указанный файл, или какие функции находятся внутри класса.
-        Например: полезно перед рефакторингом, чтобы понять, какие тесты нужно обновить.
 
-        Args:
-            project_id: ID проиндексированного графа.
-            target_name: Имя файла (например 'src/main.py') или полный путь к классу ('src/main.py::MyClass').
+        target_name: Имя файла (например 'src/main.py') или полный путь к классу ('src/main.py::MyClass').
         """
 
         if project_id not in self.client.state.active_indexes:
@@ -146,11 +140,9 @@ class CodeGraphNavigation:
     @skill(swarm=[Subagents.CODER, Subagents.QA_ENGINEER])
     async def get_file_structure(self, project_id: str, filepath: str) -> SkillResult:
         """
-        Мгновенно возвращает "оглавление" файла (какие классы и методы в нем есть) без полного чтения кода.
+        Мгновенно возвращает классы и методы файла без полного чтения кода.
 
-        Args:
-            project_id: ID проиндексированного графа.
-            filepath: Относительный путь к файлу в фреймворке (например 'src/main.py').
+        filepath: Относительный путь к файлу в фреймворке (например 'src/main.py').
         """
 
         if project_id not in self.client.state.active_indexes:

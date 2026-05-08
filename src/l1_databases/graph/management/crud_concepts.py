@@ -81,11 +81,6 @@ class GraphCRUD:
     ) -> SkillResult:
         """
         Добавляет новый узел или обновляет существующий (Upsert).
-
-        Args:
-            name: Имя концепции, субъекта или объекта.
-            description: Что это такое.
-            category: Строго из списка категорий.
         """
         async with self.db.write_lock:
 
@@ -138,12 +133,6 @@ class GraphCRUD:
     ) -> SkillResult:
         """
         Создает связь между двумя узлами. Если узлов нет — они создаются автоматически.
-
-        Args:
-            source_name: Имя исходящего узла.
-            target_name: Имя целевого узла.
-            relation: Тип связи (строго из списка).
-            description: Описание связи (почему они связаны).
         """
         if relation not in GRAPH_EDGE_TABLES:
             return SkillResult.fail(f"Неизвестный тип связи: {relation}")
@@ -273,7 +262,6 @@ class GraphCRUD:
     ) -> SkillResult:
         """
         Удаляет связь(и) между двумя узлами.
-        Если relation не передан, удаляются все связи между этими узлами.
         """
         async with self.db.write_lock:
 
@@ -313,6 +301,7 @@ class GraphCRUD:
         """
         Полностью стирает узел и его связи из базы данных.
         """
+
         async with self.db.write_lock:
 
             def _sync_erase() -> str:

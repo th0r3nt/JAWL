@@ -73,10 +73,9 @@ class GithubRepositories:
         limit: int = 10,
     ) -> SkillResult:
         """
-        Получает трендовые (самые популярные за последнее время) репозитории.
+        Получает трендовые репозитории.
 
-        Args:
-            language: Опциональный фильтр по языку программирования.
+        language: Опциональный фильтр по языку программирования.
         """
 
         try:
@@ -252,10 +251,9 @@ class GithubRepositories:
         self, owner: str, repo: str, dest_filename: str, ref: Optional[str] = None
     ) -> SkillResult:
         """
-        Скачивает репозиторий в виде ZIP-архива. Без .git файлов. По умолчанию сохраняет в sandbox/download/.
+        Скачивает репозиторий в виде ZIP-архива. По умолчанию сохраняет в sandbox/download/.
 
-        Args:
-            ref: Опционально (имя ветки, тег или коммит).
+        ref: Опционально (имя ветки, тег или коммит).
         """
 
         try:
@@ -298,7 +296,7 @@ class GithubRepositories:
     @skill(swarm=[Subagents.CODER])
     async def get_commit_details(self, owner: str, repo: str, commit_sha: str) -> SkillResult:
         """
-        Возвращает детальную информацию о коммите, включая точные пути всех измененных файлов.
+        Возвращает детальную информацию о коммите.
         """
 
         try:
@@ -343,11 +341,10 @@ class GithubRepositories:
         self, owner: str, repo: str, path: str = "", ref: Optional[str] = None
     ) -> SkillResult:
         """
-        Просматривает содержимое (файлы и папки) в указанной директории GitHub репозитория.
+        Просматривает содержимое в указанной директории GitHub репозитория.
 
-        Args:
-            path: путь к директории (оставить пустым "" для просмотра корневой папки).
-            ref: Опционально (имя ветки, тег или коммит).
+        path: путь к директории (оставить пустым "" для просмотра корневой папки).
+        ref: Опционально (имя ветки, тег или коммит).
         """
 
         try:
@@ -450,7 +447,6 @@ class GithubRepositories:
     ) -> SkillResult:
         """
         Создает новый репозиторий в аккаунте.
-        Автоматически инициализирует с README.md.
         """
 
         if not self.client.config.agent_account:
@@ -482,7 +478,7 @@ class GithubRepositories:
     @require_agent_account()
     async def fork_repository(self, owner: str, repo: str) -> SkillResult:
         """
-        Делает форк (копию) чужого репозитория в аккаунт.
+        Делает форк чужого репозитория в аккаунт.
         """
 
         if not self.client.config.agent_account:
@@ -511,7 +507,6 @@ class GithubRepositories:
     ) -> SkillResult:
         """
         Создает Gist (публичный или приватный сниппет кода/текста).
-        Удобно для того, чтобы поделиться логами, длинными скриптами или заметками по ссылке.
         """
         if not self.client.config.agent_account:
             return SkillResult.fail("Ошибка: Для создания Gist нужен Agent Account.")

@@ -20,12 +20,8 @@ class AiogramModeration:
     @skill()
     async def ban_user(self, chat_id: int, user_id: int) -> SkillResult:
         """
-        Банит (исключает навсегда) пользователя из указанной группы или супергруппы.
-        Для работы навыка бот должен обладать правами администратора.
-
-        Args:
-            chat_id (int): ID группы/канала.
-            user_id (int): ID нарушителя.
+        Банит пользователя из указанной группы или супергруппы.
+        Нужно обладать правами администратора.
         """
         try:
             bot = self.client.bot()
@@ -45,11 +41,7 @@ class AiogramModeration:
     @skill()
     async def unban_user(self, chat_id: int, user_id: int) -> SkillResult:
         """
-        Разбанивает пользователя в группе (удаляет из локального ЧС чата).
-
-        Args:
-            chat_id (int): ID группы/канала.
-            user_id (int): ID пользователя для амнистии.
+        Разбанивает пользователя в группе.
         """
         try:
             bot = self.client.bot()

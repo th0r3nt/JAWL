@@ -27,8 +27,9 @@ def mock_system() -> System:
         max_tasks = 10
 
     class DummyTicks:
-        ticks_limit = 10
-        detailed_ticks = 2
+        high_ticks = 3
+        medium_ticks = 7
+        low_ticks = 20
 
     sys_mock.sql = DummySQL()
     sys_mock.sql.tasks = DummyTasks()
@@ -108,11 +109,11 @@ async def test_bridge_config_update(mock_system: System) -> None:
         if call[0][0].name == Events.SYSTEM_CONFIG_UPDATED.name:
             config_handlers.append(call[0][1])
 
-    # ИСПРАВЛЕНИЕ: Вызываем ВСЕ найденные хендлеры.
-    # Один из них пробросит событие в Heartbeat, а второй изменит конфиги БД.
     for handler in config_handlers:
         await handler(key="db_limit", module="tasks", value=42)
-        await handler(key="context_depth", total_ticks=20, detailed_ticks=5)
+        await handler(key="context_depth", high_ticks=5, medium_ticks=10, low_ticks=15)
 
     assert mock_system.sql.tasks.max_tasks == 42
-    assert mock_system.sql.ticks.ticks_limit == 20
+    assert mock_system.sql.ticks.high_ticks == 5
+    assert mock_system.sql.ticks.medium_ticks == 10
+    assert mock_system.sql.ticks.low_ticks == 15

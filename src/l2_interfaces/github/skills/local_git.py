@@ -73,10 +73,7 @@ class GithubLocalGit:
         Клонирует удаленный репозиторий в локальную песочницу с сохранением директории `.git`.
         Позволяет вносить изменения и отправлять коммиты.
 
-        Args:
-            owner: Владелец репозитория.
-            repo: Имя репозитория.
-            dest_folder: Имя целевой папки внутри `sandbox/`.
+        dest_folder: Имя целевой папки внутри `sandbox/`.
         """
         try:
             safe_path = validate_sandbox_path(dest_folder)
@@ -130,10 +127,9 @@ class GithubLocalGit:
         """
         Переключает локальный репозиторий на другую ветку.
 
-        Args:
-            repo_folder: Папка в песочнице, где лежит клонированный репо.
-            branch_name: Название ветки.
-            create_new: Если True, создаст новую ветку от текущей.
+        repo_folder: Папка в песочнице, где лежит клонированный репо.
+        branch_name: Название ветки.
+        create_new: Если True, создаст новую ветку от текущей.
         """
         try:
             safe_path = validate_sandbox_path(repo_folder)
@@ -168,10 +164,9 @@ class GithubLocalGit:
         """
         Индексирует все изменения, создает коммит и пушит в origin.
 
-        Args:
-            repo_folder: Папка в песочнице с репозиторием.
-            commit_message: Описание коммита.
-            branch_name: Имя ветки, в которую нужно сделать пуш.
+        repo_folder: Папка в песочнице с репозиторием.
+        commit_message: Описание коммита.
+        branch_name: Имя ветки, в которую нужно сделать пуш.
         """
         if not self.github.token:
             return SkillResult.fail(

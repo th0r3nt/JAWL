@@ -36,11 +36,7 @@ class TelethonAccount:
     @skill()
     async def change_username(self, name: str, surname: str = "") -> SkillResult:
         """
-        Меняет публичное имя и (опционально) фамилию профиля агента.
-
-        Args:
-            name (str): Новое имя (first_name).
-            surname (str, optional): Новая фамилия (last_name).
+        Меняет публичное имя и (опционально) фамилию профиля.
         """
         try:
             client = self.tg_client.client()
@@ -58,11 +54,8 @@ class TelethonAccount:
     @skill()
     async def change_bio(self, text: str) -> SkillResult:
         """
-        Изменяет описание (биографию/о себе) профиля агента.
+        Изменяет описание (биографию/о себе) профиля.
         Максимальная длина - 70 символов.
-
-        Args:
-            text (str): Текст биографии.
         """
         try:
             client = self.tg_client.client()
@@ -77,10 +70,9 @@ class TelethonAccount:
     @skill()
     async def change_avatar(self, filepath: str) -> SkillResult:
         """
-        Устанавливает новую аватарку профиля агента.
+        Устанавливает новую аватарку профиля.
 
-        Args:
-            filepath (str): Относительный путь к картинке внутри папки sandbox/.
+        filepath: Относительный путь к картинке внутри папки sandbox/.
         """
         try:
             safe_path = validate_sandbox_path(filepath)
@@ -106,12 +98,7 @@ class TelethonAccount:
         self, user_id: Union[int, str], first_name: str, last_name: str = ""
     ) -> SkillResult:
         """
-        Добавляет пользователя в системную записную книжку (контакты) Telegram.
-
-        Args:
-            user_id (Union[int, str]): ID пользователя или его юзернейм (@username).
-            first_name (str): Имя для сохранения.
-            last_name (str, optional): Фамилия.
+        Добавляет пользователя в контакты Telegram.
         """
         try:
             client = self.tg_client.client()
@@ -145,12 +132,10 @@ class TelethonAccount:
     ) -> SkillResult:
         """
         Скачивает текущую (или одну из предыдущих) фотографий пользователя, группы или канала.
-        Сохраняет файл в песочницу (sandbox/download/).
+        Сохраняет файл в песочницу.
 
-        Args:
-            user_or_chat_id (Union[int, str]): Идентификатор пользователя или чата.
-            dest_filename (str): Имя файла для сохранения локально.
-            avatar_index (int, optional): Индекс фото. 0 - текущее, 1 - предыдущее и т.д.
+        dest_filename: Имя файла для сохранения локально.
+        avatar_index: Индекс фото. 0 - текущее, 1 - предыдущее и т.д.
         """
         try:
             if "/" not in dest_filename and "\\" not in dest_filename:
@@ -198,11 +183,7 @@ class TelethonAccount:
     @skill()
     async def get_user_info(self, user_id: Union[int, str]) -> SkillResult:
         """
-        Возвращает детальную информацию о конкретном пользователе Telegram
-        (имя, био, сетевой статус, наличие premium/scam/bot флагов).
-
-        Args:
-            user_id (Union[int, str]): ID или юзернейм пользователя.
+        Возвращает детальную информацию о конкретном пользователе Telegram.
         """
         try:
             client = self.tg_client.client()
@@ -258,10 +239,7 @@ class TelethonAccount:
     async def set_personal_channel(self, channel_id: Union[int, str]) -> SkillResult:
         """
         Устанавливает указанный канал как личный (будет отображаться в био профиля).
-        Для удаления личного канала из профиля необходимо передать пустую строку "".
-
-        Args:
-            channel_id (Union[int, str]): ID или юзернейм канала.
+        Для удаления из профиля - передать пустую строку "".
         """
         try:
             client = self.tg_client.client()

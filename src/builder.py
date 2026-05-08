@@ -79,8 +79,9 @@ class SystemBuilder:
             heartbeat_interval=self.sys_cfg.heartbeat_interval,
             continuous_cycle=self.sys_cfg.continuous_cycle,
             proactive_guidance=self.sys_cfg.proactive_guidance,
-            context_ticks=self.sys_cfg.context_depth.ticks,
-            context_detailed_ticks=self.sys_cfg.context_depth.detailed_ticks,
+            context_high_ticks=self.sys_cfg.context_depth.high_ticks,
+            context_medium_ticks=self.sys_cfg.context_depth.medium_ticks,
+            context_low_ticks=self.sys_cfg.context_depth.low_ticks,
             subconscious_enabled=self.sys_cfg.subconscious.enabled,
         )
 
@@ -124,22 +125,30 @@ class SystemBuilder:
         sys.sql = SQLManager(
             db_path=sys.local_data_dir / "sql" / "db" / "agent.db",
             notes_max_notes=self.sys_cfg.db.sql.notes.max_notes,
-            ticks_limit=self.sys_cfg.context_depth.ticks,
-            detailed_ticks=self.sys_cfg.context_depth.detailed_ticks,
+            # Ticks
+            high_ticks=self.sys_cfg.context_depth.high_ticks,
+            medium_ticks=self.sys_cfg.context_depth.medium_ticks,
+            low_ticks=self.sys_cfg.context_depth.low_ticks,
             tick_action_max_chars=self.sys_cfg.context_depth.tick_action_max_chars,
             tick_result_max_chars=self.sys_cfg.context_depth.tick_result_max_chars,
             tick_thoughts_short_max_chars=self.sys_cfg.context_depth.tick_thoughts_short_max_chars,
             tick_action_short_max_chars=self.sys_cfg.context_depth.tick_action_short_max_chars,
             tick_result_short_max_chars=self.sys_cfg.context_depth.tick_result_short_max_chars,
+            # Tasks
             max_tasks=self.sys_cfg.db.sql.tasks.max_tasks,
+            # Mental States
             max_mental_state_entities=self.sys_cfg.db.sql.mental_states.max_entities,
+            # Traits
             max_traits=self.sys_cfg.db.sql.personality_traits.max_traits,
+            # Drives
             drives_enabled=self.sys_cfg.db.sql.drives.enabled,
+            dynamic_reduction=self.sys_cfg.db.sql.drives.dynamic_reduction,
             decay_rate=self.sys_cfg.db.sql.drives.decay_rate,
             decay_interval_sec=self.sys_cfg.db.sql.drives.decay_interval_sec,
             max_history_drives=self.sys_cfg.db.sql.drives.max_reflections_history,
             max_custom_drives=self.sys_cfg.db.sql.drives.max_custom_drives,
             fundamental_toggles=self.sys_cfg.db.sql.drives.fundamental.model_dump(),
+            # Time
             timezone=self.sys_cfg.timezone,
         )
         await sys.sql.connect()
@@ -333,7 +342,7 @@ class SystemBuilder:
         if self.sys_cfg.subconscious.enabled:
             subc_orch = SubconsciousOrchestrator(
                 config=self.sys_cfg.subconscious,
-                llm_client=sys_obj.sub_llm_client, # Используем дешевую модель, как у Swarm
+                llm_client=sys_obj.sub_llm_client,  # Используем дешевую модель, как у Swarm
                 sql_manager=sys_obj.sql,
                 vector_manager=sys_obj.vector,
                 graph_manager=sys_obj.graph,
@@ -341,7 +350,7 @@ class SystemBuilder:
                 token_tracker=token_tracker,
                 event_bus=sys_obj.event_bus,
                 agent_state=sys_obj.agent_state,
-                root_dir=sys_obj.root_dir
+                root_dir=sys_obj.root_dir,
             )
             # Подписываем на ивенты
             subc_orch.setup_routing()

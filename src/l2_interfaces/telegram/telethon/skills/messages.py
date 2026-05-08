@@ -37,15 +37,8 @@ class TelethonMessages:
     ) -> SkillResult:
         """
         Отправляет текстовое сообщение.
-        Поддерживается Markdown форматирование: **жирный**, __курсив__, ~~зачеркнутый~~, `код`.
+        Поддерживается Markdown форматирование.
 
-        Args:
-            to_id: ID или юзернейм получателя/группы.
-            text: Текст сообщения.
-            reply_to_message_id: Сделать Reply на это сообщение.
-            topic_id: ID топика форума.
-            is_silent: Отправить без звука.
-            time_delay: Отложенная отправка (в секундах, мин 10).
         """
 
         try:
@@ -92,11 +85,6 @@ class TelethonMessages:
     ) -> SkillResult:
         """
         Отправляет файл из папки sandbox/ в чат.
-
-        Args:
-            chat_id: Кому отправить.
-            file_path: Относительный путь к файлу внутри песочницы.
-            caption: Текст подписи к файлу.
         """
         try:
             safe_path = validate_sandbox_path(file_path)
@@ -124,13 +112,8 @@ class TelethonMessages:
         self, chat_id: Union[int, str], message_id: int, dest_filename: str
     ) -> SkillResult:
         """
-        Скачивает медиа-вложение (документ, фото, видео) из сообщения Telegram.
+        Скачивает медиа-вложение из сообщения Telegram.
         По умолчанию сохраняет в sandbox/download/.
-
-        Args:
-            chat_id: Откуда качаем.
-            message_id: ID сообщения с файлом.
-            dest_filename: Имя для сохранения.
         """
         try:
             if "/" not in dest_filename and "\\" not in dest_filename:
@@ -172,11 +155,6 @@ class TelethonMessages:
     ) -> SkillResult:
         """
         Пересылает сообщение из одного чата в другой.
-
-        Args:
-            msg_id: ID пересылаемого сообщения.
-            from_id: ID исходного чата.
-            to_id: ID чата назначения.
         """
         try:
             client = self.tg_client.client()
@@ -192,8 +170,9 @@ class TelethonMessages:
     @skill()
     async def delete_message(self, msg_id: int, chat_id: Union[int, str]) -> SkillResult:
         """
-        Безвозвратно удаляет сообщение (для себя и для всех участников чата, если хватает прав).
+        Удаляет сообщение.
         """
+
         try:
             client = self.tg_client.client()
             await client.delete_messages(
@@ -208,8 +187,9 @@ class TelethonMessages:
         self, msg_id: int, new_text: str, chat_id: Union[int, str]
     ) -> SkillResult:
         """
-        Редактирует текст уже отправленного вашего сообщения.
+        Редактирует текст сообщения.
         """
+
         try:
             client = self.tg_client.client()
             await client.edit_message(
@@ -228,12 +208,8 @@ class TelethonMessages:
     ) -> SkillResult:
         """
         Нажимает inline-кнопку под сообщением Telegram-бота (ищет по тексту кнопки).
-
-        Args:
-            chat_id: ID чата, где находится бот.
-            message_id: ID сообщения с кнопками.
-            button_text: Частичный или полный текст кнопки (регистр не важен).
         """
+
         try:
             client = self.tg_client.client()
             msg = await client.get_messages(parse_int_or_str(chat_id), ids=int(message_id))
@@ -281,7 +257,7 @@ class TelethonMessages:
         self, chat_id: Union[int, str], query: str, limit: int = 10
     ) -> SkillResult:
         """
-        Выполняет локальный поиск по истории переписки чата (удобно для извлечения старых логов).
+        Выполняет поиск по истории чата.
         """
 
         try:
@@ -315,7 +291,7 @@ class TelethonMessages:
         self, chat_id: Union[int, str], text: str, append: bool = True
     ) -> SkillResult:
         """
-        Обновляет черновик (Draft - неотправленное сообщение) в чате.
+        Обновляет черновик в чате.
         Если append=True, добавляет текст к уже существующему.
         """
 
@@ -347,7 +323,9 @@ class TelethonMessages:
 
     @skill()
     async def delete_draft(self, chat_id: Union[int, str]) -> SkillResult:
-        """Полностью удаляет черновик в указанном чате."""
+        """
+        Удаляет черновик в чате.
+        """
 
         try:
             client = self.tg_client.client()

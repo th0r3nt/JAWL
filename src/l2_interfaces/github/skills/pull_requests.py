@@ -22,7 +22,7 @@ class GithubPullRequests:
         self, owner: str, repo: str, state: str = "open", per_page: int = 10
     ) -> SkillResult:
         """
-        Возвращает список Pull Requests репозитория (state: open/closed/all).
+        Возвращает список Pull Requests репозитория.
         """
 
         try:
@@ -52,12 +52,8 @@ class GithubPullRequests:
         self, owner: str, repo: str, pull_number: int
     ) -> SkillResult:
         """
-        Запрашивает Diff (добавленные/удаленные строки) конкретного Pull Request'а.
+        Запрашивает Diff конкретного Pull Request'а.
 
-        Args:
-            owner: Владелец репозитория.
-            repo: Название репозитория.
-            pull_number: Номер PR.
         """
 
         try:
@@ -93,9 +89,8 @@ class GithubPullRequests:
         """
         Создает новый Pull Request.
 
-        Args:
-            head: Ветка, из которой переносить изменения.
-            base: Ветка, куда вливать изменения.
+        head: Ветка, из которой переносить изменения.
+        base: Ветка, куда вливать изменения.
         """
 
         if not self.client.config.agent_account:

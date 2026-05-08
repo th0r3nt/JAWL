@@ -15,7 +15,6 @@ class BrowserNavigation:
     async def navigate(self, url: str) -> SkillResult:
         """
         Переходит по указанному URL (или обновляет страницу).
-        Запускает браузер, если он был закрыт.
         """
 
         try:
@@ -41,7 +40,7 @@ class BrowserNavigation:
     @skill()
     async def scroll(self, direction: str = "down") -> SkillResult:
         """
-        Прокручивает страницу вниз (down) или вверх (up) на один экран.
+        Прокручивает страницу вниз/вверх на один экран.
         """
 
         try:
@@ -67,7 +66,7 @@ class BrowserNavigation:
     @skill()
     async def close(self) -> SkillResult:
         """
-        акрывает браузер. Рекомендуется вызывать после завершения работы с сайтом для экономии ОЗУ.
+        Закрывает браузер.
         """
 
         try:

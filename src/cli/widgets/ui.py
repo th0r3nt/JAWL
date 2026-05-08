@@ -129,10 +129,17 @@ def launch_in_new_window(arg: str) -> None:
                     return
 
             print_error("Не удалось найти графический терминал. Открытие в текущем окне.")
+            print_info("Нажмите Ctrl+C в любой момент, чтобы закрыть инструмент и вернуться в главное меню.")
             import time
 
-            time.sleep(1)
-            subprocess.call(cmd)
+            time.sleep(2)
+            try:
+                subprocess.call(cmd)
+            except KeyboardInterrupt:
+                # Игнорируем прерывание в родительском процессе, 
+                # чтобы меню не падало вместе с закрытием дочернего окна логов/терминала
+                pass
+            return
 
     except Exception as e:
         print_error(f"Ошибка при открытии нового окна: {e}")

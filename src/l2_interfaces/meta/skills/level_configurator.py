@@ -24,11 +24,9 @@ class MetaConfigurator:
     @skill()
     async def change_heartbeat_interval(self, interval_sec: int) -> SkillResult:
         """
-        Изменяет Heartbeat интервал между пробуждениями агента.
-
-        Args:
-            interval_sec: Время ожидания в секундах.
+        Изменяет Heartbeat интервал между пробуждениями.
         """
+
         success = await self.client.update_yaml(
             self.client.settings_path, ["system", "heartbeat_interval"], interval_sec
         )
@@ -45,10 +43,8 @@ class MetaConfigurator:
     async def change_max_react_steps(self, steps: int) -> SkillResult:
         """
         Изменяет максимальное количество шагов в одном цикле ReAct.
-
-        Args:
-            steps: Число итераций (Мысль -> Действие).
         """
+
         success = await self.client.update_yaml(
             self.client.settings_path, ["llm", "max_react_steps"], steps
         )
@@ -65,11 +61,7 @@ class MetaConfigurator:
         new_limit: int,
     ) -> SkillResult:
         """
-        Изменяет лимиты для различных SQL-модулей памяти.
-
-        Args:
-            database: Название модуля БД.
-            new_limit: Максимальное количество записей для хранения.
+        Изменяет лимиты для различных SQL-модулей.
         """
 
         db_keys_map = {
@@ -98,41 +90,41 @@ class MetaConfigurator:
         return SkillResult.fail("Ошибка обновления конфигурации.")
 
     @skill()
-    async def change_context_depth(self, total_ticks: int, detailed_ticks: int) -> SkillResult:
+    async def change_context_depth(
+        self, high_ticks: int, medium_ticks: int, low_ticks: int
+    ) -> SkillResult:
         """
-        Динамически изменяет "окно внимания" (глубину памяти логов) агента.
-        Обновляет YAML и применяет лимиты на лету через EventBus.
+        Динамически изменяет контекстное окно.
 
-        Args:
-            total_ticks: Общее количество шагов (Ticks), хранимых в промпте.
-            detailed_ticks: Количество последних шагов, которые не подвергаются жесткому сжатию.
+        - high_ticks: количество последних тиков без обрезки.
+        - medium_ticks: тики с обрезкой параметров и результатов.
+        - low_ticks: только мысли.
         """
-
-        if detailed_ticks > total_ticks:
-            return SkillResult.fail("detailed_ticks не может быть больше чем total_ticks.")
-
         s1 = await self.client.update_yaml(
-            self.client.settings_path, ["system", "context_depth", "ticks"], total_ticks
+            self.client.settings_path, ["system", "context_depth", "high_ticks"], high_ticks
         )
         s2 = await self.client.update_yaml(
             self.client.settings_path,
-            ["system", "context_depth", "detailed_ticks"],
-            detailed_ticks,
+            ["system", "context_depth", "medium_ticks"],
+            medium_ticks,
+        )
+        s3 = await self.client.update_yaml(
+            self.client.settings_path, ["system", "context_depth", "low_ticks"], low_ticks
         )
 
-        if s1 and s2:
-            # Обновляем AgentState (чтобы агент видел в промпте)
-            self.client.agent_state.context_ticks = total_ticks
-            self.client.agent_state.context_detailed_ticks = detailed_ticks
+        if s1 and s2 and s3:
+            self.client.agent_state.context_high_ticks = high_ticks
+            self.client.agent_state.context_medium_ticks = medium_ticks
+            self.client.agent_state.context_low_ticks = low_ticks
 
-            # Обновляем сами классы БД через EventBus
             await self.client.bus.publish(
                 Events.SYSTEM_CONFIG_UPDATED,
                 key="context_depth",
-                total_ticks=total_ticks,
-                detailed_ticks=detailed_ticks,
+                high_ticks=high_ticks,
+                medium_ticks=medium_ticks,
+                low_ticks=low_ticks,
             )
             return SkillResult.ok(
-                f"Глубина контекста изменена (Общие: {total_ticks}, Детальные: {detailed_ticks}). Изменения применены."
+                f"Глубина контекста изменена (High: {high_ticks}, Medium: {medium_ticks}, Low: {low_ticks}). Изменения применены."
             )
         return SkillResult.fail("Ошибка сохранения настроек.")

@@ -23,6 +23,7 @@ class AiogramChats:
             aiogram_client (AiogramClient): Клиент Aiogram.
             state (AiogramState): Состояние интерфейса с кэшем диалогов.
         """
+
         self.client = aiogram_client
         self.state = state
 
@@ -30,10 +31,6 @@ class AiogramChats:
     async def get_chats(self, limit: int = 10) -> SkillResult:
         """
         Возвращает список последних чатов, с которыми бот взаимодействовал.
-        (Bot API не позволяет получить полный список всех диалогов аккаунта).
-
-        Args:
-            limit (int): Максимальное количество чатов для возврата.
         """
         try:
             if not self.state._chats_cache:
@@ -50,10 +47,7 @@ class AiogramChats:
     @skill()
     async def get_chat_info(self, chat_id: int) -> SkillResult:
         """
-        Получает подробную метаинформацию о конкретном чате (описание, кол-во участников).
-
-        Args:
-            chat_id (int): Уникальный числовой идентификатор чата.
+        Получает подробную метаинформацию о конкретном чате.
         """
         try:
             bot = self.client.bot()

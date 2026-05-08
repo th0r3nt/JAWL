@@ -46,10 +46,10 @@ class SQLPersonalityTraits:
         Добавляет новую приобретенную черту характера.
 
         Args:
-            name: Короткое название черты.
-            description: В чем именно она заключается (само правило).
-            reason: Событие, повлекшее формирование этой черты (зачем это нужно).
-            context: Ситуации, в которых её следует применять (триггеры).
+            name: Название черты.
+            description: В чем она заключается.
+            reason: Событие, повлекшее формирование этой черты.
+            context: Ситуации, в которых её следует применять.
         """
 
         trait_id = str(uuid.uuid4())[:8]
@@ -75,7 +75,7 @@ class SQLPersonalityTraits:
     @skill(subconscious=[Pattern.REFLECTION])
     async def get_traits(self) -> SkillResult:
         """
-        Возвращает список всех текущих приобретенных черт личности агента.
+        Возвращает список всех приобретенных черт личности.
         """
 
         async with self.db.session_factory() as session:
@@ -100,10 +100,7 @@ class SQLPersonalityTraits:
     @skill(subconscious=[Pattern.REFLECTION])
     async def remove_trait(self, trait_id: str) -> SkillResult:
         """
-        Удаляет черту личности по ID, если она больше не актуальна.
-
-        Args:
-            trait_id: ID удаляемой черты.
+        Удаляет черту личности по ID.
         """
         async with self.db.session_factory() as session:
             result = await session.execute(

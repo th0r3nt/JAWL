@@ -20,9 +20,6 @@ class GithubAccounts:
     async def get_user_profile(self, username: str) -> SkillResult:
         """
         Возвращает публичный профиль пользователя GitHub.
-
-        Args:
-            username: Никнейм пользователя на GitHub.
         """
         try:
             data = await self.client.request("GET", f"/users/{username}")
@@ -47,10 +44,9 @@ class GithubAccounts:
     @require_agent_account()
     async def get_my_notifications(self, unread_only: bool = True) -> SkillResult:
         """
-        Проверяет входящие уведомления (меншны, ревью).
+        Проверяет входящие уведомления.
 
-        Args:
-            unread_only: Если True, вернет только новые непрочитанные.
+        unread_only: Если True, вернет только новые непрочитанные.
         """
 
         if not self.client.config.agent_account:
@@ -84,7 +80,6 @@ class GithubAccounts:
     async def mark_notifications_as_read(self) -> SkillResult:
         """
         Помечает все текущие непрочитанные уведомления как прочитанные.
-        Полезно вызывать после их прочтения, чтобы очистить инбокс.
         """
 
         if not self.client.config.agent_account:

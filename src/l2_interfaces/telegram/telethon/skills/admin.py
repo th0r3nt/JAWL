@@ -42,12 +42,9 @@ class TelethonAdmin:
         self, title: str, about: str = "", is_megagroup: bool = False
     ) -> SkillResult:
         """
-        Создает новый приватный канал или супергруппу от лица агента.
+        Создает новый приватный канал или супергруппу.
 
-        Args:
-            title: Название.
-            about: Описание.
-            is_megagroup: Если True - создается супергруппа. Иначе канал.
+        is_megagroup: Если True - создается супергруппа. Иначе канал.
         """
         try:
             client = self.tg_client.client()
@@ -71,11 +68,9 @@ class TelethonAdmin:
     ) -> SkillResult:
         """
         Делает приватный канал/группу публичной, резервируя за ней указанный @username.
-        Для того, чтобы сделать чат приватным обратно - передать пустую строку ("").
+        Сделать чат приватным обратно - передать пустую строку ("").
 
-        Args:
-            chat_id: ID чата.
-            username: Желаемый публичный линк (без @ или с @).
+        username: Желаемый публичный линк (без @ или с @).
         """
 
         try:
@@ -111,9 +106,8 @@ class TelethonAdmin:
         Требуются права владельца в обоих чатах.
         Чтобы отвязать группу - передать пустую строку в group_id ("").
 
-        Args:
-            channel_id: ID канала.
-            group_id: ID супергруппы для обсуждений.
+        channel_id: ID канала.
+        group_id: ID супергруппы для обсуждений.
         """
 
         try:
@@ -145,7 +139,9 @@ class TelethonAdmin:
 
     @skill()
     async def edit_chat_title(self, chat_id: Union[int, str], new_title: str) -> SkillResult:
-        """Меняет название канала или группы."""
+        """
+        Меняет название канала или группы.
+        """
 
         try:
             client = self.tg_client.client()
@@ -170,7 +166,9 @@ class TelethonAdmin:
     async def edit_chat_description(
         self, chat_id: Union[int, str], new_description: str
     ) -> SkillResult:
-        """Изменяет описание (about/bio) канала или группы."""
+        """
+        Изменяет описание (about/bio) канала или группы.
+        """
 
         try:
             client = self.tg_client.client()
@@ -190,9 +188,7 @@ class TelethonAdmin:
         """
         Устанавливает новую картинку в качестве аватара чата.
 
-        Args:
-            chat_id: ID чата.
-            filepath: Относительный путь к фото внутри sandbox/.
+        filepath: Относительный путь внутри sandbox/.
         """
 
         try:
@@ -228,8 +224,9 @@ class TelethonAdmin:
     @skill()
     async def create_invite_link(self, chat_id: Union[int, str]) -> SkillResult:
         """
-        Генерирует новую первичную пригласительную ссылку (invite link) для закрытого чата.
+        Генерирует новую пригласительную ссылку для закрытого чата.
         """
+
         try:
             client = self.tg_client.client()
             entity = await client.get_input_entity(parse_int_or_str(chat_id))
@@ -246,11 +243,8 @@ class TelethonAdmin:
         self, chat_id: Union[int, str], limit: int = 100
     ) -> SkillResult:
         """
-        Скачивает список участников (мемберов) группы или подписчиков канала.
-
-        Args:
-            chat_id: ID чата.
-            limit: Макс. количество выводимых участников.
+        Скачивает список участников группы/канала.
+        Необходимо обладать правами админа.
         """
 
         try:
@@ -278,12 +272,9 @@ class TelethonAdmin:
         self, chat_id: Union[int, str], user_id: Union[int, str], add_admins: bool = False
     ) -> SkillResult:
         """
-        Повышает обычного участника чата до Администратора (выдает все стандартные права).
+        Повышает обычного участника чата до администратора.
 
-        Args:
-            chat_id: ID группы/канала.
-            user_id: ID пользователя.
-            add_admins: Если True, админ сможет назначать других админов.
+        add_admins: Если True, админ сможет назначать других админов.
         """
 
         try:
@@ -312,7 +303,10 @@ class TelethonAdmin:
     async def demote_user(
         self, chat_id: Union[int, str], user_id: Union[int, str]
     ) -> SkillResult:
-        """Забирает у пользователя права администратора, понижая его до обычного участника."""
+        """
+        Забирает у пользователя права администратора.
+        """
+
         try:
             client = self.tg_client.client()
 
@@ -334,10 +328,7 @@ class TelethonAdmin:
         """
         Закрепляет указанное сообщение в чате.
 
-        Args:
-            chat_id: ID чата.
-            message_id: ID сообщения.
-            notify: Если True, участникам придет Push-уведомление.
+        notify: Если True, участникам придет Push-уведомление.
         """
 
         try:
@@ -356,7 +347,10 @@ class TelethonAdmin:
 
     @skill()
     async def unpin_message(self, chat_id: Union[int, str], message_id: int) -> SkillResult:
-        """Открепляет конкретное сообщение в чате."""
+        """
+        Открепляет сообщение в чате.
+        """
+
         try:
             client = self.tg_client.client()
             await client.unpin_message(
@@ -375,10 +369,6 @@ class TelethonAdmin:
     async def create_topic(self, chat_id: Union[int, str], title: str) -> SkillResult:
         """
         Создает новый топик (раздел/ветку) в группе, в которой включены темы (Форум).
-
-        Args:
-            chat_id: ID супергруппы-форума.
-            title: Название топика.
         """
 
         if not CreateForumTopicRequest:

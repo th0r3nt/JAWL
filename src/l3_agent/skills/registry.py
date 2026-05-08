@@ -122,14 +122,14 @@ def _register_callable(
             inspect.Parameter.VAR_POSITIONAL,
             inspect.Parameter.VAR_KEYWORD,
         ):
-            param_str += " <REQUIRED>"
+            param_str += " <REQ>"
         formatted_params.append(param_str)
 
     clean_sig = f"({', '.join(formatted_params)})"
     raw_doc = inspect.getdoc(func) or "Без описания."
     clean_doc = " ".join(raw_doc.split())
 
-    doc_str = f"`{skill_name}{clean_sig}` - {clean_doc}"
+    doc_str = f"{skill_name}{clean_sig} - {clean_doc}"
 
     _REGISTRY[skill_name] = {
         "func": func,
@@ -158,7 +158,7 @@ def register_custom_callable(
     for name, param in sig.parameters.items():
         param_str = f"{name}: {param.annotation.__name__ if hasattr(param.annotation, '__name__') else param.annotation}"
         if param.default is inspect.Parameter.empty:
-            param_str += " <REQUIRED>"
+            param_str += " <REQ>"
         formatted_params.append(param_str)
 
     clean_sig = f"({', '.join(formatted_params)})"

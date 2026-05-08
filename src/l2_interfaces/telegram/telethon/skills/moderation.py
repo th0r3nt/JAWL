@@ -27,12 +27,8 @@ class TelethonModeration:
         """
         Банит пользователя.
 
-        - Если chat_id НЕ передан: добавляет юзера в глобальный личный черный список (ЛС).
-        - Если chat_id передан: исключает юзера из указанной группы/канала навсегда.
-
-        Args:
-            user_id: Числовой ID нарушителя.
-            chat_id: ID группы (если бан локальный).
+        - Если chat_id не передан: добавляет юзера в личный ЧС.
+        - Если chat_id передан: исключает юзера из группы/канала.
         """
         try:
             client = self.tg_client.client()
@@ -59,9 +55,10 @@ class TelethonModeration:
     @skill()
     async def unban_user(self, user_id: int, chat_id: Optional[int] = None) -> SkillResult:
         """
-        Разблокирует пользователя (снимает мут или бан).
-        - Если chat_id НЕ передан: удаляет юзера из глобального ЧС (ЛС).
-        - Если chat_id передан: разбанивает юзера в группе (снимает все ограничения прав).
+        Разблокирует пользователя.
+
+        - Если chat_id не передан: разбанивает из личного ЧС.
+        - Если chat_id передан: разбанивает в группе.
         """
         try:
             client = self.tg_client.client()
@@ -88,9 +85,9 @@ class TelethonModeration:
     @skill()
     async def kick_user(self, user_id: int, chat_id: int) -> SkillResult:
         """
-        Просто выгоняет пользователя из группы (Kick).
-        В отличие от бана, юзер сможет вернуться по ссылке в любой момент.
+        Выгоняет пользователя из группы.
         """
+
         try:
             client = self.tg_client.client()
             target_user = int(user_id)
@@ -112,12 +109,7 @@ class TelethonModeration:
         self, user_id: int, chat_id: int, duration_minutes: int = 0
     ) -> SkillResult:
         """
-        Выдает "Мут" — запрещает пользователю писать сообщения в группе (Read-Only режим).
-
-        Args:
-            user_id: Кого мутим.
-            chat_id: В каком чате.
-            duration_minutes: Длительность в минутах. Если 0 - навсегда.
+        Выдает Мут - запрещает пользователю писать сообщения в группе.
         """
         try:
             client = self.tg_client.client()
@@ -152,9 +144,11 @@ class TelethonModeration:
     ) -> SkillResult:
         """
         Возвращает список заблокированных пользователей.
-        Если chat_id передан 0 возвращает черный список чата (kicked),
-        если не передан - глобальный ЧС аккаунта.
+
+        - Если chat_id не передан: выводит личный ЧС.
+        - Если chat_id передан: выводит ЧС группы/канала.
         """
+
         try:
             client = self.tg_client.client()
             banned_list = []

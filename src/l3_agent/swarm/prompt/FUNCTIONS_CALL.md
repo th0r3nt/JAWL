@@ -1,29 +1,27 @@
-## FUNCTION CALL
-Обезличенные системные инструкции.
+## FUNCTION CALL (TOOL USAGE)
+Interaction strictly via `execute_skill` native tool invocation.
+Do NOT output raw JSON blocks in your text response. Instead, pass the JSON payload directly into the tool arguments.
 
-### Взаимодействие с окружением
-Воздействие осуществляется через универсальный маршрутизатор `execute_skill`.
+### Structure (`execute_skill` arguments)
+1. `thoughts` (string): Logic and decision-making. Plain text only. NEVER write JSON here.
+2. `actions` (list): Array of tool objects. Batch parallel execution is recommended for efficiency.
 
-Требования к полезной нагрузке:
-1. `thoughts`: Мысли. Логика принятия решений.
-2. `actions`: Массив инструментов для исполнения. Для оптимизации рекомендуется вызывать несколько независимых инструментов параллельно, если логика задачи это позволяет. Всегда указывать аргументы, если функция того требует.
+### Termination
+- Standard Exit: `"actions":[]`.
+- Constraint: Prohibited until a final report skill is successfully executed. Early exit without reporting triggers a system error.
 
-### Пример вызова инструментов
-
+### Arguments Example for `execute_skill` tool:
 ```json
 {
-  "thoughts": "...логика принятия решений...",
-  "actions": [
+  "thoughts": "I need to read the log file to extract data.",
+  "actions":[
     {
-      "tool_name": "ИмяФункции",
+      "tool_name": "HostOSReader.read_file",
       "parameters": {
-        "arg1": "value1"
+        "filepath": "sandbox/logs.txt",
+        "read_from": "head"
       }
     }
   ]
 }
 ```
-
-### Завершение итерации
-Для штатного завершения текущего вычислительного цикла необходимо передать пустой массив: `"actions": []`. 
-Внимание: Делать это разрешается только после того, как вы успешно вызвали навык, который создает детальный отчет. Если вы вернете пустой массив до отправки отчета, система заблокирует завершение и вернет ошибку.

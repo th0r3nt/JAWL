@@ -26,8 +26,8 @@ class HostOSSearch:
     async def list_directory(self, path: str = ".", max_depth: int = 1) -> SkillResult:
         """
         Показывает содержимое директории.
-        Args:
-            max_depth: насколько глубоко заглядывать во вложенные папки (0 - только текущая папка, 1 - на один уровень вглубь, и т.д.)
+
+        max_depth: насколько глубоко заглядывать во вложенные папки (0 - только текущая папка и т.д.)
         """
         limit = self.host_os.config.file_list_limit
 
@@ -143,7 +143,9 @@ class HostOSSearch:
     @skill(swarm=[Subagents.CODER, Subagents.QA_ENGINEER, Subagents.SYSADMIN])
     @require_access(HostOSAccessLevel.SANDBOX)
     async def search_files(self, pattern: str, path: str = ".") -> SkillResult:
-        """Поиск файлов по маске (например, '*.py', 'log_*.txt') во вложенных папках."""
+        """
+        Поиск файлов по маске (например, '*.py', 'log_*.txt').
+        """
 
         limit = self.host_os.config.file_list_limit
 
@@ -211,8 +213,7 @@ class HostOSSearch:
         recursive: bool = True,
     ) -> SkillResult:
         """
-        Ищет указанный текст (строку) внутри всех файлов в директории (аналог глобального поиска/grep).
-        Возвращает пути к файлам, номера строк и сами строки, где найдено совпадение.
+        Глобальный поиск. Ищет указанный текст (строку) внутри всех файлов в директории.
         """
 
         if not search_string:

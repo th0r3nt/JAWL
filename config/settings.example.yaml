@@ -9,7 +9,7 @@ llm:
     - claude-opus-4.6
     - gemini-3.1-pro-preview
     - gemini-3-flash-preview
-  # ...можно добавить свои, главное - убедитесь, что llm api url и ключи правильно настроены
+  # ...можно добавить свои, главное - убедитесь, что LLM_API_URL и ключи правильно настроены
 
   is_multimodal: false
   temperature: 1.0
@@ -38,23 +38,24 @@ system:
 
   # Подробнее: docs/yaml/settings/context.md
   context_depth:
-    ticks: 12
-    detailed_ticks: 3
+    high_ticks: 3
+    medium_ticks: 7
+    low_ticks: 20
 
-    tick_action_max_chars: 300
+    tick_action_max_chars: 500
     tick_result_max_chars: 10000
 
     tick_thoughts_short_max_chars: 1000
-    tick_action_short_max_chars: 50
+    tick_action_short_max_chars: 100
     tick_result_short_max_chars: 200
 
     # Подробнее: docs/yaml/settings/rag.md
     rag:
       enabled: true
-      depth_limit: 2               # Глубина поиска (1 = только первичный поиск)
-      max_vector_blocks: 5         # Лимит текстовых блоков из векторной БД
-      max_graph_nodes: 5           # Лимит узлов из графовой БД
-      max_query_chars: 200         # Лимит символов на один чанк текстового запроса
+      depth_limit: 2
+      max_vector_blocks: 5
+      max_graph_nodes: 5
+      max_query_chars: 200
 
 
   db:
@@ -89,10 +90,13 @@ system:
       # Подробнее: docs/yaml/settings/sql/drives.md
       drives:
         enabled: true
-        decay_rate: 15.0
-        decay_interval_sec: 600
+        dynamic_reduction: true
 
-        max_reflections_history: 3
+        decay_rate: 10.0
+        decay_interval_sec: 900
+
+        max_reflections_history: 5
+
         max_custom_drives: 5
         fundamental:
           curiosity: true
@@ -113,7 +117,7 @@ system:
     
     context_depth:
       max_steps: 20
-      detailed_steps: 5
+      detailed_steps: 3
       action_max_chars: 10000
       result_max_chars: 20000
       thoughts_short_max_chars: 2000
@@ -126,6 +130,7 @@ system:
     enabled: false
     llm_model: unknown
     mode: "hybrid"  # "manual", "auto", "hybrid"
+
     auto_interval_steps: 5
     
     branches: 3                # Количество макро-стратегий (Уровень 1)
@@ -137,13 +142,16 @@ system:
   subconscious:
       enabled: false
       llm_model: unknown
+
       patterns:
         consolidation:
           enabled: true
           activation_limit_ticks: 20
+
         reflection:
           enabled: true
           activation_limit_ticks: 20
+
         forgetting:
           enabled: true
           activation_limit_ticks: 60

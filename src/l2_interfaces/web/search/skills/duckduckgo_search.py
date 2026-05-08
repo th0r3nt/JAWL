@@ -55,12 +55,8 @@ class DuckDuckGoSearch:
     @skill(swarm=[Subagents.WEB_RESEARCHER])
     async def search(self, query: str, max_results: int = 5) -> SkillResult:
         """
-        Ищет информацию в интернете (через DuckDuckGo).
+        Ищет информацию в интернете через DuckDuckGo.
         Возвращает список ссылок и кратких текстовых сниппетов.
-
-        Args:
-            query: Текст запроса.
-            max_results: Лимит возвращаемых ссылок.
         """
         try:
             results = await self.search_raw(query, max_results)

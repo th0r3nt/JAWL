@@ -30,9 +30,6 @@ class HostOSReader:
         """
         Читает содержимое файла.
         Важно: путь указывается от корня фреймворка (напр. 'sandbox/file.txt').
-
-        Args:
-            read_from: 'head' - с начала, 'tail' - с конца.
         """
         max_chars = self.host_os.config.file_read_max_chars
 
@@ -100,11 +97,10 @@ class HostOSReader:
         self, path: str = ".", max_files: int = 10, recursive: bool = False
     ) -> SkillResult:
         """
-        Читает текстовое содержимое сразу нескольких файлов в директории.
+        Читает сразу несколько файлов в директории.
         Пропускает бинарные файлы.
 
-        Args:
-            recursive: Если True, прочитает файлы и во всех вложенных папках.
+        recursive: Если True, прочитает файлы и во всех вложенных папках.
         """
 
         try:

@@ -223,8 +223,10 @@ class RAGConfig(BaseModel):
 
 
 class ContextDepthConfig(BaseModel):
-    ticks: int = 15
-    detailed_ticks: int = 3
+    high_ticks: int = 3
+    medium_ticks: int = 7
+    low_ticks: int = 20
+
     tick_action_max_chars: int = 10000
     tick_result_max_chars: int = 20000
     tick_thoughts_short_max_chars: int = 1000
@@ -265,6 +267,7 @@ class FundamentalDrivesConfig(BaseModel):
 
 class DrivesConfig(BaseModel):
     enabled: bool = True
+    dynamic_reduction: bool = True
     decay_rate: float = 5.0
     decay_interval_sec: int = 540
     max_reflections_history: int = 4
@@ -476,8 +479,7 @@ def _sync_yaml_file(user_file: Path, example_file: Path) -> None:
         shutil.copy(example_file, user_file)
         main_logger.info(f"[Config] Создан базовый файл конфигурации {user_file.name}")
         return
-
-    # Загружаем через ruamel для сохранения комментариев
+    
     from ruamel.yaml import YAML
 
     ryaml = YAML()

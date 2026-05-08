@@ -35,8 +35,7 @@ class HostOSDesktop:
     @require_access(HostOSAccessLevel.SANDBOX)
     async def open_url_in_browser(self, url: str) -> SkillResult:
         """
-        [Графический интерфейс хост-машины]
-        Открывает указанную ссылку в дефолтном веб-браузере ОС.
+        [GUI] Открывает указанную ссылку в дефолтном веб-браузере ОС.
         """
 
         try:
@@ -57,8 +56,7 @@ class HostOSDesktop:
     @require_access(HostOSAccessLevel.SANDBOX)
     async def open_path_in_explorer(self, path: str = ".") -> SkillResult:
         """
-        [Графический интерфейс хост-машины]
-        Открывает указанную директорию или файл в графическом проводнике (Explorer/Finder).
+        [GUI] Открывает указанную директорию или файл в графическом проводнике (Explorer/Finder).
         """
         try:
             safe_path = self.host_os.validate_path(path, is_write=False)
@@ -88,8 +86,7 @@ class HostOSDesktop:
     @require_access(HostOSAccessLevel.SANDBOX)
     async def send_notification(self, title: str, message: str) -> SkillResult:
         """
-        [Графический интерфейс хост-машины]
-        Отправляет системное Push-уведомление.
+        [GUI] Отправляет системное Push-уведомление.
         """
         try:
 
@@ -136,8 +133,7 @@ class HostOSDesktop:
         self, filename: str, with_grid: bool = False, grid_step: int = 100
     ) -> SkillResult:
         """
-        [Графический интерфейс хост-машины]
-        Делает скриншот главного экрана и сохраняет его в песочницу.
+        [GUI] Делает скриншот главного экрана и сохраняет его в песочницу.
 
         with_grid: Накладывает контрастную координатную сетку поверх скриншота.
         grid_step: Шаг сетки в пикселях. Если нужна большая точность клика - поставить 40.
@@ -176,8 +172,7 @@ class HostOSDesktop:
     @require_access(HostOSAccessLevel.SANDBOX)
     async def lock_screen(self) -> SkillResult:
         """
-        [Графический интерфейс хост-машины]
-        Блокирует экран (переводит на окно ввода пароля).
+        [GUI] Блокирует экран.
         """
         try:
 
@@ -208,11 +203,7 @@ class HostOSDesktop:
     @require_access(HostOSAccessLevel.SANDBOX)
     async def click_coordinates(self, x: int, y: int) -> SkillResult:
         """
-        [Графический интерфейс хост-машины] Выполняет физический клик левой кнопкой мыши по абсолютным координатам монитора.
-
-        Args:
-            x: Позиция по горизонтали (пиксели).
-            y: Позиция по вертикали (пиксели).
+        [GUI] Выполняет левый клик по координатам монитора.
         """
 
         def _click():
@@ -248,8 +239,7 @@ class HostOSDesktop:
     @require_access(HostOSAccessLevel.SANDBOX)
     async def type_text(self, text: str) -> SkillResult:
         """
-        [Графический интерфейс хост-машины]
-        Печатает переданный текст (эмулирует ввод с клавиатуры).
+        [GUI] Печатает переданный текст.
         """
 
         def _type():
@@ -295,8 +285,7 @@ class HostOSDesktop:
     @require_access(HostOSAccessLevel.SANDBOX)
     async def play_audio(self, filepath: str) -> SkillResult:
         """
-        [Графический интерфейс хост-машины]
-        Воспроизводит аудиофайл (mp3, wav). Выполняется в фоновом режиме.
+        [GUI] Воспроизводит аудиофайл.
         """
         try:
             # Пропускаем через гейткипер (только из sandbox/)
@@ -340,8 +329,7 @@ class HostOSDesktop:
     @require_access(HostOSAccessLevel.SANDBOX)
     async def get_clipboard(self) -> SkillResult:
         """
-        [Графический интерфейс хост-машины]
-        Считывает текущий текстовый контент из системного буфера обмена.
+        [GUI] Читает текущий системный буфер обмена.
         """
         import base64
 
@@ -394,8 +382,7 @@ class HostOSDesktop:
     @require_access(HostOSAccessLevel.SANDBOX)
     async def set_clipboard(self, text: str) -> SkillResult:
         """
-        [Графический интерфейс хост-машины]
-        Помещает указанный текст в системный буфер обмена.
+        [GUI] Помещает текст в системный буфер обмена.
         """
         import base64
 
@@ -444,8 +431,7 @@ class HostOSDesktop:
     @require_access(HostOSAccessLevel.SANDBOX)
     async def list_active_windows(self) -> SkillResult:
         """
-        [Графический интерфейс хост-машины]
-        Возвращает список заголовков видимых и активных окон операционной системы.
+        [GUI] Возвращает список заголовков видимых и активных окон OS.
         """
 
         def _list():
@@ -506,8 +492,7 @@ class HostOSDesktop:
     @require_access(HostOSAccessLevel.SANDBOX)
     async def maximize_active_window(self) -> SkillResult:
         """
-        [Графический интерфейс хост-машины]
-        Разворачивает текущее активное окно (на переднем плане) на весь экран.
+        [GUI] Разворачивает текущее активное окно на весь экран.
         """
 
         def _maximize():
@@ -549,8 +534,7 @@ class HostOSDesktop:
     @require_access(HostOSAccessLevel.SANDBOX)
     async def focus_window(self, title_substring: str) -> SkillResult:
         """
-        [Графический интерфейс хост-машины]
-        Переключает фокус на окно, заголовок которого содержит указанную подстроку.
+        [GUI] Переключает фокус на окно, заголовок которого содержит указанную подстроку.
         """
 
         def _focus():
@@ -603,9 +587,8 @@ class HostOSDesktop:
     @skill()
     @require_access(HostOSAccessLevel.SANDBOX)
     async def press_hotkey(self, hotkey: str) -> SkillResult:
-        """[Графический интерфейс хост-машины]
-        Эмулирует нажатие горячих клавиш.
-        Примеры: 'alt+tab', 'win+d', 'ctrl+c', 'enter', 'shift+a'.
+        """[GUI] Эмулирует нажатие горячих клавиш.
+        Например: 'alt+tab', 'enter'.
         """
 
         def _press():

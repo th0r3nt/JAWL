@@ -21,11 +21,6 @@ class AiogramMessages:
     ) -> SkillResult:
         """
         Отправляет текстовое сообщение от лица бота.
-
-        Args:
-            chat_id (int): ID целевого чата.
-            text (str): Текст сообщения.
-            reply_to_message_id (Optional[int]): ID сообщения, на которое нужно ответить (реплай).
         """
         try:
             bot = self.client.bot()
@@ -51,11 +46,7 @@ class AiogramMessages:
     async def delete_message(self, chat_id: int, message_id: int) -> SkillResult:
         """
         Удаляет сообщение в чате.
-        Внимание: для удаления чужих сообщений бот должен быть администратором с правами на удаление.
-
-        Args:
-            chat_id (int): ID чата.
-            message_id (int): ID удаляемого сообщения.
+        Для удаления чужих сообщений бот должен быть администратором с правами на удаление.
         """
         try:
             bot = self.client.bot()
@@ -71,11 +62,6 @@ class AiogramMessages:
     async def edit_message(self, chat_id: int, message_id: int, new_text: str) -> SkillResult:
         """
         Изменяет текст уже отправленного ботом сообщения.
-
-        Args:
-            chat_id (int): ID чата.
-            message_id (int): ID редактируемого сообщения (должно принадлежать боту).
-            new_text (str): Новый текст.
         """
         try:
             bot = self.client.bot()
@@ -96,11 +82,7 @@ class AiogramMessages:
     @skill()
     async def pin_message(self, chat_id: int, message_id: int) -> SkillResult:
         """
-        Закрепляет сообщение в группе (бот должен иметь права администратора).
-
-        Args:
-            chat_id (int): ID чата.
-            message_id (int): ID закрепляемого сообщения.
+        Закрепляет сообщение в группе (нужно иметь права администратора).
         """
         try:
             bot = self.client.bot()
@@ -119,10 +101,6 @@ class AiogramMessages:
     async def unpin_message(self, chat_id: int, message_id: int) -> SkillResult:
         """
         Открепляет ранее закрепленное сообщение.
-
-        Args:
-            chat_id (int): ID чата.
-            message_id (int): ID открепляемого сообщения.
         """
         try:
             bot = self.client.bot()

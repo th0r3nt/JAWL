@@ -43,11 +43,7 @@ class SQLNotes:
     async def add_note(self, content: str) -> SkillResult:
         """
         Создает новую оперативную заметку.
-        Заметка будет всегда отображаться в системном контексте периферийным зрением.
-        Полезно для хранения эфемерных To-Do списков, промежуточных ID, портов, заметок или неструктурированных идей на будущее.
-
-        Args:
-            content: Текст заметки.
+        Заметка будет всегда отображаться в системном контексте.
         """
 
         if not content or not content.strip():
@@ -74,10 +70,6 @@ class SQLNotes:
     async def update_note(self, note_id: str, content: str) -> SkillResult:
         """
         Полностью перезаписывает текст существующей заметки по её ID.
-
-        Args:
-            note_id: ID редактируемой заметки.
-            content: Новый текст заметки.
         """
         if not content or not content.strip():
             return SkillResult.fail("Ошибка: Текст заметки не может быть пустым.")
@@ -100,10 +92,7 @@ class SQLNotes:
     @skill()
     async def delete_note(self, note_id: str) -> SkillResult:
         """
-        Удаляет заметку по её ID. Обязательно вызвать, когда данные теряют актуальность.
-
-        Args:
-            note_id: ID удаляемой заметки.
+        Удаляет заметку по её ID.
         """
         async with self.db.session_factory() as session:
             result = await session.execute(delete(NoteTable).where(NoteTable.id == note_id))
@@ -120,7 +109,6 @@ class SQLNotes:
     async def list_all_notes(self) -> SkillResult:
         """
         Читает полное содержимое всех текущих заметок.
-        Полезно, если в системном промпте текст длинной заметки был обрезан.
         """
 
         async with self.db.session_factory() as session:
@@ -154,18 +142,11 @@ class SQLNotes:
         if not notes:
             return ""
 
-        lines = [f"## NOTES [Лимит: {self.max_notes}]\n"]
+        lines = [f"NOTES (Max: {self.max_notes})"]
         for note in notes:
-            time_str = format_datetime(note.updated_at, self.tz_offset, "%H:%M")
-            content = note.content.replace("\n", "  ")
-
-            # Используем нашу глобальную утилиту для обрезки
-            content = truncate_text(
-                content,
-                max_chars=500,
-                suffix="... [Обрезано]",
-            )
-
-            lines.append(f"- `[{note.id}]` ({time_str}): {content}")
+            time_str = format_datetime(note.updated_at, self.tz_offset, "%m-%d %H:%M")
+            content = note.content.replace("\n", " ")
+            content = truncate_text(content, max_chars=500, suffix="...[Truncated]")
+            lines.append(f"[{note.id}] ({time_str}): {content}")
 
         return "\n".join(lines).strip()

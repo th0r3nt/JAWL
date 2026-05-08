@@ -31,8 +31,9 @@ async def test_integration_hot_reload_architecture():
     system.sql.tasks.max_tasks = 10  # Начальный лимит
 
     system.sql.ticks = MagicMock()
-    system.sql.ticks.ticks_limit = 15
-    system.sql.ticks.detailed_ticks = 3
+    system.sql.ticks.high_ticks = 3
+    system.sql.ticks.medium_ticks = 7
+    system.sql.ticks.low_ticks = 20
 
     # Настраиваем Heartbeat
     system.heartbeat = MagicMock()
@@ -49,7 +50,11 @@ async def test_integration_hot_reload_architecture():
 
     # Агент меняет глубину памяти
     await bus.publish(
-        Events.SYSTEM_CONFIG_UPDATED, key="context_depth", total_ticks=50, detailed_ticks=10
+        Events.SYSTEM_CONFIG_UPDATED,
+        key="context_depth",
+        high_ticks=5,
+        medium_ticks=10,
+        low_ticks=35,
     )
 
     # Агент меняет ритм пульса
@@ -63,8 +68,9 @@ async def test_integration_hot_reload_architecture():
 
     # SQL Manager должен был обновить лимиты на лету
     assert system.sql.tasks.max_tasks == 99
-    assert system.sql.ticks.ticks_limit == 50
-    assert system.sql.ticks.detailed_ticks == 10
+    assert system.sql.ticks.high_ticks == 5
+    assert system.sql.ticks.medium_ticks == 10
+    assert system.sql.ticks.low_ticks == 35
 
     # Heartbeat должен был получить сигнал на обновление
     system.heartbeat.update_config.assert_called_once_with("heartbeat_interval", 120)

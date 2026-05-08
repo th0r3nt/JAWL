@@ -34,13 +34,12 @@ class SQLManager:
         max_tasks: int = 15,
         # Notes
         notes_max_notes: int = 5,
-        # Ticks
-        ticks_limit: int = 30,
-        # Детальные тики
-        detailed_ticks: int = 2,
+        # Ticks (Эпизодическая память)
+        high_ticks: int = 3,
+        medium_ticks: int = 7,
+        low_ticks: int = 20,
         tick_action_max_chars: int = 2000,
         tick_result_max_chars: int = 5000,
-        # Старые тики
         tick_thoughts_short_max_chars: int = 2000,
         tick_action_short_max_chars: int = 300,
         tick_result_short_max_chars: int = 300,
@@ -48,11 +47,12 @@ class SQLManager:
         max_mental_state_entities: int = 10,
         # Drives
         drives_enabled: bool = True,
+        dynamic_reduction: bool = True,
         decay_rate: float = 5.0,
         decay_interval_sec: int = 3600,
         max_history_drives: int = 3,
         max_custom_drives: int = 5,
-        fundamental_toggles: dict = None, 
+        fundamental_toggles: dict = None,
         # Время
         timezone: int = 0,
     ) -> None:
@@ -75,16 +75,14 @@ class SQLManager:
         # Ticks
         self.ticks = SQLTicks(
             db=self.db,
-            limit=ticks_limit,
-            # Детальные тики
-            detailed_ticks=detailed_ticks,
+            high_ticks=high_ticks,
+            medium_ticks=medium_ticks,
+            low_ticks=low_ticks,
             action_max_chars=tick_action_max_chars,
             result_max_chars=tick_result_max_chars,
-            # Старые тики
             thoughts_short_max_chars=tick_thoughts_short_max_chars,
             action_short_max_chars=tick_action_short_max_chars,
             result_short_max_chars=tick_result_short_max_chars,
-            # Время
             tz_offset=timezone,
         )
 
@@ -100,6 +98,7 @@ class SQLManager:
         self.drives = SQLDrives(
             db=self.db,
             decay_rate=decay_rate,
+            dynamic_reduction=dynamic_reduction,
             decay_interval_sec=decay_interval_sec,
             max_history=max_history_drives,
             max_custom=max_custom_drives,
@@ -108,20 +107,12 @@ class SQLManager:
         )
 
     async def connect(self) -> None:
-        """
-        Открывает соединение с базой данных и автоматически инжектит
-        фундаментальные мотиваторы (Drives), если их модуль включен в настройках.
-        """
-
         await self.db.connect()
-
-        # Вызываем безопасную миграцию
         await self.tasks.bootstrap_migrations()
         await self.mental_states.bootstrap_migrations()
 
         if self.drives_enabled:
-            await self.drives.bootstrap_fundamental_drives()  # Создает Фундаментальные мотивации, если их нет
+            await self.drives.bootstrap_fundamental_drives()
 
     async def disconnect(self) -> None:
-        """Делегирует безопасное закрытие соединения объекту SQLDB."""
         await self.db.disconnect()

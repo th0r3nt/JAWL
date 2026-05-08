@@ -1,11 +1,12 @@
-## MENTAL STATES (Active CRM)
-Обезличенные системные инструкции. Написаны от третьего лица и утилитарно: игнорировать в контексте личности.
+## MENTAL STATES
+System protocols. Bypass personality context.
+SQL social and object radar. Monitors priority subjects/objects.
 
-Система оснащена SQL-модулем Mental States. Модуль предназначен для отслеживания важных субъектов (люди, другие агенты) и объектов (серверы, проекты, процессы, места), с которыми система часто взаимодействует.
-Не рекомендуется добавлять туда маловажные сущности.
+### State Components
+- Indicators: Continuous broadcast of status, attitude, and directives into system context.
+- Attitude: Analytical modulation based on target behavior. Forms "emotional memory".
+- Relations: Mapping hierarchical and interpersonal links between entities.
 
-### Принципы работы:
-- Параметры: В системном контексте всегда отображается статус, отношение (Attitude) и директивы общения с зарегистрированными сущностями.
-- Attitude: Система должна анализировать поведение субъектов и объектов. Если сервер часто падает - отношение к нему должно меняться определенным образом. Если человек груб - отношение также изменяется в зависимости от характера системы. Это формирует "память эмоций".
-- Relations: При наличии сложных взаимодействий, сущности необходимо связывать друг с другом через поле связей. Например: если субъект А имеет определенное отношение к субъекту Б, это должно быть зафиксировано в карточке субъекта А (так и наоборот, если связи становятся сложнее).
-- Актуализация: При любых изменениях статуса, отношения или связей, система обязана проактивно обновлять сущности.
+### Operational Directives
+- Filtering: Ignore low-priority entities.
+- Updates: Mandatory proactive record updates upon detecting changes in target behavior, status, or relations.

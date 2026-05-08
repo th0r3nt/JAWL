@@ -70,7 +70,7 @@ async def test_tot_generator_rules_injection():
     mock_registry._providers = {}
 
     mock_sql_ticks = MagicMock()
-    mock_sql_ticks.get_full_context_block = AsyncMock(return_value="Fake Ticks")
+    mock_sql_ticks.get_context_block = AsyncMock(return_value="Fake Ticks")
 
     generator = ToTGenerator(
         llm_client=mock_llm,
@@ -116,7 +116,7 @@ def test_tot_generator_markdown_formatting():
     )
 
     mock_sql_ticks = MagicMock()
-    mock_sql_ticks.get_full_context_block = AsyncMock(return_value="Fake Ticks")
+    mock_sql_ticks.get_context_block = AsyncMock(return_value="Fake Ticks")
 
     generator = ToTGenerator(
         llm_client=MagicMock(),
@@ -160,7 +160,7 @@ async def test_tot_generator_call_llm_success():
     mock_llm.get_session.return_value = mock_session
 
     mock_sql_ticks = MagicMock()
-    mock_sql_ticks.get_full_context_block = AsyncMock(return_value="Fake Ticks")
+    mock_sql_ticks.get_context_block = AsyncMock(return_value="Fake Ticks")
 
     generator = ToTGenerator(
         llm_client=mock_llm,

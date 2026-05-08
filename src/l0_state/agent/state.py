@@ -44,8 +44,9 @@ class AgentState(BaseModel):
     continuous_cycle: bool = False
     proactive_guidance: bool = False
 
-    context_ticks: int = 15
-    context_detailed_ticks: int = 3
+    context_high_ticks: int = 3
+    context_medium_ticks: int = 7
+    context_low_ticks: int = 20
 
     start_time: float = Field(default_factory=time.time)
     last_input_tokens: int = 0
@@ -112,7 +113,7 @@ class AgentState(BaseModel):
 
 * Heartbeat Interval: {self.heartbeat_interval}s
 * Continuous Cycle: {self.continuous_cycle}
-* Context Depth: {self.context_ticks} recent ticks (Detailed: {self.context_detailed_ticks})
+* Context Depth Ticks: High={self.context_high_ticks} | Medium={self.context_medium_ticks} | Low={self.context_low_ticks}
 
 * LLM Model: {self.llm_model}
 * Temperature: {self.temperature}

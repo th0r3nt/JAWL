@@ -39,14 +39,17 @@ async def test_change_database_limits(config_skills, meta_client):
 
 @pytest.mark.asyncio
 async def test_change_context_depth(config_skills, meta_client):
-    res = await config_skills.change_context_depth(total_ticks=20, detailed_ticks=5)
+    res = await config_skills.change_context_depth(high_ticks=5, medium_ticks=10, low_ticks=20)
 
     assert res.is_success is True
-    assert meta_client.agent_state.context_ticks == 20
-    meta_client.bus.publish.assert_called_with(
-        Events.SYSTEM_CONFIG_UPDATED, key="context_depth", total_ticks=20, detailed_ticks=5
-    )
+    assert meta_client.agent_state.context_high_ticks == 5
+    assert meta_client.agent_state.context_medium_ticks == 10
+    assert meta_client.agent_state.context_low_ticks == 20
 
-    # Ошибка: детальных не может быть больше, чем общих
-    res_fail = await config_skills.change_context_depth(5, 20)
-    assert res_fail.is_success is False
+    meta_client.bus.publish.assert_called_with(
+        Events.SYSTEM_CONFIG_UPDATED,
+        key="context_depth",
+        high_ticks=5,
+        medium_ticks=10,
+        low_ticks=20,
+    )

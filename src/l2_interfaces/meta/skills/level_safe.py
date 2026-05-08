@@ -19,10 +19,10 @@ class MetaSafe:
     @skill()
     async def change_model(self, model_name: str) -> SkillResult:
         """
-        Изменяет текущую используемую LLM модель агента.
+        Изменяет текущую используемую LLM модель.
 
         Args:
-            model_name: Название модели (должно быть в списке Available LLM models).
+            model_name: Название модели.
         """
 
         if self.client.available_models and model_name not in self.client.available_models:
@@ -43,9 +43,6 @@ class MetaSafe:
     async def add_available_model(self, model_name: str) -> SkillResult:
         """
         Добавляет новую LLM модель в список доступных.
-
-        Args:
-            model_name: Строковый идентификатор новой модели.
         """
         if model_name in self.client.available_models:
             return SkillResult.ok(f"Модель '{model_name}' уже есть в списке доступных.")
@@ -66,9 +63,6 @@ class MetaSafe:
     async def remove_available_model(self, model_name: str) -> SkillResult:
         """
         Удаляет LLM модель из списка доступных.
-
-        Args:
-            model_name: Идентификатор удаляемой модели.
         """
 
         if model_name not in self.client.available_models:
@@ -93,10 +87,7 @@ class MetaSafe:
     @skill()
     async def change_temperature(self, temperature: float) -> SkillResult:
         """
-        Изменяет параметр temperature языковой модели (влияет на креативность).
-
-        Args:
-            temperature: Значение от 0.0 до 2.0.
+        Изменяет параметр temperature языковой модели.
         """
         
         if not 0.0 <= temperature <= 2.0:

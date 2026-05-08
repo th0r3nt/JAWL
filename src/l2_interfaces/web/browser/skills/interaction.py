@@ -18,11 +18,10 @@ class BrowserInteraction:
     @skill()
     async def click(self, role: str, name: str) -> SkillResult:
         """
-        Выполняет симуляцию клика по элементу на основе его ARIA-роли.
-        
-        Args:
-            role: ARIA-роль элемента (например, 'link', 'button').
-            name: Внутреннее имя или текст элемента.
+        Выполняет клик по элементу на основе его ARIA-роли.
+
+        role: ARIA-роль элемента (например, 'link', 'button').
+        name: Внутреннее имя или текст элемента.
         """
 
         try:
@@ -52,7 +51,7 @@ class BrowserInteraction:
     @skill()
     async def hover(self, role: str, name: str) -> SkillResult:
         """
-        Наводит курсор мыши на элемент. Полезно для раскрытия выпадающих меню (dropdown).
+        Наводит курсор мыши на элемент.
         """
 
         try:
@@ -97,8 +96,7 @@ class BrowserInteraction:
     async def press_key(self, key: str) -> SkillResult:
         """
         Нажимает клавишу на клавиатуре.
-        Полезно для отправки форм. 
-        Примеры: 'Enter', 'Escape', 'Tab', 'ArrowDown'.
+        Например: 'Enter', 'Escape'.
         """
 
         try:
@@ -122,8 +120,7 @@ class BrowserInteraction:
     @skill()
     async def click_coordinates(self, x: int, y: int) -> SkillResult:
         """
-        Кликает по точным абсолютным координатам 'x' и 'y' на странице.
-        Эти координаты можно узнать, сделав скриншот с параметром координатной сетки.
+        Кликает по координатам на странице.
         """
 
         try:
@@ -162,7 +159,7 @@ class BrowserInteraction:
     @skill()
     async def hover_coordinates(self, x: int, y: int) -> SkillResult:
         """
-        Наводит курсор мыши на точные абсолютные координаты x и y на странице.
+        Наводит курсор мыши на координаты страницы.
         """
 
         try:
@@ -193,7 +190,7 @@ class BrowserInteraction:
     @skill()
     async def type_text(self, text: str) -> SkillResult:
         """
-        Вводит текст с клавиатуры (имитируя нажатия клавиш) в текущий сфокусированный элемент.
+        Вводит текст с клавиатуры в сфокусированный элемент.
         """
 
         try:

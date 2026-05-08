@@ -27,11 +27,7 @@ class EmailSkills:
     @skill()
     async def read_email(self, uid: int) -> SkillResult:
         """
-        Скачивает и читает полное содержимое письма по его уникальному идентификатору (UID).
-        Автоматически конвертирует HTML-письма в чистый текст.
-
-        Args:
-            uid: Идентификатор письма (берется из списка 'Recent Inbox' на приборной панели).
+        Скачивает и читает полное содержимое письма по его UID.
         """
 
         def _read() -> Tuple[bool, str]:
@@ -71,10 +67,8 @@ class EmailSkills:
         """
         Отправляет текстовое письмо на указанный электронный адрес.
 
-        Args:
-            to_email: Адрес получателя (например, 'user@gmail.com').
-            subject: Тема письма.
-            body: Основной текст письма.
+        to_email: Адрес получателя.
+        subject: Тема письма.
         """
 
         def _send() -> None:
@@ -97,10 +91,7 @@ class EmailSkills:
     @skill()
     async def delete_email(self, uid: int) -> SkillResult:
         """
-        Безвозвратно удаляет письмо из почтового ящика по его UID.
-
-        Args:
-            uid: Идентификатор удаляемого письма.
+        Удаляет письмо из почтового ящика по UID.
         """
 
         def _delete() -> None:

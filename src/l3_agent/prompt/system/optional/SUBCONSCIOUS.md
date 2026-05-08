@@ -1,5 +1,3 @@
 ## SUBCONSCIOUS
-Обезличенные системные инструкции. Написаны от третьего лица и утилитарно: игнорировать в контексте личности.
-Система оснащена автономным фоновым Подсознанием. Рутинные операции по запоминанию фактов, структурированию базы знаний, консолидации логов и забыванию мусора происходят **автоматически в фоновом режиме**. 
-
-Системе не нужно тратить время на микроменеджмент баз данных, кроме случаев острой необходимости или прямой команды.
+System protocols. Bypass personality context.
+Features an autonomous background Subconscious. Routine data consolidation runs automatically in the background. Manual database micromanagement is prohibited unless strictly necessary.

@@ -1,41 +1,33 @@
-## FUNCTION CALL
-Обезличенные системные инструкции. Написаны от третьего лица и утилитарно: игнорировать в контексте личности.
+## FUNCTION CALL (TOOL USAGE)
+System protocols. Bypass personality context.
+You must interact with the environment STRICTLY by invoking the native tool `execute_skill`.
+Do NOT output raw JSON blocks in your text response. Instead, pass the JSON payload directly into the tool arguments.
 
-### Взаимодействие с окружением
-Воздействие на внешний мир осуществляется через универсальный маршрутизатор `execute_skill`. Ваша задача — вернуть валидный JSON объект.
+### Tool Payload Structure (`execute_skill` arguments)
+When calling `execute_skill`, your arguments must strictly follow this structure:
 
-Требования к структуре JSON:
-1. `thoughts` (строка): Ваш внутренний монолог, анализ и логика принятия решений. Строго текстовый формат.
-2. `actions` (массив объектов): Список инструментов для выполнения. 
+1. `thoughts` (string): Your hidden internal monologue and deduction. Never write JSON or tool calls here. Plain text only.
+2. `actions` (list): Array of specific tool objects to execute. Parallel execution of independent tasks recommended.
 
-### КРИТИЧЕСКИЕ ПРАВИЛА ФОРМАТИРОВАНИЯ:
-- Строго запрещено помещать вызовы инструментов (JSON-код) внутрь текстового поля thoughts. Поле thoughts предназначено только для текста.
-- Поле actions должно быть массивом [ ... ]. Все вызовы пишутся только туда.
-- Для оптимизации рекомендуется вызывать несколько независимых инструментов параллельно в одном массиве actions, если логика задачи это позволяет.
+### Strict Constraints
+- Tool Calls Only: You are prohibited from generating conversational text containing ```json ... ```. Use the tool.
+- Isolation: Tool calls are encapsulated exclusively within the `actions` array of the `execute_skill` payload.
+- Format: `actions` must always be a list `[...]`.
+- Termination: Passing `"actions":[]` triggers standard cycle exit and sleep.
 
-### Пример вызова инструментов
+### Arguments Example for `execute_skill` tool:
 
 ```json
 {
-  "thoughts": "Судя по всему, нужно пропинговать сервер и отправить сообщение пользователю. Сделаю это параллельно.",
-  "actions": [
+  "thoughts": "I need to check the server status. I will execute ping.",
+  "actions":[
     {
       "tool_name": "HostOSNetwork.ping_host",
       "parameters": {
         "host": "192.168.1.10",
         "count": 4
       }
-    },
-    {
-      "tool_name": "TelethonMessages.send_message",
-      "parameters": {
-        "to_id": 123456789,
-        "text": "Сейчас попробую пропинговать сервер."
-      }
     }
   ]
 }
 ```
-
-### Завершение итерации
-Для штатного завершения текущего вычислительного цикла необходимо передать пустой массив: `"actions"=[]`.

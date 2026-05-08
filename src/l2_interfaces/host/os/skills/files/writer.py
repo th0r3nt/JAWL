@@ -31,10 +31,7 @@ class HostOSWriter:
         """
         Создает новый файл или полностью перезаписывает существующий.
 
-        Если передан 'description', к файлу сразу будет привязано текстовое описание.
-
-        Args:
-            description: советуется писать полезную информацию. В будущем это поможет искать нужные функции намного быстрее.
+        description: лаконичное описание содержимого файла.
         """
 
         try:
@@ -77,7 +74,6 @@ class HostOSWriter:
     async def append_to_file(self, filepath: str, content: str) -> SkillResult:
         """
         Безопасно добавляет текст в конец существующего файла.
-        Автоматически ставит перенос строки, если его нет.
         """
 
         try:
@@ -116,7 +112,9 @@ class HostOSWriter:
     @skill()
     @require_access(HostOSAccessLevel.SANDBOX)
     async def delete_file(self, filepath: str) -> SkillResult:
-        """Удаляет указанный файл (не папки)."""
+        """
+        Удаляет указанный файл (не папки).
+        """
 
         try:
             safe_path = self.host_os.validate_path(filepath, is_write=True)
@@ -144,7 +142,9 @@ class HostOSWriter:
     @skill()
     @require_access(HostOSAccessLevel.SANDBOX)
     async def delete_directory(self, path: str) -> SkillResult:
-        """Удаляет указанную директорию вместе со всем её содержимым."""
+        """
+        Удаляет указанную директорию вместе со всем её содержимым.
+        """
 
         try:
             safe_path = self.host_os.validate_path(path, is_write=True)
@@ -179,7 +179,9 @@ class HostOSWriter:
     @skill(swarm=[Subagents.CODER, Subagents.QA_ENGINEER, Subagents.SYSADMIN])
     @require_access(HostOSAccessLevel.SANDBOX)
     async def create_directories(self, paths: Union[str, List[str]]) -> SkillResult:
-        """Создает одну или несколько директорий (папок)."""
+        """
+        Создает одну или несколько директорий.
+        """
 
         if isinstance(paths, str):
             try:
@@ -224,7 +226,6 @@ class HostOSWriter:
     async def move_or_rename(self, source_path: str, destination_path: str) -> SkillResult:
         """
         Перемещает/переименовывает файл/директорию.
-        Если destination_path указывает на существующую папку, объект будет перемещен внутрь неё.
         """
         try:
             # Проверяем оба пути через гейткипер ОС (и источник, и назначение)

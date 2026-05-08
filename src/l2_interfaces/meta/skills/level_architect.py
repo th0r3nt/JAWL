@@ -36,9 +36,8 @@ class MetaArchitect:
         """
         Включает или выключает системные интерфейсы через YAML конфиг.
 
-        Args:
-            interface: Название целевого модуля (например 'github').
-            state: True (включить) или False (выключить).
+        interface: Название целевого модуля.
+        state: включить или выключить.
         """
         # Маппинг ключей из Literal на реальные пути в interfaces.yaml
         ifmap = {
@@ -87,11 +86,9 @@ class MetaArchitect:
     @skill()
     async def off_system(self, reason: str = "Без причины") -> SkillResult:
         """
-        Завершает работу агента и полностью выключает систему.
-
-        Args:
-            reason: Причина выключения (останется в логах).
+        Завершает работу и полностью выключает систему.
         """
+
         main_logger.info(f"[Meta] Запрошено выключение системы. Причина: {reason}")
         await self.client.bus.publish(Events.SYSTEM_SHUTDOWN_REQUESTED, reason=reason)
         return SkillResult.ok(
@@ -101,11 +98,9 @@ class MetaArchitect:
     @skill()
     async def reboot_system(self, reason: str = "Обновление конфигурации") -> SkillResult:
         """
-        Выполняет полную перезагрузку системы (полезно после изменения конфигов).
-
-        Args:
-            reason: Причина перезагрузки.
+        Выполняет полную перезагрузку системы.
         """
+        
         main_logger.info(f"[Meta] Запрошена перезагрузка системы. Причина: {reason}")
         await self.client.bus.publish(Events.SYSTEM_REBOOT_REQUESTED, reason=reason)
         return SkillResult.ok(

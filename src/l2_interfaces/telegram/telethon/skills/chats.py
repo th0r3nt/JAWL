@@ -49,12 +49,9 @@ class TelethonChats:
     @skill()
     async def get_chats(self, limit: int = 10) -> SkillResult:
         """
-        Возвращает список последних чатов (ЛС, группы, каналы), отсортированных по активности.
-        Если чат является Форумом, дополнительно выводит список его топиков.
-
-        Args:
-            limit (int, optional): Количество чатов для возврата. По умолчанию 10.
+        Возвращает список последних чатов, отсортированных по активности.
         """
+
         try:
             client = self.tg_client.client()
             chats = []
@@ -117,7 +114,10 @@ class TelethonChats:
 
     @skill()
     async def get_unread_chats(self, limit: int = 20) -> SkillResult:
-        """Возвращает отфильтрованный список чатов, в которых есть непрочитанные сообщения."""
+        """
+        Возвращает список непрочитанных чатов.
+        """
+
         try:
             client = self.tg_client.client()
             chats = []
@@ -169,11 +169,6 @@ class TelethonChats:
     ) -> SkillResult:
         """
         Читает историю переписки указанного чата без сброса флага UNREAD.
-
-        Args:
-            chat_id: ID или юзернейм чата.
-            limit: Количество последних сообщений для чтения.
-            topic_id: ID топика (для Форумов).
         """
         try:
             client = self.tg_client.client()
@@ -239,12 +234,8 @@ class TelethonChats:
         self, chat_id: Union[int, str], topic_id: Optional[int] = None
     ) -> SkillResult:
         """
-        Помечает все сообщения (а также меншны и реакции) в чате как прочитанные.
-        Полезно, чтобы убрать маркер UNREAD и не отвлекаться на старые уведомления.
-
-        Args:
-            chat_id: ID/название чата.
-            topic_id: ID топика (для выборочной очистки).
+        Помечает все сообщения в чате как прочитанные.
+        Полезно, чтобы убрать маркер UNREAD.
         """
 
         try:
@@ -272,7 +263,7 @@ class TelethonChats:
     @skill()
     async def search_public_chats(self, query: str, limit: int = 5) -> SkillResult:
         """
-        Осуществляет глобальный поиск по Telegram (как в строке поиска в приложении).
+        Осуществляет глобальный поиск по Telegram.
         Ищет публичные группы и каналы.
         """
 
@@ -303,7 +294,9 @@ class TelethonChats:
 
     @skill()
     async def get_chat_info(self, chat_id: Union[int, str]) -> SkillResult:
-        """Получает расширенную информацию о чате (описание, кол-во участников/подписчиков)."""
+        """
+        Получает расширенную информацию о чате.
+        """
 
         try:
             client = self.tg_client.client()
@@ -351,6 +344,7 @@ class TelethonChats:
         """
         Вступает в открытый канал/группу (по юзернейму) или закрытый (по t.me/joinchat/ хэшу).
         """
+
         try:
             client = self.tg_client.client()
             target = link_or_username.strip()
@@ -374,7 +368,9 @@ class TelethonChats:
 
     @skill()
     async def leave_chat(self, chat_id: Union[int, str]) -> SkillResult:
-        """Отписывается от канала или выходит из группы."""
+        """
+        Отписывается от канала/выходит из группы.
+        """
 
         try:
             client = self.tg_client.client()
@@ -389,8 +385,7 @@ class TelethonChats:
     @skill()
     async def join_channel_discussion(self, channel_id: Union[int, str]) -> SkillResult:
         """
-        Автоматически определяет ID привязанной супергруппы комментариев у канала
-        и добавляет агента в нее.
+        Вступает в супергруппу-дискуссию переданного канала.
         """
 
         try:
@@ -422,9 +417,7 @@ class TelethonChats:
         self, chat_id: Union[int, str], users: list[Union[int, str]]
     ) -> SkillResult:
         """
-        Инвайтит (добавляет) пользователей в вашу группу/канал.
-
-        users: массив ID или юзернеймов (@username).
+        Добавляет пользователей в группу/канал.
         """
 
         if not users:

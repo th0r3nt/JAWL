@@ -28,9 +28,7 @@ class CalendarManagement:
         """
         Создает разовый будильник.
 
-        Args:
-            title: Название или причина будильника.
-            datetime_str: Время в формате 'YYYY-MM-DD HH:MM' (например, '2024-05-15 15:30').
+        datetime_str: Время в формате 'YYYY-MM-DD HH:MM'.
         """
         try:
             # Парсим строку с учетом часового пояса системы
@@ -60,9 +58,7 @@ class CalendarManagement:
         """
         Создает регулярный таймер, который будет срабатывать каждые N минут начиная от текущего момента.
 
-        Args:
-            title: Причина пробуждения (что нужно проверить).
-            interval_minutes: Интервал в минутах (например, 2880 = каждые два дня).
+        interval_minutes: Интервал в минутах (например, 2880 = каждые два дня).
         """
         if interval_minutes < 1:
             return SkillResult.fail("Ошибка: Интервал должен быть не менее 1 минуты.")
@@ -94,12 +90,10 @@ class CalendarManagement:
         self, title: str, time_str: str, interval_days: int = 1
     ) -> SkillResult:
         """
-        Создает будильник, который будет будить агента в конкретное время суток с заданным шагом в днях.
+        Создает будильник, который будет активироваться в конкретное время суток с заданным шагом в днях.
 
-        Args:
-            title: Причина пробуждения (что нужно сделать).
-            time_str: Время в формате 'HH:MM'.
-            interval_days: Частота в днях (1 = каждый день, 7 = раз в неделю).
+         time_str: Время в формате 'HH:MM'.
+        interval_days: Частота в днях (1 = каждый день, 7 = раз в неделю).
         """
         if interval_days < 1:
             return SkillResult.fail("Ошибка: interval_days должен быть >= 1.")
@@ -169,10 +163,7 @@ class CalendarManagement:
     @skill()
     async def delete_alarm(self, alarm_id: str) -> SkillResult:
         """
-        Удаляет существующий будильник или таймер по его ID.
-
-        Args:
-            alarm_id: Уникальный ID таймера (или его первые 8 символов).
+        Удаляет существующий будильник/таймер.
         """
 
         events = self.client.get_all_events()

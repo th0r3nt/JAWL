@@ -68,10 +68,6 @@ class VectorThoughts:
     async def save_thought(self, thought_text: str, tags: List[VectorTag]) -> SkillResult:
         """
         Векторизует и сохраняет мысль или логический паттерн во внутреннюю память.
-
-        Args:
-            thought_text: Текст рефлексии или вывода.
-            tags: Строгий классификатор (например, 'type:concept', 'domain:self').
         """
 
         if not tags:
@@ -106,11 +102,6 @@ class VectorThoughts:
     ) -> SkillResult:
         """
         Семантический поиск мыслей из базы данных.
-
-        Args:
-            query: Текстовый запрос (будет конвертирован в вектор).
-            limit: Максимальное количество возвращаемых релевантных узлов.
-            tags_filter: Опциональный массив тегов. Если передан, найдет только те записи, которые содержат ВСЕ указанные теги.
         """
         try:
             query_str = str(query)
@@ -182,13 +173,10 @@ class VectorThoughts:
             main_logger.error(msg)
             return SkillResult.fail(msg)
 
-    @skill(swarm=[Subagents.ARCHIVIST])
+    @skill(swarm=[Subagents.ARCHIVIST], subconscious=[Pattern.FORGETTING, Pattern.CONSOLIDATION])
     async def delete_thought(self, point_id: str) -> SkillResult:
         """
-        Безвозвратно удаляет мысль из базы данных по ID.
-
-        Args:
-            point_id: Идентификатор удаляемого узла.
+        Удаляет мысль из базы данных по ID.
         """
         try:
             await self.db.client.delete(
@@ -210,11 +198,8 @@ class VectorThoughts:
     ) -> SkillResult:
         """
         Получает последние N мыслей из базы данных.
-        Используется субагентами (ARCHIVIST) для ревизии памяти.
 
-        Args:
-            limit: Количество извлекаемых мыслей.
-            tags_filter: Опциональный массив тегов.
+        tags_filter: Опциональный массив тегов для фильтра.
         """
         try:
             query_filter = None

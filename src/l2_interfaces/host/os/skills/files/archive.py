@@ -82,10 +82,7 @@ class HostOSArchive:
     @require_access(HostOSAccessLevel.SANDBOX)
     async def extract_archive(self, archive_path: str, extract_to: str = ".") -> SkillResult:
         """
-        Распаковывает архив (zip, tar, gz и др.).
-
-        Args:
-            extract_to: папка, куда будут извлечены файлы (по умолчанию текущая директория).
+        Распаковывает архив.
         """
         try:
             # Проверяем оба пути через гейткипер ОС

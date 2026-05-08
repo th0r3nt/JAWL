@@ -19,11 +19,8 @@ class HostOSDeploy:
     async def start_deploy_session(self, reason: str) -> SkillResult:
         """
         Открывает деплой-сессию (режим самомодификации).
-        Необходимо вызывать перед любыми попытками изменить исходный код в директории src/.
-        Система начнет делать прозрачные бэкапы изменяемых файлов (Copy-on-Write).
-
-        Args:
-            reason: Обоснование изменения.
+        Вызывать перед любыми попытками изменить исходный код.
+        Система начнет делать прозрачные бэкапы изменяемых файлов.
         """
 
         if not self.host_os.config.require_deploy_sessions:
@@ -38,12 +35,11 @@ class HostOSDeploy:
     @require_access(HostOSAccessLevel.OPERATOR)
     async def commit_deploy_session(self, test_path: str = "tests/unit/", force: bool = False) -> SkillResult:
         """
-        Завершает деплой-сессию. Физически проверяет код на синтаксические ошибки и запускает pytest.
-        По умолчанию запускается вся директория быстрых юнит-тестов (tests/unit/).
+        Завершает деплой-сессию. Тестирует измененный код и инициализацию фреймворка.
+        По умолчанию запускает всю директория быстрых юнит-тестов (tests/unit/).
 
-        Args:
-            test_path: Путь к тестам для проверки. По умолчанию "tests/unit/".
-            force: Принудительный коммит. Установить True, если тесты падают из-за причин, не связанных с измененным кодом. Применять в крайнем случае.
+        test_path: Путь к тестам для проверки. По умолчанию "tests/unit/".
+        force: Принудительный коммит. Установить True, если тесты падают из-за причин, не связанных с измененным кодом.
         """
 
         success, msg = await self.host_os.deploy_manager.commit_session(test_path=test_path, force=force)

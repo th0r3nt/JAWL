@@ -31,13 +31,14 @@ class SQLTicks:
     def __init__(
         self,
         db: "SQLDB",
-        limit: int = 15,
-        detailed_ticks: int = 2,
+        high_ticks: int = 3,
+        medium_ticks: int = 7,
+        low_ticks: int = 20,
         action_max_chars: int = 2000,
         result_max_chars: int = 5000,
-        thoughts_short_max_chars: int = 2000,
-        action_short_max_chars: int = 300,
-        result_short_max_chars: int = 300,
+        thoughts_short_max_chars: int = 1000,
+        action_short_max_chars: int = 100,
+        result_short_max_chars: int = 200,
         tz_offset: int = 0,
     ) -> None:
         """
@@ -55,8 +56,9 @@ class SQLTicks:
             tz_offset: Смещение временной зоны.
         """
         self.db = db
-        self.ticks_limit = limit
-        self.detailed_ticks = detailed_ticks
+        self.high_ticks = high_ticks
+        self.medium_ticks = medium_ticks
+        self.low_ticks = low_ticks
 
         self.action_max_chars = action_max_chars
         self.result_max_chars = result_max_chars
@@ -91,7 +93,6 @@ class SQLTicks:
             session.add(new_tick)
             await session.commit()
 
-        main_logger.debug(f"[SQL DB] Тик сохранен (ID: {tick_id[:8]}).")
         return tick_id
 
     async def get_ticks(self, limit: int = 5) -> List[TickTable]:
@@ -109,109 +110,58 @@ class SQLTicks:
             stmt = select(TickTable).order_by(desc(TickTable.created_at)).limit(limit)
             result = await session.execute(stmt)
 
-            ticks = result.scalars().all()
-            return list(reversed(ticks))
+            return list(reversed(result.scalars().all()))
 
-    def _format_tick_entry(self, t: TickTable, is_detailed: bool) -> str:
+    def _format_tick_entry(self, t: TickTable, tier: str) -> str:
         """
         Внутренний утилитарный метод для форматирования одного тика.
-        Реализует инкапсулированную логику умного сжатия (Type Coercion и Truncation),
-        чтобы избежать дублирования кода между провайдерами контекста.
-
-        Args:
-            t: Объект таблицы тиков (TickTable).
-            is_detailed: Флаг детальности. Если True, применяются 'max_chars' лимиты,
-                         если False - жесткие 'short_max_chars' лимиты.
 
         Returns:
             Отформатированная Markdown-строка с мыслями, действиями и результатами.
         """
-        # ===============================================================================
-        # ПАРСИНГ МЫСЛЕЙ
-        # ===============================================================================
+        time_str = format_datetime(t.created_at, self.tz_offset, "%m-%d %H:%M:%S")
+        step_str = (
+            f"[Step {t.results['step']}/{t.results['max_steps']}] "
+            if t.results and "step" in t.results
+            else ""
+        )
+
+        header = f"## TICK {time_str} \n{step_str}"
 
         thoughts_str = t.thoughts
-        if not is_detailed and len(thoughts_str) > self.thoughts_short_max_chars:
-            thoughts_str = (
-                thoughts_str[: self.thoughts_short_max_chars]
-                + " ... [Мысли обрезаны системой]"
-            )
+        if tier in ("MEDIUM", "LOW") and len(thoughts_str) > self.thoughts_short_max_chars:
+            thoughts_str = thoughts_str[: self.thoughts_short_max_chars] + "...[Truncated]"
 
-        # ===============================================================================
-        # ПАРСИНГ ДЕЙСТВИЙ
-        # ===============================================================================
+        # Для LOW тиков возвращаем ТОЛЬКО мысли
+        if tier == "LOW":
+            return f"{header}\nThoughts: {thoughts_str}"
 
-        action_limit = self.action_max_chars if is_detailed else self.action_short_max_chars
+        # MEDIUM и HIGH
+        action_limit = self.action_max_chars if tier == "HIGH" else self.action_short_max_chars
         actions_list = []
-
-        actions_raw = t.actions
-        if isinstance(actions_raw, dict):
-            actions_raw = [actions_raw]
-        elif not isinstance(actions_raw, list):
-            actions_raw = [actions_raw]
+        actions_raw = t.actions if isinstance(t.actions, list) else [t.actions]
 
         for a in actions_raw:
             if isinstance(a, dict):
                 t_name = a.get("tool_name", "unknown")
                 params = a.get("parameters", {})
-                act_str = f"`{t_name}`({json.dumps(params, ensure_ascii=False)})"
+                act_str = f"{t_name}({json.dumps(params, ensure_ascii=False)})"
             else:
                 act_str = str(a)
-
             if len(act_str) > action_limit:
-                act_str = act_str[:action_limit] + " ...[Параметры обрезаны]"
-
+                act_str = act_str[:action_limit] + "...[Truncated]"
             actions_list.append(act_str)
 
-        actions_str = "\n".join(actions_list) if actions_list else "None"
+        actions_str = " | ".join(actions_list) if actions_list else "None"
 
-        # ===============================================================================
-        # ПАРСИНГ РЕЗУЛЬТАТОВ ДЕЙСТВИЙ
-        # ===============================================================================
-
-        res_limit = self.result_max_chars if is_detailed else self.result_short_max_chars
-
-        if t.results and isinstance(t.results, dict) and "execution_report" in t.results:
-            raw_report = str(t.results["execution_report"])
-            parts = re.split(r"(?=^Action \[[^\]]+\]: )", raw_report, flags=re.MULTILINE)
-
-            formatted_parts = []
-            for part in parts:
-                part = part.strip()
-                if not part:
-                    continue
-
-                if len(part) > res_limit:
-                    formatted_parts.append(
-                        part[:res_limit] + f"\n...[Результат обрезан. Лимит {res_limit} симв.]"
-                    )
-                else:
-                    formatted_parts.append(part)
-
-            res_str = "\n".join(formatted_parts)
-
-        elif t.results:
-            res_str = json.dumps(t.results, ensure_ascii=False, indent=2)
+        res_limit = self.result_max_chars if tier == "HIGH" else self.result_short_max_chars
+        res_str = "None"
+        if t.results:
+            res_str = str(t.results.get("execution_report", t.results))
             if len(res_str) > res_limit:
-                res_str = (
-                    res_str[:res_limit] + f"\n...[Результат обрезан. Лимит {res_limit} симв.]"
-                )
-        else:
-            res_str = "None"
+                res_str = res_str[:res_limit] + f"...[Truncated limit {res_limit}]"
 
-        time_str = format_datetime(t.created_at, self.tz_offset)
-
-        step_str = ""
-        if t.results and "step" in t.results and "max_steps" in t.results:
-            step_str = f"ReAct Step: {t.results['step']}/{t.results['max_steps']}\n"
-
-        return (
-            f"#### [Tick] {time_str}\n"
-            f"{step_str}"
-            f"*Thoughts*: '{thoughts_str}'\n\n"
-            f"*Actions*:\n{actions_str}\n\n"
-            f"*Result*:\n```\n{res_str}\n```"
-        )
+        return f"{header}\nThoughts: {thoughts_str}\nActions: {actions_str}\nResult: {res_str}"
 
     async def get_context_block(self, **kwargs: Any) -> str:
         """
@@ -225,19 +175,29 @@ class SQLTicks:
             Готовый Markdown блок 'RECENT TICKS' для инъекции в промпт.
         """
 
-        ticks = await self.get_ticks(limit=self.ticks_limit)
+        total_limit = self.high_ticks + self.medium_ticks + self.low_ticks
+        ticks = await self.get_ticks(limit=total_limit)
 
         if not ticks:
-            return "## RECENT TICKS\nНет предыдущих тиков."
+            return "## RECENT TICKS\nEmpty."
 
         blocks = []
-        total_ticks = len(ticks)
-
+        total = len(ticks)
         for i, t in enumerate(ticks):
-            is_detailed = i >= total_ticks - self.detailed_ticks
-            blocks.append(self._format_tick_entry(t, is_detailed))
+            distance_from_newest = total - 1 - i
 
-        return "## RECENT TICKS\n" + "\n\n\n".join(blocks)
+            if distance_from_newest < self.high_ticks:
+                tier = "HIGH"
+
+            elif distance_from_newest < self.high_ticks + self.medium_ticks:
+                tier = "MEDIUM"
+
+            else:
+                tier = "LOW"
+
+            blocks.append(self._format_tick_entry(t, tier))
+
+        return "## RECENT TICKS\n" + "\n\n".join(blocks)
 
     async def get_full_context_block(self, limit: int = 10) -> str:
         """
@@ -256,12 +216,9 @@ class SQLTicks:
         """
 
         ticks = await self.get_ticks(limit=limit)
-
         if not ticks:
-            return "История тиков пуста."
+            return "RECENT ACTIONS LOG\nEmpty."
 
-        blocks = []
-        for t in ticks:
-            blocks.append(self._format_tick_entry(t, is_detailed=True))
+        blocks = [self._format_tick_entry(t, "HIGH") for t in ticks]
 
-        return "## RECENT ACTIONS LOG\n" + "\n\n\n".join(blocks)
+        return "RECENT ACTIONS LOG\n" + "\n\n".join(blocks)

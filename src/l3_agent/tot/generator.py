@@ -115,7 +115,7 @@ class ToTGenerator:
         except Exception as e:
             log = f"[Tree of Thoughts] Ошибка парсинга дерева мыслей: {e}"
             main_logger.error(log)
-            tot_logger.erro(log)
+            tot_logger.error(log)
 
             return None
 
@@ -154,8 +154,9 @@ class ToTGenerator:
             if section in allowed_sections and name in all_blocks:
                 filtered_blocks.append(all_blocks[name])
 
-        full_ticks_block = await self.sql_ticks.get_full_context_block(limit=self.agent_state.context_ticks)
-        filtered_blocks.insert(-1, full_ticks_block)
+        # Используем стандартный get_context_block, чтобы ToT видел ту же иерархию сжатия, что и главный агент
+        ticks_block = await self.sql_ticks.get_context_block()
+        filtered_blocks.insert(-1, ticks_block)
 
         return "\n\n\n".join(filtered_blocks).strip()
 
@@ -170,7 +171,7 @@ class ToTGenerator:
         lines = [
             "## TREE OF THOUGHTS",
             "Подсознательная симуляция стратегических веток для глубокого анализа и планирования.",
-            f"*Время генерации: Шаг {step}*\n```text",
+            f"Время генерации: Шаг {step}\n\n```text",
         ]
 
         def _render_branch(
@@ -229,7 +230,6 @@ class ToTGenerator:
                     model=self.model_name,
                     messages=messages,
                     tools=TOT_SCHEMA,
-                    tool_choice={"type": "function", "function": {"name": "submit_tree"}},
                 )
 
                 msg_obj = response.choices[0].message

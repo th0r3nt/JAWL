@@ -18,8 +18,9 @@ class WebRSSSkills:
     @skill()
     async def list_feeds(self) -> SkillResult:
         """
-        Возвращает список сохраненных (отслеживаемых) RSS-лент.
+        Возвращает список отслеживаемых RSS-лент.
         """
+
         if not self.client.config.feeds:
             return SkillResult.ok("Список сохраненных RSS-лент пуст.")
 
@@ -32,11 +33,7 @@ class WebRSSSkills:
     @skill()
     async def read_feed(self, url: str, limit: int = 5) -> SkillResult:
         """
-        Скачивает XML-ленту, парсит записи и вырезает HTML-мусор из описаний.
-
-        Args:
-            url: Прямая ссылка на RSS/Atom файл.
-            limit: Максимальное количество последних постов для чтения.
+        Читает XML-ленту.
         """
 
         try:
