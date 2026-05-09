@@ -48,6 +48,7 @@ class SQLManager:
         # Drives
         drives_enabled: bool = True,
         dynamic_reduction: bool = True,
+        pause_on_offline: bool = True, 
         decay_rate: float = 5.0,
         decay_interval_sec: int = 3600,
         max_history_drives: int = 3,
@@ -99,6 +100,7 @@ class SQLManager:
             db=self.db,
             decay_rate=decay_rate,
             dynamic_reduction=dynamic_reduction,
+            pause_on_offline=pause_on_offline,
             decay_interval_sec=decay_interval_sec,
             max_history=max_history_drives,
             max_custom=max_custom_drives,
@@ -113,6 +115,7 @@ class SQLManager:
 
         if self.drives_enabled:
             await self.drives.bootstrap_fundamental_drives()
+            await self.drives.adjust_downtime()
 
     async def disconnect(self) -> None:
         await self.db.disconnect()

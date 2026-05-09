@@ -268,6 +268,7 @@ class FundamentalDrivesConfig(BaseModel):
 class DrivesConfig(BaseModel):
     enabled: bool = True
     dynamic_reduction: bool = True
+    pause_on_offline: bool = True
     decay_rate: float = 5.0
     decay_interval_sec: int = 540
     max_reflections_history: int = 4

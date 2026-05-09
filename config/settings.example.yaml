@@ -91,6 +91,7 @@ system:
       drives:
         enabled: true
         dynamic_reduction: true
+        pause_on_offline: true
 
         decay_rate: 10.0
         decay_interval_sec: 900

@@ -75,9 +75,9 @@ class SubagentReport:
             file_path.write_text(report, encoding="utf-8")
 
         await asyncio.to_thread(_write)
+        swarm_logger.info(f"Отчет субагента {role}_{subagent_id}: \n\n'{report}'")
 
         log = f"[Swarm] Субагент {role}_{subagent_id} завершил работу. Отчет сформирован."
-        main_logger.info(log)
         swarm_logger.info(log)
 
         # Сигнализируем главному агенту, что раб закончил

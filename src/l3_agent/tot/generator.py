@@ -76,7 +76,6 @@ class ToTGenerator:
         """
 
         log = f"[Tree of Thoughts] Запуск генерации дерева мыслей (Модель: {self.model_name})."
-        main_logger.info(log)
         tot_logger.info(log)
 
         context = await self._build_filtered_context(event_name, payload, missed_events)
@@ -114,7 +113,6 @@ class ToTGenerator:
 
         except Exception as e:
             log = f"[Tree of Thoughts] Ошибка парсинга дерева мыслей: {e}"
-            main_logger.error(log)
             tot_logger.error(log)
 
             return None
@@ -249,7 +247,6 @@ class ToTGenerator:
                     wait_sec = int(match.group(1)) if match else 10
 
                     log = f"[Tree of Thoughts] Все ключи в кулдауне. Ждем {wait_sec}с."
-                    main_logger.warning(log)
                     tot_logger.warning(log)
 
                     await asyncio.sleep(wait_sec + 1)
@@ -277,7 +274,6 @@ class ToTGenerator:
                 wait_time = max(2, min(wait_time, 120))
 
                 log = f"[Tree of Thoughts] Rate Limit (429). Кулдаун ключа на {wait_time}с."
-                main_logger.warning(log)
                 tot_logger.warning(log)
 
                 self.llm.rotator.cooldown_key(session.api_key, wait_time)
@@ -290,7 +286,6 @@ class ToTGenerator:
                 continue
             except Exception as e:
                 log = f"[Tree of Thoughts] LLM ошибка: {e}"
-                main_logger.error(log)
                 tot_logger.error(log)
 
                 await asyncio.sleep(2)
@@ -300,5 +295,5 @@ class ToTGenerator:
 
     def _dump_context_to_file(self, messages: List[Dict[str, Any]]) -> None:
         dump_prompt_to_file(
-            "logs/prompts/last_tot_prompt.md", messages, meta_header="# TREE OF THOUGHTS DUMP"
+            "logs/prompts/tot_prompt.md", messages, meta_header="# TREE OF THOUGHTS DUMP"
         )

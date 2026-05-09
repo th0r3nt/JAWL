@@ -70,8 +70,7 @@ class GraphRAGOrchestrator:
             current_vector_queries.update(self.extractor.extract_vector_queries(text))
             current_graph_nodes.update(self.extractor.extract_graph_nodes(text))
 
-        log = f"[GraphRAG] Старт цикла. Извлечено: {len(current_vector_queries)} векторных якорей, {len(current_graph_nodes)} графовых узлов."
-        main_logger.info(log)
+        log = f"[Vector-Graph RAG] Извлечено: {len(current_vector_queries)} векторных якорей, {len(current_graph_nodes)} графовых узлов."
         agent_logger.info(log)
 
         # Главный цикл семантического резолвинга

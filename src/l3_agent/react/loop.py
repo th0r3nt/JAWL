@@ -116,7 +116,6 @@ class ReactLoop:
             self.agent_state.reset_step()
 
             log = f"[ReAct] Цикл инициирован. Причина: {event_name} (LLM Model: {self.agent_state.llm_model})."
-            main_logger.info(log)
             agent_logger.info(log)
 
             prompt = self.prompt_builder.build()
@@ -173,7 +172,6 @@ class ReactLoop:
 
                 if thoughts:
                     log = f"[Thoughts]:\n{thoughts}\n"
-                    main_logger.info(log)
                     agent_logger.info(log)
 
                 # =======================================================
@@ -282,7 +280,6 @@ class ReactLoop:
         """
 
         log = "[ReAct] Передан пустой массив действий. Завершение."
-        main_logger.info(log)
         agent_logger.info(log)
 
         await self.sql_ticks.save_tick(
@@ -340,14 +337,12 @@ class ReactLoop:
                     wait_sec = int(match.group(1)) if match else 10
 
                     log = f"[LLM] Все ключи в кулдауне. Ждем {wait_sec} сек."
-                    main_logger.warning(log)
                     agent_logger.warning(log)
 
                     await asyncio.sleep(wait_sec + 1)  # +1 сек для гарантии
                     continue
                 else:
                     log = f"[LLM] Внутренняя ошибка API: {e}"
-                    main_logger.error(log)
                     agent_logger.error(log)
 
                     self.agent_state.update_state(AgentStatus.ERROR)
@@ -357,14 +352,12 @@ class ReactLoop:
                 timeout_retries += 1
                 if timeout_retries >= max_timeout_retries:
                     log = f"[LLM] API недоступно после {max_timeout_retries} таймаутов. Прерывание цикла."
-                    main_logger.error(log)
                     agent_logger.error(log)
 
                     self.agent_state.update_state(AgentStatus.ERROR)
                     return None
                 
                 log = f"[LLM] Таймаут ответа API. Повтор ({timeout_retries}/{max_timeout_retries})."
-                main_logger.warning(log)
                 agent_logger.warning(log)
                 continue
 
@@ -373,7 +366,6 @@ class ReactLoop:
                 if err_code == "insufficient_quota" or "billing" in str(e).lower():
 
                     log = f"[LLM] Квота исчерпана. Бан ключа {session.api_key[:8]} на 24ч"
-                    main_logger.error(log)
                     agent_logger.error(log)
 
                     self.llm.rotator.cooldown_key(session.api_key, 86400)
@@ -405,7 +397,6 @@ class ReactLoop:
                     wait_time = max(2, min(wait_time, 300))  # Ограничиваем от 2с до 5 минут
 
                     log = f"[LLM] Рейт-лимит (429). Пауза {wait_time}с для ключа {session.api_key[:8]}"
-                    main_logger.info(log)
                     agent_logger.info(log)
 
                     self.llm.rotator.cooldown_key(session.api_key, wait_time)
@@ -420,7 +411,6 @@ class ReactLoop:
 
             except openai.AuthenticationError:
                 log = "[LLM] Ключ невалиден (401). Удаляем из пула."
-                main_logger.warning(log)
                 agent_logger.warning(log)
 
                 self.llm.rotator.ban_key(session.api_key)
@@ -428,7 +418,6 @@ class ReactLoop:
 
             except Exception as e:
                 log = f"[LLM] Ошибка API: {e}"
-                main_logger.error(log)
                 agent_logger.error(log)
 
                 self.agent_state.update_state(AgentStatus.ERROR)
@@ -450,7 +439,7 @@ class ReactLoop:
 
         # Ошибка структуры
         log = "[ReAct] Ошибка структуры JSON."
-        main_logger.warning(log)
+
         agent_logger.warning(log)
 
         await self.sql_ticks.save_tick(
@@ -485,7 +474,7 @@ class ReactLoop:
         """
 
         dump_prompt_to_file(
-            "logs/prompts/last_main_prompt.md", messages, meta_header="# MAIN AGENT DUMP"
+            "logs/prompts/main_prompt.md", messages, meta_header="# MAIN AGENT DUMP"
         )
 
     def _encode_image(self, image_path: str) -> str:
@@ -540,7 +529,6 @@ class ReactLoop:
                         )
 
                         log = f"[ReAct] Изображение {path_obj.name} успешно инжектировано."
-                        main_logger.info(log)
                         agent_logger.info(log)
 
                 except Exception as e:

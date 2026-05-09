@@ -180,7 +180,7 @@ def test_subagent_dump_context_to_file(mock_open, mock_loop_deps):
     loop._dump_context_to_file(messages, current_step=1)
 
     args, kwargs = mock_open.call_args
-    assert str(args[0]).replace("\\", "/") == "logs/prompts/last_sub_prompt.md"
+    assert str(args[0]).replace("\\", "/") == "logs/prompts/sub_prompt.md"
 
     content = "".join([call[0][0] for call in mock_file.write.call_args_list])
     assert "SUBAGENT DUMP" in content

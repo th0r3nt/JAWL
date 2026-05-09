@@ -90,8 +90,7 @@ class SubconsciousPoller:
 
         # Отправляем триггеры в шину событий
         for pattern in triggered_patterns:
-            log = f"[Subconscious] Паттерн '{pattern.value}' достиг лимита тиков. Отправка триггера."
-            main_logger.info(log)
+            log = f"[Subconscious] Паттерн '{pattern.value.upper()}' достиг лимита тиков. Отправка триггера."
             subc_logger.info(log)
             
             await self.bus.publish(Events.SUBCONSCIOUS_TRIGGERED, pattern=pattern)

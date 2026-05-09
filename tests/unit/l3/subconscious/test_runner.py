@@ -73,7 +73,7 @@ async def test_runner_rbac_guard(mock_registry, mock_call_skill, runner):
     results = await runner._execute_actions(actions, Pattern.FORGETTING)
 
     assert "Отказано в доступе" in results
-    assert "не разрешен для паттерна forgetting" in results
+    assert "не разрешен для паттерна FORGETTING" in results
     mock_call_skill.assert_not_called()
 
 

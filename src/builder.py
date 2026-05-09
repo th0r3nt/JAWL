@@ -143,6 +143,7 @@ class SystemBuilder:
             # Drives
             drives_enabled=self.sys_cfg.db.sql.drives.enabled,
             dynamic_reduction=self.sys_cfg.db.sql.drives.dynamic_reduction,
+            pause_on_offline=self.sys_cfg.db.sql.drives.pause_on_offline, 
             decay_rate=self.sys_cfg.db.sql.drives.decay_rate,
             decay_interval_sec=self.sys_cfg.db.sql.drives.decay_interval_sec,
             max_history_drives=self.sys_cfg.db.sql.drives.max_reflections_history,

@@ -157,5 +157,4 @@ class SwarmManager:
                 await loop.run()
         except Exception:
             log = f"[Swarm] Критическая ошибка в фоновой задаче субагента {role.id}_{subagent_id}:\n{traceback.format_exc()}"
-            main_logger.error(log)
             swarm_logger.error(log)

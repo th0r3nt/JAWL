@@ -83,7 +83,6 @@ class SubagentLoop:
         Крутит цикл "Запрос к LLM -> Парсинг -> Выполнение", пока задача не завершится.
         """
         log = f"[Swarm] Запуск субагента {self.role.id}_{self.subagent_id}."
-        main_logger.info(log)
         swarm_logger.info(log)
         
         prompt = self.prompt_builder.build(self.role)
@@ -92,7 +91,6 @@ class SubagentLoop:
         step = 1
         while step <= self.max_steps and not self.is_done:
             log = f"[Subagent ReAct] Шаг {step}/{self.max_steps}."
-            main_logger.info(log)
             swarm_logger.info(log)
 
             messages = self._prepare_messages(prompt)
@@ -104,7 +102,6 @@ class SubagentLoop:
             raw_answer = await self._call_llm_with_retries(messages)
             if raw_answer is None:
                 log = f"[Swarm] Критическая ошибка API у субагента {self.subagent_id}. Принудительное создание краш-репорта."
-                main_logger.error(log)
                 swarm_logger.error(log)
 
                 await call_skill(
@@ -141,7 +138,6 @@ class SubagentLoop:
             if not actions:
                 if not self.report_submitted:
                     log = f"[Swarm] Субагент {self.subagent_id} попытался завершить работу без отчета. Принуждаем к действию."
-                    main_logger.warning(log)
                     swarm_logger.warning(log)
 
                     self.history.append(
@@ -155,7 +151,6 @@ class SubagentLoop:
                     continue
                 else:
                     log = f"[Swarm] Субагент {self.role.id}_{self.subagent_id} передал пустой массив действий. Завершение."
-                    main_logger.info(log)
                     swarm_logger.info(log)
 
                     self.is_done = True
@@ -170,7 +165,6 @@ class SubagentLoop:
 
         if not self.is_done:
             log = f"[Swarm] Субагент {self.subagent_id} достиг лимита шагов ({self.max_steps}) и был убит."
-            main_logger.warning(log)
             swarm_logger.warning(log)
 
             # Принудительно отправляем то, что успел накопать
@@ -200,7 +194,7 @@ class SubagentLoop:
 
     def _dump_context_to_file(self, messages: List[Dict[str, str]], current_step: int) -> None:
         meta = f"# SUBAGENT DUMP\n* **Role**: {self.role.name.upper()}\n* **Subagent ID**: {self.subagent_id}\n* **Step**: {current_step} / {self.max_steps}"
-        dump_prompt_to_file("logs/prompts/last_sub_prompt.md", messages, meta_header=meta)
+        dump_prompt_to_file("logs/prompts/sub_prompt.md", messages, meta_header=meta)
 
     async def _call_llm_with_retries(self, messages: List[Dict[str, str]]) -> Optional[str]:
         for attempt in range(5):
@@ -229,7 +223,6 @@ class SubagentLoop:
                     wait_sec = int(match.group(1)) if match else 10
 
                     log = f"[Swarm] Все ключи в кулдауне. Субагент {self.subagent_id} ждет {wait_sec}с."
-                    main_logger.warning(log)
                     swarm_logger.warning(log)
 
                     await asyncio.sleep(wait_sec + 1)
@@ -262,7 +255,6 @@ class SubagentLoop:
                 wait_time = max(2, min(wait_time, 120))
 
                 log = f"[Swarm] Rate Limit (429) у субагента {self.subagent_id}. Кулдаун ключа на {wait_time}с."
-                main_logger.warning(log)
                 swarm_logger.warning(log)
 
                 self.llm.rotator.cooldown_key(session.api_key, wait_time)
@@ -276,7 +268,6 @@ class SubagentLoop:
             except Exception as e:
                 if attempt == 4:
                     log = f"[Swarm] LLM ошибка у субагента {self.subagent_id}: {e}"
-                    main_logger.error(log)
                     swarm_logger.error(log)
                     return None
                 await asyncio.sleep(5)

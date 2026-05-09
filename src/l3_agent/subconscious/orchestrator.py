@@ -90,8 +90,7 @@ class SubconsciousOrchestrator:
         """
 
         if self._semaphores[pattern].locked():
-            log = f"[Subconscious] Паттерн {pattern.value} уже выполняется, пропуск."
-            main_logger.debug(log)
+            log = f"[Subconscious] Паттерн {pattern.value.upper()} уже выполняется, пропуск."
             subc_logger.debug(log)
             return
 
@@ -101,6 +100,5 @@ class SubconsciousOrchestrator:
                 await self.runner.run(pattern, ticks_to_analyze=limit)
 
             except Exception as e:
-                log = f"[Subconscious] Критическая ошибка в паттерне {pattern.value}: {e}"
-                main_logger.error(log)
+                log = f"[Subconscious] Критическая ошибка в паттерне {pattern.value.upper()}: {e}"
                 subc_logger.error(log)

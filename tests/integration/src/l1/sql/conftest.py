@@ -55,6 +55,7 @@ def drives_manager(memory_db):
     return SQLDrives(
         db=memory_db,
         decay_rate=5.0,
+        pause_on_offline=True,
         decay_interval_sec=3600,
         max_history=3,
         max_custom=2,

@@ -259,7 +259,7 @@ def dump_prompt_to_file(filename: str, messages: list, meta_header: str = "") ->
     Сохраняет контекст (prompts) в Markdown-файл для отладки.
 
     Args:
-        filename: Путь к файлу (например 'logs/prompts/last_main_prompt.md').
+        filename: Путь к файлу (например 'logs/prompts/main_prompt.md').
         messages: Массив сообщений (OpenAI формат).
         meta_header: Опциональный заголовок для файла.
     """

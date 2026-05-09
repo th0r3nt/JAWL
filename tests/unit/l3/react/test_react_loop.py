@@ -23,7 +23,7 @@ def test_react_dump_context_to_file(mock_dependencies):
 
         # Проверяем, что используется правильный унифицированный путь
         args, kwargs = mock_open.call_args
-        assert str(args[0]).replace("\\", "/") == "logs/prompts/last_main_prompt.md"
+        assert str(args[0]).replace("\\", "/") == "logs/prompts/main_prompt.md"
 
         written_content = "".join([call[0][0] for call in mock_file.write.call_args_list])
         assert "### Role: system" in written_content

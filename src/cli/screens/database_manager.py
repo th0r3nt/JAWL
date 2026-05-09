@@ -664,7 +664,7 @@ def database_manager_screen() -> None:
             questionary.Choice("Стереть графовую базу данных", "clean_graph"),
             questionary.Separator(" "),
             questionary.Separator("🗂️ Interfaces Cache"),
-            questionary.Choice("Стереть кэш всех интерфейсов (local/data/interfaces/)", "clean_interfaces"),
+            questionary.Choice("Стереть кэш всех интерфейсов (src/utils/local/data/interfaces/)", "clean_interfaces"),
             questionary.Separator(" "),
             questionary.Choice("❌ Выход в главное меню", "exit"),
         ]

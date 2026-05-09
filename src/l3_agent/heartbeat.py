@@ -119,13 +119,11 @@ class Heartbeat:
 
             log = f"[Heartbeat] Входящее событие '{event_name}' ({level.name}) получено во время работы агента. Данные добавлены в контекст текущего цикла."
 
-            main_logger.info(log)
             agent_logger.info(log)
 
             # Если множитель 0.0 - это жесткое прерывание текущего процесса
             if multiplier <= 0.01:
                 log = f"[Heartbeat] Прерывание текущего ReAct-цикла из-за события: {event_name} ({level.name})"
-                main_logger.warning(log)
                 agent_logger.warning(log)
 
                 self._wake_reason = event_name
@@ -166,7 +164,6 @@ class Heartbeat:
                 # Перезаписываем главную причину, только если новое событие важнее или такое же
                 if level.value >= self._wake_level:
                     log = f"[Heartbeat] Входящее событие: '{event_name}' ({level.name}). Инициализация вызова LLM."
-                    main_logger.info(log)
                     agent_logger.info(log)
 
                     self._wake_reason = event_name
@@ -174,12 +171,10 @@ class Heartbeat:
                     self._wake_level = level.value
                 else:
                     log = f"[Heartbeat] Входящее событие: '{event_name}' ({level.name}). Сон уже прерван более приоритетным событием."
-                    main_logger.info(log)
                     agent_logger.info(log)
             else:
                 if safe_remaining > 0:
                     log = f"[Heartbeat] Входящее событие: '{event_name}' ({level.name}). Следующий вызов LLM сокращен на {reduced_by:.1f} сек. До пробуждения: {new_remaining:.1f} сек."
-                    main_logger.info(log)
                     agent_logger.info(log)
 
     async def start(self) -> None:
@@ -193,7 +188,6 @@ class Heartbeat:
 
         self._is_running = True
         log = "[Heartbeat] Агент переведен в автономный режим."
-        main_logger.info(log)
         agent_logger.info(log)
 
         if self._next_tick_time == 0.0:
@@ -262,7 +256,6 @@ class Heartbeat:
 
                 except Exception as e:
                     log = f"[System] Критическая ошибка в ReAct-цикле: {e}"
-                    main_logger.error(log)
                     agent_logger.error(log)
 
                     # При краше сбрасываем таймер заново, чтобы не уйти в бесконечный луп ошибок
@@ -282,7 +275,6 @@ class Heartbeat:
             self._active_react_task.cancel()
 
         log = "[Heartbeat] Остановка завершена."
-        main_logger.info(log)
         agent_logger.info(log)
 
     def update_config(self, key: str, value: Any) -> None:
@@ -297,12 +289,10 @@ class Heartbeat:
             self.heartbeat_interval = int(value)
 
             log = f"[System] Heartbeat обновил интервал на {self.heartbeat_interval} сек."
-            main_logger.info(log)
             agent_logger.info(log)
 
         elif key == "continuous_cycle":
             self.continuous_cycle = bool(value)
 
             log = f"[System] Heartbeat обновил continuous_cycle на {self.continuous_cycle}."
-            main_logger.info(log)
             agent_logger.info(log)

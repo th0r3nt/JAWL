@@ -49,8 +49,7 @@ class SubconsciousRunner:
 
     async def run(self, pattern: Pattern, ticks_to_analyze: int) -> None:
         """Запускает мини-цикл раздумий подсознания."""
-        log = f"[Subconscious] Запуск паттерна {pattern.value} (LLM: {self.model_name})."
-        main_logger.info(log)
+        log = f"[Subconscious] Запуск паттерна {pattern.value.upper()} (LLM: {self.model_name})."
         subc_logger.info(log)
 
         prompt = self._get_prompt(pattern)
@@ -83,8 +82,7 @@ class SubconsciousRunner:
                 continue
 
             if not parsed.actions:
-                log = f"[Subconscious] Паттерн {pattern.value} штатно завершил работу."
-                main_logger.info(log)
+                log = f"[Subconscious] Паттерн {pattern.value.upper()} штатно завершил работу."
                 subc_logger.info(log)
                 break
 
@@ -92,8 +90,7 @@ class SubconsciousRunner:
             messages.append({"role": "assistant", "content": raw_answer})
             messages.append({"role": "user", "content": results})
 
-        log = f"[Subconscious] Цикл {pattern.value} окончен."
-        main_logger.debug(log)
+        log = f"[Subconscious] Цикл паттерна {pattern.value.upper()} окончен."
         subc_logger.debug(log)
 
     # ========================================================
@@ -185,7 +182,6 @@ class SubconsciousRunner:
                     wait_sec = int(match.group(1)) if match else 10
 
                     log = f"[Subconscious] Все ключи в кулдауне. Ждем {wait_sec}с."
-                    main_logger.warning(log)
                     subc_logger.warning(log)
 
                     await asyncio.sleep(wait_sec + 1)
@@ -218,7 +214,6 @@ class SubconsciousRunner:
                 wait_time = max(2, min(wait_time, 120))
 
                 log = f"[Subconscious] Rate Limit (429). Кулдаун ключа на {wait_time}с."
-                main_logger.warning(log)
                 subc_logger.warning(log)
 
                 self.llm.rotator.cooldown_key(session.api_key, wait_time)
@@ -232,7 +227,6 @@ class SubconsciousRunner:
             except Exception as e:
                 if attempt == 4:
                     log = f"[Subconscious] LLM Ошибка: {e}"
-                    main_logger.error(log)
                     subc_logger.error(log)
                     return None
 
@@ -252,7 +246,7 @@ class SubconsciousRunner:
             item = _REGISTRY.get(act.tool_name)
             if not item or pattern not in item.get("subconscious", []):
                 results.append(
-                    f"* Action [{act.tool_name}]: Отказано в доступе. Инструмент не разрешен для паттерна {pattern.value}."
+                    f"* Action [{act.tool_name}]: Отказано в доступе. Инструмент не разрешен для паттерна {pattern.value.upper()}."
                 )
                 continue
 
@@ -282,7 +276,7 @@ class SubconsciousRunner:
         )
         if prompt_path.exists():
             return prompt_path.read_text(encoding="utf-8").strip()
-        return f"Вы — фоновый процесс Подсознания ({pattern.value})."
+        return f"Вы — фоновый процесс подсознания ({pattern.value.upper()})."
 
     def _dump_context_to_file(self, messages: list, pattern: Pattern) -> None:
         """Сохраняет промпт подсознания (Consolidation/Reflection/Forgetting) для отладки."""
@@ -290,5 +284,5 @@ class SubconsciousRunner:
 
         meta = f"# SUBCONSCIOUS DUMP: {pattern.value.upper()}"
         dump_prompt_to_file(
-            f"logs/prompts/last_{pattern.value}_prompt.md", messages, meta_header=meta
+            f"logs/prompts/{pattern.value}_prompt.md", messages, meta_header=meta
         )

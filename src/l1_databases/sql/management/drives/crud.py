@@ -8,12 +8,12 @@ CRUD-контроллер для управления внутренними п�
 import uuid
 from typing import TYPE_CHECKING, Any
 from datetime import datetime, timezone, timedelta
-from sqlalchemy import select, func
+from sqlalchemy import select, func, desc
 
 from src.utils.logger import main_logger
 from src.utils.dtime import format_datetime
 
-from src.l1_databases.sql.tables import DriveTable
+from src.l1_databases.sql.tables import DriveTable, TickTable
 from src.l1_databases.sql.management.drives.semantics import DRIVES_SEMANTIC_MATRIX
 
 if TYPE_CHECKING:
@@ -29,6 +29,7 @@ class SQLDrives:
         self,
         db: "SQLDB",
         dynamic_reduction: bool = True,
+        pause_on_offline: bool = True,
         decay_rate: float = 2.5,
         decay_interval_sec: int = 3600,
         max_history: int = 3,
@@ -51,6 +52,7 @@ class SQLDrives:
         self.db = db
 
         self.dynamic_reduction = dynamic_reduction
+        self.pause_on_offline = pause_on_offline
         self.decay_rate = decay_rate
         self.decay_interval_sec = decay_interval_sec
 
@@ -237,32 +239,30 @@ class SQLDrives:
     def _get_drive_semantic_state(self, name: str, deficit: int, description: str) -> str:
         """
         Переводит сухие проценты дефицита в утилитарное психологическое состояние.
-        Нужно, чтобы агент видел больше контекста для своего 'самоощущения'.
+        Нужно, чтобы агент видел конкретные директивы (Вектор действий и Тон).
         """
 
-        # Определяем индекс ступени (0-6)
-        if deficit <= 15:
-            step = 0
-        elif deficit <= 30:
+        # Определяем индекс ступени (1-5) по 20% на каждый шаг
+        if deficit <= 20:
             step = 1
-        elif deficit <= 45:
+        elif deficit <= 40:
             step = 2
         elif deficit <= 60:
             step = 3
-        elif deficit <= 75:
+        elif deficit <= 80:
             step = 4
-        elif deficit <= 90:
-            step = 5
         else:
-            step = 6
+            step = 5
 
         # Выбираем текст из импортированной матрицы
         if name in DRIVES_SEMANTIC_MATRIX:
-            state_text = DRIVES_SEMANTIC_MATRIX[name][step]
+            state_text = DRIVES_SEMANTIC_MATRIX[name][step].strip()
         else:
-            state_text = f"{DRIVES_SEMANTIC_MATRIX['Custom'][step]} Базовое описание драйва: {description}"
+            # Для кастомных драйвов подставляем их описание прямо в шаблон
+            template = DRIVES_SEMANTIC_MATRIX["Custom"][step].strip()
+            state_text = template.format(description=description)
 
-        return state_text
+        return f"\n{state_text}"
 
     async def get_context_block(self, **kwargs: Any) -> str:
         """Формирует Markdown-блок с семантическим самоощущением для системного промпта."""
@@ -355,3 +355,55 @@ class SQLDrives:
             return t50 + (deficit - 50.0) / (decay_rate * 0.5)
         else:
             return t80 + (deficit - 80.0) / (decay_rate * 0.2)
+
+    async def adjust_downtime(self) -> None:
+        """
+        Компенсирует время, пока агент был выключен (даунтайм),
+        сдвигая last_satisfied_at у всех драйвов.
+        Это предотвращает мгновенный рост дефицита при долгом оффлайне.
+        """
+        if not self.pause_on_offline:
+            return
+
+        async with self.db.session_factory() as session:
+            # Находим время последнего тика (сохраненного перед выключением)
+            res = await session.execute(
+                select(TickTable.created_at).order_by(desc(TickTable.created_at)).limit(1)
+            )
+            last_tick_time = res.scalar_one_or_none()
+
+            if not last_tick_time:
+                return
+
+            now = datetime.now(timezone.utc)
+            last_tick_time = (
+                last_tick_time.replace(tzinfo=timezone.utc)
+                if last_tick_time.tzinfo is None
+                else last_tick_time
+            )
+
+            downtime = now - last_tick_time
+            
+            # Если даунтайм больше 1 минуты, компенсируем
+            if downtime.total_seconds() > 60:
+                drives_res = await session.execute(select(DriveTable))
+                drives = drives_res.scalars().all()
+                
+                adjusted = 0
+                for d in drives:
+                    sat_time = (
+                        d.last_satisfied_at.replace(tzinfo=timezone.utc)
+                        if d.last_satisfied_at.tzinfo is None
+                        else d.last_satisfied_at
+                    )
+                    
+                    # Если драйв был обновлен (или создан) после последнего тика, не трогаем его
+                    if sat_time >= last_tick_time:
+                        continue
+                        
+                    d.last_satisfied_at = sat_time + downtime
+                    adjusted += 1
+                    
+                if adjusted > 0:
+                    await session.commit()
+                    main_logger.info(f"[SQL DB] Даунтайм ({int(downtime.total_seconds())} сек) компенсирован для {adjusted} мотиваторов.")

@@ -65,7 +65,6 @@ class ContextRegistry:
         self._providers[name] = {"func": provider_func, "section": section}
 
         log = f"[System] Зарегистрирован провайдер контекста: {name} (Секция: {section.name})"
-        main_logger.debug(log)
         agent_logger.debug(log)
 
     async def gather_all(
@@ -112,7 +111,6 @@ class ContextRegistry:
         for name, res in zip(sorted_names, results):
             if isinstance(res, Exception):
                 log = f"[System] Ошибка сборки контекста в модуле '{name}': {res}"
-                main_logger.error(log)
                 agent_logger.error(log)
                 continue
 

@@ -221,6 +221,14 @@ class HostOSExecution:
         Запускает сырую bash/cmd команду в терминале OS.
         """
 
+        # Защита от самоубийства
+        cmd_lower = command.lower()
+        if "taskkill" in cmd_lower or "kill" in cmd_lower or "pkill" in cmd_lower:
+            if "python" in cmd_lower or "jawl" in cmd_lower:
+                return SkillResult.fail(
+                    "SYSTEM DENIED: Попытка завершить системный процесс python. Данная команда может прекратить работу основной системы фреймворка. Действие заблокировано в целях безопасности."
+                )
+
         timeout = self.host_os.config.execution_timeout_sec
 
         try:

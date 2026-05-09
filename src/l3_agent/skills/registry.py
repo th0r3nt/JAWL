@@ -142,7 +142,6 @@ def _register_callable(
         "hidden": hidden,
     }
     log = f"[Skills] Зарегистрирован скилл: {skill_name}"
-    main_logger.debug(log)
     agent_logger.debug(log)
 
 
@@ -176,7 +175,6 @@ def register_custom_callable(
         "hidden": False,
     }
     log = f"[Skills] Зарегистрирован кастомный скилл: {skill_name}"
-    main_logger.info(log)
     agent_logger.info(log)
 
 
