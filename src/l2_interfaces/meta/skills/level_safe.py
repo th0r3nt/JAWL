@@ -89,7 +89,7 @@ class MetaSafe:
         """
         Изменяет параметр temperature языковой модели.
         """
-        
+
         if not 0.0 <= temperature <= 2.0:
             return SkillResult.fail("Температура должна быть в пределах от 0.0 до 2.0.")
 
@@ -101,3 +101,18 @@ class MetaSafe:
 
         self.client.agent_state.temperature = temperature
         return SkillResult.ok(f"Температура успешно изменена на {temperature}.")
+
+    @skill()
+    async def set_current_goal(self, goal: str) -> SkillResult:
+        """
+        Устанавливает текущую цель-фокус.
+        Эта цель будет закреплена в системном промпте и поможет не потерять контекст
+        при длительных рассуждениях, большом количестве шагов или перерывах между тиками.
+        Для сброса, когда цель выполнена - передать пустую строку "".
+        """
+        clean_goal = goal.strip()
+        self.client.agent_state.current_goal = clean_goal
+
+        if clean_goal:
+            return SkillResult.ok(f"Текущая цель успешно установлена: '{clean_goal}'.")
+        return SkillResult.ok("Текущая цель успешно сброшена.")

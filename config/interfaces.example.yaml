@@ -154,9 +154,8 @@ voice:
       elevenlabs:
         enabled: false
         tts_model: "eleven_multilingual_v2"
-        main_voice: "CwhRBWXzGAHq8TQ4Fs17" # Roger (premade)
+        main_voice: "CwhRBWXzGAHq8TQ4Fs17"
 
-        # Если список пуст, агент сможет выбрать любой голос, доступный в аккаунте
         available_voices: [] 
 
         stability: 0.5
@@ -172,7 +171,6 @@ voice:
           - "en-US-AriaNeural"
           - "en-US-GuyNeural"
 
-        # Настройки генерации (формат: "+20%", "-10%", "+5Hz")
         rate: "+0%"
         volume: "+0%"
         pitch: "+0Hz"

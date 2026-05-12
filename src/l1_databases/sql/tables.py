@@ -16,6 +16,7 @@ class Base(DeclarativeBase):
 
     pass
 
+
 class TaskTable(Base):
     """
     Таблица долгосрочных задач (Tasks).
@@ -31,7 +32,7 @@ class TaskTable(Base):
         default="todo"
     )  # todo, in_progress, blocked, done, cancelled
     progress: Mapped[int] = mapped_column(default=0)  # 0-100%
-    
+
     # Квадрант матрицы Эйзенхауэра (1-4)
     quadrant: Mapped[int] = mapped_column(default=2)
 
@@ -121,10 +122,15 @@ class MentalStateTable(Base):
     status: Mapped[str]
     context: Mapped[Optional[str]]
     related_information: Mapped[Optional[str]]
-    
-    attitude: Mapped[str] = mapped_column(default="Neutral") # Отношение агента
-    directives: Mapped[str] = mapped_column(default="")      # Правила взаимодействия
-    relations: Mapped[dict[str, str]] = mapped_column(JSON, default=dict) # Связи {"ID_СУБЪЕКТА": "Причина"}
+
+    attitude: Mapped[str] = mapped_column(default="Neutral")  # Отношение агента
+    directives: Mapped[str] = mapped_column(default="")  # Правила взаимодействия
+    epistemic_state: Mapped[str] = mapped_column(
+        default=""
+    )  # Theory of Mind: знание о том, что знает/не знает субъект
+    relations: Mapped[dict[str, str]] = mapped_column(
+        JSON, default=dict
+    )  # Связи {"ID_СУБЪЕКТА": "Причина"}
 
 
 class DriveTable(Base):
@@ -148,3 +154,24 @@ class DriveTable(Base):
 
     # Хранит список строк (последние текстовые рефлексии агента)
     recent_reflections: Mapped[list[str]] = mapped_column(JSON, default=list)
+
+
+class BayesianHypothesisTable(Base):
+    """
+    Таблица Байесовских гипотез.
+    Используется агентом для дедуктивного расследования и вероятностного мышления.
+    """
+
+    __tablename__ = "bayesian_hypotheses"
+
+    id: Mapped[str] = mapped_column(primary_key=True)
+    title: Mapped[str]
+    prior_probability: Mapped[float]
+    current_probability: Mapped[float]
+
+    # Хранит список улик: [{"evidence": "Текст", "tpr": 0.9, "fpr": 0.1, "new_prob": 0.85}]
+    evidence_log: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list)
+
+    updated_at: Mapped[datetime] = mapped_column(
+        default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc)
+    )

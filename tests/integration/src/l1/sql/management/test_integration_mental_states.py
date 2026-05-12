@@ -77,6 +77,7 @@ async def test_mental_states_radar_relations_and_attitude(mental_states_manager)
         status="Offline",
         attitude="Hostile",
         directives="Never deploy on Friday",
+        epistemic_state="Senior in breaking down",
         relations={"id_admin": "Hates the admin"},
     )
     assert res_create.is_success is True
@@ -85,4 +86,5 @@ async def test_mental_states_radar_relations_and_attitude(mental_states_manager)
     context = res_get.message
     assert "Attitude: Hostile" in context
     assert "Never deploy on Friday" in context
+    assert "Senior in breaking down" in context
     assert "Hates the admin" in context

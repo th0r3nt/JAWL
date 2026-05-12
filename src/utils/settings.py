@@ -330,6 +330,11 @@ class NotesConfig(BaseModel):
     max_notes: int = 5
 
 
+class HypothesesConfig(BaseModel):
+    enabled: bool = True
+    max_hypotheses: int = 5
+
+
 class SQLConfig(BaseModel):
     tasks: TasksConfig = Field(default_factory=TasksConfig)
     personality_traits: PersonalityTraitsConfig = Field(
@@ -338,6 +343,7 @@ class SQLConfig(BaseModel):
     mental_states: MentalStatesConfig = Field(default_factory=MentalStatesConfig)
     drives: DrivesConfig = Field(default_factory=DrivesConfig)
     notes: NotesConfig = Field(default_factory=NotesConfig)
+    hypotheses: HypothesesConfig = Field(default_factory=HypothesesConfig) 
 
 
 class GraphDBConfig(BaseModel):

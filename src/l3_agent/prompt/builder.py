@@ -27,6 +27,7 @@ class PromptBuilder:
         swarm_enabled: bool = False,
         tot_enabled: bool = False,
         subconscious_enabled: bool = False,
+        hypotheses_enabled: bool = False,
     ) -> None:
         """
         Инициализирует билдер.
@@ -39,6 +40,7 @@ class PromptBuilder:
             mental_states_enabled: Включен ли модуль сущностей.
             swarm_enabled: Включена ли система субагентов.
             tot_enabled: Включена ли система стратегического планирования (Tree of Thoughts).
+            hypotheses_enabled: Включена ли система гипотез.
         """
 
         self.prompt_dir = Path(prompt_dir)
@@ -55,6 +57,7 @@ class PromptBuilder:
         self.swarm_enabled = swarm_enabled
         self.tot_enabled = tot_enabled
         self.subconscious_enabled = subconscious_enabled
+        self.hypotheses_enabled = hypotheses_enabled
 
     def _gather_markdown(self, sub_folder: Literal["personality", "system", "custom"]) -> str:
         """
@@ -103,6 +106,9 @@ class PromptBuilder:
 
         if not self.subconscious_enabled:
             valid_files =[f for f in valid_files if f.name.upper() != "SUBCONSCIOUS.md"]
+
+        if not self.hypotheses_enabled:
+            valid_files = [f for f in valid_files if f.name.upper() != "HYPOTHESES.md"]
 
         def sort_key(path: Path):
             name = path.name.upper()

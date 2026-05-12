@@ -9,6 +9,7 @@ from src.l1_databases.sql.management.ticks import SQLTicks
 from src.l1_databases.sql.management.personality_traits import SQLPersonalityTraits
 from src.l1_databases.sql.management.drives.crud import SQLDrives
 from src.l1_databases.sql.management.notes import SQLNotes
+from src.l1_databases.sql.management.hypotheses.crud import SQLHypotheses
 
 
 @pytest_asyncio.fixture
@@ -62,3 +63,8 @@ def drives_manager(memory_db):
         tz_offset=3,
         fundamental_toggles={"curiosity": True, "social": True, "mastery": True},
     )
+
+
+@pytest.fixture
+def hypotheses_manager(memory_db):
+    return SQLHypotheses(db=memory_db, max_hypotheses=2, tz_offset=3)

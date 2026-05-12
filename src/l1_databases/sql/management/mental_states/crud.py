@@ -8,7 +8,7 @@ from src.l3_agent.swarm.roles import Subagents
 from src.l3_agent.subconscious.schema import Pattern
 
 from src.l1_databases.sql.tables import MentalStateTable
-from src.l1_databases.sql.management.mental_states.semantics import build_mental_states_radar
+from src.l1_databases.sql.management.mental_states.semantics import build_mental_states
 
 if TYPE_CHECKING:
     from src.l1_databases.sql.db import SQLDB
@@ -37,6 +37,11 @@ class SQLMentalStates:
                 await conn.execute(
                     text("ALTER TABLE mental_states ADD COLUMN relations JSON DEFAULT '{}'")
                 )
+                await conn.execute(
+                    text(
+                        "ALTER TABLE mental_states ADD COLUMN epistemic_state TEXT DEFAULT ''"
+                    )
+                )
                 main_logger.info(
                     "[SQL DB] Выполнена успешная миграция таблицы MentalStates (добавлены CRM колонки)."
                 )
@@ -53,6 +58,7 @@ class SQLMentalStates:
         status: str,
         attitude: str = "Neutral",
         directives: str = "",
+        epistemic_state: str = "",
         relations: Optional[Dict[str, str]] = None,
         context: Optional[str] = None,
         related_information: Optional[str] = None,
@@ -62,6 +68,7 @@ class SQLMentalStates:
 
         attitude: Субъективное отношение.
         directives: Индивидуальные рекомендации взаимодействия.
+        epistemic_state: Theory of Mind. Карта знаний субъекта.
         relations: Словарь связей вида {"ID_другой_сущности": "Описание связи"}.
         """
 
@@ -89,6 +96,7 @@ class SQLMentalStates:
                 status=status,
                 attitude=attitude,
                 directives=directives,
+                epistemic_state=epistemic_state,
                 relations=relations or {},
                 context=context,
                 related_information=related_information,
@@ -110,7 +118,7 @@ class SQLMentalStates:
             result = await session.execute(select(MentalStateTable))
             states = result.scalars().all()
 
-        return SkillResult.ok(build_mental_states_radar(states, self.max_entities))
+        return SkillResult.ok(build_mental_states(states, self.max_entities))
 
     @skill(swarm=[Subagents.ARCHIVIST], subconscious=[Pattern.REFLECTION])
     async def update_mental_state(
@@ -122,6 +130,7 @@ class SQLMentalStates:
         status: Optional[str] = None,
         attitude: Optional[str] = None,
         directives: Optional[str] = None,
+        epistemic_state: Optional[str] = None,
         relations: Optional[Dict[str, str]] = None,
         context: Optional[str] = None,
         related_information: Optional[str] = None,
@@ -158,6 +167,8 @@ class SQLMentalStates:
                 state.attitude = attitude
             if directives is not None:
                 state.directives = directives
+            if epistemic_state is not None:
+                state.epistemic_state = epistemic_state
             if relations is not None:
                 state.relations = relations
             if context is not None:

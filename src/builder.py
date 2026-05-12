@@ -155,6 +155,9 @@ class SystemBuilder:
             max_history_drives=self.sys_cfg.db.sql.drives.max_reflections_history,
             max_custom_drives=self.sys_cfg.db.sql.drives.max_custom_drives,
             fundamental_toggles=self.sys_cfg.db.sql.drives.fundamental.model_dump(),
+            # Hypotheses
+            hypotheses_enabled=self.sys_cfg.db.sql.hypotheses.enabled,
+            max_hypotheses=self.sys_cfg.db.sql.hypotheses.max_hypotheses,
             # Time
             timezone=self.sys_cfg.timezone,
         )
@@ -197,6 +200,15 @@ class SystemBuilder:
                 "sql_mental_states",
                 sys.sql.mental_states.get_context_block,
                 section=ContextSection.MENTAL_STATES,
+            )
+
+        # Hypotheses
+        if self.sys_cfg.db.sql.hypotheses.enabled:
+            register_instance(sys.sql.hypotheses)
+            sys.context_registry.register_provider(
+                "sql_hypotheses",
+                sys.sql.hypotheses.get_context_block,
+                section=ContextSection.HYPOTHESES,
             )
 
         # Регистрируются всегда
@@ -279,6 +291,7 @@ class SystemBuilder:
             swarm_enabled=self.sys_cfg.swarm.enabled,
             tot_enabled=self.sys_cfg.tree_of_thoughts.enabled,
             subconscious_enabled=self.sys_cfg.subconscious.enabled,
+            hypotheses_enabled=self.sys_cfg.db.sql.hypotheses.enabled,
         )
 
         # ======================================================================

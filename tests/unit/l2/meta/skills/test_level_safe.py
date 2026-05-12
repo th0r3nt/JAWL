@@ -47,3 +47,21 @@ async def test_meta_safe_change_temperature(meta_client):
 
     res_fail = await skills.change_temperature(5.0)
     assert res_fail.is_success is False
+
+
+@pytest.mark.asyncio
+async def test_meta_safe_set_current_goal(meta_client):
+    """Тест: Навык установки текущей цели корректно обновляет L0 State агента."""
+    skills = MetaSafe(meta_client)
+
+    # Установка цели
+    res = await skills.set_current_goal("Протестировать модуль X")
+    assert res.is_success is True
+    assert meta_client.agent_state.current_goal == "Протестировать модуль X"
+    assert "установлена" in res.message
+
+    # Сброс цели
+    res_clear = await skills.set_current_goal("   ")
+    assert res_clear.is_success is True
+    assert meta_client.agent_state.current_goal == ""
+    assert "сброшена" in res_clear.message

@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from src.l1_databases.sql.tables import MentalStateTable
 
 
-def build_mental_states_radar(states: List[MentalStateTable], max_entities: int) -> str:
+def build_mental_states(states: List[MentalStateTable], max_entities: int) -> str:
     if not states:
         return f"## MENTAL STATES\nMax number of entities that can be remembered: {max_entities}\n\nСписок сущностей пуст."
 
@@ -42,6 +42,9 @@ def build_mental_states_radar(states: List[MentalStateTable], max_entities: int)
 
         if s.directives:
             lines.append(f"  * Directives: {s.directives}")
+
+        if s.epistemic_state:
+            lines.append(f"  * Epistemic State, Theory of Mind: {s.epistemic_state}")
 
         if s.context:
             lines.append(f"  * Context: {s.context}")

@@ -40,6 +40,9 @@ class AgentState(BaseModel):
     max_react_steps: int = 15
     heartbeat_interval: int = 180
 
+    # Текущая цель для удержания фокуса при длительных задачах (навык доступен при интерфейсе Meta уровня 0)
+    current_goal: str = ""
+
     # Системные лимиты и режимы
     continuous_cycle: bool = False
     proactive_guidance: bool = False
@@ -106,6 +109,10 @@ class AgentState(BaseModel):
         Returns:
             str: Статистика агента, лимиты, версия системы, аптайм и состояние подсознания.
         """
+        goal_str = (
+            f"\n* Current Goal: {self.current_goal}" if self.current_goal else ""
+        )
+
         base_info = f"""
 ### AGENT STATE
 * JAWL Version: {__version__}
@@ -120,8 +127,12 @@ class AgentState(BaseModel):
 
 * ReAct Step: {self.current_step}/{self.max_react_steps}
 * Input Tokens (current step): {self.last_input_tokens}
+
+{goal_str}
+
         """.strip()
 
+        # TODO: надо бы этот блок вынести в модуль подсознания, мол "get_context_block" и дергать отсюда
         if self.subconscious_enabled and self.subconscious_counters:
             subc_lines = [
                 "\n\n### SUBCONSCIOUS STATE",

@@ -16,6 +16,7 @@ from src.l1_databases.sql.management.ticks import SQLTicks
 from src.l1_databases.sql.management.personality_traits import SQLPersonalityTraits
 from src.l1_databases.sql.management.drives.crud import SQLDrives
 from src.l1_databases.sql.management.notes import SQLNotes
+from src.l1_databases.sql.management.hypotheses.crud import SQLHypotheses
 
 
 class SQLManager:
@@ -48,12 +49,15 @@ class SQLManager:
         # Drives
         drives_enabled: bool = True,
         dynamic_reduction: bool = True,
-        pause_on_offline: bool = True, 
+        pause_on_offline: bool = True,
         decay_rate: float = 5.0,
         decay_interval_sec: int = 3600,
         max_history_drives: int = 3,
         max_custom_drives: int = 5,
         fundamental_toggles: dict = None,
+        # Hypotheses
+        hypotheses_enabled: bool = True,
+        max_hypotheses: int = 5,
         # Время
         timezone: int = 0,
     ) -> None:
@@ -64,7 +68,6 @@ class SQLManager:
         глубиной контекста и защитой от переполнения токенов LLM.
         """
 
-        self.drives_enabled = drives_enabled
         self.db = SQLDB(db_path=str(db_path))
 
         # Tasks
@@ -96,6 +99,7 @@ class SQLManager:
         )
 
         # Drives
+        self.drives_enabled = drives_enabled
         self.drives = SQLDrives(
             db=self.db,
             decay_rate=decay_rate,
@@ -106,6 +110,12 @@ class SQLManager:
             max_custom=max_custom_drives,
             tz_offset=timezone,
             fundamental_toggles=fundamental_toggles or {},
+        )
+
+        # Hypotheses
+        self.hypotheses_enabled = hypotheses_enabled
+        self.hypotheses = SQLHypotheses(
+            db=self.db, max_hypotheses=max_hypotheses, tz_offset=timezone
         )
 
     async def connect(self) -> None:

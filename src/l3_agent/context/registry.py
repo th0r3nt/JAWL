@@ -10,7 +10,7 @@ import asyncio
 from enum import IntEnum
 from typing import Callable, Awaitable, Any, Dict, List
 
-from src.utils.logger import main_logger, agent_logger
+from src.utils.logger import agent_logger
 
 
 class ContextSection(IntEnum):
@@ -24,6 +24,7 @@ class ContextSection(IntEnum):
     TRAITS = 20
     SKILLS = 30
     AGENT_STATE = 40
+    HYPOTHESES = 48
     NOTES = 45
 
     # Универсальный блок для всех L2 интерфейсов
