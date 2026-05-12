@@ -26,6 +26,9 @@ from src.l2_interfaces.github.state import GithubState
 from src.l2_interfaces.email.state import EmailState
 from src.l2_interfaces.meta.state import CustomDashboardState
 from src.l2_interfaces.code_graph.state import CodeGraphState
+from src.l2_interfaces.voice.tts.cloud.elevenlabs.state import CloudElevenLabsTTSState
+from src.l2_interfaces.voice.tts.cloud.edge.state import CloudEdgeTTSState
+from src.l2_interfaces.voice.stt.cloud.whisper.state import CloudWhisperSTTState
 
 from src.l1_databases.vector.manager import VectorManager
 from src.l1_databases.sql.manager import SQLManager
@@ -112,6 +115,9 @@ class SystemBuilder:
         )
         sys.calendar_state = CalendarState()
         sys.dashboard_state = CustomDashboardState()
+        sys.elevenlabs_state = CloudElevenLabsTTSState()
+        sys.edge_state = CloudEdgeTTSState()
+        sys.cloud_whisper_state = CloudWhisperSTTState()
 
     async def build_l1_databases(self) -> None:
         """Поднимает базы данных и регистрирует их CRUD-скиллы."""
@@ -143,7 +149,7 @@ class SystemBuilder:
             # Drives
             drives_enabled=self.sys_cfg.db.sql.drives.enabled,
             dynamic_reduction=self.sys_cfg.db.sql.drives.dynamic_reduction,
-            pause_on_offline=self.sys_cfg.db.sql.drives.pause_on_offline, 
+            pause_on_offline=self.sys_cfg.db.sql.drives.pause_on_offline,
             decay_rate=self.sys_cfg.db.sql.drives.decay_rate,
             decay_interval_sec=self.sys_cfg.db.sql.drives.decay_interval_sec,
             max_history_drives=self.sys_cfg.db.sql.drives.max_reflections_history,

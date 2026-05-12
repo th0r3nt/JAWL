@@ -16,8 +16,8 @@ from src.l3_agent.skills.registry import clear_registry
 from src import __version__
 
 # Архитектурные обертки
-from src.builder import SystemBuilder # Фасад
-from src.utils.event.bridge import EventBridge # Строитель
+from src.builder import SystemBuilder  # Фасад
+from src.utils.event.bridge import EventBridge  # Строитель
 
 if TYPE_CHECKING:
     from src.l0_state.agent.state import AgentState
@@ -35,6 +35,9 @@ if TYPE_CHECKING:
     from src.l2_interfaces.web.rss.state import WebRSSState
     from src.l2_interfaces.calendar.state import CalendarState
     from src.l2_interfaces.meta.state import CustomDashboardState
+    from src.l2_interfaces.voice.tts.cloud.elevenlabs.state import CloudElevenLabsTTSState
+    from src.l2_interfaces.voice.tts.cloud.edge.state import CloudEdgeTTSState
+    from src.l2_interfaces.voice.stt.cloud.whisper.state import CloudWhisperSTTState
 
     from src.l1_databases.sql.manager import SQLManager
     from src.l1_databases.vector.manager import VectorManager
@@ -86,7 +89,9 @@ class System:
         self.web_rss_state: Optional["WebRSSState"] = None
         self.calendar_state: Optional["CalendarState"] = None
         self.dashboard_state: Optional["CustomDashboardState"] = None
-
+        self.elevenlabs_state: Optional["CloudElevenLabsTTSState"] = None
+        self.edge_state: Optional["CloudEdgeTTSState"] = None
+        self.cloud_whisper_state: Optional["CloudWhisperSTTState"] = None
 
         # Заглушки L1-L3 (Заполняются через SystemBuilder)
         self.sql: Optional["SQLManager"] = None
@@ -120,7 +125,13 @@ class System:
         email_password: Optional[str] = None,
         # Web Search
         tavily_api_key: Optional[str] = None,
+        # Web Hooks
         webhook_secret: Optional[str] = None,
+        # Voice
+        elevenlabs_api_key: Optional[str] = None,
+        elevenlabs_api_url: Optional[str] = None,
+        cloud_whisper_api_key: Optional[str] = None,
+        cloud_whisper_api_url: Optional[str] = None,
     ):
         """Читает конфиг, поднимает нужные интерфейсы и регистрирует их скиллы."""
 
@@ -137,7 +148,13 @@ class System:
             "EMAIL_PASSWORD": email_password,
             # Web Search
             "TAVILY_API_KEY": tavily_api_key,
+            # Web Hook
             "WEBHOOK_SECRET": webhook_secret,
+            # Voice
+            "ELEVENLABS_API_KEY": elevenlabs_api_key,
+            "ELEVENLABS_API_URL": elevenlabs_api_url,
+            "CLOUD_WHISPER_API_KEY": cloud_whisper_api_key,
+            "CLOUD_WHISPER_API_URL": cloud_whisper_api_url,
         }
         SystemBuilder(self).build_l2_interfaces(env_vars)
 
@@ -186,6 +203,11 @@ class System:
         tavily_api_key: Optional[str] = None,
         # Web Hooks
         webhook_secret: Optional[str] = None,
+        # Voice
+        elevenlabs_api_key: Optional[str] = None,
+        elevenlabs_api_url: Optional[str] = None,
+        cloud_whisper_api_key: Optional[str] = None,
+        cloud_whisper_api_url: Optional[str] = None,
     ) -> int:
         """Запуск системы."""
 
@@ -214,6 +236,11 @@ class System:
                 # Web Search
                 tavily_api_key=tavily_api_key,
                 webhook_secret=webhook_secret,
+                # Voice
+                elevenlabs_api_key=elevenlabs_api_key,
+                elevenlabs_api_url=elevenlabs_api_url,
+                cloud_whisper_api_key=cloud_whisper_api_key,
+                cloud_whisper_api_url=cloud_whisper_api_url,
             )
 
             # L3 AGENT
@@ -380,6 +407,15 @@ async def main() -> int:
         TAVILY_API_KEY = os.getenv("TAVILY_API_KEY", None)
         # Web Hooks
         WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET", None)
+        # ElevenLabs TTS
+        ELEVENLABS_API_KEY = os.getenv("ELEVENLABS_API_KEY", None)
+        ELEVENLABS_API_URL = os.getenv("ELEVENLABS_API_URL", "https://api.elevenlabs.io/v1")
+        CLOUD_WHISPER_API_KEY = (
+            os.getenv("CLOUD_WHISPER_API_KEY")
+            or os.getenv("WHISPER_API_KEY")
+            or os.getenv("OPENAI_API_KEY")
+        )
+        CLOUD_WHISPER_API_URL = os.getenv("CLOUD_WHISPER_API_URL", None)
 
         # Динамически собираем все ключи, которые начинаются с LLM_API_KEY_
         LLM_API_URL = os.getenv("LLM_API_URL", None)
@@ -423,6 +459,11 @@ async def main() -> int:
             tavily_api_key=TAVILY_API_KEY,
             # Web Hook
             webhook_secret=WEBHOOK_SECRET,
+            # Voice
+            elevenlabs_api_key=ELEVENLABS_API_KEY,
+            elevenlabs_api_url=ELEVENLABS_API_URL,
+            cloud_whisper_api_key=CLOUD_WHISPER_API_KEY,
+            cloud_whisper_api_url=CLOUD_WHISPER_API_URL,
         )
         return exit_code
 

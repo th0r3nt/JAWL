@@ -362,3 +362,31 @@ class FileWatcher:
             )
         else:
             self.state.framework_files = ""
+
+        tracked_trees_blocks = []
+        fw_depth = self.client.config.framework_tree_depth
+
+        for watch_path_str in self._watches.keys():
+            path_obj = Path(watch_path_str)
+            # Пропускаем песочницу, так как она уже отрисована выше
+            if path_obj == self.client.sandbox_dir:
+                continue
+
+            try:
+                # Строим дерево
+                lines = self.tree_builder.build_tree(path_obj, use_emojis=True, max_depth=fw_depth)
+                
+                if len(lines) > max_tree_lines:
+                    lines = lines[:max_tree_lines] + [
+                        f"└── ...[Дерево обрезано: показано {max_tree_lines} элементов]"
+                    ]
+                    
+                tree_str = f"{path_obj.name}/\n" + "\n".join(lines)
+                tracked_trees_blocks.append(tree_str)
+            except Exception:
+                pass
+
+        if tracked_trees_blocks:
+            self.state.tracked_dirs_trees = "\n\n".join(tracked_trees_blocks)
+        else:
+            self.state.tracked_dirs_trees = ""

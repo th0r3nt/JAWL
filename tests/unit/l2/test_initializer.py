@@ -36,6 +36,10 @@ def test_initialize_l2_interfaces_all_off():
     config_mock.meta.enabled = False
     config_mock.multimodality.enabled = False
     config_mock.calendar.enabled = False
+    
+    config_mock.code_graph.enabled = False
+    config_mock.voice.tts.cloud.elevenlabs.enabled = False
+    config_mock.voice.tts.cloud.edge.enabled = False
 
     system_mock.interfaces_config = config_mock
 
@@ -79,6 +83,10 @@ def test_initialize_l2_interfaces_some_on(mock_setup_os, mock_setup_terminal):
     config_mock.meta.enabled = False
     config_mock.multimodality.enabled = False
     config_mock.calendar.enabled = False
+
+    config_mock.code_graph.enabled = False
+    config_mock.voice.tts.cloud.elevenlabs.enabled = False
+    config_mock.voice.tts.cloud.edge.enabled = False
 
     system_mock.interfaces_config = config_mock
 

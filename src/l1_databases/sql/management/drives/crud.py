@@ -294,7 +294,7 @@ class SQLDrives:
             semantic_state = self._get_drive_semantic_state(d.name, deficit_int, d.description)
 
             # Выводим драйв в формате: * [CURIOSITY]: Текст состояния. (Дефицит: X%)
-            lines.append(f"* [{d.name}]: {semantic_state} (Дефицит: {deficit_int}%)")
+            lines.append(f"* [{d.name}; Дефицит: {deficit_int}%]: \n{semantic_state}")
 
             # Оставляем историю рефлексий, чтобы LLM понимала, что она делала недавно для закрытия этой потребности
             if d.recent_reflections:

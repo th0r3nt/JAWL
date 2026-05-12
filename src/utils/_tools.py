@@ -283,3 +283,46 @@ def dump_prompt_to_file(filename: str, messages: list, meta_header: str = "") ->
                 f.write(f"### Role: {role}\n{content}\n\n---\n")
     except Exception as e:
         main_logger.error(f"[System] Не удалось сохранить промпт в {filename}: {e}")
+
+
+def get_python_module_docstring(filepath: Path, max_length: int = 150) -> str:
+    """
+    Извлекает module-level docstring из Python файла.
+
+    Оптимизировано для фонового поллинга: читает только первые 2 КБ файла
+    и использует Regex (избегая тяжелого построения AST дерева для всего файла).
+
+    Args:
+        filepath (Path): Путь к целевому файлу.
+        max_length (int, optional): Максимальная длина возвращаемой строки. По умолчанию 150.
+
+    Returns:
+        str: Отформатированная строка вида ' [\"\"\"Текст...\"\"\"]' или пустая строка,
+             если докстринг не найден или файл не является .py.
+    """
+    if filepath.suffix.lower() != ".py":
+        return ""
+
+    try:
+        # Читаем только начало файла (2 КБ хватит для 99% module-level докстрингов)
+        with open(filepath, "r", encoding="utf-8") as f:
+            head = f.read(2048)
+
+        # Ищем тройные кавычки в самом начале файла
+        # (допускаются пустые строки и однострочные комментарии # до них)
+        match = re.search(r"^\s*(?:#.*?\n\s*)*(['\"]{3})(.*?)\1", head, re.DOTALL)
+
+        if match:
+            doc = match.group(2)
+            # Схлопываем все переносы строк и табы в один пробел
+            clean_doc = " ".join(doc.split())
+
+            if len(clean_doc) > max_length:
+                clean_doc = clean_doc[:max_length] + "..."
+
+            return f' ["""{clean_doc}"""]'
+
+        return ""
+    except Exception:
+        # Тихо проглатываем ошибки чтения (например, бинарник или лок файла)
+        return ""

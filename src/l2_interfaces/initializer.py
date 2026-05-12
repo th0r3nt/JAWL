@@ -26,6 +26,9 @@ from src.l2_interfaces.web.rss.bootstrap import setup_web_rss
 from src.l2_interfaces.multimodality.bootstrap import setup_multimodality
 from src.l2_interfaces.calendar.bootstrap import setup_calendar
 from src.l2_interfaces.github.bootstrap import setup_github
+from src.l2_interfaces.voice.tts.cloud.elevenlabs.bootstrap import setup_elevenlabs
+from src.l2_interfaces.voice.tts.cloud.edge.bootstrap import setup_edge
+from src.l2_interfaces.voice.stt.cloud.whisper.bootstrap import setup_cloud_whisper
 
 # Импортируйте сюда свой кастомный интерфейс
 # from src.l2_interfaces.interface_name.bootstrap import setup_interface
@@ -267,6 +270,53 @@ def initialize_l2_interfaces(
     else:
         system.context_registry.register_provider(
             "calendar", off_provider("CALENDAR"), ContextSection.INTERFACES
+        )
+
+    # ================================================================
+    # VOICE CLOUD WHISPER STT
+    # ================================================================
+
+    if config.voice.stt.cloud.whisper.enabled:
+        components.extend(
+            setup_cloud_whisper(
+                system=system,
+                api_key=env_vars.get("CLOUD_WHISPER_API_KEY"),
+                api_url=env_vars.get("CLOUD_WHISPER_API_URL"),
+            )
+        )
+    else:
+        system.context_registry.register_provider(
+            "cloud_whisper_stt",
+            off_provider("CLOUD WHISPER STT"),
+            ContextSection.INTERFACES,
+        )
+
+    # ================================================================
+    # VOICE CLOUD ELEVENLABS TTS
+    # ================================================================
+
+    if config.voice.tts.cloud.elevenlabs.enabled:
+        components.extend(
+            setup_elevenlabs(
+                system=system,
+                api_key=env_vars.get("ELEVENLABS_API_KEY"),
+                api_url=env_vars.get("ELEVENLABS_API_URL"),
+            )
+        )
+    else:
+        system.context_registry.register_provider(
+            "elevenlabs_tts", off_provider("ELEVENLABS TTS"), ContextSection.INTERFACES
+        )
+
+    # ================================================================
+    # VOICE CLOUD EDGE TTS
+    # ================================================================
+
+    if config.voice.tts.cloud.edge.enabled:
+        components.extend(setup_edge(system=system))
+    else:
+        system.context_registry.register_provider(
+            "edge_tts", off_provider("EDGE TTS"), ContextSection.INTERFACES
         )
 
     # ================================================================

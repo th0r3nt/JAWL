@@ -6,7 +6,7 @@ import asyncio
 from pathlib import Path
 
 from src.utils.logger import main_logger
-from src.utils._tools import format_size
+from src.utils._tools import format_size, get_python_module_docstring
 
 from src.l2_interfaces.host.os.client import HostOSClient, HostOSAccessLevel
 from src.l2_interfaces.host.os.decorators import require_access
@@ -110,6 +110,8 @@ class HostOSSearch:
                             except Exception:
                                 pass
 
+                            desc += get_python_module_docstring(item)
+
                             lines.append(
                                 f"{prefix}{connector}📄 {item.name} ({size_str}){desc}"
                             )
@@ -188,6 +190,8 @@ class HostOSSearch:
                             desc = f" [Description: {meta[full_rel_path]}]"
                 except Exception:
                     pass
+
+                desc += get_python_module_docstring(file_path)
 
                 found.append(f"- {rel_path} ({size_str}){desc}")
 

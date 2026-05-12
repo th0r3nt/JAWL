@@ -38,7 +38,7 @@ system:
 
   # Подробнее: docs/yaml/settings/context.md
   context_depth:
-    high_ticks: 3
+    high_ticks: 4
     medium_ticks: 7
     low_ticks: 20
 

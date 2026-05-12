@@ -380,6 +380,15 @@ class HostOSClient:
             )
 
         # ===============================================
+        # Отслеживаемые директории
+
+        tracked_dirs_block = ""
+        if self.state.tracked_dirs_trees:
+            tracked_dirs_block = (
+                f"* Tracked Directories (Pinned):\n{self.state.tracked_dirs_trees}\n"
+            )
+
+        # ===============================================
         # Финальная сборка
 
         return f"""
@@ -409,6 +418,9 @@ class HostOSClient:
 * Sandbox Directory:
 {self.state.sandbox_files}
 
+* Tracked Directories:
+{tracked_dirs_block}
+
 * Recent Changes in Files:
 {recent_changes_block}
 
@@ -417,12 +429,9 @@ class HostOSClient:
 
 [Напоминание] 
 - Папка sandbox/_system/ является системной и не подлежит изменению.
-- Внутри неё также находится файл 'framework_api.py'. 
-- Этот файл позволяет взаимодействовать с пробуждениями и контекстом агента.
+- Внутри неё находится файл 'framework_api.py'. 
+- Этот файл позволяет взаимодействовать с пробуждениями и контекстом системы.
 
 - Все относительные пути строго исчисляются от корневой директории фреймворка (JAWL/).
 - Если необходимо создать файл в песочнице - нужно указывать это (например, `sandbox/test.py`).
-
-- Для вызова навыков: путь всегда от корня проекта.
-- Внутри Python-скриптов в песочнице: рабочая директория уже 'sandbox/'.
 """.strip()

@@ -134,7 +134,7 @@ class SQLTicks:
 
         # Для LOW тиков возвращаем ТОЛЬКО мысли
         if tier == "LOW":
-            return f"{header}\nThoughts: {thoughts_str}"
+            return f"{header}\nThoughts: '{thoughts_str}'"
 
         # MEDIUM и HIGH
         action_limit = self.action_max_chars if tier == "HIGH" else self.action_short_max_chars
@@ -161,7 +161,7 @@ class SQLTicks:
             if len(res_str) > res_limit:
                 res_str = res_str[:res_limit] + f"...[Truncated limit {res_limit}]"
 
-        return f"{header}\nThoughts: {thoughts_str}\nActions: {actions_str}\nResult: {res_str}"
+        return f"{header}\nThoughts: '{thoughts_str}' \nActions: {actions_str} \nResult: {res_str}"
 
     async def get_context_block(self, **kwargs: Any) -> str:
         """

@@ -1,6 +1,7 @@
 from pathlib import Path
 from src.l2_interfaces.host.os.client import HostOSClient
 from src.l2_interfaces.host.os.polls.utils import is_ignored
+from src.utils._tools import get_python_module_docstring
 
 
 class TreeBuilder:
@@ -40,6 +41,8 @@ class TreeBuilder:
                             desc = f" — [{meta[rel_path]}]"
                     except ValueError:
                         pass  # Файл вне песочницы, метаданных нет
+
+                    desc += get_python_module_docstring(item)
 
                 # Папка sandbox/ выводится отдельным блоком - проверяем, чтобы не дублировать
                 is_sandbox = item == self.client.sandbox_dir

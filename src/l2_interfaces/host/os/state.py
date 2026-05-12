@@ -20,6 +20,7 @@ class HostOSState:
         self.telemetry = "Нет доступной телеметрии."  # CPU, ОЗУ, процессы
         self.sandbox_files = "Неизвестно."  # Текущие файлы в Sandbox
         self.framework_files = "Неизвестно."  # Дерево директории JAWL
+        self.tracked_dirs_trees = "Нет отслеживаемых директорий."
         self.active_daemons = "Нет запущенных демонов."
 
         self.polling_interval = "Неизвестно."

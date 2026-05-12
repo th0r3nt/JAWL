@@ -33,7 +33,6 @@ def setup_calendar(system: "System") -> List[Any]:
     """
     config = system.interfaces_config.calendar
 
-    # Берем готовый стейт прямо из DI-контейнера
     client = CalendarClient(
         state=system.calendar_state,
         data_dir=system.local_data_dir,

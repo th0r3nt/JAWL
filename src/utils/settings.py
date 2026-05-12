@@ -172,6 +172,54 @@ class CalendarConfig(BaseModel):
     upcoming_events_limit: int = 10
 
 
+class ElevenLabsConfig(BaseModel):
+    enabled: bool = False
+    tts_model: str = "eleven_multilingual_v2"
+    main_voice: str = "CwhRBWXzGAHq8TQ4Fs17"
+    available_voices: list[str] = Field(default_factory=list)
+    stability: float = 0.5
+    similarity_boost: float = 0.75
+
+
+class EdgeConfig(BaseModel):
+    enabled: bool = False
+    main_voice: str = "ru-RU-SvetlanaNeural"
+    available_voices: list[str] = Field(default_factory=list)
+    # Настройки генерации (строки со знаками +/- и % или Hz)
+    rate: str = "+0%"
+    volume: str = "+0%"
+    pitch: str = "+0Hz"
+
+
+class CloudWhisperConfig(BaseModel):
+    enabled: bool = False
+    model: str = "whisper-1"
+    temperature: float = 0.0
+    timeout_sec: int = 120
+
+
+class CloudSTTConfig(BaseModel):
+    whisper: CloudWhisperConfig = Field(default_factory=CloudWhisperConfig)
+
+
+class STTConfig(BaseModel):
+    cloud: CloudSTTConfig = Field(default_factory=CloudSTTConfig)
+
+
+class CloudTTSConfig(BaseModel):
+    elevenlabs: ElevenLabsConfig = Field(default_factory=ElevenLabsConfig)
+    edge: EdgeConfig = Field(default_factory=EdgeConfig)
+
+
+class TTSConfig(BaseModel):
+    cloud: CloudTTSConfig = Field(default_factory=CloudTTSConfig)
+
+
+class VoiceInterfacesConfig(BaseModel):
+    stt: STTConfig = Field(default_factory=STTConfig)
+    tts: TTSConfig = Field(default_factory=TTSConfig)
+
+
 class InterfacesConfig(BaseModel):
     host: HostConfig = Field(default_factory=HostConfig)
     telegram: TelegramConfig = Field(default_factory=TelegramConfig)
@@ -182,6 +230,7 @@ class InterfacesConfig(BaseModel):
     multimodality: MultimodalityConfig = Field(default_factory=MultimodalityConfig)
     calendar: CalendarConfig = Field(default_factory=CalendarConfig)
     email: EmailConfig = Field(default_factory=EmailConfig)
+    voice: VoiceInterfacesConfig = Field(default_factory=VoiceInterfacesConfig)
 
 
 # ==========================================
@@ -480,7 +529,7 @@ def _sync_yaml_file(user_file: Path, example_file: Path) -> None:
         shutil.copy(example_file, user_file)
         main_logger.info(f"[Config] Создан базовый файл конфигурации {user_file.name}")
         return
-    
+
     from ruamel.yaml import YAML
 
     ryaml = YAML()

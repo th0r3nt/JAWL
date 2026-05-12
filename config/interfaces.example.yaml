@@ -138,3 +138,41 @@ calendar:
   enabled: false
   polling_interval_sec: 60
   upcoming_events_limit: 10
+
+# Подробнее: docs/yaml/interfaces/voice.md
+voice:
+  stt:
+    cloud:
+      whisper:
+        enabled: false
+        model: "whisper-1"
+        temperature: 0.0
+        timeout_sec: 120
+
+  tts:
+    cloud:
+      elevenlabs:
+        enabled: false
+        tts_model: "eleven_multilingual_v2"
+        main_voice: "CwhRBWXzGAHq8TQ4Fs17" # Roger (premade)
+
+        # Если список пуст, агент сможет выбрать любой голос, доступный в аккаунте
+        available_voices: [] 
+
+        stability: 0.5
+        similarity_boost: 0.75
+
+      edge:
+        enabled: false
+        main_voice: "ru-RU-SvetlanaNeural"
+
+        available_voices: 
+          - "ru-RU-SvetlanaNeural"
+          - "ru-RU-DmitryNeural"
+          - "en-US-AriaNeural"
+          - "en-US-GuyNeural"
+
+        # Настройки генерации (формат: "+20%", "-10%", "+5Hz")
+        rate: "+0%"
+        volume: "+0%"
+        pitch: "+0Hz"

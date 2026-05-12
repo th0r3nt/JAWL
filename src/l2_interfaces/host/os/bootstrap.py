@@ -16,8 +16,6 @@ from src.l2_interfaces.host.os.skills.monitoring import HostOSMonitoring
 from src.l2_interfaces.host.os.skills.network import HostOSNetwork
 from src.l2_interfaces.host.os.skills.desktop import HostOSDesktop
 from src.l2_interfaces.host.os.skills.deploy import HostOSDeploy
-
-# Импортируем наши новые распиленные файловые навыки
 from src.l2_interfaces.host.os.skills.files.reader import HostOSReader
 from src.l2_interfaces.host.os.skills.files.writer import HostOSWriter
 from src.l2_interfaces.host.os.skills.files.editor import HostOSEditor
@@ -25,6 +23,7 @@ from src.l2_interfaces.host.os.skills.files.search import HostOSSearch
 from src.l2_interfaces.host.os.skills.files.archive import HostOSArchive
 from src.l2_interfaces.host.os.skills.files.workspace import HostOSWorkspace
 from src.l2_interfaces.host.os.skills.files.metadata import HostOSMetadata
+from src.l2_interfaces.host.os.skills.files.documents import HostOSDocuments
 
 from src.l3_agent.skills.registry import register_instance
 from src.l3_agent.context.registry import ContextSection
@@ -60,8 +59,6 @@ def setup_host_os(system: "System") -> List[Any]:
     register_instance(HostOSNetwork(client))
     register_instance(HostOSMonitoring(client, events))
     register_instance(HostOSDeploy(client))
-
-    # Регистрация файловых навыков (заменяет старый огромный HostOSFiles)
     register_instance(HostOSReader(client))
     register_instance(HostOSWriter(client))
     register_instance(HostOSEditor(client))
@@ -69,6 +66,7 @@ def setup_host_os(system: "System") -> List[Any]:
     register_instance(HostOSArchive(client))
     register_instance(HostOSWorkspace(client))
     register_instance(HostOSMetadata(client))
+    register_instance(HostOSDocuments(client)) 
 
     # Опциональная активация GUI-навыков
     if system.interfaces_config.host.os.desktop_interactions:
