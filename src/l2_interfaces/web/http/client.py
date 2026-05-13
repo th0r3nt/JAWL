@@ -10,6 +10,6 @@ class WebHTTPClient:
 
     async def get_context_block(self, **kwargs) -> str:
         if not self.state.is_online:
-            return "### WEB HTTP [OFF]\nИнтерфейс отключен."
+            return "### WEB HTTP [OFF]\nThe interface is disabled."
 
         return f"### WEB HTTP [ON]\n* История запросов:\n{self.state.http_history}"

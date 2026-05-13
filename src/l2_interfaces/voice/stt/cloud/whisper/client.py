@@ -96,7 +96,7 @@ class CloudWhisperSTTClient:
         """
 
         if not self.state.is_online:
-            return "### CLOUD WHISPER STT [OFF]\nИнтерфейс отключен."
+            return "### CLOUD WHISPER STT [OFF]\nThe interface is disabled."
 
         url_str = self.api_url if self.api_url else "OpenAI Official"
 

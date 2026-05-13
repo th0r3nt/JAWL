@@ -67,4 +67,4 @@ def drives_manager(memory_db):
 
 @pytest.fixture
 def hypotheses_manager(memory_db):
-    return SQLHypotheses(db=memory_db, max_hypotheses=2, tz_offset=3)
+    return SQLHypotheses(db=memory_db, max_clusters=2, max_hypotheses=4, tz_offset=3)

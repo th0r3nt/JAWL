@@ -145,7 +145,7 @@ async def test_e2e_swarm_refactoring_task(tmp_path: Path):
         MagicMock(
             function=MagicMock(
                 name="execute_skill",
-                arguments=json.dumps({"thoughts": "Выхожу.", "actions": []}),
+                arguments=json.dumps({"reflection": "Выхожу.", "actions": []}),
             )
         )
     ]

@@ -85,7 +85,7 @@ class EmailClient:
                 pass
 
             self.state.is_online = True
-            self.state.account_info = f"{self.account} (IMAP/SMTP настроены автоматически)"
+            self.state.account_info = f"{self.account}"
             main_logger.info(f"[Email] Успешная авторизация в ящике {self.account}")
 
             # Сразу обновляем дашборд
@@ -205,6 +205,6 @@ class EmailClient:
         """Формирует Markdown-блок для приборной панели агента."""
 
         if not self.state.is_online:
-            return "### EMAIL [OFF] \nИнтерфейс отключен."
+            return "### EMAIL [OFF] \nThe interface is disabled."
 
         return f"### EMAIL [ON] \nAccount: {self.state.account_info}\n\nRecent Inbox:\n{self.state.mailbox_preview}"

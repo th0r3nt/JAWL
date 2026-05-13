@@ -157,6 +157,7 @@ class SystemBuilder:
             fundamental_toggles=self.sys_cfg.db.sql.drives.fundamental.model_dump(),
             # Hypotheses
             hypotheses_enabled=self.sys_cfg.db.sql.hypotheses.enabled,
+            max_clusters_hypotheses=self.sys_cfg.db.sql.hypotheses.max_clusters,
             max_hypotheses=self.sys_cfg.db.sql.hypotheses.max_hypotheses,
             # Time
             timezone=self.sys_cfg.timezone,

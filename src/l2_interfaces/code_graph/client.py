@@ -23,7 +23,7 @@ class CodeGraphClient:
     async def get_context_block(self, **kwargs: Any) -> str:
         """Блок для системного промпта агента."""
         if not self.state.is_online:
-            return "### CODE GRAPH [OFF]\nИнтерфейс отключен."
+            return "### CODE GRAPH [OFF]\nThe interface is disabled."
 
         if not self.state.active_indexes:
             return "### CODE GRAPH [ON]\nАктивных графов кодовых баз не обнаружено."

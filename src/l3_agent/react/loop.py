@@ -435,7 +435,7 @@ class ReactLoop:
 
         # Если { } не найдено вообще, значит LLM просто решила поболтать текстом
         if "System Error" in error_msg and "{" not in raw_answer:
-            return AgentResponse(thoughts=raw_answer.strip(), actions=[])
+            return AgentResponse(observation="[Plain Text]", reasoning="", reflection=raw_answer.strip(), actions=[])
 
         # Ошибка структуры
         log = "[ReAct] Ошибка структуры JSON."

@@ -78,16 +78,16 @@ def setup_wizard_screen() -> None:
         choice = questionary.select(
             "Выберите конфигурационный файл для редактирования:",
             choices=[
-                questionary.Choice("⚙️ Настройки системы (settings.yaml)", "settings.yaml"),
+                questionary.Choice("[*] Настройки системы (settings.yaml)", "settings.yaml"),
                 questionary.Choice(
-                    "🔌 Интерфейсы и доступы (interfaces.yaml)", "interfaces.yaml"
+                    "[*] Интерфейсы и доступы (interfaces.yaml)", "interfaces.yaml"
                 ),
                 questionary.Separator(" "),
-                questionary.Choice("❌ Выход в главное меню", "exit"),
+                questionary.Choice("[x] Выход в главное меню", "exit"),
             ],
             style=style,
             qmark="",
-            instruction="\n (Используйте стрелочки ↑/↓ и Enter)\n",
+            instruction="\n Используйте стрелочки ↑/↓ и Enter\n",
         ).ask()
 
         if choice is None or choice == "exit":

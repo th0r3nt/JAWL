@@ -40,7 +40,7 @@ class WebRSSClient:
 
     async def get_context_block(self, **kwargs) -> str:
         if not self.state.is_online:
-            return "### WEB RSS [OFF]\nИнтерфейс отключен."
+            return "### WEB RSS [OFF]\nThe interface is disabled."
 
         return (
             f"### WEB RSS [ON]\n"

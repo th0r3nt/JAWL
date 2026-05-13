@@ -190,7 +190,7 @@ class WebBrowserClient:
     async def get_context_block(self, **kwargs: Any) -> str:
         """Провайдер контекста для агента."""
         if not self.state.is_online:
-            return "### WEB BROWSER [OFF]\nИнтерфейс отключен."
+            return "### WEB BROWSER [OFF]\nThe interface is disabled."
 
         if not self.state.is_open:
             return (

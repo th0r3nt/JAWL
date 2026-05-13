@@ -130,7 +130,7 @@ class YamlEditor:
 
         choices.append(questionary.Separator(" "))
 
-        back_label = "❌ Сохранить и выйти" if not self.current_path else "↩ Назад"
+        back_label = "[x] Сохранить и выйти" if not self.current_path else "↩ Назад"
         choices.append(questionary.Choice(back_label, "_back_"))
 
         choice = questionary.select(
@@ -138,7 +138,7 @@ class YamlEditor:
             choices=choices,
             style=self.style,
             qmark="",
-            instruction="\n (Используйте стрелочки ↑/↓ и Enter)\n",
+            instruction="\n Используйте стрелочки ↑/↓ и Enter\n",
         ).ask()
 
         if choice is None or choice == "_back_":
@@ -177,7 +177,7 @@ class YamlEditor:
         choices.append(questionary.Choice("↩ Назад", "_back_"))
 
         choice = questionary.select(
-            prompt_msg, choices=choices, style=self.style, qmark="", instruction=""
+            prompt_msg, choices=choices, style=self.style, qmark="", instruction=" "
         ).ask()
 
         if choice is None or choice == "_back_":

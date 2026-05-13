@@ -64,7 +64,9 @@ async def test_e2e_react_loop_creates_task_and_saves_tick(tmp_path: Path):
     mock_msg.tool_calls = None
     mock_msg.content = """
     {
-      "thoughts": "Я получил запрос на создание теста. Занесу это в задачи.",
+      "observation": "Я получил запрос на создание теста.",
+      "reasoning": "Занесу это в задачи.",
+      "reflection": "Это будет E2E проверка.",
       "actions": [
         {
           "tool_name": "SQLTasks.create_task",

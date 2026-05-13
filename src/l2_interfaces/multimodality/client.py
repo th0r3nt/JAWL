@@ -32,9 +32,9 @@ class MultimodalityClient:
         Провайдер контекста для ContextRegistry.
         Отдает отформатированный блок контекста для агента.
         """
-        
+
         status = "ON" if self.is_online else "OFF"
         if not self.is_online:
-            return f"### MULTIMODALITY [{status}]\nИнтерфейс отключен."
+            return f"### MULTIMODALITY [{status}]\nThe interface is disabled."
 
         return f"### MULTIMODALITY [{status}]\nМультимодальное зрение активно."

@@ -255,7 +255,7 @@ def run_onboarding_if_needed() -> bool:
             ],
             style=style,
             qmark="",
-            instruction=""
+            instruction=" "
         ).ask()
         if not tot_mode:
             return False

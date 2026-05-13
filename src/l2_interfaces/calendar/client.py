@@ -115,6 +115,6 @@ class CalendarClient:
     async def get_context_block(self, **kwargs: Any) -> str:
         """Провайдер контекста для ContextRegistry."""
         if not self.state.is_online:
-            return "### CALENDAR [OFF] \nИнтерфейс отключен."
+            return "### CALENDAR [OFF] \nThe interface is disabled."
 
         return f"### CALENDAR [ON] \n{self.state.upcoming_events}"

@@ -60,14 +60,14 @@ async def test_integration_swarm_full_cycle(tmp_path: Path):
         MagicMock(
             function=MagicMock(
                 name="execute_skill",
-                arguments='{"thoughts": "Задача решена.", "actions":[{"tool_name": "SubagentReport.submit_final_report", "parameters": {"subagent_id": "test_123", "role": "coder", "report": "# Задача выполнена. Все баги починены."}}]}',
+                arguments='{"reflection": "Задача решена.", "actions":[{"tool_name": "SubagentReport.submit_final_report", "parameters": {"subagent_id": "test_123", "role": "coder", "report": "# Задача выполнена. Все баги починены."}}]}',
             )
         )
     ]
 
     # На втором шаге LLM возвращает пустой массив действий для завершения цикла
     mock_msg_exit = MagicMock()
-    mock_msg_exit.content = '{"thoughts": "Завершаю работу.", "actions":[]}'
+    mock_msg_exit.content = '{"reflection": "Завершаю работу.", "actions":[]}'
     mock_msg_exit.tool_calls = None
 
     mock_session.chat.completions.create.side_effect = [

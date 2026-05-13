@@ -50,7 +50,7 @@ async def test_e2e_react_loop_with_tot_auto():
 
     mock_msg = MagicMock()
     mock_msg.tool_calls = None
-    mock_msg.content = '{"thoughts": "Я вижу дерево мыслей!", "actions": []}'
+    mock_msg.content = '{"reflection": "Я вижу дерево мыслей!", "actions": []}'
     mock_main_session.chat.completions.create.return_value = MagicMock(
         choices=[MagicMock(message=mock_msg)]
     )

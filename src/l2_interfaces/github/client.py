@@ -178,7 +178,7 @@ class GithubClient:
         Отдает отформатированный блок контекста для системного промпта агента.
         """
         if not self.state.is_online:
-            return "### GITHUB [OFF]\nИнтерфейс отключен."
+            return "### GITHUB [OFF]\nThe interface is disabled."
 
         agent_dashboard = ""
         if self.config.agent_account and self.token:

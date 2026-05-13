@@ -11,4 +11,4 @@ async def test_multimodality_context_block(vision_client):
     vision_client.is_online = False
     ctx = await vision_client.get_context_block()
     assert "MULTIMODALITY [OFF]" in ctx
-    assert "отключен" in ctx
+    assert "disabled" in ctx

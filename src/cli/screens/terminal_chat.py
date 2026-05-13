@@ -215,8 +215,8 @@ def terminal_chat_screen() -> None:
         choice = questionary.select(
             "Чат с агентом:",
             choices=[
-                questionary.Choice("💬 Открыть чат", "open"),
-                questionary.Choice("🧹 Очистить историю чата", "clear_history"),
+                questionary.Choice("[@] Открыть чат", "open"),
+                questionary.Choice("[-] Очистить историю чата", "clear_history"),
                 questionary.Separator(" "),
                 questionary.Choice("↩ Назад", "back"),
             ],

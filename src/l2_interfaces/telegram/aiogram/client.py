@@ -99,6 +99,6 @@ class AiogramClient:
         """
 
         if not self.state.is_online:
-            return "### AIOGRAM [OFF] \nИнтерфейс отключен."
+            return "### AIOGRAM [OFF] \nThe interface is disabled."
 
         return f"### AIOGRAM [ON] \n{self.state.last_chats}"

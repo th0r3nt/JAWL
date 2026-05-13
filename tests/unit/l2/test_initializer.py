@@ -13,7 +13,7 @@ async def test_off_provider():
     result = await provider(event_name="TEST", payload={})
 
     assert "### TEST_MODULE [OFF]" in result
-    assert "отключен" in result
+    assert "disabled" in result
 
 
 def test_initialize_l2_interfaces_all_off():

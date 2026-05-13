@@ -36,7 +36,7 @@ async def test_subagent_graceful_exit(mock_loop_deps, mock_openai_response):
 
     mock_session = AsyncMock()
     mock_session.chat.completions.create.return_value = mock_openai_response(
-        '{"thoughts": "Я всё сделал", "actions": []}'
+        '{"reflection": "Я всё сделал", "actions": []}'
     )
     loop.llm.get_session.return_value = mock_session
 
@@ -56,9 +56,9 @@ async def test_subagent_forbidden_skill(mock_call_skill, mock_loop_deps, mock_op
     mock_session = AsyncMock()
     mock_session.chat.completions.create.side_effect = [
         mock_openai_response(
-            '{"thoughts": "Hacking", "actions": [{"tool_name": "Forbidden.tool", "parameters": {}}]}'
+            '{"reflection": "Hacking", "actions": [{"tool_name": "Forbidden.tool", "parameters": {}}]}'
         ),
-        mock_openai_response('{"thoughts": "Exit", "actions": []}'),
+        mock_openai_response('{"reflection": "Exit", "actions": []}'),
     ]
     loop.llm.get_session.return_value = mock_session
 
@@ -80,7 +80,7 @@ async def test_subagent_invalid_json(mock_call_skill, mock_loop_deps, mock_opena
     mock_session = AsyncMock()
     mock_session.chat.completions.create.side_effect = [
         mock_openai_response("This is plain text, not JSON!"),
-        mock_openai_response('{"thoughts": "Fixing", "actions": []}'),
+        mock_openai_response('{"reflection": "Fixing", "actions": []}'),
     ]
     loop.llm.get_session.return_value = mock_session
 
@@ -102,8 +102,8 @@ async def test_subagent_forces_report_submission(mock_loop_deps, mock_openai_res
     mock_session = AsyncMock()
     # LLM дважды настойчиво пытается выйти (пустой массив)
     mock_session.chat.completions.create.side_effect = [
-        mock_openai_response('{"thoughts": "Я хочу уйти", "actions": []}'),
-        mock_openai_response('{"thoughts": "Ну выпусти", "actions": []}'),
+        mock_openai_response('{"reflection": "Я хочу уйти", "actions": []}'),
+        mock_openai_response('{"reflection": "Ну выпусти", "actions": []}'),
     ]
     loop.llm.get_session.return_value = mock_session
 
@@ -152,7 +152,7 @@ async def test_subagent_timeout_forces_report(
     mock_session = AsyncMock()
     # Агент возвращает разрешенное действие (Allowed.tool), но не отправляет отчет
     mock_session.chat.completions.create.return_value = mock_openai_response(
-        '{"thoughts": "Working", "actions": [{"tool_name": "Allowed.tool", "parameters": {}}]}'
+        '{"reflection": "Working", "actions": [{"tool_name": "Allowed.tool", "parameters": {}}]}'
     )
     loop.llm.get_session.return_value = mock_session
 
@@ -193,16 +193,17 @@ def test_subagent_parse_response_robustness(mock_loop_deps):
     loop = SubagentLoop(**mock_loop_deps)
 
     # 1. Markdown
-    raw_md = 'Отчет:\n```\n{"thoughts": "a", "actions": []}\n```\n'
+    raw_md = 'Отчет:\n```\n{"observation": "", "reasoning": "", "reflection": "a", "actions": []}\n```\n'
     res_md, err_md = loop._parse_response(raw_md)
     assert err_md is None
-    assert res_md.thoughts == "a"
+    assert "[Reflection]: a" in res_md.thoughts
 
-    # 2. Грязный текст с фейковыми скобками (проверка перебора)
-    raw_dirty = ' { сломанный json } {"thoughts": "b", "actions": []} конец.'
+    # 2. Грязный текст с фейковыми скобками + ОБЯЗАТЕЛЬНО tool_name для эвристики
+    raw_dirty = ' { сломанный json } {"observation": "", "reasoning": "", "reflection": "b", "actions": [{"tool_name": "test", "parameters": {}}]} конец.'
     res_dirty, err_dirty = loop._parse_response(raw_dirty)
     assert err_dirty is None
-    assert res_dirty.thoughts == "b"
+    # Парсер нашел валидный JSON и проигнорировал 'сломанный json'
+    assert "[Reflection]: b" in res_dirty.thoughts
 
     # 3. Полный мусор (возвращает ошибку, а не падает)
     raw_fail = "Я просто текст без джейсона"

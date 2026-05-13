@@ -43,7 +43,7 @@ def build_eisenhower_matrix(tasks: List[TaskTable], max_tasks: int, tz_offset: i
     """
 
     if not tasks:
-        return f"## TASKS (Eisenhower Matrix)\nMax tasks allowed: {max_tasks}\nAllowed tags: {', '.join(ALLOWED_TAGS)}\n\nСписок задач пуст."
+        return f"## TASKS \nEisenhower Matrix. \nMax tasks allowed: {max_tasks}\nAllowed tags: {', '.join(ALLOWED_TAGS)}\n\nСписок задач пуст."
 
     # Группируем задачи по квадрантам (по умолчанию 2, если что-то пошло не так)
     matrix: Dict[int, List[TaskTable]] = {1: [], 2: [], 3: [], 4: []}
@@ -54,7 +54,8 @@ def build_eisenhower_matrix(tasks: List[TaskTable], max_tasks: int, tz_offset: i
         matrix[q].append(t)
 
     lines = [
-        "## TASKS (Eisenhower Matrix)",
+        "## TASKS",
+        "Eisenhower Matrix.",
         f"Max tasks allowed: {max_tasks}",
         f"Allowed tags: {', '.join(ALLOWED_TAGS)}",
     ]

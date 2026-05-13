@@ -32,7 +32,9 @@ async def test_hypotheses_crud_lifecycle(hypotheses_manager):
     """Тест: Полный жизненный цикл гипотезы (Создание -> Улика -> Удаление)."""
 
     # 1. Создание
-    res_add = await hypotheses_manager.formulate_hypothesis("Сервер упал из-за DDoS", 0.5)
+    res_add = await hypotheses_manager.formulate_hypothesis(
+        "Инцидент 1", "Сервер упал из-за DDoS", 0.5
+    )
     assert res_add.is_success is True
     assert "Текущая уверенность: 50%" in res_add.message
 
@@ -58,7 +60,7 @@ async def test_hypotheses_crud_lifecycle(hypotheses_manager):
     context_updated = await hypotheses_manager.get_context_block()
     assert "Трафик вырос в 100 раз" in context_updated
     assert "TPR: 90%, FPR: 10%" in context_updated
-    assert "Became: 90%" in context_updated
+    assert "Became: 50% -> 90%" in context_updated
 
     # 3. Закрытие (Разрешение) гипотезы
     res_resolve = await hypotheses_manager.resolve_hypothesis(hyp_id)
@@ -71,15 +73,24 @@ async def test_hypotheses_crud_lifecycle(hypotheses_manager):
 
 @pytest.mark.asyncio
 async def test_hypotheses_limits(hypotheses_manager):
-    """Тест: Защита от переполнения оперативной памяти."""
+    """Тест: Защита от переполнения оперативной памяти (лимиты гипотез и кластеров)."""
 
-    # Лимит в фикстуре стоит на 2
-    await hypotheses_manager.formulate_hypothesis("H1", 0.5)
-    await hypotheses_manager.formulate_hypothesis("H2", 0.5)
+    # В фикстуре max_clusters=2, max_hypotheses=4
+    await hypotheses_manager.formulate_hypothesis("Кластер 1", "H1", 0.5)
+    await hypotheses_manager.formulate_hypothesis("Кластер 2", "H2", 0.5)
 
-    res_fail = await hypotheses_manager.formulate_hypothesis("H3", 0.5)
-    assert res_fail.is_success is False
-    assert "Достигнут лимит" in res_fail.message
+    # 1. Тест лимита кластеров
+    res_fail_cluster = await hypotheses_manager.formulate_hypothesis("Кластер 3", "H3", 0.5)
+    assert res_fail_cluster.is_success is False
+    assert "Достигнут лимит уникальных кластеров" in res_fail_cluster.message
+
+    # 2. Тест глобального лимита гипотез
+    await hypotheses_manager.formulate_hypothesis("Кластер 1", "H3", 0.5)
+    await hypotheses_manager.formulate_hypothesis("Кластер 2", "H4", 0.5)
+
+    res_fail_hyp = await hypotheses_manager.formulate_hypothesis("Кластер 1", "H5", 0.5)
+    assert res_fail_hyp.is_success is False
+    assert "Достигнут глобальный лимит" in res_fail_hyp.message
 
 
 @pytest.mark.asyncio
@@ -87,10 +98,10 @@ async def test_hypotheses_validation(hypotheses_manager):
     """Тест: Защита от галлюцинаций LLM при вводе вероятностей."""
 
     # Вероятность больше 1
-    res_high = await hypotheses_manager.formulate_hypothesis("H", 1.5)
+    res_high = await hypotheses_manager.formulate_hypothesis("Кластер 1", "H", 1.5)
     assert res_high.is_success is False
     assert "между 0.01 и 0.99" in res_high.message
 
     # Вероятность меньше 0
-    res_low = await hypotheses_manager.formulate_hypothesis("H", -0.5)
+    res_low = await hypotheses_manager.formulate_hypothesis("Кластер 1", "H", -0.5)
     assert res_low.is_success is False

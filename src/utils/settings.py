@@ -332,7 +332,8 @@ class NotesConfig(BaseModel):
 
 class HypothesesConfig(BaseModel):
     enabled: bool = True
-    max_hypotheses: int = 5
+    max_clusters: int = 3
+    max_hypotheses: int = 10
 
 
 class SQLConfig(BaseModel):

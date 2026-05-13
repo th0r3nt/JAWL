@@ -114,7 +114,7 @@ class CloudElevenLabsTTSClient:
     async def get_context_block(self, **kwargs: Any) -> str:
         """Формирует блок состояния для системного промпта агента."""
         if not self.state.is_online:
-            return "### ELEVENLABS TTS [OFF]\nИнтерфейс отключен."
+            return "### ELEVENLABS TTS [OFF]\nThe interface is disabled."
 
         used = self.state.character_count
         limit = self.state.character_limit

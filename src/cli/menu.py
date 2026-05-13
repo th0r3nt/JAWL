@@ -38,7 +38,7 @@ def main_menu() -> None:
             choices=choices,
             style=get_custom_style(),
             qmark="",
-            instruction="\n (Используйте стрелочки ↑/↓ и Enter)\n",
+            instruction="\n Используйте стрелочки ↑/↓ и Enter\n",
         ).ask()
 
         if result is None or result == "exit":

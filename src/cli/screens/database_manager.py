@@ -173,16 +173,18 @@ def _manage_sql_module(
         choice = questionary.select(
             "Выберите действие:",
             choices=[
-                questionary.Choice(f"Включить / Выключить (сейчас {status_str})", "toggle"),
+                questionary.Separator(" "),
+                questionary.Choice(f"Включить/Выключить (сейчас {status_str})", "toggle"),
                 questionary.Choice("Изменить максимальный лимит", "change_limit"),
-                questionary.Choice("➕ Добавить новую запись", "add_record"),
-                questionary.Choice(f"❌ Удалить записи из {module_name}", "delete_records"),
+                questionary.Separator(" "),
+                questionary.Choice("[+] Добавить новую запись", "add_record"),
+                questionary.Choice(f"[x] Удалить записи из {module_name}", "delete_records"),
                 questionary.Separator(" "),
                 questionary.Choice("↩ Назад", "back"),
             ],
             style=style,
             qmark="",
-            instruction="",
+            instruction=" ",
         ).ask()
 
         if choice == "back" or choice is None:
@@ -353,14 +355,14 @@ def _manage_drives_screen():
             choices=[
                 questionary.Choice(f"Включить / Выключить (сейчас {status_str})", "toggle"),
                 questionary.Choice("Изменить лимит кастомных мотиваций", "change_limit"),
-                questionary.Choice("➕ Добавить новую кастомную мотивацию", "add_drive"),
-                questionary.Choice("❌ Удалить кастомную мотивацию", "del_drive"),
+                questionary.Choice("[+] Добавить новую кастомную мотивацию", "add_drive"),
+                questionary.Choice("[x] Удалить кастомную мотивацию", "del_drive"),
                 questionary.Separator(" "),
                 questionary.Choice("↩ Назад", "back"),
             ],
             style=style,
             qmark="",
-            instruction="",
+            instruction=" ",
         ).ask()
 
         if choice == "back" or choice is None:
@@ -630,7 +632,7 @@ def database_manager_screen() -> None:
         dr_on = "[ON] " if sql_cfg.get("drives", {}).get("enabled") else "[OFF]"
 
         choices = [
-            questionary.Separator("🗂️ SQL DB"),
+            questionary.Separator("[#] SQL DB"),
             questionary.Choice(
                 f" ● Mental States {ms_on}  (Сущности: {s_stats['mental_states']}/{sql_cfg['mental_states']['max_entities']})",
                 "ms",
@@ -647,26 +649,26 @@ def database_manager_screen() -> None:
                 f" ● Drives        {dr_on}  (Мотиваций: {s_stats['drives_fund']} баз., {s_stats['drives_cust']}/{sql_cfg['drives']['max_custom_drives']} каст.)",
                 "drives",
             ),
-            questionary.Choice("Стереть реляционную базу данных", "clean_sql"),
+            questionary.Choice(" ● Стереть базу данных", "clean_sql"),
             questionary.Separator(" "),
             questionary.Separator(" "),
-            questionary.Separator("🗂️ Vector DB"),
+            questionary.Separator("[#] Vector DB"),
             questionary.Choice(
                 f" ● Knowledge            ({v_stats['knowledge']} записей)", "knowledge"
             ),
             questionary.Choice(
                 f" ● Thoughts             ({v_stats['thoughts']} записей)", "thoughts"
             ),
-            questionary.Choice("Стереть векторную базу данных", "clean_vector"),
+            questionary.Choice(" ● Стереть базу данных", "clean_vector"),
             questionary.Separator(" "),
-            questionary.Separator("🗂️ Graph DB (Kuzu)"),
+            questionary.Separator("[#] Graph DB"),
             questionary.Choice(f" ● Concepts             ({g_stats['concepts']} записей)", "dummy_graph_info"),
-            questionary.Choice("Стереть графовую базу данных", "clean_graph"),
+            questionary.Choice(" ● Стереть базу данных", "clean_graph"),
             questionary.Separator(" "),
-            questionary.Separator("🗂️ Interfaces Cache"),
-            questionary.Choice("Стереть кэш всех интерфейсов (src/utils/local/data/interfaces/)", "clean_interfaces"),
+            questionary.Separator("[#] Interfaces Cache"),
+            questionary.Choice(" ● Стереть кэш (src/utils/local/data/interfaces/)", "clean_interfaces"),
             questionary.Separator(" "),
-            questionary.Choice("❌ Выход в главное меню", "exit"),
+            questionary.Choice("[x] Выход в главное меню", "exit"),
         ]
 
         choice = questionary.select(

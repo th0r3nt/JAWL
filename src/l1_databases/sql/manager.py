@@ -57,7 +57,8 @@ class SQLManager:
         fundamental_toggles: dict = None,
         # Hypotheses
         hypotheses_enabled: bool = True,
-        max_hypotheses: int = 5,
+        max_clusters_hypotheses: int = 3,
+        max_hypotheses: int = 10,
         # Время
         timezone: int = 0,
     ) -> None:
@@ -115,13 +116,17 @@ class SQLManager:
         # Hypotheses
         self.hypotheses_enabled = hypotheses_enabled
         self.hypotheses = SQLHypotheses(
-            db=self.db, max_hypotheses=max_hypotheses, tz_offset=timezone
+            db=self.db,
+            max_clusters=max_clusters_hypotheses,
+            max_hypotheses=max_hypotheses,
+            tz_offset=timezone,
         )
 
     async def connect(self) -> None:
         await self.db.connect()
         await self.tasks.bootstrap_migrations()
         await self.mental_states.bootstrap_migrations()
+        await self.hypotheses.bootstrap_migrations()
 
         if self.drives_enabled:
             await self.drives.bootstrap_fundamental_drives()

@@ -51,7 +51,7 @@ async def test_react_empty_actions_exit(
 
     mock_session = AsyncMock()
     mock_session.chat.completions.create.return_value = mock_openai_response(
-        '{"thoughts": "Мне нечего делать.", "actions": []}'
+        '{"reflection": "Мне нечего делать.", "actions": []}'
     )
     deps["llm_client"].get_session = MagicMock(return_value=mock_session)
 
@@ -74,7 +74,7 @@ async def test_react_max_steps_limit(
 
     mock_session = AsyncMock()
     mock_session.chat.completions.create.return_value = mock_openai_response(
-        '{"thoughts": "Делаю шаг", "actions": [{"tool_name": "test", "parameters": {}}]}'
+        '{"reflection": "Делаю шаг", "actions": [{"tool_name": "test", "parameters": {}}]}'
     )
     deps["llm_client"].get_session = MagicMock(return_value=mock_session)
     mock_execute_skill.return_value = "Result"
@@ -105,7 +105,7 @@ async def test_react_rate_limit(mock_dependencies, mock_openai_response):
     mock_session2 = AsyncMock()
     mock_session2.api_key = "key_2"
     mock_session2.chat.completions.create.return_value = mock_openai_response(
-        '{"thoughts": "ok", "actions": []}'
+        '{"reflection": "ok", "actions": []}'
     )
 
     deps["llm_client"].get_session = MagicMock(side_effect=[mock_session1, mock_session2])
@@ -127,7 +127,7 @@ async def test_react_auth_error_ban_key(mock_dependencies, mock_openai_response)
 
     mock_session.chat.completions.create.side_effect = [
         auth_err,
-        mock_openai_response('{"thoughts": "ok", "actions": []}'),
+        mock_openai_response('{"reflection": "ok", "actions": []}'),
     ]
     deps["llm_client"].get_session = MagicMock(return_value=mock_session)
 
@@ -208,7 +208,7 @@ async def test_react_timeout_retry(mock_dependencies, mock_openai_response):
     timeout_err = openai.APITimeoutError(request=MagicMock())
     mock_session.chat.completions.create.side_effect = [
         timeout_err,
-        mock_openai_response('{"thoughts": "ok", "actions": []}'),
+        mock_openai_response('{"reflection": "ok", "actions": []}'),
     ]
 
     deps["llm_client"].get_session = MagicMock(return_value=mock_session)
@@ -226,21 +226,24 @@ async def test_react_parse_response_robustness(mock_dependencies):
     loop = ReactLoop(**mock_dependencies)
 
     # 1. LLM обернула JSON в Markdown (```json ... ```)
-    raw_md = 'Вот мой ответ:\n```json\n{"thoughts": "1", "actions": []}\n```\nГотово.'
+    raw_md = 'Вот мой ответ:\n```json\n{"observation": "", "reasoning": "", "reflection": "1", "actions": []}\n```\nГотово.'
     res_md = await loop._parse_response(raw_md)
     assert res_md is not None
-    assert res_md.thoughts == "1"
+    assert "[Reflection]: 1" in res_md.thoughts
 
     # 2. Мусорный текст до и после голого JSON
-    raw_garbage = 'Окей, я подумала. { "thoughts": "2", "actions": [] } Жду команд.'
+    raw_garbage = 'Окей, я подумала. { "observation": "", "reasoning": "", "reflection": "2", "actions": [] } Жду команд.'
     res_garbage = await loop._parse_response(raw_garbage)
     assert res_garbage is not None
-    assert res_garbage.thoughts == "2"
+    assert "[Reflection]: 2" in res_garbage.thoughts
 
-    # 3. Сломанные/случайные скобки ДО реального JSON (Fallback механизм)
+    # 3. Сломанные/случайные скобки ДО реального JSON
     raw_broken = (
-        'Здесь случайная скобка { а вот тут реальный: {"thoughts": "3", "actions": []}'
+        'Здесь случайная скобка { а вот тут реальный: {"observation": "", "reasoning": "", "reflection": "3", '
+        '"actions": [{"tool_name": "mock.tool", "parameters": {}}]}'
     )
     res_broken = await loop._parse_response(raw_broken)
     assert res_broken is not None
-    assert res_broken.thoughts == "3"
+    # Парсер идеально находит начало JSON по ключу "observation" и игнорирует мусор
+    assert "[Reflection]: 3" in res_broken.thoughts
+    assert len(res_broken.actions) == 1

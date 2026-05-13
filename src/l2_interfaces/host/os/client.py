@@ -287,7 +287,7 @@ class HostOSClient:
         Отдает отформатированный блок телеметрии, файловой системы и воркспейса.
         """
         if not self.state.is_online:
-            return "### HOST OS [OFF]\nИнтерфейс отключен."
+            return "### HOST OS [OFF]\nThe interface is disabled."
 
         framework_block = ""
         if self.access_level >= HostOSAccessLevel.OBSERVER and self.state.framework_files:
@@ -304,7 +304,7 @@ class HostOSClient:
         )
 
         if self.deploy_manager.is_active:
-            access_levels_desc += f"\n\n[DEPLOY SESSION ACTIVE] Активирована возможность менять код фреймворка. Попыток коммита осталось: {self.deploy_manager.retries_left}."
+            access_levels_desc += f"\n\n[DEPLOY SESSION ACTIVE] The ability to change framework code has been enabled. Remaining commit attempts: {self.deploy_manager.retries_left}."
 
         # ===============================================
         # Сборка открытых файлов (те файлы, которые агент открыл в контексте)
@@ -332,7 +332,7 @@ class HostOSClient:
                         if len(content) > limit:
                             content = (
                                 content[:limit]
-                                + f"\n...[Файл слишком большой, обрезан (больше {limit} символов). Для полного содержания - использовать соответствующий навык]"
+                                + f"\n...[The file is too large and has been truncated (more than {limit} characters). For full content - use the appropriate skill]"
                             )
 
                         ext = full_path.suffix.lower().strip(".")
@@ -345,7 +345,7 @@ class HostOSClient:
                             lang = "python"
 
                         ws_lines.append(
-                            f"\n\n#### Вкладка: {display_path} \n```{lang}\n{content}\n```"
+                            f"\n\n#### Tab: {display_path} \n```{lang}\n{content}\n```"
                         )
                     else:
                         self.state.opened_workspace_files.discard(rel_path)
@@ -353,7 +353,7 @@ class HostOSClient:
                     pass
             workspace_block = "\n" + "\n".join(ws_lines) + "\n"
         else:
-            workspace_block = "Нет открытых вкладок."
+            workspace_block = "No open tabs."
 
         # ===============================================
         # Сборка истории изменений
@@ -364,7 +364,7 @@ class HostOSClient:
             rc_lines.extend(self.state.recent_file_changes)
             recent_changes_block = "" + "\n\n".join(rc_lines) + "\n"
         else:
-            recent_changes_block = "Нет последних изменений."
+            recent_changes_block = "No recent changes."
 
         # ===============================================
         # Абсолютные пути, если активен уровень доступа ROOT
@@ -374,9 +374,9 @@ class HostOSClient:
             home_dir = Path.home().resolve().as_posix()
             fw_dir = self.framework_dir.resolve().as_posix()
             absolute_paths_block = (
-                f"\n[Активен уровен доступа ROOT]\n"
-                f"* Абсолютный путь фреймворка: {fw_dir}\n"
-                f"* Домашняя директория: {home_dir}\n"
+                f"\n[ROOT access level is active]\n"
+                f"* Absolute path of the framework: {fw_dir}\n"
+                f"* Home directory: {home_dir}\n"
             )
 
         # ===============================================
@@ -384,9 +384,9 @@ class HostOSClient:
 
         tracked_dirs_block = ""
         if self.state.tracked_dirs_trees:
-            tracked_dirs_block = (
-                f"* Tracked Directories (Pinned):\n{self.state.tracked_dirs_trees}\n"
-            )
+            tracked_dirs_block = f"* Tracked Directories:\n{self.state.tracked_dirs_trees}\n"
+        else:
+            tracked_dirs_block = "There are no watched directories."
 
         # ===============================================
         # Финальная сборка
@@ -401,14 +401,15 @@ class HostOSClient:
 
 * Network: \n{getattr(self.state, 'network', 'Неизвестно')}
 
-* Telemetry: {self.state.telemetry}
+* Telemetry: 
+{self.state.telemetry}
 
 * Polling interval: {self.state.polling_interval}
 
 * Active Daemons:
 {self.state.active_daemons}
 
-* Current Access Level: {self.access_level.value}/{self.access_level.name} (текущий уровень доступа)
+* Current Access Level: {self.access_level.value}/{self.access_level.name}
 {access_levels_desc}
 {absolute_paths_block}
 
@@ -427,11 +428,10 @@ class HostOSClient:
 * Workspace:
 {workspace_block}
 
-[Напоминание] 
-- Папка sandbox/_system/ является системной и не подлежит изменению.
-- Внутри неё находится файл 'framework_api.py'. 
-- Этот файл позволяет взаимодействовать с пробуждениями и контекстом системы.
-
-- Все относительные пути строго исчисляются от корневой директории фреймворка (JAWL/).
-- Если необходимо создать файл в песочнице - нужно указывать это (например, `sandbox/test.py`).
+[Reminder]
+- sandbox/_system/ is a system folder and immutable.
+- It contains 'framework_api.py'.
+- This file enables interaction with system awakenings and context.
+- All relative paths are strictly calculated from the framework root (JAWL/).
+- To create a file in the sandbox, specify the path (e.g., sandbox/test.py).
 """.strip()

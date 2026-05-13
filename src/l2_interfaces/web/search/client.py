@@ -42,6 +42,6 @@ class WebSearchClient:
         Отдает отформатированный блок контекста для агента (история серфинга).
         """
         if not self.state.is_online:
-            return "### WEB SEARCH [OFF] \nИнтерфейс отключен."
+            return "### WEB SEARCH [OFF] \nThe interface is disabled."
 
         return f"### WEB SEARCH [ON] \n{self.state.browser_history}"

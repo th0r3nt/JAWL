@@ -5,7 +5,7 @@ CRUD-контроллер для Байесовских гипотез.
 
 import uuid
 from typing import TYPE_CHECKING, Any
-from sqlalchemy import select, delete, func
+from sqlalchemy import select, delete, func, text
 
 from src.utils.logger import main_logger
 from src.l1_databases.sql.tables import BayesianHypothesisTable
@@ -21,10 +21,30 @@ class SQLHypotheses:
     Контроллер вероятностной дедукции.
     """
 
-    def __init__(self, db: "SQLDB", max_hypotheses: int = 5, tz_offset: int = 0) -> None:
+    def __init__(
+        self, db: "SQLDB", max_clusters: int = 3, max_hypotheses: int = 10, tz_offset: int = 0
+    ) -> None:
         self.db = db
+        self.max_clusters = max_clusters
         self.max_hypotheses = max_hypotheses
         self.tz_offset = tz_offset
+
+    async def bootstrap_migrations(self) -> None:
+        """
+        Мягкая миграция для добавления колонки cluster_name в старые базы данных.
+        """
+        async with self.db.engine.begin() as conn:
+            try:
+                await conn.execute(
+                    text(
+                        "ALTER TABLE bayesian_hypotheses ADD COLUMN cluster_name TEXT DEFAULT 'Общий кластер'"
+                    )
+                )
+                main_logger.info(
+                    "[SQL DB] Выполнена успешная миграция таблицы BayesianHypotheses (добавлен cluster_name)."
+                )
+            except Exception:
+                pass  # Колонка уже существует
 
     def _calculate_posterior(self, prior: float, tpr: float, fpr: float) -> float:
         """
@@ -49,13 +69,14 @@ class SQLHypotheses:
 
     @skill()
     async def formulate_hypothesis(
-        self, title: str, initial_probability: float
+        self, cluster_name: str, title: str, initial_probability: float
     ) -> SkillResult:
         """
         Создает новую гипотезу для направленного расследования.
 
+        cluster_name: Название инцидента.
         title: Суть гипотезы.
-        initial_probability: Стартовая уверенность от 0.01 до 0.99 (например, 0.3 - 30%).
+        initial_probability: Стартовая уверенность от 0.01 до 0.99 (напр., 0.3 - 30%).
         """
 
         if not (0.01 <= initial_probability <= 0.99):
@@ -63,17 +84,38 @@ class SQLHypotheses:
                 "Ошибка: начальная вероятность должна быть между 0.01 и 0.99."
             )
 
+        clean_cluster = cluster_name.strip()
+        if not clean_cluster:
+            clean_cluster = "Общий кластер"
+
         hyp_id = str(uuid.uuid4())[:4]
 
         async with self.db.session_factory() as session:
+            # 1. Проверка глобального лимита гипотез
             count_res = await session.execute(select(func.count(BayesianHypothesisTable.id)))
             if count_res.scalar_one() >= self.max_hypotheses:
                 return SkillResult.fail(
-                    f"Достигнут лимит активных гипотез ({self.max_hypotheses}). Сначала удалите подтвержденные/опровергнутые."
+                    f"Достигнут глобальный лимит активных гипотез ({self.max_hypotheses}). Рекомендуется удалить подтвержденные/опровергнутые."
+                )
+
+            # 2. Проверка лимита уникальных кластеров
+            clusters_res = await session.execute(
+                select(BayesianHypothesisTable.cluster_name).distinct()
+            )
+            existing_clusters = {row[0] for row in clusters_res.all()}
+
+            if (
+                clean_cluster not in existing_clusters
+                and len(existing_clusters) >= self.max_clusters
+            ):
+                return SkillResult.fail(
+                    f"Достигнут лимит уникальных кластеров гипотез ({self.max_clusters}). "
+                    f"Рекомендуется закрыть старые гипотезы, чтобы очистить кластер."
                 )
 
             new_hyp = BayesianHypothesisTable(
                 id=hyp_id,
+                cluster_name=clean_cluster,
                 title=title.strip(),
                 prior_probability=initial_probability,
                 current_probability=initial_probability,
@@ -132,6 +174,7 @@ class SQLHypotheses:
                     "evidence": evidence_desc.strip(),
                     "tpr": true_positive_rate,
                     "fpr": false_positive_rate,
+                    "old_prob": old_prob,
                     "new_prob": new_prob,
                 }
             )
@@ -174,4 +217,6 @@ class SQLHypotheses:
             result = await session.execute(select(BayesianHypothesisTable))
             hypotheses = result.scalars().all()
 
-        return build_hypotheses(hypotheses, self.max_hypotheses, self.tz_offset)
+        return build_hypotheses(
+            hypotheses, self.max_clusters, self.max_hypotheses, self.tz_offset
+        )

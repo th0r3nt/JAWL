@@ -19,7 +19,7 @@ class ExampleClient:
     def __init__(self, state: Any, api_key: str) -> None:
         """
         Инициализация клиента.
-        
+
         Args:
             state: Ссылка на L0 State из приборной панели агента.
             api_key: Ключ доступа.
@@ -49,16 +49,16 @@ class ExampleClient:
     async def get_context_block(self, **kwargs: Any) -> str:
         """
         Провайдер контекста. Вызывается каждый раз, когда агент просыпается (Heartbeat).
-        
+
         Returns:
             str: Markdown-отформатированный текст, который будет внедрен в System Prompt агента.
                  Старайтесь делать его максимально коротким и информативным.
         """
         if not getattr(self.state, "is_online", False):
-            return "### EXAMPLE_SERVICE [OFF]\nИнтерфейс отключен."
+            return "### EXAMPLE_SERVICE [OFF]\nThe interface is disabled."
 
         # Отдаем агенту кэшированные (MRU) данные из стейта:
         # data = self.state.recent_notifications
         data = "Нет новых уведомлений."
-        
+
         return f"### EXAMPLE_SERVICE [ON]\n{data}"

@@ -136,13 +136,13 @@ class AgentState(BaseModel):
         if self.subconscious_enabled and self.subconscious_counters:
             subc_lines = [
                 "\n\n### SUBCONSCIOUS STATE",
-                "Когнитивные фоновые процессы, работающие параллельно с основным ReAct-циклом. Они автоматически консолидируют память, адаптируют характер и проводят информационную очистку баз данных.\n",
+                "Cognitive background processes running parallel to the main ReAct loop. They automatically consolidate memory, adapt persona, and perform database cleanup.\n",
             ]
 
             descriptions = {
-                "consolidation": "Автоматический перенос краткосрочного операционного опыта (логов действий и мыслей) в долгосрочную семантическую память и структурированные связи. Позволяет кристаллизовать извлеченные факты, правила и знания, предотвращая амнезию.",
-                "reflection": "Когнитивная переоценка недавних коммуникаций и паттернов взаимодействия. Обновляет CRM-систему (Mental States) - модулирует отношение (Attitude) к внешним субъектам, фиксирует новые директивы общения и адаптирует характер (Personality Traits).",
-                "forgetting": "Информационная гигиена и деградация неактуальных воспоминаний. Сканирует векторную и графовую базы, вычищая битые данные, дубликаты, случайный системный мусор и логи ошибок. Поддерживает высокую семантическую плотность RAG, защищая контекст.",
+                "consolidation": "Automatic transfer of short-term operational experience (action and thought logs) into long-term semantic memory and structured links. Crystallizes extracted facts, rules, and knowledge, preventing amnesia.",
+                "reflection": "Cognitive reappraisal of recent communications and interaction patterns. Updates CRM (Mental States) — modulates attitude toward external subjects, records new communication directives, and adapts character (Personality Traits).",
+                "forgetting": "Information hygiene and irrelevant memory degradation. Scans vector and graph databases, purging corrupted data, duplicates, system noise, and error logs. Maintains high RAG semantic density, protecting context.",
             }
 
             for pattern_name, data in sorted(self.subconscious_counters.items()):

@@ -165,6 +165,7 @@ class BayesianHypothesisTable(Base):
     __tablename__ = "bayesian_hypotheses"
 
     id: Mapped[str] = mapped_column(primary_key=True)
+    cluster_name: Mapped[str] = mapped_column(default="Общее расследование")
     title: Mapped[str]
     prior_probability: Mapped[float]
     current_probability: Mapped[float]

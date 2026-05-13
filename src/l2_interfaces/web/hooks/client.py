@@ -19,12 +19,12 @@ class WebHooksClient:
 
     async def get_context_block(self, **kwargs) -> str:
         if not self.state.is_online:
-            return "### WEB HOOKS [OFF]\nИнтерфейс отключен."
+            return "### WEB HOOKS [OFF]\nThe interface is disabled."
 
         hooks_str = (
             "\n".join(self.state.preview_lines)
             if self.state.preview_lines
-            else "  Пока пусто."
+            else "  Пусто."
         )
 
         return f"""

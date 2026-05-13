@@ -53,12 +53,12 @@ async def test_e2e_subconscious_full_pipeline(tmp_path: Path):
 
     # Ответ Главного агента (просто завершает цикл)
     mock_msg_react = MagicMock()
-    mock_msg_react.content = '{"thoughts": "Я завершаю цикл", "actions":[]}'
+    mock_msg_react.content = '{"reflection": "Я завершаю цикл", "actions":[]}'
     mock_msg_react.tool_calls = None
 
     # Ответ Подсознания (Вызывает навык)
     mock_msg_subc = MagicMock()
-    mock_msg_subc.content = '{"thoughts": "Нашел факт", "actions": [{"tool_name": "mock.skill", "parameters": {}}]}'
+    mock_msg_subc.content = '{"reflection": "Нашел факт", "actions": [{"tool_name": "mock.skill", "parameters": {}}]}'
     mock_msg_subc.tool_calls = None
 
     # Подсовываем ответы по очереди

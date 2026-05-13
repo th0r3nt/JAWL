@@ -75,7 +75,7 @@ class DiscordClient:
 
     async def get_context_block(self, **kwargs) -> str:
         if not self.state.is_online:
-            return "### DISCORD [OFF]\nИнтерфейс отключен."
+            return "### DISCORD [OFF]\nThe interface is disabled."
         return f"### DISCORD [ON]\nПоследние сообщения:\n{self.state.last_messages}"
 ```
 

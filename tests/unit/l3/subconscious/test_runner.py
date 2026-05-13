@@ -85,7 +85,7 @@ async def test_runner_loop_termination(runner):
     mock_session = AsyncMock()
     mock_msg = MagicMock()
     mock_msg.tool_calls = None
-    mock_msg.content = '{"thoughts": "Я всё почистил", "actions":[]}'
+    mock_msg.content = '{"reflection": "Я всё почистил", "actions":[]}'
     mock_session.chat.completions.create.return_value = MagicMock(
         choices=[MagicMock(message=mock_msg)]
     )

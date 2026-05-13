@@ -226,6 +226,7 @@ class HostTerminalClient:
         """
         Подтягивает историю контекста из файла при рестарте сервера.
         """
+
         history = self._read_history_file()
         recent = history[-self.config.context_limit :]
         for msg in recent:
@@ -233,11 +234,11 @@ class HostTerminalClient:
 
     async def get_context_block(self, **kwargs: Any) -> str:
         if not self.state.is_online:
-            return "### HOST TERMINAL [OFF]\nИнтерфейс отключен."
+            return "### HOST TERMINAL [OFF] \nThe interface is disabled."
 
         ui_status = (
-            "Окно терминала открыто."
+            "The terminal window is opened."
             if self.state.is_ui_connected
-            else "Окно терминала закрыто."
+            else "The terminal window is closed."
         )
-        return f"### HOST TERMINAL [ON]\nСтатус: {ui_status}\n\nПоследние сообщения:\n{self.state.formatted_messages}"
+        return f"### HOST TERMINAL [ON]\nStatus: {ui_status}\n\nRecent messages:\n{self.state.formatted_messages}"

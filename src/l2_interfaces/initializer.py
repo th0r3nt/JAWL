@@ -49,7 +49,7 @@ def off_provider(name: str) -> Any:
     """
 
     async def provider(**kwargs: Any) -> str:
-        return f"### {name} [OFF]\nИнтерфейс отключен."
+        return f"### {name} [OFF]\nThe interface is disabled."
 
     return provider
 
@@ -244,7 +244,9 @@ def initialize_l2_interfaces(
                 if config.meta.custom_skills_enabled
                 else "отключены"
             )
-            return f"### META [OFF]\nИнтерфейс отключен.\n* Custom Skills: {custom_status}"
+            return (
+                f"### META [OFF]\nThe interface is disabled.\n* Custom Skills: {custom_status}"
+            )
 
         system.context_registry.register_provider(
             "meta", meta_off_provider, ContextSection.INTERFACES

@@ -89,7 +89,7 @@ class EdgeClient:
         """
 
         if not self.state.is_online:
-            return "### EDGE TTS [OFF]\nИнтерфейс отключен."
+            return "### EDGE TTS [OFF]\nThe interface is disabled."
 
         main_voice_str = self.voice_manager.main_voice
 

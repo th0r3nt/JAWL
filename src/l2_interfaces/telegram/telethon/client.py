@@ -146,6 +146,6 @@ class TelethonClient:
     async def get_context_block(self, **kwargs: Any) -> str:
         """Провайдер контекста для ContextRegistry."""
         if not self.state.is_online:
-            return "### TELETHON [OFF]\nИнтерфейс отключен."
+            return "### TELETHON [OFF]\nThe interface is disabled."
 
         return f"### TELETHON [ON] \nAccount info: {self.state.account_info}\nВАЖНО: рекомендуется отвечать пользователям, у которых стоит UNREAD. \n\n{self.state.last_chats}"

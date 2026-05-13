@@ -107,7 +107,8 @@ system:
       # Подробнее: docs/yaml/settings/sql/hypotheses.md
       hypotheses:
         enabled: true
-        max_hypotheses: 5
+        max_clusters: 3
+        max_hypotheses: 10
 
     # Подробнее: docs/yaml/settings/graph_db.md
     graph:

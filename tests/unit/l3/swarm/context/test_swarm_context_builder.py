@@ -95,13 +95,17 @@ def test_swarm_context_builder_history_formatting(
 
     history: List[Dict[str, str]] = [
         {
-            "thoughts": "Old thought that is very very very long and should be truncated because it exceeds the limit of 20 chars.",
+            "thoughts": "[Reflection]: Old thought that is very very very long and should be truncated because it exceeds the limit of 20 chars.",
             "actions": "Old action",
             "results": "Old result that is too long.",
         },
-        {"thoughts": "Second thought", "actions": "Second action", "results": "Second result"},
         {
-            "thoughts": "Fresh detailed thought that should NOT be truncated even if it is very long because detailed_steps=1.",
+            "thoughts": "[Reflection]: Second thought",
+            "actions": "Second action",
+            "results": "Second result",
+        },
+        {
+            "thoughts": "[Reflection]: Fresh detailed thought that should NOT be truncated even if it is very long because detailed_steps=1.",
             "actions": "Fresh action",
             "results": "Fresh result",
         },
@@ -109,8 +113,8 @@ def test_swarm_context_builder_history_formatting(
 
     context = builder.build(subagent_id="test_id", task_description="Task", history=history)
 
-    # Старый шаг должен быть обрезан
-    assert "Old thought that is " in context
+    # Старый шаг должен быть обрезан. Лимит 20 символов, "[Reflection]: Old th" - это ровно 20 символов
+    assert "[Reflection]: Old th" in context
     assert "обрезаны системой" in context
 
     # Свежий шаг не должен резаться
