@@ -8,6 +8,7 @@ Unit-тесты для глобальных утилит (src/utils/_tools.py).
 
 import pytest
 from pathlib import Path
+from unittest.mock import patch
 
 from src.utils._tools import (
     format_size,
@@ -16,6 +17,8 @@ from src.utils._tools import (
     clean_html,
     validate_sandbox_path,
     draw_image_grid,
+    is_agent_running,
+    SystemInstanceLock,
 )
 
 
@@ -52,9 +55,9 @@ def test_truncate_text_never_exceeds_max_chars() -> None:
     long_text = "a" * 1000
     for limit in (1, 10, 50, 100, 200, 500, 999):
         result = truncate_text(long_text, limit)
-        assert len(result) <= limit, (
-            f"truncate_text превысил лимит: limit={limit}, len(result)={len(result)}"
-        )
+        assert (
+            len(result) <= limit
+        ), f"truncate_text превысил лимит: limit={limit}, len(result)={len(result)}"
 
 
 def test_truncate_text_suffix_longer_than_limit() -> None:
@@ -129,9 +132,6 @@ class TestGatekeeper:
             validate_sandbox_path(forbidden_path)
 
 
-# === НОВЫЕ ТЕСТЫ: ПРОВЕРКА PIL ИЗОБРАЖЕНИЙ ===
-
-
 class TestImageGrid:
     """Группа тестов для алгоритма наложения координатной сетки."""
 
@@ -159,3 +159,55 @@ class TestImageGrid:
             assert r == 255  # Красный канал максимальный
             assert g < 255  # Зеленый просел из-за альфа-канала (краска легла)
             assert b < 255  # Синий просел
+
+
+def test_system_instance_lock(tmp_path):
+    """Тест: SystemInstanceLock должен корректно блокировать файл (Mutex)."""
+    lock_file = tmp_path / "agent.pid"
+
+    lock1 = SystemInstanceLock(lock_file)
+    lock2 = SystemInstanceLock(lock_file)
+
+    # Первый процесс получает лок
+    assert lock1.acquire() is True
+    assert lock_file.exists()
+
+    # Второй процесс пытается получить лок на тот же файл — отказ
+    assert lock2.acquire() is False
+
+    # Первый процесс снимает блокировку
+    lock1.release()
+
+    # Теперь второй процесс может захватить лок
+    assert lock2.acquire() is True
+    lock2.release()
+
+
+@patch("src.utils._tools.get_lock_file_path")
+@patch("src.utils._tools.get_pid_file_path")
+def test_is_agent_running_with_lock(mock_get_pid, mock_get_lock, tmp_path):
+    """Тест: is_agent_running использует File Lock для гарантии статуса."""
+    pid_file = tmp_path / "agent.pid"
+    lock_file = tmp_path / "agent.lock"
+
+    mock_get_pid.return_value = pid_file
+    mock_get_lock.return_value = lock_file
+
+    # Файла нет -> агент выключен
+    assert is_agent_running() is False
+
+    # Имитируем запуск агента (создаем файлы и вешаем лок)
+    pid_file.write_text("12345")
+    lock = SystemInstanceLock(lock_file)
+    assert lock.acquire() is True
+
+    # Лок висит -> агент работает
+    assert is_agent_running() is True
+
+    # Имитируем краш (ОС снимает лок, но файлы остаются)
+    lock.release()
+
+    # Лок не висит -> агент "мертв" -> функция возвращает False и чистит мусор!
+    assert is_agent_running() is False
+    assert not pid_file.exists()
+    assert not lock_file.exists()

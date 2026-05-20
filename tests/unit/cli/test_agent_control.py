@@ -1,4 +1,4 @@
-import psutil
+import pytest
 from unittest.mock import patch, MagicMock
 
 from src.cli.screens.agent_control import (
@@ -7,40 +7,12 @@ from src.cli.screens.agent_control import (
 )
 
 
-@patch("src.cli.screens.agent_control.psutil.Process")
-@patch("src.cli.screens.agent_control.psutil.pid_exists")
-@patch("src.cli.screens.agent_control.get_pid_file_path")
-def test_is_agent_running_true(mock_get_pid, mock_pid_exists, mock_process):
-    """Тест: _is_agent_running определяет запущенного агента."""
-    mock_file = MagicMock()
-    mock_file.exists.return_value = True
-    mock_file.read_text.return_value = "1234"
-    mock_get_pid.return_value = mock_file
-
-    mock_pid_exists.return_value = True
-    mock_proc = MagicMock()
-    mock_proc.is_running.return_value = True
-    mock_proc.name.return_value = "python.exe"
-    mock_process.return_value = mock_proc
-
+@patch("src.cli.screens.agent_control.is_agent_running")
+def test_is_agent_running_proxy(mock_global_is_running):
+    """Тест: локальная функция просто проксирует вызов в утилиты."""
+    mock_global_is_running.return_value = True
     assert _is_agent_running() is True
-
-
-@patch("src.cli.screens.agent_control.psutil.Process")
-@patch("src.cli.screens.agent_control.psutil.pid_exists")
-@patch("src.cli.screens.agent_control.get_pid_file_path")
-def test_is_agent_running_zombie(mock_get_pid, mock_pid_exists, mock_process):
-    """Тест: процесс не существует (NoSuchProcess). Файл должен быть удален."""
-    mock_file = MagicMock()
-    mock_file.exists.return_value = True
-    mock_file.read_text.return_value = "1234"
-    mock_get_pid.return_value = mock_file
-
-    mock_pid_exists.return_value = True
-    mock_process.side_effect = psutil.NoSuchProcess(pid=1234)
-
-    assert _is_agent_running() is False
-    mock_file.unlink.assert_called_once()
+    mock_global_is_running.assert_called_once()
 
 
 @patch("src.cli.screens.agent_control.PROMPTS_DIR")

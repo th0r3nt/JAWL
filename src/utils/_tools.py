@@ -1,13 +1,6 @@
-"""
-Глобальные служебные инструменты и утилиты фреймворка JAWL.
-
-Содержит функции для форматирования размеров, очистки HTML-контента, валидации
-путей песочницы (Gatekeeper) и работы с процессами агента.
-"""
-
-import psutil
+import os
 from pathlib import Path
-from typing import Union
+from typing import Union, Optional, IO
 import re
 import html
 
@@ -115,10 +108,7 @@ def truncate_text(
     if len(text) <= max_chars:
         return text
 
-    # Корневой баг до этого фикса: text[:max_chars] + suffix могло быть длиннее
-    # и самого max_chars, и исходного текста. "Защита" и увеличивала размер.
     if len(suffix) >= max_chars:
-        # Суффикс сам по себе не влезает; обрезаем его, основной текст выкидываем.
         return suffix[:max_chars]
 
     body_budget = max_chars - len(suffix)
@@ -147,36 +137,12 @@ def get_pid_file_path() -> Path:
     return get_project_root() / "src" / "utils" / "local" / "data" / "agent.pid"
 
 
-def is_agent_running() -> bool:
+def get_lock_file_path() -> Path:
     """
-    Проверяет, работает ли процесс агента на самом деле.
-    Исключает ложные срабатывания (когда PID-файл остался после краша системы).
-
-    Returns:
-        bool: True, если агент запущен и это процесс Python. False в противном случае.
+    Возвращает путь к файлу блокировки (Mutex) для защиты от двойного запуска.
     """
 
-    pid_file = get_pid_file_path()
-    if not pid_file.exists():
-        return False
-
-    try:
-        pid = int(pid_file.read_text().strip())
-        if psutil.pid_exists(pid):
-            proc = psutil.Process(pid)
-            # Проверяем, что это не какой-то левый процесс занял этот PID
-            return proc.is_running() and "python" in proc.name().lower()
-        return False
-    except (ValueError, psutil.NoSuchProcess, psutil.AccessDenied):
-        if pid_file.exists():
-            try:
-                pid_file.unlink()
-            except Exception as e:
-                # Если файл заблокирован другой службой
-                main_logger.debug(
-                    f"[Tools] Не удалось очистить неактуальный PID-файл {pid_file.name}: {e}"
-                )
-        return False
+    return get_project_root() / "src" / "utils" / "local" / "data" / "agent.lock"
 
 
 def clean_html(raw_html: str) -> str:
@@ -194,21 +160,12 @@ def clean_html(raw_html: str) -> str:
     if not raw_html:
         return ""
 
-    # 1. Удаляем скрипты и стили вместе с их содержимым (игнорируя регистр и переносы строк)
     text = re.sub(
         r"<(script|style)[^>]*>.*?</\1>", " ", raw_html, flags=re.IGNORECASE | re.DOTALL
     )
-
-    # 2. Удаляем HTML комментарии
     text = re.sub(r"<!--.*?-->", " ", text, flags=re.DOTALL)
-
-    # 3. Удаляем все остальные теги
     text = re.sub(r"<[^>]+>", " ", text)
-
-    # 4. Декодируем HTML-сущности (&quot;, &amp;, &#39;, &nbsp; и т.д.)
     text = html.unescape(text)
-
-    # 5. Схлопываем множественные пробелы и переносы в один пробел для плотности контекста
     text = re.sub(r"\s+", " ", text).strip()
 
     return text
@@ -219,42 +176,31 @@ def draw_image_grid(image_path: str | Path, step: int = 100) -> None:
     Накладывает высококонтрастную полупрозрачную координатную сетку на изображение.
     Используется навыком take_screenshot для точного визуального позиционирования
     элементов мультимодальными моделями (Vision LLM).
-
-    Args:
-        image_path (str | Path): Путь к изображению, которое нужно модифицировать.
-        step (int, optional): Шаг сетки в пикселях. По умолчанию 100.
     """
 
     from PIL import Image, ImageDraw
 
     with Image.open(image_path) as img:
-        # Создаем прозрачный слой для сетки
         overlay = Image.new("RGBA", img.size, (255, 255, 255, 0))
         draw = ImageDraw.Draw(overlay)
         width, height = img.size
 
-        # Рисуем линии сетки
         for x in range(0, width, step):
             draw.line([(x, 0), (x, height)], fill=(255, 0, 0, 80), width=1)
         for y in range(0, height, step):
             draw.line([(0, y), (width, y)], fill=(255, 0, 0, 80), width=1)
 
-        # Рисуем координаты с белой подложкой для идеальной читаемости LLM
         for x in range(0, width, step):
             for y in range(0, height, step):
                 text = f"{x},{y}"
-                # Примерный расчет ширины текста (стандартный шрифт PIL ~ 6x10 px на символ)
                 text_w = len(text) * 6
                 text_h = 10
 
-                # Рисуем белую полупрозрачную подложку
                 draw.rectangle(
                     [x + 2, y + 2, x + 4 + text_w, y + 4 + text_h], fill=(255, 255, 255, 220)
                 )
-                # Рисуем сам текст красным цветом
                 draw.text((x + 4, y + 2), text, fill=(255, 0, 0, 255))
 
-        # Склеиваем слои и сохраняем
         combined = Image.alpha_composite(img.convert("RGBA"), overlay)
         combined.convert("RGB").save(image_path)
 
@@ -262,14 +208,7 @@ def draw_image_grid(image_path: str | Path, step: int = 100) -> None:
 def dump_prompt_to_file(filename: str, messages: list, meta_header: str = "") -> None:
     """
     Сохраняет контекст (prompts) в Markdown-файл для отладки.
-
-    Args:
-        filename: Путь к файлу (например 'logs/prompts/main_prompt.md').
-        messages: Массив сообщений (OpenAI формат).
-        meta_header: Опциональный заголовок для файла.
     """
-    from src.utils.logger import main_logger
-
     try:
         file_path = Path(filename)
         file_path.parent.mkdir(parents=True, exist_ok=True)
@@ -293,33 +232,18 @@ def dump_prompt_to_file(filename: str, messages: list, meta_header: str = "") ->
 def get_python_module_docstring(filepath: Path, max_length: int = 150) -> str:
     """
     Извлекает module-level docstring из Python файла.
-
-    Оптимизировано для фонового поллинга: читает только первые 2 КБ файла
-    и использует Regex (избегая тяжелого построения AST дерева для всего файла).
-
-    Args:
-        filepath (Path): Путь к целевому файлу.
-        max_length (int, optional): Максимальная длина возвращаемой строки. По умолчанию 150.
-
-    Returns:
-        str: Отформатированная строка вида ' [\"\"\"Текст...\"\"\"]' или пустая строка,
-             если докстринг не найден или файл не является .py.
     """
     if filepath.suffix.lower() != ".py":
         return ""
 
     try:
-        # Читаем только начало файла (2 КБ хватит для 99% module-level докстрингов)
         with open(filepath, "r", encoding="utf-8") as f:
             head = f.read(2048)
 
-        # Ищем тройные кавычки в самом начале файла
-        # (допускаются пустые строки и однострочные комментарии # до них)
         match = re.search(r"^\s*(?:#.*?\n\s*)*(['\"]{3})(.*?)\1", head, re.DOTALL)
 
         if match:
             doc = match.group(2)
-            # Схлопываем все переносы строк и табы в один пробел
             clean_doc = " ".join(doc.split())
 
             if len(clean_doc) > max_length:
@@ -329,5 +253,114 @@ def get_python_module_docstring(filepath: Path, max_length: int = 150) -> str:
 
         return ""
     except Exception:
-        # Тихо проглатываем ошибки чтения (например, бинарник или лок файла)
         return ""
+
+
+class SystemInstanceLock:
+    """
+    Эксклюзивная блокировка инстанса (Mutex) через отдельный lock-файл.
+    Кроссплатформенная реализация: msvcrt (Windows) и fcntl (Unix).
+    """
+
+    def __init__(self, lock_file: Path):
+        self.lock_file = lock_file
+        self._file: Optional[IO] = None
+
+    def acquire(self) -> bool:
+        """Пытается эксклюзивно заблокировать файл. Возвращает True при успехе."""
+        self.lock_file.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            # Открываем в a+, чтобы создать файл, если его нет, но читать/писать
+            self._file = open(self.lock_file, "a+", encoding="utf-8")
+            fd = self._file.fileno()
+
+            if os.name == "nt":
+                import msvcrt
+
+                # Блокируем 1 байт с начала файла
+                self._file.seek(0)
+                msvcrt.locking(fd, msvcrt.LK_NBLCK, 1)
+            else:
+                import fcntl
+
+                fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+
+            # Записываем наш PID для истории
+            self._file.seek(0)
+            self._file.truncate()
+            self._file.write(str(os.getpid()))
+            self._file.flush()
+            return True
+
+        except (IOError, OSError, PermissionError):
+            if self._file:
+                self._file.close()
+                self._file = None
+            return False
+
+    def release(self) -> None:
+        """Снимает блокировку и закрывает файл."""
+        if self._file:
+            try:
+                fd = self._file.fileno()
+                if os.name == "nt":
+                    import msvcrt
+
+                    self._file.seek(0)
+                    msvcrt.locking(fd, msvcrt.LK_UNLCK, 1)
+                else:
+                    import fcntl
+
+                    fcntl.flock(fd, fcntl.LOCK_UN)
+            except Exception:
+                pass
+
+            try:
+                self._file.close()
+            except Exception:
+                pass
+            self._file = None
+
+
+def is_agent_running() -> bool:
+    """
+    Проверяет, работает ли процесс агента на самом деле.
+    Использует проверку File Lock ОС для 100% гарантии.
+
+    Returns:
+        bool: True, если агент запущен. False в противном случае.
+    """
+
+    lock_file = get_lock_file_path()
+    pid_file = get_pid_file_path()
+
+    is_locked = False
+    try:
+        # Пытаемся получить лок на файл-мьютекс
+        with open(lock_file, "a+", encoding="utf-8") as f:
+            fd = f.fileno()
+            if os.name == "nt":
+                import msvcrt
+
+                f.seek(0)
+                msvcrt.locking(fd, msvcrt.LK_NBLCK, 1)
+                msvcrt.locking(fd, msvcrt.LK_UNLCK, 1)
+            else:
+                import fcntl
+
+                fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                fcntl.flock(fd, fcntl.LOCK_UN)
+    except (IOError, OSError, PermissionError):
+        is_locked = True
+
+    if is_locked:
+        return True
+
+    # Если лок свободен - агент "умер" (или не запускался). Чистим за собой мусор.
+    try:
+        pid_file.unlink(missing_ok=True)
+        lock_file.unlink(missing_ok=True)
+    except Exception:
+        pass
+
+    return False

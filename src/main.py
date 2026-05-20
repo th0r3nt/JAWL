@@ -4,7 +4,7 @@ import asyncio
 import traceback
 from dotenv import load_dotenv
 
-from src.utils._tools import get_pid_file_path
+from src.utils._tools import get_pid_file_path, get_lock_file_path, SystemInstanceLock
 from src.utils.logger import main_logger, apply_logger_config
 from src.utils.event.bus import EventBus
 from src.utils.settings import load_config
@@ -37,6 +37,19 @@ async def main() -> int:
     )
 
     pid_file = get_pid_file_path()
+    lock_file = get_lock_file_path()
+
+    instance_lock = SystemInstanceLock(lock_file)
+    if not instance_lock.acquire():
+        # Если блокировку получить не удалось, значит агент уже работает
+        print("\n[!] Критическая ошибка: Экземпляр агента уже запущен.")
+        print(f"[!] Файл блокировки ({lock_file.name}) заблокирован операционной системой.")
+        print(
+            "[!] Если вы уверены, что это сбой, закройте скрытые процессы python.exe вручную.\n"
+        )
+        return 0
+
+    # Создаем обычный (незаблокированный) PID-файл для чтения из CLI
     pid_file.parent.mkdir(parents=True, exist_ok=True)
     pid_file.write_text(str(os.getpid()))
 
@@ -63,7 +76,6 @@ async def main() -> int:
             for k, v in sorted(os.environ.items())
             if k.startswith("LLM_API_KEY_") and v.strip()
         ] or ["local_dummy_key"]
-
         SUB_LLM_API_URL = os.getenv("SUB_LLM_API_URL", "")
         SUB_LLM_API_KEYS = [
             v
@@ -98,8 +110,8 @@ async def main() -> int:
 
         # ==================================================================
         # Сборка системы
+        
         container = SystemContainer(settings, interfaces, event_bus)
-
         builder = SystemBuilder(container)
         builder.with_l0_states()
         await builder.with_l1_databases()
@@ -128,9 +140,29 @@ async def main() -> int:
     finally:
         if orchestrator:
             await orchestrator.stop()
+
+        # Снимаем блокировку, чтобы иметь возможность удалить файл на Windows
+        instance_lock.release()
+
+        # Ownership Check перед удалением файлов
         if pid_file.exists():
-            pid_file.unlink()
-            main_logger.info("[System] PID-файл удален.")
+            try:
+                current_pid = int(pid_file.read_text().strip())
+                if current_pid == os.getpid():
+                    pid_file.unlink(missing_ok=True)
+                    lock_file.unlink(missing_ok=True)
+                    main_logger.info("[System] PID-файлы удалены.")
+                else:
+                    main_logger.warning(
+                        f"[System] PID-файл содержит чужой PID ({current_pid}). Удаление отменено."
+                    )
+            except Exception as e:
+                main_logger.debug(f"[System] Ошибка при валидации/удалении PID-файла: {e}")
+                try:
+                    pid_file.unlink(missing_ok=True)
+                    lock_file.unlink(missing_ok=True)
+                except Exception:
+                    pass
 
 
 if __name__ == "__main__":

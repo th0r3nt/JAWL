@@ -46,6 +46,8 @@ async def test_watch_for_stop_file_triggers_shutdown(tmp_path):
     bus.publish.assert_called_once_with(
         Events.SYSTEM_SHUTDOWN_REQUESTED, reason="Остановка пользователем из меню"
     )
+
+
 @patch("src.main.SystemOrchestrator")
 @patch("src.main.SystemBuilder")
 @patch("src.main.load_config")
@@ -163,3 +165,77 @@ async def test_system_stop_shared_llm_client_closes_once(mock_configs):
     await orchestrator.stop()
 
     mock_llm.close.assert_awaited_once()
+
+
+@patch("src.main.get_lock_file_path")
+@patch("src.main.get_pid_file_path")
+@patch("src.main.SystemInstanceLock")
+def test_main_instance_already_locked(mock_lock_cls, mock_get_pid, mock_get_lock, tmp_path):
+    """
+    Тест: Если SystemInstanceLock не выдал блокировку (агент уже запущен),
+    система должна прервать инициализацию и вернуть 0, не трогая Qdrant.
+    """
+    import asyncio
+    from src.main import main
+
+    mock_get_pid.return_value = tmp_path / "agent.pid"
+    mock_get_lock.return_value = tmp_path / "agent.lock"
+
+    mock_lock = MagicMock()
+    mock_lock.acquire.return_value = False
+    mock_lock_cls.return_value = mock_lock
+
+    # Запускаем main()
+    exit_code = asyncio.run(main())
+
+    # Система должна была завершиться штатно (код 0) без вызова оркестратора
+    assert exit_code == 0
+
+
+@patch("src.main.get_lock_file_path")
+@patch("src.main.get_pid_file_path")
+@patch("src.main.load_config")
+@patch("src.main.SystemBuilder")
+@patch("src.main.SystemInstanceLock")
+def test_main_finally_block_ownership_protection(
+    mock_lock_cls, mock_builder_cls, mock_load, mock_get_pid, mock_get_lock, tmp_path
+):
+    """
+    Тест: Процесс-дубликат крашится, но в блоке finally он НЕ удаляет
+    agent.pid, потому что обнаруживает, что этот файл принадлежит
+    оригинальному (первому) процессу.
+    """
+    import asyncio
+    from src.main import main
+    from src.utils.settings import SettingsConfig, InterfacesConfig
+
+    mock_load.return_value = (SettingsConfig(), InterfacesConfig())
+
+    pid_file = tmp_path / "agent.pid"
+    lock_file = tmp_path / "agent.lock"
+
+    mock_get_pid.return_value = pid_file
+    mock_get_lock.return_value = lock_file
+
+    mock_lock = MagicMock()
+    mock_lock.acquire.return_value = True
+    mock_lock_cls.return_value = mock_lock
+
+    # Подменяем поведение конструктора билдера
+    def fake_builder_init(*args, **kwargs):
+        # В момент, когда main() пытается создать билдер (т.е. УЖЕ после
+        # успешного создания PID-файла со своим PID), мы имитируем,
+        # что какой-то внешний оригинальный процесс перезаписал файл!
+        pid_file.write_text("999999")
+        raise Exception("Искусственный краш для теста")
+
+    mock_builder_cls.side_effect = fake_builder_init
+
+    # Запускаем main
+    exit_code = asyncio.run(main())
+
+    # Проверки:
+    assert exit_code == 0
+    # Файл НЕ должен быть удален, так как там чужой PID!
+    assert pid_file.exists()
+    assert pid_file.read_text().strip() == "999999"

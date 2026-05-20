@@ -10,9 +10,9 @@ from telethon import TelegramClient
 from dotenv import dotenv_values
 import questionary
 from pydantic import ValidationError
-from src.utils.settings import load_config
-from src.utils._tools import get_pid_file_path
 
+from src.utils.settings import load_config
+from src.utils._tools import is_agent_running
 from src.cli.widgets.ui import print_success, print_error, print_info, wait_for_enter
 from src.cli.screens.onboarding import run_onboarding_if_needed
 
@@ -26,20 +26,7 @@ PROMPTS_DIR = ROOT_DIR / "src" / "l3_agent" / "prompt" / "personality"
 
 def _is_agent_running() -> bool:
     """Проверяет, работает ли агент на самом деле."""
-    pid_file = get_pid_file_path()
-    if not pid_file.exists():
-        return False
-
-    try:
-        pid = int(pid_file.read_text().strip())
-        if psutil.pid_exists(pid):
-            proc = psutil.Process(pid)
-            return proc.is_running() and "python" in proc.name().lower()
-        return False
-    except (ValueError, psutil.NoSuchProcess, psutil.AccessDenied):
-        if pid_file.exists():
-            pid_file.unlink()
-        return False
+    return is_agent_running()
 
 
 def _check_and_setup_prompts() -> None:
@@ -198,7 +185,6 @@ def start_agent_screen() -> None:
                 env=env,
                 **kwargs,
             )
-            PID_FILE.write_text(str(process.pid))
 
         finally:
             f_err.close()
@@ -206,8 +192,6 @@ def start_agent_screen() -> None:
         time.sleep(5)
 
         if process.poll() is not None:
-            if PID_FILE.exists():
-                PID_FILE.unlink()
             print_error("Агент завершился с ошибкой сразу после старта.")
 
             error_output = crash_log_path.read_text(encoding="utf-8", errors="replace").strip()
@@ -235,12 +219,17 @@ def stop_agent_screen() -> None:
     """Экран остановки агента."""
     if not _is_agent_running():
         print_info(" Агент в данный момент не запущен.")
-        if PID_FILE.exists():
-            PID_FILE.unlink()
+        # Для надежности сносим файлы-маркеры, если они остались
+        try:
+            if PID_FILE.exists():
+                PID_FILE.unlink()
+        except Exception:
+            pass
         wait_for_enter()
         return
 
     try:
+        # Читаем PID из незаблокированного файла agent.pid
         pid = int(PID_FILE.read_text().strip())
         process = psutil.Process(pid)
 
@@ -265,12 +254,16 @@ def stop_agent_screen() -> None:
             process.kill()
             print_success("Процесс агента выслежен и убит.")
 
+    except Exception as e:
+        print_error(f"Ошибка при попытке остановить агента: {e}")
+
+    # Подчищаем мусор, игнорируя ошибки
+    try:
         if PID_FILE.exists():
             PID_FILE.unlink()
         if STOP_FILE.exists():
             STOP_FILE.unlink()
-
-    except Exception as e:
-        print_error(f"Ошибка при попытке остановить агента: {e}")
+    except Exception:
+        pass
 
     wait_for_enter()
