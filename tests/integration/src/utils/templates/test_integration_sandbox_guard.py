@@ -71,6 +71,7 @@ def run_in_sandbox(
     )
 
     env = os.environ.copy()
+    env["PYTHONIOENCODING"] = "utf-8"
     if secret_env:
         env.update(secret_env)
 
@@ -79,6 +80,7 @@ def run_in_sandbox(
         check=False,
         capture_output=True,
         text=True,
+        encoding="utf-8",
         env=env,
         timeout=10,
     )

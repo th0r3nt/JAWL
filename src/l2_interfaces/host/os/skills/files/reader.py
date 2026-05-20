@@ -28,7 +28,7 @@ class HostOSReader:
         self, filepath: str, read_from: Literal["head", "tail"] = "head"
     ) -> SkillResult:
         """
-        Reads file content. 
+        Reads file content.
         Note: use framework root relative path (e.g., 'sandbox/file.txt').
         """
 
@@ -98,9 +98,9 @@ class HostOSReader:
         self, path: str = ".", max_files: int = 10, recursive: bool = False
     ) -> SkillResult:
         """
-        Reads multiple files in dir. 
-        Skips binaries. 
-        
+        Reads multiple files in dir.
+        Skips binaries.
+
         recursive: Includes subdirectories if True.
         """
 
@@ -131,11 +131,9 @@ class HostOSReader:
                 }
 
                 iterator = safe_path.rglob("*") if recursive else safe_path.iterdir()
+                items = sorted([p for p in iterator if p.is_file()])
 
-                for item in iterator:
-                    if not item.is_file():
-                        continue
-
+                for item in items:
                     rel_path = item.relative_to(safe_path)
 
                     # Пропускаем мусорные папки
