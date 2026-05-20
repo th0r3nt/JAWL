@@ -1,116 +1,136 @@
 """
-Мост маршрутизации системных событий (Event Bridge).
+Мост маршрутизации системных событий.
 
-Отделяет логику подписки (EventBus) от главного файла main.py.
-Слушает шину событий и пробрасывает триггеры в Heartbeat агента,
-а также обрабатывает системные команды на выключение/ребут и изменение конфигов.
+Отделяет логику подписки (EventBus) от главного файла. Слушает шину
+событий и пробрасывает триггеры в Heartbeat агента, а также обрабатывает
+системные команды на выключение/ребут и изменение конфигов в рантайме.
 """
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Callable, Coroutine
 
 from src.utils.logger import main_logger
-from src.utils.event.registry import Events
+from src.utils.event.registry import Events, EventConfig
 
 if TYPE_CHECKING:
-    from src.main import System
+    from src.system.container import SystemContainer
 
 
 class EventBridge:
     """Маршрутизатор системных событий (Event-Driven паттерн)."""
 
-    def __init__(self, system: "System"):
-        self.system = system
+    def __init__(self, container: "SystemContainer"):
+        self.container = container
 
     def setup_routing(self) -> None:
         """Подписывает Heartbeat и системные триггеры на все события из EventBus."""
 
-        def create_handler(evt):
-            # АСИНХРОННЫЙ ХЕНДЛЕР: гарантирует потокобезопасность при Event.set() в Heartbeat
-            async def handler(**kwargs):
-                # Если система уже останавливается - игнорируем любые события
-                if evt == Events.SYSTEM_CORE_STOP:
-                    return
+        # Специфичные системные подписки
+        self.container.event_bus.subscribe(
+            Events.SYSTEM_SHUTDOWN_REQUESTED, self._handle_shutdown
+        )
+        self.container.event_bus.subscribe(Events.SYSTEM_REBOOT_REQUESTED, self._handle_reboot)
+        self.container.event_bus.subscribe(
+            Events.SYSTEM_CONFIG_UPDATED, self._handle_config_update
+        )
+        self.container.event_bus.subscribe(
+            Events.SYSTEM_DASHBOARD_UPDATE, self._handle_dashboard_update
+        )
 
-                if self.system.heartbeat:
-                    self.system.heartbeat.answer_to_event(
-                        level=evt.level, event_name=evt.name, payload=kwargs
-                    )
+        # Подписка Heartbeat на остальные события (динамическая генерация)
+        system_events = {
+            Events.SYSTEM_CORE_STOP.name,
+            Events.SYSTEM_SHUTDOWN_REQUESTED.name,
+            Events.SYSTEM_REBOOT_REQUESTED.name,
+        }
 
-            return handler
-
-        # Базовая подписка: будим агента на любые события, кроме остановки
         for event in Events.all():
-            if event.name in (
-                Events.SYSTEM_CORE_STOP.name,
-                Events.SYSTEM_SHUTDOWN_REQUESTED.name,
-                Events.SYSTEM_REBOOT_REQUESTED.name,
-            ):
+            if event.name in system_events:
                 continue
-            self.system.event_bus.subscribe(event, create_handler(event))
 
-        # Специфичные подписки (сделаны асинхронными для единообразия и стабильности)
-        async def handle_config_update(**kwargs):
-            key = kwargs.get("key")
+            # Замыкание для фиксации текущего event в контексте генератора
+            handler = self._create_heartbeat_handler(event)
+            self.container.event_bus.subscribe(event, handler)
 
-            # Настройки Heartbeat
-            if key in ("heartbeat_interval", "continuous_cycle"):
-                if self.system.heartbeat:
-                    self.system.heartbeat.update_config(key, kwargs.get("value"))
+    def _create_heartbeat_handler(
+        self, evt: EventConfig
+    ) -> Callable[..., Coroutine[Any, Any, None]]:
+        """
+        Генерирует асинхронный обработчик для перенаправления события в Heartbeat.
+        """
 
-            # Лимиты SQL баз данных
-            elif key == "db_limit":
-                module = kwargs.get("module")
-                val = kwargs.get("value")
-                if self.system.sql:
-                    if module == "tasks":
-                        self.system.sql.tasks.max_tasks = val
-                    elif module == "personality_traits":
-                        self.system.sql.personality_traits.max_traits = val
-                    elif module == "mental_states":
-                        self.system.sql.mental_states.max_entities = val
-                    elif module == "drives_custom":
-                        self.system.sql.drives.max_custom = val
+        async def handler(**kwargs: Any) -> None:
+            if evt == Events.SYSTEM_CORE_STOP:
+                return
 
+            if self.container.heartbeat:
+                self.container.heartbeat.answer_to_event(
+                    level=evt.level, event_name=evt.name, payload=kwargs
+                )
+
+        return handler
+
+    # =========================================================================
+    # ОБРАБОТЧИКИ СИСТЕМНЫХ КОМАНД И КОНФИГУРАЦИЙ
+    # =========================================================================
+
+    async def _handle_config_update(self, **kwargs: Any) -> None:
+        """
+        Рантайм-обновление настроек подсистем (Hot Reload).
+        """
+
+        key = kwargs.get("key")
+
+        # Настройки Heartbeat
+        if key in ("heartbeat_interval", "continuous_cycle"):
+            if self.container.heartbeat:
+                self.container.heartbeat.update_config(key, kwargs.get("value"))
+
+        # Лимиты SQL баз данных
+        elif key == "db_limit":
+            module = kwargs.get("module", "")
+            val = kwargs.get("value", 0)
+
+            if self.container.sql:
+                self.container.sql.update_limits(module, val)
                 main_logger.info(f"[System] Рантайм-обновление лимита для {module}: {val}")
 
-            # Глубина контекста
-            elif key == "context_depth":
-                if self.system.sql:
-                    self.system.sql.ticks.high_ticks = kwargs.get("high_ticks")
-                    self.system.sql.ticks.medium_ticks = kwargs.get("medium_ticks")
-                    self.system.sql.ticks.low_ticks = kwargs.get("low_ticks")
+        # Глубина контекста (Ticks)
+        elif key == "context_depth":
+            high = kwargs.get("high_ticks", 0)
+            medium = kwargs.get("medium_ticks", 0)
+            low = kwargs.get("low_ticks", 0)
 
-                total = (
-                    kwargs.get("high_ticks", 0)
-                    + kwargs.get("medium_ticks", 0)
-                    + kwargs.get("low_ticks", 0)
-                )
-                main_logger.info(f"[System] Рантайм-обновление контекста: {total} тиков")
+            if self.container.sql:
+                self.container.sql.update_context_depth(high, medium, low)
 
-        async def handle_dashboard_update(**kwargs):
-            name = kwargs.get("name")
-            content = kwargs.get("content")
-            if name:
-                if content:
-                    self.system.dashboard_state.blocks[name] = content
-                else:
-                    self.system.dashboard_state.blocks.pop(name, None)
+            total = high + medium + low
+            main_logger.info(f"[System] Рантайм-обновление контекста: {total} тиков")
 
-        # Если агент решил совершить сэппуку
-        async def handle_shutdown(**kwargs):
-            self.system._exit_code = 0
-            if self.system.heartbeat:
-                self.system.heartbeat.stop()
+    async def _handle_dashboard_update(self, **kwargs: Any) -> None:
+        """
+        Обновление или удаление кастомного блока Markdown на дашборде L0 State.
+        """
 
-        # Если агент запросил перезагрузку
-        async def handle_reboot(**kwargs):
-            self.system._exit_code = 1
-            if self.system.heartbeat:
-                self.system.heartbeat.stop()
+        name = kwargs.get("name")
+        content = kwargs.get("content")
 
-        self.system.event_bus.subscribe(Events.SYSTEM_SHUTDOWN_REQUESTED, handle_shutdown)
-        self.system.event_bus.subscribe(Events.SYSTEM_REBOOT_REQUESTED, handle_reboot)
-        self.system.event_bus.subscribe(Events.SYSTEM_CONFIG_UPDATED, handle_config_update)
-        self.system.event_bus.subscribe(
-            Events.SYSTEM_DASHBOARD_UPDATE, handle_dashboard_update
-        )
+        if name and self.container.dashboard_state:
+            self.container.dashboard_state.update_block(name, content)
+
+    async def _handle_shutdown(self, **kwargs: Any) -> None:
+        """
+        Команда на выключение системы.
+        """
+
+        self.container.exit_code = 0
+        if self.container.heartbeat:
+            self.container.heartbeat.stop()
+
+    async def _handle_reboot(self, **kwargs: Any) -> None:
+        """
+        Команда на перезагрузку системы.
+        """
+        
+        self.container.exit_code = 1
+        if self.container.heartbeat:
+            self.container.heartbeat.stop()

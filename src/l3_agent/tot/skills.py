@@ -14,13 +14,10 @@ class DeepThinkSkill:
     @skill()
     async def deep_think(self, task_description: str = "") -> SkillResult:
         """
-        Обращается к подсознанию для генерации вложенного дерева мыслей: Tree of Thoughts.
-
-        Симулирует в уме несколько вариантов развития событий будущего, 
-        генерирует макро- и микро- стратегии.
-
-        Args:
-            task_description: (опционально) Описание проблемы или задачи, о которой подсознанию нужно подумать.
+        Triggers subconscious Tree of Thoughts generation. 
+        Simulates future scenarios, generates macro/micro strategies. 
+        
+        task_description: Optional problem description to ponder.
         """
 
         tree_md = await self.generator.generate(

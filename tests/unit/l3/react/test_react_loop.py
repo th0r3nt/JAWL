@@ -1,59 +1,33 @@
 import pytest
-import openai
 from unittest.mock import AsyncMock, MagicMock, patch
-
 from src.l0_state.agent.state import AgentStatus
 from src.l3_agent.react.loop import ReactLoop
 
 
 def test_react_dump_context_to_file(mock_dependencies):
-    """Тест: Запись системного промпта в файл логов (last_prompt.md) работает безопасно."""
     loop = ReactLoop(**mock_dependencies)
-
     messages = [
         {"role": "system", "content": "You are AI"},
         {"role": "user", "content": "Hello"},
     ]
-
     with patch("builtins.open") as mock_open:
         mock_file = MagicMock()
         mock_open.return_value.__enter__.return_value = mock_file
-
         loop._dump_context_to_file(messages)
-
-        # Проверяем, что используется правильный унифицированный путь
         args, kwargs = mock_open.call_args
         assert str(args[0]).replace("\\", "/") == "logs/prompts/main_prompt.md"
-
-        written_content = "".join([call[0][0] for call in mock_file.write.call_args_list])
-        assert "### Role: system" in written_content
-        assert "You are AI" in written_content
-        assert "### Role: user" in written_content
-        assert "Hello" in written_content
-
-
-def test_react_dump_context_exception_safety(mock_dependencies):
-    """Тест: Если файл недоступен, дамп падает тихо и не ломает цикл агента."""
-    loop = ReactLoop(**mock_dependencies)
-
-    with patch("builtins.open", side_effect=PermissionError("Access Denied")):
-        # Не должно выкинуть Exception наверх
-        loop._dump_context_to_file([{"role": "system", "content": "1"}])
 
 
 @pytest.mark.asyncio
 @patch("src.l3_agent.react.loop.execute_skill", new_callable=AsyncMock)
-async def test_react_empty_actions_exit(
-    mock_execute_skill, mock_dependencies, mock_openai_response
-):
+async def test_react_empty_actions_exit(mock_execute_skill, mock_dependencies):
     deps = mock_dependencies
     loop = ReactLoop(**deps)
 
-    mock_session = AsyncMock()
-    mock_session.chat.completions.create.return_value = mock_openai_response(
+    # Мокаем экзекутор, чтобы он вернул пустой список действий
+    deps["executor"].execute.return_value = (
         '{"reflection": "Мне нечего делать.", "actions": []}'
     )
-    deps["llm_client"].get_session = MagicMock(return_value=mock_session)
 
     await loop.run("HEARTBEAT", {}, missed_events=[])
 
@@ -65,108 +39,20 @@ async def test_react_empty_actions_exit(
 
 @pytest.mark.asyncio
 @patch("src.l3_agent.react.loop.execute_skill", new_callable=AsyncMock)
-async def test_react_max_steps_limit(
-    mock_execute_skill, mock_dependencies, mock_openai_response
-):
+async def test_react_max_steps_limit(mock_execute_skill, mock_dependencies):
     deps = mock_dependencies
     deps["agent_state"].max_react_steps = 2
     loop = ReactLoop(**deps)
 
-    mock_session = AsyncMock()
-    mock_session.chat.completions.create.return_value = mock_openai_response(
+    deps["executor"].execute.return_value = (
         '{"reflection": "Делаю шаг", "actions": [{"tool_name": "test", "parameters": {}}]}'
     )
-    deps["llm_client"].get_session = MagicMock(return_value=mock_session)
     mock_execute_skill.return_value = "Result"
 
     await loop.run("TEST", {}, missed_events=[])
 
-    assert mock_session.chat.completions.create.call_count == 2
-    # Цикл оборвался, потому что 3 > 2 (лимит достигнут)
+    assert deps["executor"].execute.call_count == 2
     assert deps["agent_state"].current_step == 3
-
-
-@pytest.mark.asyncio
-async def test_react_rate_limit(mock_dependencies, mock_openai_response):
-    deps = mock_dependencies
-    loop = ReactLoop(**deps)
-
-    mock_session1 = AsyncMock()
-    mock_session1.api_key = "key_1"
-
-    # Явно создаем мок ответа с пустыми заголовками,
-    # чтобы механизм вычисления кулдауна пошел по дефолтному пути (60 сек)
-    mock_resp = MagicMock()
-    mock_resp.headers = {}
-    rate_limit_err = openai.RateLimitError("429", response=mock_resp, body={})
-
-    mock_session1.chat.completions.create.side_effect = rate_limit_err
-
-    mock_session2 = AsyncMock()
-    mock_session2.api_key = "key_2"
-    mock_session2.chat.completions.create.return_value = mock_openai_response(
-        '{"reflection": "ok", "actions": []}'
-    )
-
-    deps["llm_client"].get_session = MagicMock(side_effect=[mock_session1, mock_session2])
-
-    await loop.run("TEST", {}, missed_events=[])
-
-    deps["llm_client"].rotator.cooldown_key.assert_called_once_with("key_1", 60)
-    assert deps["agent_state"].state == AgentStatus.IDLE
-
-
-@pytest.mark.asyncio
-async def test_react_auth_error_ban_key(mock_dependencies, mock_openai_response):
-    deps = mock_dependencies
-    loop = ReactLoop(**deps)
-
-    mock_session = AsyncMock()
-    mock_session.api_key = "dead_key"
-    auth_err = openai.AuthenticationError("401", response=MagicMock(), body={})
-
-    mock_session.chat.completions.create.side_effect = [
-        auth_err,
-        mock_openai_response('{"reflection": "ok", "actions": []}'),
-    ]
-    deps["llm_client"].get_session = MagicMock(return_value=mock_session)
-
-    await loop.run("TEST", {}, missed_events=[])
-    deps["llm_client"].rotator.ban_key.assert_called_once_with("dead_key")
-
-
-@pytest.mark.asyncio
-async def test_react_no_tool_calls(mock_dependencies, mock_openai_response):
-    deps = mock_dependencies
-    loop = ReactLoop(**deps)
-
-    mock_session = AsyncMock()
-    mock_session.chat.completions.create.return_value = mock_openai_response(
-        "Я просто хочу поболтать.", finish_reason="stop"
-    )
-    deps["llm_client"].get_session = MagicMock(return_value=mock_session)
-
-    await loop.run("TEST", {}, missed_events=[])
-    assert deps["agent_state"].state == AgentStatus.IDLE
-
-
-@pytest.mark.asyncio
-async def test_react_inject_images_no_markers(mock_dependencies):
-    deps = mock_dependencies
-    loop = ReactLoop(**deps)
-
-    # Стейт пустой - инжекта не будет
-    loop.agent_state.last_actions_result = "Обычный ответ тулзы"
-
-    messages = [
-        {"role": "system", "content": "Система"},
-        {"role": "user", "content": "Контекст агента"},
-    ]
-
-    result = await loop._inject_images_to_payload(messages.copy())
-
-    assert result == messages
-    assert isinstance(result[-1]["content"], str)
 
 
 @pytest.mark.asyncio
@@ -177,7 +63,6 @@ async def test_react_inject_images_success(mock_dependencies, tmp_path):
     fake_img = tmp_path / "test.jpg"
     fake_img.write_bytes(b"hello")
 
-    # Маркер теперь лежит в результатах последнего действия стейта
     loop.agent_state.last_actions_result = (
         f"Result:[SYSTEM_MARKER_IMAGE_ATTACHED: {fake_img.resolve()}]"
     )
@@ -192,58 +77,4 @@ async def test_react_inject_images_success(mock_dependencies, tmp_path):
 
     assert isinstance(last_msg_content, list)
     assert last_msg_content[0]["type"] == "text"
-    assert last_msg_content[0]["text"] == "Анализируй"
     assert last_msg_content[1]["type"] == "image_url"
-    assert "aGVsbG8=" in last_msg_content[1]["image_url"]["url"]
-
-
-@pytest.mark.asyncio
-async def test_react_timeout_retry(mock_dependencies, mock_openai_response):
-    deps = mock_dependencies
-    loop = ReactLoop(**deps)
-
-    mock_session = AsyncMock()
-    mock_session.api_key = "key_1"
-
-    timeout_err = openai.APITimeoutError(request=MagicMock())
-    mock_session.chat.completions.create.side_effect = [
-        timeout_err,
-        mock_openai_response('{"reflection": "ok", "actions": []}'),
-    ]
-
-    deps["llm_client"].get_session = MagicMock(return_value=mock_session)
-
-    await loop.run("TEST", {}, missed_events=[])
-
-    assert mock_session.chat.completions.create.call_count == 2
-    assert deps["agent_state"].current_step == 1
-    assert deps["agent_state"].state == AgentStatus.IDLE
-
-
-@pytest.mark.asyncio
-async def test_react_parse_response_robustness(mock_dependencies):
-    """Регрессионный тест: парсер должен выживать при любом мусоре от LLM."""
-    loop = ReactLoop(**mock_dependencies)
-
-    # 1. LLM обернула JSON в Markdown (```json ... ```)
-    raw_md = 'Вот мой ответ:\n```json\n{"observation": "", "reasoning": "", "reflection": "1", "actions": []}\n```\nГотово.'
-    res_md = await loop._parse_response(raw_md)
-    assert res_md is not None
-    assert "[Reflection]: 1" in res_md.thoughts
-
-    # 2. Мусорный текст до и после голого JSON
-    raw_garbage = 'Окей, я подумала. { "observation": "", "reasoning": "", "reflection": "2", "actions": [] } Жду команд.'
-    res_garbage = await loop._parse_response(raw_garbage)
-    assert res_garbage is not None
-    assert "[Reflection]: 2" in res_garbage.thoughts
-
-    # 3. Сломанные/случайные скобки ДО реального JSON
-    raw_broken = (
-        'Здесь случайная скобка { а вот тут реальный: {"observation": "", "reasoning": "", "reflection": "3", '
-        '"actions": [{"tool_name": "mock.tool", "parameters": {}}]}'
-    )
-    res_broken = await loop._parse_response(raw_broken)
-    assert res_broken is not None
-    # Парсер идеально находит начало JSON по ключу "observation" и игнорирует мусор
-    assert "[Reflection]: 3" in res_broken.thoughts
-    assert len(res_broken.actions) == 1

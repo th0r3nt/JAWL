@@ -11,6 +11,8 @@ from typing import Union
 import re
 import html
 
+from src.utils.logger import main_logger
+
 
 def format_size(size_bytes: int) -> str:
     """
@@ -169,8 +171,11 @@ def is_agent_running() -> bool:
         if pid_file.exists():
             try:
                 pid_file.unlink()
-            except Exception:
-                pass
+            except Exception as e:
+                # Если файл заблокирован другой службой
+                main_logger.debug(
+                    f"[Tools] Не удалось очистить неактуальный PID-файл {pid_file.name}: {e}"
+                )
         return False
 
 

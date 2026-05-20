@@ -14,5 +14,5 @@ class WebHTTPState:
     @property
     def http_history(self) -> str:
         if not self.history:
-            return "История пуста."
+            return "History is empty."
         return "\n".join(f"- {item}" for item in self.history)

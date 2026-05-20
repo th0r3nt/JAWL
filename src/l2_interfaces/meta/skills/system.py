@@ -20,7 +20,7 @@ class MetaSystem:
     @skill()
     async def off_system(self, reason: str = "Без причины") -> SkillResult:
         """
-        Завершает работу и полностью выключает систему.
+        Shuts down and completely powers off the system.
         """
 
         main_logger.info(f"[Meta] Запрошено выключение системы. Причина: {reason}")
@@ -33,7 +33,7 @@ class MetaSystem:
     @skill()
     async def reboot_system(self, reason: str = "Обновление конфигурации") -> SkillResult:
         """
-        Выполняет полную перезагрузку системы.
+        Performs full system reboot.
         """
 
         main_logger.info(f"[Meta] Запрошена перезагрузка системы. Причина: {reason}")

@@ -7,6 +7,7 @@ Stateful-клиент для работы с Telegram User API (Telethon).
 """
 
 from typing import Any, Optional
+from python_socks import parse_proxy_url
 from telethon import TelegramClient
 from telethon.tl.functions.users import GetFullUserRequest
 
@@ -26,6 +27,7 @@ class TelethonClient:
         api_hash: str,
         session_path: str,
         timezone: int,
+        proxy_url: Optional[str] = None,
     ) -> None:
         """
         Инициализирует клиент.
@@ -43,6 +45,7 @@ class TelethonClient:
         self.api_hash = api_hash
         self.session_path = session_path
         self.timezone = timezone
+        self.proxy_url = proxy_url
 
         self._client: Optional[TelegramClient] = None
 
@@ -72,7 +75,10 @@ class TelethonClient:
         main_logger.info("[Telegram Telethon] Инициализация клиента.")
 
         try:
-            self._client = TelegramClient(self.session_path, self.api_id, self.api_hash)
+            # Парсим прокси, если он есть
+            proxy = parse_proxy_url(self.proxy_url) if self.proxy_url else None
+            
+            self._client = TelegramClient(self.session_path, self.api_id, self.api_hash, proxy=proxy)
 
             # Встроенная магия Telethon для консольной авторизации
             await self._client.start()
@@ -144,8 +150,12 @@ class TelethonClient:
             self.state.account_info = "Профиль: Ошибка загрузки данных\n---"
 
     async def get_context_block(self, **kwargs: Any) -> str:
-        """Провайдер контекста для ContextRegistry."""
-        if not self.state.is_online:
-            return "### TELETHON [OFF]\nThe interface is disabled."
+        """
+        Провайдер контекста для ContextRegistry.
+        """
 
-        return f"### TELETHON [ON] \nAccount info: {self.state.account_info}\nВАЖНО: рекомендуется отвечать пользователям, у которых стоит UNREAD. \n\n{self.state.last_chats}"
+        desc = "Description: Telegram User API. Connects to personal Telegram account."
+        if not self.state.is_online:
+            return f"### TELETHON [OFF]\n{desc}\nThe interface is disabled."
+
+        return f"### TELETHON [ON] \n{desc}\nAccount info: {self.state.account_info}\nIMPORTANT: It is recommended to reply to users who have UNREAD. \n\n{self.state.last_chats}"

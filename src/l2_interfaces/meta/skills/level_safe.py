@@ -19,10 +19,7 @@ class MetaSafe:
     @skill()
     async def change_model(self, model_name: str) -> SkillResult:
         """
-        Изменяет текущую используемую LLM модель.
-
-        Args:
-            model_name: Название модели.
+        Changes currently active LLM model.
         """
 
         if self.client.available_models and model_name not in self.client.available_models:
@@ -37,15 +34,16 @@ class MetaSafe:
             return SkillResult.fail("Ошибка при сохранении файла конфигурации.")
 
         self.client.agent_state.llm_model = model_name
-        return SkillResult.ok(f"Модель успешно изменена на {model_name}.")
+        return SkillResult.ok("True")
 
     @skill()
     async def add_available_model(self, model_name: str) -> SkillResult:
         """
-        Добавляет новую LLM модель в список доступных.
+        Adds new LLM model to available models list.
         """
+
         if model_name in self.client.available_models:
-            return SkillResult.ok(f"Модель '{model_name}' уже есть в списке доступных.")
+            return SkillResult.ok("True")
 
         new_list = list(self.client.available_models)
         new_list.append(model_name)
@@ -57,12 +55,12 @@ class MetaSafe:
             return SkillResult.fail("Ошибка при обновлении конфигурации.")
 
         self.client.available_models = new_list
-        return SkillResult.ok(f"Модель '{model_name}' добавлена в список доступных.")
+        return SkillResult.ok("True")
 
     @skill()
     async def remove_available_model(self, model_name: str) -> SkillResult:
         """
-        Удаляет LLM модель из списка доступных.
+        Removes LLM model from available list.
         """
 
         if model_name not in self.client.available_models:
@@ -82,12 +80,12 @@ class MetaSafe:
             return SkillResult.fail("Ошибка при обновлении конфигурации.")
 
         self.client.available_models = new_list
-        return SkillResult.ok(f"Модель '{model_name}' удалена из списка доступных.")
+        return SkillResult.ok("True")
 
     @skill()
     async def change_temperature(self, temperature: float) -> SkillResult:
         """
-        Изменяет параметр temperature языковой модели.
+        Changes LLM generation temperature parameter.
         """
 
         if not 0.0 <= temperature <= 2.0:
@@ -100,19 +98,19 @@ class MetaSafe:
             return SkillResult.fail("Ошибка при сохранении конфигурации.")
 
         self.client.agent_state.temperature = temperature
-        return SkillResult.ok(f"Температура успешно изменена на {temperature}.")
+        return SkillResult.ok("True")
 
     @skill()
     async def set_current_goal(self, goal: str) -> SkillResult:
         """
-        Устанавливает текущую цель-фокус.
-        Эта цель будет закреплена в системном промпте и поможет не потерять контекст
-        при длительных рассуждениях, большом количестве шагов или перерывах между тиками.
-        Для сброса, когда цель выполнена - передать пустую строку "".
+        Sets current focus goal. 
+        Pins goal in system prompt to maintain context over long cycles. 
+        Pass empty string to clear.
         """
+        
         clean_goal = goal.strip()
         self.client.agent_state.current_goal = clean_goal
 
         if clean_goal:
-            return SkillResult.ok(f"Текущая цель успешно установлена: '{clean_goal}'.")
-        return SkillResult.ok("Текущая цель успешно сброшена.")
+            return SkillResult.ok("True")
+        return SkillResult.ok("True")

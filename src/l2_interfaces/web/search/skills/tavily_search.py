@@ -60,8 +60,8 @@ class TavilySearch:
     @skill(swarm=[Subagents.WEB_RESEARCHER])
     async def search(self, query: str, max_results: int = 5) -> SkillResult:
         """
-        Ищет информацию в интернете через Tavily AI Search.
-        Возвращает список ссылок и кратких сниппетов.
+        Searches web via Tavily AI. 
+        Returns links and short snippets.
         """
         try:
             results = await self.search_raw(query, max_results)

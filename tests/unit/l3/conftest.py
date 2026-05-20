@@ -2,35 +2,20 @@ import pytest
 from unittest.mock import AsyncMock, MagicMock
 from src.l0_state.agent.state import AgentState
 from src.utils.event.bus import EventBus
+from src.l3_agent.llm.executor import LLMExecutor
 
 
 @pytest.fixture
-def mock_openai_response():
-    def _create(arguments_json: str, finish_reason: str = "tool_calls"):
-        response = MagicMock()
-        message = MagicMock()
-
-        if finish_reason == "tool_calls":
-            tool_call = MagicMock()
-            tool_call.id = "call_123"
-            tool_call.function.name = "execute_skill"
-            tool_call.function.arguments = arguments_json
-            message.tool_calls = [tool_call]
-        else:
-            message.tool_calls = None
-            message.content = arguments_json
-
-        response.choices = [MagicMock(message=message)]
-        return response
-
-    return _create
+def mock_executor():
+    executor = AsyncMock(spec=LLMExecutor)
+    executor.tracker = MagicMock()
+    # По дефолту возвращаем пустой массив действий для штатного завершения циклов
+    executor.execute.return_value = '{"reflection": "ok", "actions": []}'
+    return executor
 
 
 @pytest.fixture
-def mock_dependencies():
-    llm_client = MagicMock()
-    llm_client.rotator = MagicMock()
-
+def mock_dependencies(mock_executor):
     prompt_builder = MagicMock()
     prompt_builder.build.return_value = "System Prompt"
 
@@ -44,19 +29,15 @@ def mock_dependencies():
 
     vector_manager = MagicMock()
 
-    token_tracker = MagicMock()
-    tools =[{"type": "function", "function": {"name": "execute_skill"}}]
-    cooldown_sec = 0.2
+    tools = [{"type": "function", "function": {"name": "execute_skill"}}]
 
     return {
-        "llm_client": llm_client,
+        "executor": mock_executor,
         "prompt_builder": prompt_builder,
         "context_builder": context_builder,
         "agent_state": agent_state,
         "sql_ticks": sql_ticks,
         "vector_manager": vector_manager,
-        "token_tracker": token_tracker,
         "tools": tools,
-        "cooldown_sec": cooldown_sec,
         "event_bus": MagicMock(spec=EventBus),
     }

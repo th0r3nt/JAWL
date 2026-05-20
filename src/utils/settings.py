@@ -308,18 +308,26 @@ class MentalStatesConfig(BaseModel):
     max_entities: int = 10
 
 
+class DriveDecayConfig(BaseModel):
+    rate: float = 10.0
+    interval_sec: int = 900
+
+
+class FundamentalDriveConfig(BaseModel):
+    enabled: bool = True
+    decay: DriveDecayConfig = Field(default_factory=DriveDecayConfig)
+
+
 class FundamentalDrivesConfig(BaseModel):
-    curiosity: bool = True
-    social: bool = True
-    mastery: bool = True
+    curiosity: FundamentalDriveConfig = Field(default_factory=FundamentalDriveConfig)
+    social: FundamentalDriveConfig = Field(default_factory=FundamentalDriveConfig)
+    mastery: FundamentalDriveConfig = Field(default_factory=FundamentalDriveConfig)
 
 
 class DrivesConfig(BaseModel):
     enabled: bool = True
     dynamic_reduction: bool = True
     pause_on_offline: bool = True
-    decay_rate: float = 5.0
-    decay_interval_sec: int = 540
     max_reflections_history: int = 4
     max_custom_drives: int = 5
     fundamental: FundamentalDrivesConfig = Field(default_factory=FundamentalDrivesConfig)
@@ -344,7 +352,7 @@ class SQLConfig(BaseModel):
     mental_states: MentalStatesConfig = Field(default_factory=MentalStatesConfig)
     drives: DrivesConfig = Field(default_factory=DrivesConfig)
     notes: NotesConfig = Field(default_factory=NotesConfig)
-    hypotheses: HypothesesConfig = Field(default_factory=HypothesesConfig) 
+    hypotheses: HypothesesConfig = Field(default_factory=HypothesesConfig)
 
 
 class GraphDBConfig(BaseModel):

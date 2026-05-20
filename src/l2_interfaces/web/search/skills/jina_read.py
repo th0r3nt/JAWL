@@ -39,7 +39,7 @@ class JinaReader:
     @skill(swarm=[Subagents.WEB_RESEARCHER])
     async def read_webpage(self, url: str) -> SkillResult:
         """
-        Читает содержимое веб-страницы.
+        Reads webpage content.
         """
         try:
             text = await self.read_raw(url)

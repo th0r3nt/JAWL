@@ -144,7 +144,7 @@ class ContextBuilder:
 
         # Сначала лог, потом системный триггер
         return f"""
-## EVENT LOG (missed while sleeping or thinking)
+## EVENT LOG (missed while sleeping/thinking)
 {event_log}
 
 ---
@@ -162,7 +162,7 @@ class ContextBuilder:
 
         payload_lines = [f"{k}: {v}" for k, v in payload.items()]
         payload_str = (
-            "\n".join(payload_lines) if payload_lines else "Нет дополнительных данных"
+            "\n".join(payload_lines) if payload_lines else "No data"
         )
 
         main_trigger = f"{event_name}\n{payload_str}"
@@ -195,17 +195,18 @@ class ContextBuilder:
 
         proactive_prompt = """
 [SYSTEM]
-Рекомендуется проактивное выполнение действий.
+Proactive action execution is recommended.
 
-Векторы активности могут включать: 
-- Выполнение шагов по долгосрочным задачам.
-- Сбор данных во внешних сетях по релевантным тематикам.
-- Ревизия, консолидация или удаление ненужных данных в подсистемах памяти.
-- Рефлексия о недавних действиях.
-- Очистка рабочих директорий от нерелевантных файлов.
-- Составление/создание новых задач для выполнения.
+Activity vectors may include:
 
-В случае, если текущих задач нет - системе рекомендуется проактивно поставить их (Tasks).
+- Executing steps for long-term tasks.
+- Gathering data in external networks on relevant topics.
+- Revising, consolidating, or deleting unnecessary data in memory subsystems.
+- Reflecting on recent actions.
+- Clearing working directories of irrelevant files.
+- Drafting/creating new tasks for execution.
+
+In the absence of current tasks, the system is advised to proactively generate them.
 """
 
         header = f"**{event_name}**"
@@ -214,16 +215,16 @@ class ContextBuilder:
 
         if event_name == "HEARTBEAT":
             if self.agent_state.proactive_guidance:
-                return f"{header}\n[Статус: Heartbeat тик] \n{proactive_prompt}"
+                return f"{header}\n[Status: Heartbeat tick] \n{proactive_prompt}"
             else:
-                return f"{header}\n[Статус: Heartbeat тик]"
+                return f"{header}\n[Heartbeat tick]"
 
         if event_name == "SYSTEM_CORE_START":
-            return f"{header}\n[Статус: Инициализация ядра JAWL. Запуск подсистем завершен]"
+            return f"{header}\n[Initializing JAWL kernel. Subsystem startup complete]"
 
         if event_name == "SYSTEM_CALENDAR_ALARM":
             alarm_title = payload.get("title", "Неизвестно")
-            return f"{header}\n[Статус: Срабатывание системного таймера]\n\nЗадача: {alarm_title}."
+            return f"{header}\n[System timer triggered]\n\nЗадача: {alarm_title}."
 
         lines = [header]
 

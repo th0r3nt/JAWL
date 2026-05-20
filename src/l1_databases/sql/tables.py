@@ -145,7 +145,9 @@ class DriveTable(Base):
     name: Mapped[str]
     type: Mapped[str]  # "fundamental" (системные) или "custom" (созданные самим агентом)
     description: Mapped[str]
+
     decay_rate: Mapped[float]  # Скорость роста дефицита (% в интервал)
+    decay_interval_sec: Mapped[int] = mapped_column(default=3600)  # Длина интервала
 
     # Время последнего удовлетворения мотивации (UTC)
     last_satisfied_at: Mapped[datetime] = mapped_column(

@@ -399,16 +399,18 @@ def _manage_drives_screen():
 
             name = questionary.text("Название мотивации (напр. 'Любовь к яблокам'):").ask()
             desc = questionary.text("Описание (почему агент должен это делать):").ask()
-            decay = questionary.text("Скорость дефицита (от 0.1 до 100):", default="5.0").ask()
+            decay = questionary.text("Скорость роста дефицита (от 0.1 до 100):", default="10.0").ask()
+            interval = questionary.text("Интервал роста в секундах (напр. 900):", default="900").ask()
 
-            if name and desc and decay:
+            if name and desc and decay and interval:
                 try:
                     decay_float = float(decay)
+                    interval_int = int(interval)
                     d_id = str(uuid.uuid4())[:8]
                     now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S.000000")
                     _run_sql(
-                        "INSERT INTO drives (id, name, type, description, decay_rate, last_satisfied_at, recent_reflections) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                        (d_id, name, "custom", desc, decay_float, now_str, "[]"),
+                        "INSERT INTO drives (id, name, type, description, decay_rate, decay_interval_sec, last_satisfied_at, recent_reflections) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                        (d_id, name, "custom", desc, decay_float, interval_int, now_str, "[]"),
                     )
                     print_success(f"Мотивация '{name}' успешно добавлена.")
                 except Exception as e:

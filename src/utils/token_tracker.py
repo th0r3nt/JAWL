@@ -73,7 +73,7 @@ class TokenTracker:
 
         num_tokens = 0
         for message in messages:
-            num_tokens += 3  # Накладные расходы на каждое сообщение
+            num_tokens += 5  # Накладные расходы на каждое сообщение
             if isinstance(message, dict):
                 m_dict = message
             elif hasattr(message, "model_dump"):
@@ -88,7 +88,7 @@ class TokenTracker:
                     num_tokens += self._approximate_tokens(value)
                 elif isinstance(value, list):
                     num_tokens += self._approximate_tokens(str(value))
-        num_tokens += 3  # Накладные расходы на ответ модели
+        num_tokens += 3
         return num_tokens
 
     def add_input_record(

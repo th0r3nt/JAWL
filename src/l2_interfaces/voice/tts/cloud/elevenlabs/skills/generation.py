@@ -23,7 +23,7 @@ class CloudElevenLabsTTSGeneration:
     @skill(swarm=[Subagents.CODER, Subagents.WEB_RESEARCHER])
     async def get_available_voices(self) -> SkillResult:
         """
-        Возвращает список доступных голосов и их ID.
+        Returns available voices and their IDs.
         """
 
         voices = self.client.state.available_voices_cache
@@ -39,10 +39,10 @@ class CloudElevenLabsTTSGeneration:
         self, text: str, voice_id: str = None, filename: str = None
     ) -> SkillResult:
         """
-        Синтезирует речь из текста.
-
-        voice_id: ID голоса (опционально).
-        filename: Имя файла с озвучкой (опционально).
+        Synthesizes speech from text. 
+        
+        voice_id: Optional voice ID. 
+        filename: Optional output filename.
         """
         if not text.strip():
             return SkillResult.fail("Текст для озвучки не может быть пустым.")
@@ -87,9 +87,7 @@ class CloudElevenLabsTTSGeneration:
                 f"Сгенерирован {rel_path} (size: {size_str}, text: {text})"
             )
 
-            return SkillResult.ok(
-                f"Аудио сгенерировано и сохранено по пути: sandbox/{rel_path} ({size_str}).\n"
-            )
+            return SkillResult.ok("True")
 
         except PermissionError as e:
             return SkillResult.fail(str(e))

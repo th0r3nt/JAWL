@@ -203,8 +203,8 @@ class EmailClient:
 
     async def get_context_block(self, **kwargs: Any) -> str:
         """Формирует Markdown-блок для приборной панели агента."""
-
+        desc = "Description: Connecting to the specified mailbox account (IMAP/SMTP)."
         if not self.state.is_online:
-            return "### EMAIL [OFF] \nThe interface is disabled."
+            return f"### EMAIL [OFF] \n{desc}\nThe interface is disabled."
 
-        return f"### EMAIL [ON] \nAccount: {self.state.account_info}\n\nRecent Inbox:\n{self.state.mailbox_preview}"
+        return f"### EMAIL [ON] \n{desc}\nAccount: {self.state.account_info}\n\nRecent Inbox:\n{self.state.mailbox_preview}"

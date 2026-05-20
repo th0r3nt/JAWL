@@ -18,22 +18,22 @@ class WebHooksClient:
         self.state.port = config.port
 
     async def get_context_block(self, **kwargs) -> str:
+        desc = "Description: Local HTTP server for receiving incoming webhooks."
         if not self.state.is_online:
-            return "### WEB HOOKS [OFF]\nThe interface is disabled."
+            return f"### WEB HOOKS [OFF]\n{desc}\nThe interface is disabled."
 
         hooks_str = (
-            "\n".join(self.state.preview_lines)
-            if self.state.preview_lines
-            else "  Пусто."
+            "\n".join(self.state.preview_lines) if self.state.preview_lines else "  Empty."
         )
 
         return f"""
 ### WEB HOOKS [ON]
-* Сервер: http://{self.state.host}:{self.state.port}
+{desc}
+* Server: http://{self.state.host}:{self.state.port}
 
-* Эндпоинт для входящих запросов: POST /webhook/{{source}} (где {{source}} - название сервиса-отправителя)
-* Авторизация: параметр '?token=' или HTTP-заголовок 'Authorization: Bearer '
+* Endpoint for incoming requests: POST /webhook/{{source}} (where {{source}} is the name of the sending service)
+* Authorization: '?token=' parameter or 'Authorization: Bearer' HTTP header
 
-* Последние вебхуки:
+* Recent Webhooks:
 {hooks_str}
 """

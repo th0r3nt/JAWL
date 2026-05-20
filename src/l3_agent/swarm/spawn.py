@@ -1,9 +1,6 @@
+# ФАЙЛ: src/l3_agent/swarm/spawn.py
 """
 Навык-оркестратор (Swarm Manager).
-
-Предоставляет главному агенту инструмент (скилл) `spawn_subagent`, через который
-он может делегировать объемные задачи. Управляет пулом (семафором) запущенных воркеров
-для защиты от перегрузки сети и Rate Limits (HTTP 429).
 """
 
 import asyncio
@@ -11,12 +8,10 @@ import uuid
 import traceback
 from pathlib import Path
 
-from src.utils.logger import main_logger, swarm_logger
+from src.utils.logger import swarm_logger
 from src.utils.settings import SwarmConfig
-from src.utils.token_tracker import TokenTracker
 
-from src.l3_agent.llm.client import LLMClient
-
+from src.l3_agent.llm.executor import LLMExecutor
 from src.l3_agent.skills.registry import skill, SkillResult, _REGISTRY
 
 from src.l3_agent.swarm.roles import Subagents, SubagentRole
@@ -30,32 +25,19 @@ class SwarmManager:
 
     def __init__(
         self,
-        llm_client: LLMClient,
+        executor: LLMExecutor,
         swarm_config: SwarmConfig,
         root_dir: Path,
-        token_tracker: TokenTracker,
     ) -> None:
-        """
-        Инициализирует менеджер роя.
-
-        Args:
-            llm_client: Выделенный клиент языковой модели для субагентов (часто с более дешевой моделью).
-            swarm_config: Конфигурация подсистемы.
-            root_dir: Корень проекта JAWL.
-            token_tracker: Отслеживатель токенов.
-        """
-
-        self.llm = llm_client
+        self.executor = executor
         self.config = swarm_config
-        self.tracker = token_tracker
 
         self.prompt_builder = SwarmPromptBuilder(root_dir)
         self.semaphore = asyncio.Semaphore(self.config.max_concurrent_workers)
         self.active_tasks: set[asyncio.Task] = set()
 
-        # Динамически собираем доступные роли и их навыки из реестра (OCP)
         self.role_skills: dict[str, list[str]] = {}
-        self.active_roles: dict[str, SubagentRole] = {}  # role_id -> SubagentRole
+        self.active_roles: dict[str, SubagentRole] = {}
 
         for skill_name, data in _REGISTRY.items():
             for role_obj in data.get("swarm", []):
@@ -64,19 +46,13 @@ class SwarmManager:
                 self.role_skills[role_obj.id].append(skill_name)
                 self.active_roles[role_obj.id] = role_obj
 
-        # Формируем динамический докстринг с описанием ролей
-        base_doc = (
-            "Делегирует сложную и объемную задачу автономному субагенту. "
-            "Он будет работать в фоне параллельно вам и вернет подробный отчет после завершения. "
-            "Рекомендовано использовать для делегирования рутины или любых других задач."
-        )  # Докстринг, который будет видеть LLM в навыке spawn_subagent
+        base_doc = "Delegates heavy tasks to background autonomous subagent, returns report. "
 
         if self.active_roles:
             roles_desc = ["Доступные роли в данный момент:"]
             for r_id, r_obj in self.active_roles.items():
                 roles_desc.append(f"- '{r_id}' ({r_obj.name}): {r_obj.description}")
             roles_str = "\n".join(roles_desc)
-
         else:
             roles_str = "Внимание: нет доступных ролей (Не хватает системных интерфейсов)."
 
@@ -110,7 +86,7 @@ class SwarmManager:
         if not target_role or target_role.id not in self.active_roles:
             active_ids = list(self.active_roles.keys())
             return SkillResult.fail(
-                f"Роль '{role}' сейчас недоступна. Возможные причины: опечатка или отключен необходимый системный интерфейс. Доступные роли: {active_ids}"
+                f"Роль '{role}' сейчас недоступна. Доступные роли: {active_ids}"
             )
 
         subagent_id = str(uuid.uuid4())[:8]
@@ -136,7 +112,6 @@ class SwarmManager:
             actual_skills = self.role_skills.get(role.id, [])
 
             async with self.semaphore:
-                # Передаем конфигурацию в сборщик контекста
                 context_builder = SwarmContextBuilder(
                     role=role, allowed_skills=actual_skills, config=self.config.context_depth
                 )
@@ -145,12 +120,11 @@ class SwarmManager:
                     subagent_id=subagent_id,
                     role=role,
                     task_description=task_description,
-                    llm_client=self.llm,
+                    executor=self.executor,
                     model_name=self.config.subagent_model,
                     prompt_builder=self.prompt_builder,
                     context_builder=context_builder,
                     allowed_skills=actual_skills,
-                    token_tracker=self.tracker,
                     max_steps=self.config.context_depth.max_steps,
                 )
 

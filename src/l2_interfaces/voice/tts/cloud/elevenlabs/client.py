@@ -112,9 +112,13 @@ class CloudElevenLabsTTSClient:
         return await asyncio.to_thread(_do_request)
 
     async def get_context_block(self, **kwargs: Any) -> str:
-        """Формирует блок состояния для системного промпта агента."""
+        """
+        Формирует блок состояния для системного промпта агента.
+        """
+
+        desc = "Description: Text-to-Speech generation via ElevenLabs API."
         if not self.state.is_online:
-            return "### ELEVENLABS TTS [OFF]\nThe interface is disabled."
+            return f"### ELEVENLABS TTS [OFF]\n{desc}\nThe interface is disabled."
 
         used = self.state.character_count
         limit = self.state.character_limit
@@ -131,22 +135,23 @@ class CloudElevenLabsTTSClient:
         # Формируем список доступных голосов
         voices_cache = self.state.available_voices_cache
         if not voices_cache:
-            available_str = "  Кэш пуст."
+            available_str = "  Cashe is empty."
         elif len(voices_cache) > 5:
             # Показываем 10 штук, остальное прячем под скилл
             display_voices = voices_cache[:5]
             available_str = "\n".join(f"  - {v}" for v in display_voices)
-            available_str += f"\n  ...и еще {len(voices_cache) - 10} голосов."
+            available_str += f"\n  ...and another {len(voices_cache) - 10} votes."
         else:
             available_str = "\n".join(f"  - {v}" for v in voices_cache)
 
         return f"""### ELEVENLABS TTS [ON]
-* Квота: {used}/{limit} символов. 
+{desc}
+* Quota: {used}/{limit} characters. 
 
-* Основной голос (по умолчанию): {main_voice_str}
-* Доступные голоса:
+* Main voice (default): {main_voice_str}
+* Available voices:
 {available_str}
 
-* История генераций:
+* Generation history:
 {self.state.recent_history}
 """

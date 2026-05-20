@@ -70,7 +70,6 @@ async def test_integration_auto_graphrag_context_injection(tmp_path: Path):
         vector_thoughts=thoughts,
         graph_manager=graph_manager,
         embedding_model=mock_emb,
-        telethon_state=telethon_state,
         agent_state=agent_state,
         rag_config=rag_config,
     )

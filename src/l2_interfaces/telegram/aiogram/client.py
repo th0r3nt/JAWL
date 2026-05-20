@@ -6,8 +6,12 @@ Stateful-клиент для работы с Telegram Bot API (через биб
 """
 
 from typing import Any, Optional
+from aiohttp_socks import ProxyConnector
+from aiogram.client.session.aiohttp import AiohttpSession
 from aiogram import Bot
+
 from src.utils.logger import main_logger
+
 from src.l2_interfaces.telegram.aiogram.state import AiogramState
 
 
@@ -17,7 +21,9 @@ class AiogramClient:
     Гарантирует безопасное открытие и закрытие HTTP сессий.
     """
 
-    def __init__(self, bot_token: str, state: AiogramState) -> None:
+    def __init__(
+        self, bot_token: str, state: AiogramState, proxy_url: Optional[str] = None
+    ) -> None:
         """
         Инициализирует клиент бота.
 
@@ -36,6 +42,8 @@ class AiogramClient:
 
         self.bot_token = bot_token
         self._bot: Optional[Bot] = None
+
+        self.proxy_url = proxy_url
 
     def bot(self) -> Bot:
         """
@@ -64,7 +72,17 @@ class AiogramClient:
         main_logger.info("[Telegram Aiogram] Инициализация Aiogram клиента.")
 
         try:
-            self._bot = Bot(token=self.bot_token)
+            # Настраиваем прокси сессию для aiohttp
+            if self.proxy_url:
+                if self.proxy_url.startswith("socks"):
+                    connector = ProxyConnector.from_url(self.proxy_url)
+                    session = AiohttpSession(connector=connector)
+                else:
+                    session = AiohttpSession(proxy=self.proxy_url)
+
+                self._bot = Bot(token=self.bot_token, session=session)
+            else:
+                self._bot = Bot(token=self.bot_token)
 
             # Делаем тестовый запрос для проверки токена
             me = await self._bot.get_me()
@@ -93,12 +111,11 @@ class AiogramClient:
         """
         Провайдер контекста для ContextRegistry.
         Отдает отформатированный список последних активных чатов.
-
-        Returns:
-            str: Markdown-строка с контекстом.
         """
 
-        if not self.state.is_online:
-            return "### AIOGRAM [OFF] \nThe interface is disabled."
+        desc = "Description: Telegram Bot API. Connects to the registered bot account."
 
-        return f"### AIOGRAM [ON] \n{self.state.last_chats}"
+        if not self.state.is_online:
+            return f"### AIOGRAM [OFF] \n{desc}\nThe interface is disabled."
+
+        return f"### AIOGRAM [ON] \n{desc}\n{self.state.last_chats}"

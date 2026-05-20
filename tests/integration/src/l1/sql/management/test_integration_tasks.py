@@ -43,7 +43,7 @@ async def test_delete_task(tasks_manager):
     assert res_delete.is_success is True
 
     context = await tasks_manager.get_context_block()
-    assert "Список задач пуст" in context
+    assert "The task list is empty" in context
 
 
 @pytest.mark.asyncio

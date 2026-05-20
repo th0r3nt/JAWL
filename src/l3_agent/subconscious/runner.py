@@ -1,14 +1,11 @@
 import asyncio
-import openai
-import time
-import re
 from pathlib import Path
 from typing import List, Tuple, Optional
 
-from src.utils.logger import main_logger, subc_logger
-from src.utils.token_tracker import TokenTracker
+from src.utils.logger import subc_logger
 
-from src.l3_agent.llm.client import LLMClient
+from src.l3_agent.llm.executor import LLMExecutor
+
 from src.l3_agent.skills.schema import AgentResponse, ActionCall, ACTION_SCHEMA, parse_llm_json
 from src.l3_agent.skills.registry import _REGISTRY, call_skill
 from src.l3_agent.subconscious.schema import Pattern
@@ -25,21 +22,20 @@ class SubconsciousRunner:
 
     def __init__(
         self,
-        llm_client: LLMClient,
+        executor: LLMExecutor,
         model_name: str,
         sql_manager: SQLManager,
         vector_manager: VectorManager,
         graph_manager: GraphManager,
-        token_tracker: TokenTracker,
         root_dir: Path,
         max_steps: int = 4,
     ) -> None:
-        self.llm = llm_client
+        self.executor = executor
+
         self.model_name = model_name
         self.sql = sql_manager
         self.vector = vector_manager
         self.graph = graph_manager
-        self.tracker = token_tracker
         self.root_dir = root_dir
         self.max_steps = max_steps
 
@@ -49,7 +45,9 @@ class SubconsciousRunner:
 
     async def run(self, pattern: Pattern, ticks_to_analyze: int) -> None:
         """Запускает мини-цикл раздумий подсознания."""
-        log = f"[Subconscious] Запуск паттерна {pattern.value.upper()} (LLM: {self.model_name})."
+        log = (
+            f"[Subconscious] Запуск паттерна {pattern.value.upper()} (LLM: {self.model_name})."
+        )
         subc_logger.info(log)
 
         prompt = self._get_prompt(pattern)
@@ -64,14 +62,20 @@ class SubconsciousRunner:
             {"role": "system", "content": prompt},
             {"role": "user", "content": full_user_msg},
         ]
-        self.tracker.add_input_record(
-            messages, log_prefix="[Subconscious]", logger=subc_logger
-        )
 
         # Мини-ReAct Loop
         for step in range(self.max_steps):
             await asyncio.to_thread(self._dump_context_to_file, messages, pattern)
-            raw_answer = await self._call_llm(messages)
+
+            raw_answer = await self.executor.execute(
+                model_name=self.model_name,
+                messages=messages,
+                temperature=0.5,
+                logger=subc_logger,
+                log_prefix=f"[{pattern.value.upper()}]",
+                tools=ACTION_SCHEMA,
+            )
+
             if not raw_answer:
                 break
 
@@ -154,86 +158,6 @@ class SubconsciousRunner:
     # Служебные методы
     # ========================================================
 
-    async def _call_llm(self, messages: list) -> Optional[str]:
-        for attempt in range(5):
-            try:
-                session = self.llm.get_session()
-                response = await session.chat.completions.create(
-                    model=self.model_name,
-                    messages=messages,
-                    tools=ACTION_SCHEMA,
-                    temperature=0.3,
-                )
-                msg_obj = response.choices[0].message
-                ans = (
-                    str(msg_obj.tool_calls[0].function.arguments)
-                    if msg_obj.tool_calls
-                    else msg_obj.content or ""
-                )
-                self.tracker.add_output_record(
-                    ans, log_prefix="[Subconscious]", logger=subc_logger
-                )
-                return ans
-
-            except RuntimeError as e:
-                # Все ключи в бане
-                if "исчерпали лимиты" in str(e):
-                    match = re.search(r"подождать (\d+) сек", str(e))
-                    wait_sec = int(match.group(1)) if match else 10
-
-                    log = f"[Subconscious] Все ключи в кулдауне. Ждем {wait_sec}с."
-                    subc_logger.warning(log)
-
-                    await asyncio.sleep(wait_sec + 1)
-                    continue
-
-                return None
-
-            except openai.RateLimitError as e:
-                # Грамотно перехватываем 429 Rate Limit
-                wait_time = 30
-                if e.response is not None:
-                    headers = e.response.headers
-                    retry_after = (
-                        headers.get("retry-after")
-                        or headers.get("x-ratelimit-reset")
-                        or headers.get("retry-after-ms")
-                    )
-                    if retry_after:
-                        try:
-                            if headers.get("retry-after-ms"):
-                                wait_time = max(1, int(int(retry_after) / 1000))
-                            else:
-                                wait_time = int(float(retry_after))
-
-                            if wait_time > time.time():
-                                wait_time = int(wait_time - time.time())
-                        except ValueError:
-                            pass
-
-                wait_time = max(2, min(wait_time, 120))
-
-                log = f"[Subconscious] Rate Limit (429). Кулдаун ключа на {wait_time}с."
-                subc_logger.warning(log)
-
-                self.llm.rotator.cooldown_key(session.api_key, wait_time)
-
-                if self.llm.rotator.total_keys() == 1:
-                    await asyncio.sleep(wait_time + 1)
-                else:
-                    await asyncio.sleep(1)
-                continue
-
-            except Exception as e:
-                if attempt == 4:
-                    log = f"[Subconscious] LLM Ошибка: {e}"
-                    subc_logger.error(log)
-                    return None
-
-                await asyncio.sleep(2)
-
-        return None
-
     def _parse_response(
         self, raw_answer: str
     ) -> Tuple[Optional[AgentResponse], Optional[str]]:
@@ -246,15 +170,15 @@ class SubconsciousRunner:
             item = _REGISTRY.get(act.tool_name)
             if not item or pattern not in item.get("subconscious", []):
                 results.append(
-                    f"* Action [{act.tool_name}]: Отказано в доступе. Инструмент не разрешен для паттерна {pattern.value.upper()}."
+                    f"* {act.tool_name}: Отказано в доступе. Инструмент не разрешен для паттерна {pattern.value.upper()}."
                 )
                 continue
 
             try:
                 res = await call_skill(act.tool_name, act.parameters, logger=subc_logger)
-                results.append(f"* Action[{act.tool_name}]: {res.message}")
+                results.append(f"* {act.tool_name}: {res.message}")
             except Exception as e:
-                results.append(f"* Action[{act.tool_name}]: Внутренняя ошибка - {e}")
+                results.append(f"* {act.tool_name}: Внутренняя ошибка - {e}")
 
         return "\n".join(results)
 

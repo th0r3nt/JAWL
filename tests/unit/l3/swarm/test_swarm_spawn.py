@@ -18,12 +18,11 @@ def mock_registry():
 @pytest.fixture
 def swarm_manager(mock_registry):
     config = SwarmConfig(enabled=True, subagent_model="cheap-model", max_concurrent_workers=2)
-    mock_llm = MagicMock()
-    mock_tracker = MagicMock()
+    mock_executor = AsyncMock()
 
     with patch("src.l3_agent.swarm.spawn._REGISTRY", mock_registry):
         with patch("src.l3_agent.swarm.spawn.SwarmPromptBuilder"):
-            return SwarmManager(mock_llm, config, MagicMock(), mock_tracker)
+            return SwarmManager(mock_executor, config, MagicMock())
 
 
 @pytest.mark.asyncio
@@ -74,13 +73,13 @@ def test_swarm_manager_dynamic_docstring(mock_registry):
 
     # Сценарий 1: Роли активны
     with patch("src.l3_agent.swarm.spawn._REGISTRY", mock_registry):
-        manager1 = SwarmManager(MagicMock(), config, MagicMock(), MagicMock())
+        manager1 = SwarmManager(AsyncMock(), config, MagicMock())
         assert "coder" in manager1.spawn_subagent.__doc__
         assert "web_researcher" in manager1.spawn_subagent.__doc__
 
     # Сценарий 2: Host OS выключен (нету скиллов для coder)
     empty_registry = {"DeepResearch.deep_research": {"swarm": [Subagents.WEB_RESEARCHER]}}
     with patch("src.l3_agent.swarm.spawn._REGISTRY", empty_registry):
-        manager2 = SwarmManager(MagicMock(), config, MagicMock(), MagicMock())
+        manager2 = SwarmManager(AsyncMock(), config, MagicMock())
         assert "coder" not in manager2.spawn_subagent.__doc__
         assert "web_researcher" in manager2.spawn_subagent.__doc__

@@ -27,7 +27,7 @@ class GithubRepositories:
         per_page: int = 10,
     ) -> SkillResult:
         """
-        Ищет репозитории по ключевым словам или темам.
+        Searches repositories by keywords or topics.
         """
 
         try:
@@ -73,9 +73,9 @@ class GithubRepositories:
         limit: int = 10,
     ) -> SkillResult:
         """
-        Получает трендовые репозитории.
-
-        language: Опциональный фильтр по языку программирования.
+        Gets trending repositories. 
+        
+        language: Optional language filter.
         """
 
         try:
@@ -136,7 +136,7 @@ class GithubRepositories:
     @skill(swarm=[Subagents.CODER])
     async def get_repo_info(self, owner: str, repo: str) -> SkillResult:
         """
-        Возвращает метаданные репозитория.
+        Returns repository metadata.
         """
 
         try:
@@ -158,7 +158,7 @@ class GithubRepositories:
     @require_github_token()
     async def search_code(self, query: str, per_page: int = 10) -> SkillResult:
         """
-        Ищет код по GitHub.
+        Searches code across GitHub.
         """
 
         if not self.client.token:
@@ -190,7 +190,7 @@ class GithubRepositories:
         self, owner: str, repo: str, path: str, ref: Optional[str] = None
     ) -> SkillResult:
         """
-        Читает содержимое файла из репозитория GitHub.
+        Reads file content from repository.
         """
 
         try:
@@ -221,7 +221,7 @@ class GithubRepositories:
         self, owner: str, repo: str, per_page: int = 10
     ) -> SkillResult:
         """
-        Возвращает последние коммиты репозитория.
+        Returns repository's recent commits.
         """
 
         try:
@@ -251,9 +251,9 @@ class GithubRepositories:
         self, owner: str, repo: str, dest_filename: str, ref: Optional[str] = None
     ) -> SkillResult:
         """
-        Скачивает репозиторий в виде ZIP-архива. По умолчанию сохраняет в sandbox/download/.
-
-        ref: Опционально (имя ветки, тег или коммит).
+        Downloads repository as ZIP archive to sandbox/download/. 
+        
+        ref: Optional branch name, tag, or commit.
         """
 
         try:
@@ -296,7 +296,7 @@ class GithubRepositories:
     @skill(swarm=[Subagents.CODER])
     async def get_commit_details(self, owner: str, repo: str, commit_sha: str) -> SkillResult:
         """
-        Возвращает детальную информацию о коммите.
+        Returns detailed information about a commit.
         """
 
         try:
@@ -341,10 +341,10 @@ class GithubRepositories:
         self, owner: str, repo: str, path: str = "", ref: Optional[str] = None
     ) -> SkillResult:
         """
-        Просматривает содержимое в указанной директории GitHub репозитория.
-
-        path: путь к директории (оставить пустым "" для просмотра корневой папки).
-        ref: Опционально (имя ветки, тег или коммит).
+        Lists directory contents in repository. 
+        
+        path: Directory path (empty for root). 
+        ref: Optional branch, tag, or commit.
         """
 
         try:
@@ -383,7 +383,7 @@ class GithubRepositories:
     @require_agent_account()
     async def star_repository(self, owner: str, repo: str) -> SkillResult:
         """
-        Ставит звезду репозиторию.
+        Stars repository.
         """
 
         if not self.client.config.agent_account:
@@ -393,7 +393,7 @@ class GithubRepositories:
             await self.client.request("PUT", f"/user/starred/{owner}/{repo}")
             self.client.state.add_history(f"star: {owner}/{repo}")
             main_logger.info(f"[Github] Поставлена звезда репозиторию {owner}/{repo}")
-            return SkillResult.ok(f"Звезда успешно поставлена репозиторию {owner}/{repo}.")
+            return SkillResult.ok("True")
         except Exception as e:
             return SkillResult.fail(f"Ошибка при постановке звезды: {e}")
 
@@ -401,7 +401,7 @@ class GithubRepositories:
     @require_agent_account()
     async def unstar_repository(self, owner: str, repo: str) -> SkillResult:
         """
-        Убирает звезду с репозитория.
+        Unstars repository.
         """
 
         if not self.client.config.agent_account:
@@ -411,14 +411,14 @@ class GithubRepositories:
             await self.client.request("DELETE", f"/user/starred/{owner}/{repo}")
             self.client.state.add_history(f"unstar: {owner}/{repo}")
             main_logger.info(f"[Github] Убрана звезда с репозитория {owner}/{repo}")
-            return SkillResult.ok(f"Звезда успешно убрана с репозитория {owner}/{repo}.")
+            return SkillResult.ok("True")
         except Exception as e:
             return SkillResult.fail(f"Ошибка при удалении звезды: {e}")
 
     @skill(swarm=[Subagents.CODER])
     async def list_branches(self, owner: str, repo: str, per_page: int = 30) -> SkillResult:
         """
-        Возвращает список веток репозитория.
+        Returns list of repository branches.
         """
 
         try:
@@ -446,7 +446,7 @@ class GithubRepositories:
         self, name: str, description: str = "", private: bool = False
     ) -> SkillResult:
         """
-        Создает новый репозиторий в аккаунте.
+        Creates new repository in account.
         """
 
         if not self.client.config.agent_account:
@@ -467,9 +467,7 @@ class GithubRepositories:
             url = data.get("html_url")
 
             main_logger.info(f"[Github] Создан репозиторий {repo_full_name}")
-            return SkillResult.ok(
-                f"Репозиторий '{repo_full_name}' успешно создан.\nURL: {url}"
-            )
+            return SkillResult.ok(f"True. URL: {url}")
 
         except Exception as e:
             return SkillResult.fail(f"Ошибка при создании репозитория: {e}")
@@ -478,7 +476,7 @@ class GithubRepositories:
     @require_agent_account()
     async def fork_repository(self, owner: str, repo: str) -> SkillResult:
         """
-        Делает форк чужого репозитория в аккаунт.
+        Forks repository into account.
         """
 
         if not self.client.config.agent_account:
@@ -493,9 +491,7 @@ class GithubRepositories:
             url = data.get("html_url")
 
             main_logger.info(f"[Github] Сделан форк {owner}/{repo} -> {fork_name}")
-            return SkillResult.ok(
-                f"Форк успешно создан: '{fork_name}'. Теперь его можно клонировать локально.\nURL: {url}"
-            )
+            return SkillResult.ok(f"True. URL: {url}")
 
         except Exception as e:
             return SkillResult.fail(f"Ошибка при форке репозитория: {e}")
@@ -506,8 +502,9 @@ class GithubRepositories:
         self, filename: str, content: str, description: str = "", public: bool = True
     ) -> SkillResult:
         """
-        Создает Gist (публичный или приватный сниппет кода/текста).
+        Creates public or private Gist snippet.
         """
+        
         if not self.client.config.agent_account:
             return SkillResult.fail("Ошибка: Для создания Gist нужен Agent Account.")
 

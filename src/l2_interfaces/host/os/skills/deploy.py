@@ -18,9 +18,9 @@ class HostOSDeploy:
     @require_access(HostOSAccessLevel.OPERATOR)
     async def start_deploy_session(self, reason: str) -> SkillResult:
         """
-        Открывает деплой-сессию (режим самомодификации).
-        Вызывать перед любыми попытками изменить исходный код.
-        Система начнет делать прозрачные бэкапы изменяемых файлов.
+        Starts deploy session (self-modification mode). 
+        Required before modifying framework code. 
+        Initiates transparent file backups.
         """
 
         if not self.host_os.config.require_deploy_sessions:
@@ -35,11 +35,12 @@ class HostOSDeploy:
     @require_access(HostOSAccessLevel.OPERATOR)
     async def commit_deploy_session(self, test_path: str = "tests/unit/", force: bool = False) -> SkillResult:
         """
-        Завершает деплой-сессию. Тестирует измененный код и инициализацию фреймворка.
-        По умолчанию запускает всю директория быстрых юнит-тестов (tests/unit/).
-
-        test_path: Путь к тестам для проверки. По умолчанию "tests/unit/".
-        force: Принудительный коммит. Установить True, если тесты падают из-за причин, не связанных с измененным кодом.
+        Commits deploy session. 
+        Runs syntax checker and pytest. 
+        Fails and consumes retry attempt on error. 
+        
+        test_path: Path to tests. 
+        force: Ignores test failures (not recommended).
         """
 
         success, msg = await self.host_os.deploy_manager.commit_session(test_path=test_path, force=force)
@@ -49,7 +50,7 @@ class HostOSDeploy:
     @require_access(HostOSAccessLevel.OPERATOR)
     async def rollback_deploy_session(self) -> SkillResult:
         """
-        Принудительно отменяет деплой-сессию и откатывает код фреймворка до исходного состояния.
+        Forcefully aborts deploy session and rolls framework code back to initial state.
         """
 
         success, msg = self.host_os.deploy_manager.rollback_session()

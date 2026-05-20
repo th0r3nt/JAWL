@@ -43,7 +43,7 @@ async def test_integration_llm_json_to_real_disk(tmp_path: Path):
     report = await execute_skill(actions)
 
     # 5. Проверяем результаты
-    assert "успешно перезаписан" in report
+    assert "True" in report
 
     # Проверяем физический файл на диске
     target_file = tmp_path / "sandbox" / "integration_test.txt"

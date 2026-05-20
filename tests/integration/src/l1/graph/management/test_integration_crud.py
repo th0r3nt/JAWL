@@ -16,7 +16,7 @@ async def test_add_concept_success(graph_manager):
     )
     
     assert res.is_success is True
-    assert "Python" in res.message
+    assert "True" in str(res.message)
 
 
 @pytest.mark.asyncio

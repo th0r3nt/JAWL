@@ -10,7 +10,7 @@ from src.l1_databases.sql.tables import MentalStateTable
 
 def build_mental_states(states: List[MentalStateTable], max_entities: int) -> str:
     if not states:
-        return f"## MENTAL STATES\nMax number of entities that can be remembered: {max_entities}\n\nСписок сущностей пуст."
+        return f"## MENTAL STATES\nMax number of entities that can be remembered: {max_entities}\nThe list of entities is empty."
 
     lines = [
         "## MENTAL STATES",

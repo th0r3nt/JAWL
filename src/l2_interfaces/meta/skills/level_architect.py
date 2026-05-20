@@ -34,11 +34,12 @@ class MetaArchitect:
         state: bool,
     ) -> SkillResult:
         """
-        Включает или выключает системные интерфейсы через YAML конфиг.
-
-        interface: Название целевого модуля.
-        state: включить или выключить.
+        Toggles system interfaces via YAML config. 
+        
+        interface: Target module name. 
+        state: True to enable, False to disable.
         """
+
         # Маппинг ключей из Literal на реальные пути в interfaces.yaml
         ifmap = {
             "host_os": ["host", "os", "enabled"],
@@ -77,16 +78,14 @@ class MetaArchitect:
         success = await self.client.update_yaml(self.client.interfaces_path, path_keys, state)
         if success:
             state_str = "включен" if state else "выключен"
-            return SkillResult.ok(
-                f"Интерфейс '{interface}' будет {state_str}. Изменения вступят в силу только после перезагрузки."
-            )
+            return SkillResult.ok("True")
 
         return SkillResult.fail("Ошибка обновления файла конфигурации.")
 
     @skill()
     async def off_system(self, reason: str = "Без причины") -> SkillResult:
         """
-        Завершает работу и полностью выключает систему.
+        Shuts down and completely powers off the system.
         """
 
         main_logger.info(f"[Meta] Запрошено выключение системы. Причина: {reason}")
@@ -98,7 +97,7 @@ class MetaArchitect:
     @skill()
     async def reboot_system(self, reason: str = "Обновление конфигурации") -> SkillResult:
         """
-        Выполняет полную перезагрузку системы.
+        Performs full system reboot.
         """
         
         main_logger.info(f"[Meta] Запрошена перезагрузка системы. Причина: {reason}")

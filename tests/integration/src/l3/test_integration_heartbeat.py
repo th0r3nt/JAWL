@@ -2,7 +2,7 @@ import pytest
 import asyncio
 from unittest.mock import AsyncMock
 
-from src.main import System
+from src.system.container import SystemContainer
 from src.utils.event.bus import EventBus
 from src.utils.event.bridge import EventBridge
 from src.utils.event.registry import Events
@@ -20,9 +20,11 @@ async def test_integration_eventbus_wakes_heartbeat():
 
     # 1. Поднимаем реальную шину и мост
     bus = EventBus()
-    system = System(bus, SettingsConfig(), InterfacesConfig())
+    container = SystemContainer(
+        settings=SettingsConfig(), interfaces_config=InterfacesConfig(), event_bus=bus
+    )
 
-    bridge = EventBridge(system)
+    bridge = EventBridge(container)
     bridge.setup_routing()  # Подписываем Heartbeat на события
 
     # 2. Поднимаем реальный Heartbeat (с фейковым ReactLoop, чтобы не дергать LLM)
@@ -33,10 +35,10 @@ async def test_integration_eventbus_wakes_heartbeat():
         react_loop=mock_react_loop,
         heartbeat_interval=3600,
         continuous_cycle=False,
-        accel_config=system.settings.system.event_acceleration,
+        accel_config=container.settings.system.event_acceleration,
         timezone=3,
     )
-    system.heartbeat = hb
+    container.heartbeat = hb
 
     # 3. Запускаем Heartbeat в фоне
     hb_task = asyncio.create_task(hb.start())

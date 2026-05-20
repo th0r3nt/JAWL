@@ -79,10 +79,10 @@ class VectorKnowledge:
         reliability: ReliabilityLevel = "verified",
     ) -> SkillResult:
         """
-        Векторизует и сохраняет фрагмент знаний в базу.
-
-        source: Откуда взят факт.
-        reliability: Степень доверия.
+        Vectorizes and saves knowledge snippet to database. 
+        
+        source: Origin of the fact. 
+        reliability: level of trustworthiness.
         """
 
         if not tags:
@@ -111,7 +111,7 @@ class VectorKnowledge:
 
             msg = f"[Vector DB] Знание успешно сохранено в базе данных (ID: {point_id}). Теги: {tags}"
             main_logger.info(msg)
-            return SkillResult.ok(msg)
+            return SkillResult.ok(f"True. ID: {point_id}")
 
         except Exception as e:
             msg = f"[Vector DB] Ошибка при сохранении знания в базе данных: {e}"
@@ -126,9 +126,9 @@ class VectorKnowledge:
         self, query: str, limit: int = 5, tags_filter: Optional[List[VectorTag]] = None
     ) -> SkillResult:
         """
-        Выполняет семантический поиск по сохраненным знаниям.
-
-        tags_filter: Опциональный фильтр. Отсекает факты, не содержащие ВСЕ указанные теги.
+        Performs semantic search over saved knowledge. 
+        
+        tags_filter: Optional. Returns only facts containing all specified tags.
         """
 
         try:
@@ -165,7 +165,7 @@ class VectorKnowledge:
             if not points:
                 msg = "[Vector DB] Поиск знаний не дал результатов."
                 main_logger.debug(msg)
-                return SkillResult.ok(msg)
+                return SkillResult.ok("Поиск знаний не дал результатов.")
 
             short_query = truncate_text(query_str.replace("\n", " "), 50, "... [Обрезано]")
             main_logger.info(
@@ -211,7 +211,7 @@ class VectorKnowledge:
     )
     async def delete_knowledge(self, point_id: str) -> SkillResult:
         """
-        Удаляет фрагмент знаний по ID.
+        Deletes knowledge snippet.
         """
         try:
             await self.db.client.delete(
@@ -235,8 +235,9 @@ class VectorKnowledge:
         self, limit: int = 50, tags_filter: Optional[List[VectorTag]] = None
     ) -> SkillResult:
         """
-        Получает последние N записей из базы знаний (с возможной фильтрацией по тегам).
+        Retrieves last N records from knowledge base. 
         """
+        
         try:
             query_filter = None
             if tags_filter:

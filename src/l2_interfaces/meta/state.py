@@ -2,6 +2,8 @@
 L0 State для кастомных компонентов (Meta).
 """
 
+from typing import Optional
+
 
 class CustomDashboardState:
     """
@@ -12,10 +14,21 @@ class CustomDashboardState:
     def __init__(self):
         self.blocks: dict[str, str] = {}
 
+    def update_block(self, name: str, content: Optional[str]) -> None:
+        """
+        Обновляет или удаляет Markdown-блок на приборной панели.
+        """
+
+        if content:
+            self.blocks[name] = content
+        else:
+            self.blocks.pop(name, None)
+
     async def get_context_block(self, **kwargs) -> str:
         """
         Провайдер контекста для сборщика промптов.
         """
+        
         if not self.blocks:
             return ""
 

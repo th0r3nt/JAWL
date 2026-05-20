@@ -24,7 +24,7 @@ class MetaConfigurator:
     @skill()
     async def change_heartbeat_interval(self, interval_sec: int) -> SkillResult:
         """
-        Изменяет Heartbeat интервал между пробуждениями.
+        Changes Heartbeat interval between wakeups.
         """
 
         success = await self.client.update_yaml(
@@ -37,12 +37,12 @@ class MetaConfigurator:
         await self.client.bus.publish(
             Events.SYSTEM_CONFIG_UPDATED, key="heartbeat_interval", value=interval_sec
         )
-        return SkillResult.ok(f"Интервал успешно изменен на {interval_sec} сек.")
+        return SkillResult.ok("True")
 
     @skill()
     async def change_max_react_steps(self, steps: int) -> SkillResult:
         """
-        Изменяет максимальное количество шагов в одном цикле ReAct.
+        Changes max steps allowed in single ReAct cycle.
         """
 
         success = await self.client.update_yaml(
@@ -52,7 +52,7 @@ class MetaConfigurator:
             return SkillResult.fail("Ошибка при сохранении конфигурации.")
 
         self.client.agent_state.max_react_steps = steps
-        return SkillResult.ok(f"Лимит шагов успешно изменен на {steps}.")
+        return SkillResult.ok("True")
 
     @skill()
     async def change_database_limits(
@@ -61,7 +61,7 @@ class MetaConfigurator:
         new_limit: int,
     ) -> SkillResult:
         """
-        Изменяет лимиты для различных SQL-модулей.
+        Changes row limits for specific SQL modules.
         """
 
         db_keys_map = {
@@ -84,9 +84,7 @@ class MetaConfigurator:
             await self.client.bus.publish(
                 Events.SYSTEM_CONFIG_UPDATED, key="db_limit", module=database, value=new_limit
             )
-            return SkillResult.ok(
-                f"Лимит базы данных '{database}' успешно изменен на {new_limit}. Изменения применены."
-            )
+            return SkillResult.ok("True")
         return SkillResult.fail("Ошибка обновления конфигурации.")
 
     @skill()
@@ -94,12 +92,13 @@ class MetaConfigurator:
         self, high_ticks: int, medium_ticks: int, low_ticks: int
     ) -> SkillResult:
         """
-        Динамически изменяет контекстное окно.
-
-        - high_ticks: количество последних тиков без обрезки.
-        - medium_ticks: тики с обрезкой параметров и результатов.
-        - low_ticks: только мысли.
+        Dynamically alters context window depth. 
+        
+        high_ticks: Uncut recent ticks. 
+        medium_ticks: Ticks with truncated I/O. 
+        low_ticks: Thoughts only.
         """
+        
         s1 = await self.client.update_yaml(
             self.client.settings_path, ["system", "context_depth", "high_ticks"], high_ticks
         )
@@ -124,7 +123,5 @@ class MetaConfigurator:
                 medium_ticks=medium_ticks,
                 low_ticks=low_ticks,
             )
-            return SkillResult.ok(
-                f"Глубина контекста изменена (High: {high_ticks}, Medium: {medium_ticks}, Low: {low_ticks}). Изменения применены."
-            )
+            return SkillResult.ok("True")
         return SkillResult.fail("Ошибка сохранения настроек.")

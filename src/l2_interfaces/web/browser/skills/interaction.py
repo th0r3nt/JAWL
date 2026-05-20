@@ -18,10 +18,10 @@ class BrowserInteraction:
     @skill()
     async def click(self, role: str, name: str) -> SkillResult:
         """
-        Выполняет клик по элементу на основе его ARIA-роли.
-
-        role: ARIA-роль элемента (например, 'link', 'button').
-        name: Внутреннее имя или текст элемента.
+        Clicks element by ARIA role. 
+        
+        role: ARIA role (e.g., 'link', 'button'). 
+        name: Internal name or text.
         """
 
         try:
@@ -41,7 +41,7 @@ class BrowserInteraction:
             await self.client.save_session()
 
             self.client.state.add_history(f"Клик: [{role}] '{name}'")
-            return SkillResult.ok("Клик выполнен. Состояние страницы обновлено в контексте.")
+            return SkillResult.ok("True")
 
         except Exception as e:
             return SkillResult.fail(
@@ -51,7 +51,7 @@ class BrowserInteraction:
     @skill()
     async def hover(self, role: str, name: str) -> SkillResult:
         """
-        Наводит курсор мыши на элемент.
+        Hovers cursor over element.
         """
 
         try:
@@ -66,7 +66,7 @@ class BrowserInteraction:
             await self.client.update_state_view()
 
             self.client.state.add_history(f"Hover:[{role}] '{name}'")
-            return SkillResult.ok("Курсор наведен на элемент. Дерево элементов обновлено.")
+            return SkillResult.ok("True")
 
         except Exception as e:
             return SkillResult.fail(f"Не удалось навести курсор на элемент: {e}")
@@ -74,8 +74,8 @@ class BrowserInteraction:
     @skill()
     async def fill_text(self, role: str, name: str, text: str) -> SkillResult:
         """
-        Вводит текст в поле ввода.
-        Например: role="textbox", name="Username", text="admin"
+        Inputs text into a field. 
+        E.g.: role="textbox", name="Username", text="admin".
         """
 
         try:
@@ -87,7 +87,7 @@ class BrowserInteraction:
 
             await self.client.update_state_view()
             self.client.state.add_history(f"Ввод текста в: [{role}] '{name}'")
-            return SkillResult.ok("Текст успешно введен.")
+            return SkillResult.ok("True")
 
         except Exception as e:
             return SkillResult.fail(f"Не удалось ввести текст: {e}")
@@ -95,8 +95,7 @@ class BrowserInteraction:
     @skill()
     async def press_key(self, key: str) -> SkillResult:
         """
-        Нажимает клавишу на клавиатуре.
-        Например: 'Enter', 'Escape'.
+        Presses keyboard key (e.g., 'Enter', 'Escape').
         """
 
         try:
@@ -112,7 +111,7 @@ class BrowserInteraction:
 
             await self.client.update_state_view()
             self.client.state.add_history(f"Нажатие клавиши: {key}")
-            return SkillResult.ok(f"Клавиша '{key}' нажата. Состояние обновлено.")
+            return SkillResult.ok("True")
 
         except Exception as e:
             return SkillResult.fail(f"Ошибка при нажатии клавиши: {e}")
@@ -120,7 +119,7 @@ class BrowserInteraction:
     @skill()
     async def click_coordinates(self, x: int, y: int) -> SkillResult:
         """
-        Кликает по координатам на странице.
+        Clicks specified page coordinates.
         """
 
         try:
@@ -151,7 +150,7 @@ class BrowserInteraction:
             await self.client.save_session()
 
             self.client.state.add_history(f"Клик по координатам: ({x}, {y})")
-            return SkillResult.ok(f"Клик по абсолютным координатам ({x}, {y}) выполнен.")
+            return SkillResult.ok("True")
 
         except Exception as e:
             return SkillResult.fail(f"Не удалось кликнуть по координатам: {e}")
@@ -159,7 +158,7 @@ class BrowserInteraction:
     @skill()
     async def hover_coordinates(self, x: int, y: int) -> SkillResult:
         """
-        Наводит курсор мыши на координаты страницы.
+        Hovers cursor over page coordinates.
         """
 
         try:
@@ -182,7 +181,7 @@ class BrowserInteraction:
             await self.client.update_state_view()
 
             self.client.state.add_history(f"Hover по координатам: ({x}, {y})")
-            return SkillResult.ok(f"Курсор наведен на координаты ({x}, {y}).")
+            return SkillResult.ok("True")
 
         except Exception as e:
             return SkillResult.fail(f"Не удалось навести курсор: {e}")
@@ -190,7 +189,7 @@ class BrowserInteraction:
     @skill()
     async def type_text(self, text: str) -> SkillResult:
         """
-        Вводит текст с клавиатуры в сфокусированный элемент.
+        Types text into focused element.
         """
 
         try:
@@ -206,7 +205,7 @@ class BrowserInteraction:
 
             await self.client.update_state_view()
             self.client.state.add_history("Ввод текста с клавиатуры")
-            return SkillResult.ok(f"Текст '{text}' успешно напечатан.")
+            return SkillResult.ok("True")
 
         except Exception as e:
             return SkillResult.fail(f"Ошибка при вводе текста: {e}")

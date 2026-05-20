@@ -20,9 +20,10 @@ class AiogramModeration:
     @skill()
     async def ban_user(self, chat_id: int, user_id: int) -> SkillResult:
         """
-        Банит пользователя из указанной группы или супергруппы.
-        Нужно обладать правами администратора.
+        Bans user from group or supergroup. 
+        Requires admin privileges.
         """
+        
         try:
             bot = self.client.bot()
 
@@ -31,7 +32,7 @@ class AiogramModeration:
 
             msg = f"Пользователь {user_id} забанен в чате {chat_id} (Aiogram)."
             main_logger.info(f"[Telegram Aiogram] {msg}")
-            return SkillResult.ok(msg)
+            return SkillResult.ok("True")
 
         except ValueError:
             return SkillResult.fail("Ошибка: ID пользователя и чата должны быть числами.")
@@ -41,8 +42,9 @@ class AiogramModeration:
     @skill()
     async def unban_user(self, chat_id: int, user_id: int) -> SkillResult:
         """
-        Разбанивает пользователя в группе.
+        Unbans user in group.
         """
+
         try:
             bot = self.client.bot()
 
@@ -51,7 +53,7 @@ class AiogramModeration:
 
             msg = f"Пользователь {user_id} разбанен в чате {chat_id} (Aiogram)."
             main_logger.info(f"[Telegram Aiogram] {msg}")
-            return SkillResult.ok(msg)
+            return SkillResult.ok("True")
 
         except Exception as e:
             return SkillResult.fail(f"Ошибка при разблокировке пользователя (Aiogram): {e}")

@@ -7,15 +7,17 @@
 по количеству символов для экономии контекста).
 """
 
-import re
 import json
 import uuid
 from typing import TYPE_CHECKING, Any, List
 from sqlalchemy import select, desc
+from datetime import datetime, timezone
 
-from src.utils.logger import main_logger
-from src.utils.dtime import format_datetime
+from src.utils.dtime import format_datetime, get_timezone
+
 from src.l1_databases.sql.tables import TickTable
+from src.l3_agent.skills.registry import skill, SkillResult
+from src.l3_agent.swarm.roles import Subagents
 
 if TYPE_CHECKING:
     from src.l1_databases.sql.db import SQLDB
@@ -121,12 +123,12 @@ class SQLTicks:
         """
         time_str = format_datetime(t.created_at, self.tz_offset, "%m-%d %H:%M:%S")
         step_str = (
-            f"[Step {t.results['step']}/{t.results['max_steps']}] "
+            f"\n[Step {t.results['step']}/{t.results['max_steps']}]"
             if t.results and "step" in t.results
             else ""
         )
 
-        header = f"## TICK {time_str} \n{step_str}"
+        header = f"## TICK {time_str}{step_str}\n"
 
         thoughts_str = t.thoughts
         if tier in ("MEDIUM", "LOW") and len(thoughts_str) > self.thoughts_short_max_chars:
@@ -134,7 +136,7 @@ class SQLTicks:
 
         # Для LOW тиков возвращаем ТОЛЬКО мысли
         if tier == "LOW":
-            return f"{header}\nThoughts: '{thoughts_str}'"
+            return f"{header}\n### Thoughts:\n{thoughts_str}"
 
         # MEDIUM и HIGH
         action_limit = self.action_max_chars if tier == "HIGH" else self.action_short_max_chars
@@ -145,14 +147,14 @@ class SQLTicks:
             if isinstance(a, dict):
                 t_name = a.get("tool_name", "unknown")
                 params = a.get("parameters", {})
-                act_str = f"{t_name}({json.dumps(params, ensure_ascii=False)})"
+                act_str = f"* {t_name}({json.dumps(params, ensure_ascii=False)})"
             else:
-                act_str = str(a)
+                act_str = f"* {a}"
             if len(act_str) > action_limit:
                 act_str = act_str[:action_limit] + "...[Truncated]"
             actions_list.append(act_str)
 
-        actions_str = " | ".join(actions_list) if actions_list else "None"
+        actions_str = "\n".join(actions_list) if actions_list else "None"
 
         res_limit = self.result_max_chars if tier == "HIGH" else self.result_short_max_chars
         res_str = "None"
@@ -161,7 +163,7 @@ class SQLTicks:
             if len(res_str) > res_limit:
                 res_str = res_str[:res_limit] + f"...[Truncated limit {res_limit}]"
 
-        return f"{header}\nThoughts: '{thoughts_str}' \nActions: {actions_str} \nResult: {res_str}"
+        return f"{header}\n### Thoughts: \n{thoughts_str} \n\n### Actions:\n{actions_str} \n\n### Result:\n{res_str}"
 
     async def get_context_block(self, **kwargs: Any) -> str:
         """
@@ -222,3 +224,55 @@ class SQLTicks:
         blocks = [self._format_tick_entry(t, "HIGH") for t in ticks]
 
         return "RECENT ACTIONS LOG\n" + "\n\n".join(blocks)
+
+    @skill(swarm=[Subagents.ARCHIVIST])
+    async def get_ticks_by_time(
+        self, start_time: str, end_time: str, detail: bool = False
+    ) -> SkillResult:
+        """
+        Retrieves ticks for a specific time period.
+        Format 'YYYY-MM-DD HH:MM:SS'.
+
+        detail: If True, returns full logs.
+        """
+        try:
+            tz = get_timezone(self.tz_offset)
+            
+            dt_start = datetime.strptime(start_time, "%Y-%m-%d %H:%M:%S").replace(tzinfo=tz)
+            dt_end = datetime.strptime(end_time, "%Y-%m-%d %H:%M:%S").replace(tzinfo=tz)
+
+            # SQLite при сравнении фильтров в ORM работает со строками (без таймзон)
+            # Поэтому мы переводим время в UTC и срезаем tzinfo (делаем naive datetime)
+            utc_start = dt_start.astimezone(timezone.utc).replace(tzinfo=None)
+            utc_end = dt_end.astimezone(timezone.utc).replace(tzinfo=None)
+
+            if utc_start > utc_end:
+                return SkillResult.fail("Ошибка: start_time не может быть позже end_time.")
+
+            limit = 200  # Жесткий лимит на количество возвращаемых тиков, чтобы избежать перегрузки
+
+            async with self.db.session_factory() as session:
+                stmt = select(TickTable).where(
+                    TickTable.created_at >= utc_start,
+                    TickTable.created_at <= utc_end
+                ).order_by(TickTable.created_at.asc()).limit(limit)
+
+                result = await session.execute(stmt)
+                ticks = result.scalars().all()
+
+            if not ticks:
+                return SkillResult.ok(f"За указанный период ({start_time} - {end_time}) тиков не найдено.")
+
+            tier = "HIGH" if detail else "MEDIUM"
+            blocks = [self._format_tick_entry(t, tier) for t in ticks]
+
+            res_str = "\n\n".join(blocks)
+            if len(ticks) == limit:
+                res_str += f"\n\n... [Достигнут лимит вывода в {limit} тиков. Рекомендуется уточнить временной диапазон для более узкого поиска]"
+
+            return SkillResult.ok(f"История тиков ({start_time} - {end_time}):\n\n{res_str}")
+
+        except ValueError:
+            return SkillResult.fail("Ошибка: Неверный формат времени. Используйте 'YYYY-MM-DD HH:MM:SS'.")
+        except Exception as e:
+            return SkillResult.fail(f"Внутренняя ошибка при поиске тиков: {e}")

@@ -168,8 +168,11 @@ class HostTerminalClient:
             try:
                 writer.close()
                 await writer.wait_closed()
-            except Exception:
-                pass
+                
+            except Exception as e:
+                main_logger.debug(
+                    f"[Host Terminal] Ошибка при закрытии сессии клиента: {e}"
+                )
 
     async def broadcast_message(self, text: str) -> None:
         """
@@ -233,12 +236,13 @@ class HostTerminalClient:
             self.state.add_message(msg["sender"], msg["text"], msg.get("time", ""))
 
     async def get_context_block(self, **kwargs: Any) -> str:
+        desc = "Description: Direct CLI chat with the system operator/user."
         if not self.state.is_online:
-            return "### HOST TERMINAL [OFF] \nThe interface is disabled."
+            return f"### HOST TERMINAL [OFF] \n{desc}\nThe interface is disabled."
 
         ui_status = (
             "The terminal window is opened."
             if self.state.is_ui_connected
             else "The terminal window is closed."
         )
-        return f"### HOST TERMINAL [ON]\nStatus: {ui_status}\n\nRecent messages:\n{self.state.formatted_messages}"
+        return f"### HOST TERMINAL [ON]\n{desc}\nStatus: {ui_status}\n\nRecent messages:\n{self.state.formatted_messages}"

@@ -9,7 +9,7 @@ def test_rss_client_update_status_empty():
     config = WebRSSConfig(feeds=[])
     WebRSSClient(state=state, config=config)
 
-    assert "Нет настроенных RSS-лент" in state.feeds_status
+    assert "No RSS feeds configured." in state.feeds_status
 
 
 @pytest.mark.asyncio

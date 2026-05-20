@@ -77,7 +77,7 @@ class CalendarClient:
         """
         events = self._load()
         if not events:
-            self.state.upcoming_events = "Запланированных событий нет."
+            self.state.upcoming_events = "There are no scheduled events."
             return
 
         # Сортируем по ближайшему времени срабатывания и применяем лимит из конфига
@@ -114,7 +114,8 @@ class CalendarClient:
 
     async def get_context_block(self, **kwargs: Any) -> str:
         """Провайдер контекста для ContextRegistry."""
+        desc = "Description: Time management and scheduled alarms/timers."
         if not self.state.is_online:
-            return "### CALENDAR [OFF] \nThe interface is disabled."
+            return f"### CALENDAR [OFF] \n{desc}\nThe interface is disabled."
 
-        return f"### CALENDAR [ON] \n{self.state.upcoming_events}"
+        return f"### CALENDAR [ON] \n{desc}\n{self.state.upcoming_events}"

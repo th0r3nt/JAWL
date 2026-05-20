@@ -30,8 +30,9 @@ class AiogramChats:
     @skill()
     async def get_chats(self, limit: int = 10) -> SkillResult:
         """
-        Возвращает список последних чатов, с которыми бот взаимодействовал.
+        Returns list of recent chats the bot interacted with.
         """
+
         try:
             if not self.state._chats_cache:
                 return SkillResult.ok("Список чатов пуст. Никто не писал боту после запуска.")
@@ -47,8 +48,9 @@ class AiogramChats:
     @skill()
     async def get_chat_info(self, chat_id: int) -> SkillResult:
         """
-        Получает подробную метаинформацию о конкретном чате.
+        Returns detailed meta-information about specific chat.
         """
+        
         try:
             bot = self.client.bot()
             chat = await bot.get_chat(int(chat_id))

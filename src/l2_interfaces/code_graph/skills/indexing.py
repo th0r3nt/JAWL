@@ -7,6 +7,7 @@
 
 import ast
 import asyncio
+import os
 from pathlib import Path
 from typing import Dict
 
@@ -32,10 +33,10 @@ class CodeGraphIndexing:
     @skill(swarm=[Subagents.CODER, Subagents.QA_ENGINEER])
     async def index_codebase(self, target_dir: str, project_id: str) -> SkillResult:
         """
-        Сканирует директорию с кодом и строит граф архитектуры.
-
-        target_dir: Путь к папке с кодом.
-        project_id: Уникальное имя для этого графа.
+        Scans directory and builds architecture graph. 
+        
+        target_dir: Code path. 
+        project_id: Unique graph ID.
         """
 
         try:
@@ -76,7 +77,7 @@ class CodeGraphIndexing:
     @skill(swarm=[Subagents.CODER])
     async def delete_index(self, project_id: str) -> SkillResult:
         """
-        Удаляет граф проекта из баз данных.
+        Deletes project graph from databases.
         """
 
         if project_id not in self.client.state.active_indexes:
@@ -103,16 +104,15 @@ class CodeGraphIndexing:
         """
 
         stats = {"files": 0, "classes": 0, "functions": 0}
-
-        # Читаем игнорируемые папки из конфигурации
         exclude_dirs = set(self.client.config.exclude_dirs)
 
-        # Собираем список Python файлов, игнорируя мусорные директории
         py_files = []
-        for p in root_dir.rglob("*.py"):
-            # Проверяем, пересекается ли путь файла с множеством исключенных папок
-            if not set(p.parts).intersection(exclude_dirs):
-                py_files.append(p)
+        for root, dirs, files in os.walk(root_dir):
+            # Модифицируем dirs in-place, чтобы предотвратить заход в venv/.git
+            dirs[:] = [d for d in dirs if d not in exclude_dirs]
+            for file in files:
+                if file.endswith(".py"):
+                    py_files.append(Path(root) / file)
 
         # 1-й проход: Создаем узлы (Файлы, Классы, Функции)
         # Мы используем asyncio.run() внутри потока - это допустимо, т.к. мы в отдельном Thread
@@ -245,8 +245,10 @@ class CodeGraphIndexing:
                         target_id = f"{project_id}::{dep_path}"
                         await self.graph.link_nodes(file_id, target_id, "IMPORTS")
 
-                except Exception:
-                    pass
+                except Exception as e:
+                    main_logger.debug(
+                        f"[Code Graph] Не удалось разрешить импорты для файла {filepath.name}: {e}"
+                    )
 
         # Выполняем асинхронные задачи в нашем изолированном потоке
         new_loop = asyncio.new_event_loop()

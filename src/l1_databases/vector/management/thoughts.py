@@ -67,7 +67,7 @@ class VectorThoughts:
     @skill(swarm=[Subagents.ARCHIVIST])
     async def save_thought(self, thought_text: str, tags: List[VectorTag]) -> SkillResult:
         """
-        Векторизует и сохраняет мысль или логический паттерн во внутреннюю память.
+        Vectorizes and saves thought/logical pattern to internal memory.
         """
 
         if not tags:
@@ -87,7 +87,7 @@ class VectorThoughts:
 
             msg = f"[Vector DB] Мысль успешно сохранена в базу данных (ID: {point_id}). Теги: {tags}"
             main_logger.info(msg)
-            return SkillResult.ok(msg)
+            return SkillResult.ok(f"True. ID: {point_id}")
 
         except Exception as e:
             msg = f"[Vector DB] Ошибка при сохранении мысли: {e}"
@@ -101,7 +101,7 @@ class VectorThoughts:
         self, query: str, limit: int = 5, tags_filter: Optional[List[VectorTag]] = None
     ) -> SkillResult:
         """
-        Семантический поиск мыслей из базы данных.
+        Performs semantic search over internal thoughts/reflections.
         """
         try:
             query_str = str(query)
@@ -136,7 +136,7 @@ class VectorThoughts:
             if not points:
                 msg = "[Vector DB] Поиск мыслей не дал результатов."
                 main_logger.debug(msg)
-                return SkillResult.ok(msg)
+                return SkillResult.ok("True")
 
             short_query = truncate_text(query_str.replace("\n", " "), 50, "... [Обрезано]")
             main_logger.info(
@@ -176,7 +176,7 @@ class VectorThoughts:
     @skill(swarm=[Subagents.ARCHIVIST], subconscious=[Pattern.FORGETTING, Pattern.CONSOLIDATION])
     async def delete_thought(self, point_id: str) -> SkillResult:
         """
-        Удаляет мысль из базы данных по ID.
+        Deletes thought snippet.
         """
         try:
             await self.db.client.delete(
@@ -197,9 +197,9 @@ class VectorThoughts:
         self, limit: int = 50, tags_filter: Optional[List[VectorTag]] = None
     ) -> SkillResult:
         """
-        Получает последние N мыслей из базы данных.
-
-        tags_filter: Опциональный массив тегов для фильтра.
+        Retrieves last N thoughts from DB. 
+        
+        tags_filter: Optional tag array.
         """
         try:
             query_filter = None

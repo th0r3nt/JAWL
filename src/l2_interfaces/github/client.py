@@ -177,14 +177,16 @@ class GithubClient:
         """
         Отдает отформатированный блок контекста для системного промпта агента.
         """
+        desc = "Description: GitHub REST API and local Git operations."
+        
         if not self.state.is_online:
-            return "### GITHUB [OFF]\nThe interface is disabled."
+            return f"### GITHUB [OFF]\n{desc}\nThe interface is disabled."
 
         agent_dashboard = ""
         if self.config.agent_account and self.token:
             agent_dashboard = (
-                f"\n* Текущие репозитории аккаунта (Топ-5 по активности):\n  {self.state.own_repos.replace(chr(10), chr(10)+'  ')}\n"
-                f"\n* Уведомления:\n  {self.state.unread_notifications.replace(chr(10), chr(10)+'  ')}"
+                f"\n* Current account repositories (Top 5 by activity):\n  {self.state.own_repos.replace(chr(10), chr(10)+'  ')}\n"
+                f"\n* Notifications:\n  {self.state.unread_notifications.replace(chr(10), chr(10)+'  ')}"
             )
 
         watchers_block = ""
@@ -195,12 +197,13 @@ class GithubClient:
                 if self.state.recent_watcher_events
                 else "  Нет недавних событий."
             )
-            watchers_block = f"\n\n* Отслеживаемые репозитории: {repos_list}\n* Последние события в репозиториях:\n{events_str}\n"
+            watchers_block = f"\n\n* Tracked repositories: {repos_list}\n* Latest events in repositories:\n{events_str}\n"
 
         return (
             f"### GITHUB [ON]\n"
+            f"{desc}\n"
             f"* Auth: {self.state.account_info}"
             f"{agent_dashboard}"
             f"{watchers_block}\n"
-            f"* История запросов:\n{self.state.github_history}"
+            f"* Query history:\n{self.state.github_history}"
         )

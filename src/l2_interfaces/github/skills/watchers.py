@@ -14,13 +14,13 @@ class GithubWatchers:
     @skill()
     async def track_repository(self, owner: str, repo: str) -> SkillResult:
         """
-        Начинает отслеживание активности в указанном репозитории.
+        Starts tracking activity in repository.
         """
 
         repo_name = f"{owner}/{repo}"
 
         if repo_name in self.client.state.tracked_repos:
-            return SkillResult.ok(f"Репозиторий {repo_name} уже отслеживается.")
+            return SkillResult.ok("True")
 
         try:
             # Делаем тестовый запрос
@@ -41,7 +41,7 @@ class GithubWatchers:
             self.events.save_persisted_repos()
 
             main_logger.info(f"[Github] Начато отслеживание репозитория: {repo_name}")
-            return SkillResult.ok(f"Успешно. Репозиторий {repo_name} добавлен в Watchers.")
+            return SkillResult.ok("True")
 
         except Exception as e:
             return SkillResult.fail(
@@ -51,7 +51,7 @@ class GithubWatchers:
     @skill()
     async def untrack_repository(self, owner: str, repo: str) -> SkillResult:
         """
-        Прекращает отслеживание репозитория.
+        Stops repository tracking.
         """
 
         repo_name = f"{owner}/{repo}"
@@ -70,12 +70,12 @@ class GithubWatchers:
                 pass
 
         main_logger.info(f"[Github] Прекращено отслеживание репозитория: {repo_name}")
-        return SkillResult.ok(f"Успешно. Репозиторий {repo_name} удален из Watchers.")
+        return SkillResult.ok("True")
 
     @skill()
     async def get_tracked_repositories(self) -> SkillResult:
         """
-        Возвращает список отслеживаемых репозиториев.
+        Returns list of tracked repositories.
         """
 
         tracked = list(self.client.state.tracked_repos.keys())

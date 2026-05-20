@@ -12,9 +12,11 @@ from src.utils.settings import (
 from src.utils.token_tracker import TokenTracker
 
 from src.l0_state.agent.state import AgentState
+
 from src.l1_databases.sql.db import SQLDB
 from src.l1_databases.sql.management.ticks import SQLTicks
 
+from src.l3_agent.llm.executor import LLMExecutor
 from src.l3_agent.subconscious.orchestrator import SubconsciousOrchestrator
 from src.l3_agent.react.loop import ReactLoop
 from src.l3_agent.skills.schema import ACTION_SCHEMA
@@ -68,15 +70,15 @@ async def test_e2e_subconscious_full_pipeline(tmp_path: Path):
     ]
     llm.get_session.return_value = mock_session
 
+    llm_executor = LLMExecutor(llm, TokenTracker())
+
     # 3. ПОДСОЗНАНИЕ
     orchestrator = SubconsciousOrchestrator(
         config=config,
-        llm_client=llm,
+        executor=llm_executor,
         sql_manager=MagicMock(),
         vector_manager=MagicMock(),
         graph_manager=MagicMock(),
-        sql_ticks=sql_ticks,
-        token_tracker=TokenTracker(),
         event_bus=bus,
         agent_state=agent_state,
         root_dir=tmp_path,
@@ -89,13 +91,12 @@ async def test_e2e_subconscious_full_pipeline(tmp_path: Path):
 
     # 4. ГЛАВНОЕ ЯДРО
     react = ReactLoop(
-        llm_client=llm,
+        executor=llm_executor,
         prompt_builder=MagicMock(),
         context_builder=AsyncMock(),
         agent_state=agent_state,
         sql_ticks=sql_ticks,
         vector_manager=MagicMock(),
-        token_tracker=TokenTracker(),
         tools=ACTION_SCHEMA,
         event_bus=bus,
     )

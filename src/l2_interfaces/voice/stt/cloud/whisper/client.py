@@ -94,16 +94,18 @@ class CloudWhisperSTTClient:
         """
         Формирует блок состояния для системного промпта агента.
         """
+        desc = "Description: STT transcription via OpenAI Whisper."
 
         if not self.state.is_online:
-            return "### CLOUD WHISPER STT [OFF]\nThe interface is disabled."
+            return f"### CLOUD WHISPER STT [OFF]\n{desc}\nThe interface is disabled."
 
         url_str = self.api_url if self.api_url else "OpenAI Official"
 
         return f"""### CLOUD WHISPER STT [ON]
-* Провайдер: {url_str}
-* Модель: {self.config.model}
+{desc}
+* Provider: {url_str}
+* Model: {self.config.model}
 
-* История транскрибаций:
+* Transcription History:
 {self.state.recent_history}
 """

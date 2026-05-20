@@ -4,20 +4,18 @@
 """
 
 import asyncio
-import time
-import openai
 from pathlib import Path
 from typing import Dict, Any, List, Optional
 
-from src.utils.logger import main_logger, tot_logger
-from src.utils.token_tracker import TokenTracker
+from src.utils.logger import tot_logger
 from src.utils._tools import dump_prompt_to_file
 
 from src.l0_state.agent.state import AgentState
 
 from src.l1_databases.sql.management.ticks import SQLTicks
 
-from src.l3_agent.llm.client import LLMClient
+from src.l3_agent.llm.executor import LLMExecutor
+
 from src.l3_agent.prompt.builder import PromptBuilder
 from src.l3_agent.context.registry import ContextRegistry, ContextSection
 from src.l3_agent.tot.schema import TOT_SCHEMA, TreeResponse, ThoughtBranch
@@ -28,13 +26,12 @@ class ToTGenerator:
 
     def __init__(
         self,
-        llm_client: LLMClient,
+        executor: LLMExecutor,
         model_name: str,
         prompt_builder: PromptBuilder,
         context_registry: ContextRegistry,
         agent_state: AgentState,
         sql_ticks: SQLTicks,
-        token_tracker: TokenTracker,
         root_dir: Path,
         timezone: int,
         # Настройка дерева
@@ -42,13 +39,14 @@ class ToTGenerator:
         simulations_per_branch: int,
         max_depth: int,
     ) -> None:
-        self.llm = llm_client
+
+        self.executor = executor
+
         self.model_name = model_name
         self.context_registry = context_registry
         self.agent_state = agent_state
         self.sql_ticks = sql_ticks
 
-        self.tracker = token_tracker
         self.timezone = timezone
 
         self.branches_count = branches_count
@@ -85,25 +83,35 @@ class ToTGenerator:
             if task_description
             else "Провести стратегический анализ текущей ситуации и предложить оптимальные пути."
         )
-        context += f"\n\n# CURRENT TASK / FOCUS \n{target_focus}"
 
-        context += "\n\n# DIRECTIVE \n"
-        context += f"1. Рекомендовано сгенерировать примерно ~{self.branches_count} макро-стратегий (веток верхнего уровня).\n"
-        context += f"2. Рекомендованная глубина вложенности симуляции: ~{self.max_depth} (где макро-стратегия - 1).\n"
-        context += f"3. Ветви сценарии динамически: в среднем по {self.simulations_per_branch} подварианта, но система должна сама решать, где нужно углубиться, а где ветка тупиковая или привела к логическому финалу (в таких случаях оставлять `sub_branches` пустым).\n"
-        context += "4. Поля минусов и плюсов путей/сценариев необязательны. Рекомендуется заполнять их только там, где действительно имеет смысл проводить Cost-Benefit анализ.\n"
+        full_context = f"""
+{context}
+
+# CURRENT TASK 
+{target_focus}
+
+# DIRECTIVE
+1. Рекомендовано сгенерировать примерно ~{self.branches_count} макро-стратегий (веток верхнего уровня).
+2. Рекомендованная глубина вложенности симуляции: ~{self.max_depth} (где макро-стратегия - 1).
+3. Ветви сценарии динамически: в среднем по {self.simulations_per_branch} подварианта, но система должна сама решать, где нужно углубиться, а где ветка тупиковая или привела к логическому финалу (в таких случаях оставлять `sub_branches` пустым).
+4. Поля минусов и плюсов путей/сценариев необязательны. Рекомендуется заполнять их только там, где действительно имеет смысл проводить Cost-Benefit анализ.
+        """.strip()
 
         messages = [
             {"role": "system", "content": self.system_prompt},
-            {"role": "user", "content": context},
+            {"role": "user", "content": full_context},
         ]
 
-        self.tracker.add_input_record(
-            messages, log_prefix="[Tree of Thoughts LLM]", logger=tot_logger
-        )
         await asyncio.to_thread(self._dump_context_to_file, messages)
 
-        raw_json = await self._call_llm(messages)
+        raw_json = await self.executor.execute(
+            model_name=self.model_name,
+            messages=messages,
+            temperature=0.7,
+            logger=tot_logger,
+            log_prefix="[Tree of Thoughts LLM]",
+            tools=TOT_SCHEMA,
+        )
         if not raw_json:
             return None
 
@@ -152,8 +160,8 @@ class ToTGenerator:
             if section in allowed_sections and name in all_blocks:
                 filtered_blocks.append(all_blocks[name])
 
-        # Используем стандартный get_context_block, чтобы ToT видел ту же иерархию сжатия, что и главный агент
-        ticks_block = await self.sql_ticks.get_context_block()
+        # Инъекция сырых логов (Raw Ticks) для полного понимания результатов прошлых шагов
+        ticks_block = await self.sql_ticks.get_full_context_block(limit=10)
         filtered_blocks.insert(-1, ticks_block)
 
         return "\n\n\n".join(filtered_blocks).strip()
@@ -162,14 +170,15 @@ class ToTGenerator:
         """
         Превращает рекурсивный объект в классическое ASCII-дерево.
         """
+
         if not tree.branches:
             return ""
 
         step = self.agent_state.current_step
         lines = [
             "## TREE OF THOUGHTS",
-            "Подсознательная симуляция стратегических веток для глубокого анализа и планирования.",
-            f"Время генерации: Шаг {step}\n\n```text",
+            "Subconscious simulation of strategic branches for deep analysis and planning.",
+            f"Generation time: Step {step}\n\n```text",
         ]
 
         def _render_branch(
@@ -179,9 +188,9 @@ class ToTGenerator:
 
             # Формирование названия узла
             if depth == 0:
-                node_title = f'Макро-стратегия №{prefix}: "{branch.name}"'
+                node_title = f'№{prefix}: "{branch.name}"'
             elif depth == 1:
-                node_title = f"Микро-симуляция №{prefix}: {branch.name}"
+                node_title = f"№{prefix}: {branch.name}"
             else:
                 node_title = f"{prefix}: {branch.name}"
 
@@ -219,79 +228,6 @@ class ToTGenerator:
         result = "\n".join(lines).strip()
         tot_logger.info(result)
         return result
-
-    async def _call_llm(self, messages: List[Dict[str, Any]]) -> Optional[str]:
-        for _ in range(3):
-            try:
-                session = self.llm.get_session()
-                response = await session.chat.completions.create(
-                    model=self.model_name,
-                    messages=messages,
-                    tools=TOT_SCHEMA,
-                )
-
-                msg_obj = response.choices[0].message
-                if msg_obj.tool_calls:
-                    raw_answer = str(msg_obj.tool_calls[0].function.arguments)
-                    self.tracker.add_output_record(
-                        raw_answer, log_prefix="[Tree of Thoughts LLM]", logger=tot_logger
-                    )
-                    return raw_answer
-                return None
-
-            except RuntimeError as e:
-                if "исчерпали лимиты" in str(e):
-                    import re
-
-                    match = re.search(r"подождать (\d+) сек", str(e))
-                    wait_sec = int(match.group(1)) if match else 10
-
-                    log = f"[Tree of Thoughts] Все ключи в кулдауне. Ждем {wait_sec}с."
-                    tot_logger.warning(log)
-
-                    await asyncio.sleep(wait_sec + 1)
-                    continue
-                return None
-
-            except openai.RateLimitError as e:
-                wait_time = 30
-                if e.response is not None:
-                    headers = e.response.headers
-                    retry_after = headers.get("retry-after") or headers.get(
-                        "x-ratelimit-reset"
-                    )
-                    if retry_after:
-                        try:
-                            if headers.get("retry-after-ms"):
-                                wait_time = max(1, int(int(retry_after) / 1000))
-                            else:
-                                wait_time = int(float(retry_after))
-
-                            if wait_time > time.time():
-                                wait_time = int(wait_time - time.time())
-                        except ValueError:
-                            pass
-                wait_time = max(2, min(wait_time, 120))
-
-                log = f"[Tree of Thoughts] Rate Limit (429). Кулдаун ключа на {wait_time}с."
-                tot_logger.warning(log)
-
-                self.llm.rotator.cooldown_key(session.api_key, wait_time)
-
-                if self.llm.rotator.total_keys() == 1:
-                    await asyncio.sleep(wait_time + 1)
-                else:
-                    await asyncio.sleep(1)
-
-                continue
-            except Exception as e:
-                log = f"[Tree of Thoughts] LLM ошибка: {e}"
-                tot_logger.error(log)
-
-                await asyncio.sleep(2)
-                continue
-
-        return None
 
     def _dump_context_to_file(self, messages: List[Dict[str, Any]]) -> None:
         dump_prompt_to_file(

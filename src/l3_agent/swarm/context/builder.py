@@ -91,10 +91,10 @@ class SwarmContextBuilder:
             results = _truncate(results, r_limit, "Результаты")
 
             history_blocks.append(
-                f"### STEP {step_num}\n"
-                f"*Thoughts*: {thoughts}\n"
-                f"*Actions*:\n{actions}\n"
-                f"*Results*:\n```\n{results}\n```"
+                f"* STEP {step_num}\n"
+                f"### Thoughts:\n{thoughts}\n\n"
+                f"### Actions:\n{actions}\n\n"
+                f"### Results:\n{results}"
             )
 
         history_str = (

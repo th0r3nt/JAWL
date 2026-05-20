@@ -41,7 +41,8 @@ class WebSearchClient:
         Провайдер контекста для ContextRegistry.
         Отдает отформатированный блок контекста для агента (история серфинга).
         """
+        desc = "Description: Search engines (DuckDuckGo/Tavily) and web page parsers."
         if not self.state.is_online:
-            return "### WEB SEARCH [OFF] \nThe interface is disabled."
+            return f"### WEB SEARCH [OFF] \n{desc}\nThe interface is disabled."
 
-        return f"### WEB SEARCH [ON] \n{self.state.browser_history}"
+        return f"### WEB SEARCH [ON] \n{desc}\n{self.state.browser_history}"

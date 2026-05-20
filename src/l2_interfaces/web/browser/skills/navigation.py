@@ -14,7 +14,7 @@ class BrowserNavigation:
     @skill()
     async def navigate(self, url: str) -> SkillResult:
         """
-        Переходит по указанному URL (или обновляет страницу).
+        Navigates to or refreshes URL.
         """
 
         try:
@@ -30,9 +30,7 @@ class BrowserNavigation:
             self.client.state.add_history(f"Переход на: {url}")
             main_logger.info(f"[Web Browser] Переход по ссылке: {url}")
 
-            return SkillResult.ok(
-                "Страница загружена. Изучите контекст интерфейса для просмотра элементов."
-            )
+            return SkillResult.ok("True")
 
         except Exception as e:
             return SkillResult.fail(f"Ошибка загрузки страницы: {e}")
@@ -40,7 +38,7 @@ class BrowserNavigation:
     @skill()
     async def scroll(self, direction: str = "down") -> SkillResult:
         """
-        Прокручивает страницу вниз/вверх на один экран.
+        Scrolls page up/down by one viewport.
         """
 
         try:
@@ -56,9 +54,7 @@ class BrowserNavigation:
             await self.client.update_state_view()
 
             self.client.state.add_history(f"Скролл: {direction}")
-            return SkillResult.ok(
-                f"Страница прокручена {direction}. Дерево элементов обновлено."
-            )
+            return SkillResult.ok("True")
 
         except Exception as e:
             return SkillResult.fail(f"Ошибка скролла: {e}")
@@ -66,12 +62,13 @@ class BrowserNavigation:
     @skill()
     async def close(self) -> SkillResult:
         """
-        Закрывает браузер.
+        Closes browser.
         """
 
         try:
             await self.client.close_browser()
             self.client.state.add_history("Браузер закрыт.")
-            return SkillResult.ok("Браузер успешно закрыт. Память освобождена.")
+            return SkillResult.ok("True")
+        
         except Exception as e:
             return SkillResult.fail(f"Ошибка при закрытии браузера: {e}")

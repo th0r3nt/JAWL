@@ -30,7 +30,7 @@ class EdgeTTSGeneration:
     @skill(swarm=[Subagents.CODER, Subagents.WEB_RESEARCHER])
     async def get_available_voices(self) -> SkillResult:
         """
-        Возвращает список доступных голосов.
+        Returns available voices.
         """
 
         voices = self.client.state.available_voices_cache
@@ -46,10 +46,9 @@ class EdgeTTSGeneration:
         self, text: str, voice_id: Optional[str] = None, filename: Optional[str] = None
     ) -> SkillResult:
         """
-        Синтезирует и сохраняет речь из текста.
-
-        voice_id: ShortName голоса (например, 'ru-RU-DmitryNeural').
-        filename: Имя выходного .mp3 файла.
+        Synthesizes and saves speech. 
+        
+        filename: Output .mp3 name.
         """
 
         if not text.strip():
@@ -80,9 +79,7 @@ class EdgeTTSGeneration:
 
             self.client.state.add_history(f"Сгенерирован {rel_path} (size: {size_str}, text: {text})")
 
-            return SkillResult.ok(
-                f"Аудио успешно сгенерировано (Edge TTS) и сохранено по пути: sandbox/{rel_path} ({size_str})."
-            )
+            return SkillResult.ok("True")
 
         except PermissionError as e:
             return SkillResult.fail(str(e))

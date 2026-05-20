@@ -21,9 +21,9 @@ class HostOSWorkspace:
     @require_access(HostOSAccessLevel.SANDBOX)
     async def open_file(self, filepath: str) -> SkillResult:
         """
-        Добавляет файл во "вкладки редактора" (Workspace).
-        Содержимое всех"открытых файлов будет постоянно инжектиться в системный промпт.
-        Критически полезно для удержания контекста.
+        Opens file in workspace. 
+        Content remains injected into system prompt. 
+        Critical for context retention.
         """
 
         try:
@@ -46,9 +46,7 @@ class HostOSWorkspace:
             self.host_os.state.opened_workspace_files.add(rel_path)
             main_logger.info(f"[Host OS] Файл '{rel_path}' открыт в рабочей среде.")
 
-            return SkillResult.ok(
-                f"Файл '{rel_path}' открыт. Теперь его содержимое будет всегда перед глазами."
-            )
+            return SkillResult.ok("True")
 
         except PermissionError as e:
             return SkillResult.fail(str(e))
@@ -60,7 +58,7 @@ class HostOSWorkspace:
     @require_access(HostOSAccessLevel.SANDBOX)
     async def close_file(self, filepath: str) -> SkillResult:
         """
-        'Закрывает' файл, убирая его из системного промпта.
+        Closes file, removing it from system prompt.
         """
 
         try:
@@ -73,9 +71,9 @@ class HostOSWorkspace:
             if rel_path in self.host_os.state.opened_workspace_files:
                 self.host_os.state.opened_workspace_files.remove(rel_path)
                 main_logger.info(f"[Host OS] Файл '{rel_path}' закрыт.")
-                return SkillResult.ok(f"Файл '{rel_path}' закрыт и убран из рабочей среды.")
+                return SkillResult.ok("True")
             else:
-                return SkillResult.ok(f"Файл '{rel_path}' и так не был открыт.")
+                return SkillResult.ok("True")
 
         except Exception as e:
             return SkillResult.fail(f"Ошибка при закрытии файла: {e}")
@@ -86,11 +84,10 @@ class HostOSWorkspace:
         self, path: str = ".", recursive: bool = False
     ) -> SkillResult:
         """
-        Массово 'открывает' файлы из указанной директории во вкладках редактора.
-        Крайне полезно и рекомендовано, когда нужно держать перед глазами всю логику файлов в папке.
-
-        Args:
-            recursive: если True, откроет файлы и во всех вложенных подпапках.
+        Mass-opens directory files in workspace. 
+        Highly recommended for keeping folder logic in context. 
+        
+        recursive: Includes subfolders.
         """
         try:
             safe_path = self.host_os.validate_path(path, is_write=False)
@@ -179,7 +176,7 @@ class HostOSWorkspace:
                 msg = "Не найдено подходящих текстовых файлов для открытия (или все они уже открыты)."
                 if skipped_limit > 0:
                     msg += f" Пропущено из-за лимита: {skipped_limit} файлов."
-                return SkillResult.ok(msg)
+                return SkillResult.ok("True")
 
             main_logger.info(
                 f"[Host OS] Массово открыты файлы из '{safe_path.name}' в рабочей среде (рекурсивно: {recursive})."

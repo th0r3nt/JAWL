@@ -93,16 +93,27 @@ system:
         dynamic_reduction: true
         pause_on_offline: true
 
-        decay_rate: 10.0
-        decay_interval_sec: 900
-
-        max_reflections_history: 5
+        max_reflections_history: 3
         max_custom_drives: 5
 
         fundamental:
-          curiosity: true
-          social: true
-          mastery: true
+          curiosity:
+            enabled: true
+            decay:
+              rate: 12.0
+              interval_sec: 1200
+
+          social:
+            enabled: true
+            decay:
+              rate: 10.0
+              interval_sec: 1200
+
+          mastery:
+            enabled: true
+            decay:
+              rate: 8.0
+              interval_sec: 1200
 
       # Подробнее: docs/yaml/settings/sql/hypotheses.md
       hypotheses:

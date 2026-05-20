@@ -37,10 +37,9 @@ async def test_integration_swarm_concurrency_semaphore(
     with patch("src.l3_agent.swarm.spawn._REGISTRY", mock_registry_for_concurrency):
         with patch("src.l3_agent.swarm.spawn.SwarmPromptBuilder"):
             manager = SwarmManager(
-                llm_client=MagicMock(),
-                swarm_config=config,
-                root_dir=tmp_path,
-                token_tracker=MagicMock(),
+                executor=MagicMock(), 
+                swarm_config=config, 
+                root_dir=MagicMock()
             )
 
     # Переменные для отслеживания параллелизма

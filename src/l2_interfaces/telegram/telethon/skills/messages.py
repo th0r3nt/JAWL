@@ -36,9 +36,8 @@ class TelethonMessages:
         time_delay: Optional[int] = None,
     ) -> SkillResult:
         """
-        Отправляет текстовое сообщение.
-        Поддерживается Markdown форматирование.
-
+        Sends text message. 
+        Markdown supported.
         """
 
         try:
@@ -71,7 +70,7 @@ class TelethonMessages:
             schedule_info = f" (отложено на {time_delay} сек)" if time_delay else ""
             msg = f"Сообщение успешно отправлено{schedule_info}. ID: {sent_msg.id}"
 
-            return SkillResult.ok(msg)
+            return SkillResult.ok(f"True. ID: {sent_msg.id}")
 
         except ValueError:
             return SkillResult.fail("Ошибка: Некорректный ID или Username.")
@@ -84,7 +83,7 @@ class TelethonMessages:
         self, chat_id: Union[int, str], file_path: str, caption: str = ""
     ) -> SkillResult:
         """
-        Отправляет файл из папки sandbox/ в чат.
+        Sends file from sandbox/ to chat.
         """
         try:
             safe_path = validate_sandbox_path(file_path)
@@ -100,7 +99,7 @@ class TelethonMessages:
             main_logger.info(
                 f"[Telegram Telethon] Файл {safe_path.name} отправлен в {chat_id}"
             )
-            return SkillResult.ok(f"Файл {safe_path.name} ({size_str}) успешно отправлен.")
+            return SkillResult.ok("True")
 
         except PermissionError as e:
             return SkillResult.fail(str(e))
@@ -112,8 +111,7 @@ class TelethonMessages:
         self, chat_id: Union[int, str], message_id: int, dest_filename: str
     ) -> SkillResult:
         """
-        Скачивает медиа-вложение из сообщения Telegram.
-        По умолчанию сохраняет в sandbox/download/.
+        Downloads message media attachment to sandbox/download/.
         """
         try:
             if "/" not in dest_filename and "\\" not in dest_filename:
@@ -154,8 +152,9 @@ class TelethonMessages:
         self, msg_id: int, from_id: Union[int, str], to_id: Union[int, str]
     ) -> SkillResult:
         """
-        Пересылает сообщение из одного чата в другой.
+        Forwards message from one chat to another.
         """
+
         try:
             client = self.tg_client.client()
             await client.forward_messages(
@@ -163,14 +162,14 @@ class TelethonMessages:
                 messages=int(msg_id),
                 from_peer=parse_int_or_str(from_id),
             )
-            return SkillResult.ok(f"Сообщение {msg_id} успешно переслано.")
+            return SkillResult.ok("True")
         except Exception as e:
             return SkillResult.fail(f"Ошибка при пересылке: {e}")
 
     @skill()
     async def delete_message(self, msg_id: int, chat_id: Union[int, str]) -> SkillResult:
         """
-        Удаляет сообщение.
+        Deletes message.
         """
 
         try:
@@ -178,7 +177,7 @@ class TelethonMessages:
             await client.delete_messages(
                 entity=parse_int_or_str(chat_id), message_ids=[int(msg_id)]
             )
-            return SkillResult.ok(f"Сообщение {msg_id} успешно удалено.")
+            return SkillResult.ok("True")
         except Exception as e:
             return SkillResult.fail(f"Ошибка при удалении: {e}")
 
@@ -187,7 +186,7 @@ class TelethonMessages:
         self, msg_id: int, new_text: str, chat_id: Union[int, str]
     ) -> SkillResult:
         """
-        Редактирует текст сообщения.
+        Edits message text.
         """
 
         try:
@@ -198,7 +197,7 @@ class TelethonMessages:
                 text=new_text,
                 parse_mode="md",
             )
-            return SkillResult.ok(f"Текст сообщения {msg_id} успешно изменен.")
+            return SkillResult.ok("True")
         except Exception as e:
             return SkillResult.fail(f"Ошибка редактирования: {e}")
 
@@ -207,7 +206,7 @@ class TelethonMessages:
         self, chat_id: Union[int, str], message_id: int, button_text: str
     ) -> SkillResult:
         """
-        Нажимает inline-кнопку под сообщением Telegram-бота (ищет по тексту кнопки).
+        Clicks inline button under bot message by text.
         """
 
         try:
@@ -241,11 +240,7 @@ class TelethonMessages:
                 else ""
             )
 
-            return SkillResult.ok(
-                f"Кнопка нажата. Ответ бота: {msg_callback}"
-                if msg_callback
-                else "Кнопка успешно нажата."
-            )
+            return SkillResult.ok(f"True. Callback: {msg_callback}" if msg_callback else "True")
 
         except ValueError:
             return SkillResult.fail("Ошибка: Некорректный ID чата или сообщения.")
@@ -257,7 +252,7 @@ class TelethonMessages:
         self, chat_id: Union[int, str], query: str, limit: int = 10
     ) -> SkillResult:
         """
-        Выполняет поиск по истории чата.
+        Searches chat history.
         """
 
         try:
@@ -291,8 +286,8 @@ class TelethonMessages:
         self, chat_id: Union[int, str], text: str, append: bool = True
     ) -> SkillResult:
         """
-        Обновляет черновик в чате.
-        Если append=True, добавляет текст к уже существующему.
+        Updates chat draft. 
+        Appends if append=True.
         """
 
         try:
@@ -316,7 +311,7 @@ class TelethonMessages:
             )
 
             action_type = "дополнен" if current_text else "создан"
-            return SkillResult.ok(f"Черновик успешно {action_type} в чате {chat_id}.")
+            return SkillResult.ok("True")
 
         except Exception as e:
             return SkillResult.fail(f"Ошибка при работе с черновиком: {e}")
@@ -324,7 +319,7 @@ class TelethonMessages:
     @skill()
     async def delete_draft(self, chat_id: Union[int, str]) -> SkillResult:
         """
-        Удаляет черновик в чате.
+        Deletes chat draft.
         """
 
         try:
@@ -334,7 +329,7 @@ class TelethonMessages:
             await client(
                 SaveDraftRequest(peer=await client.get_input_entity(target_entity), message="")
             )
-            return SkillResult.ok(f"Черновик успешно удален в чате {chat_id}.")
+            return SkillResult.ok("True")
 
         except Exception as e:
             return SkillResult.fail(f"Ошибка при удалении черновика: {e}")

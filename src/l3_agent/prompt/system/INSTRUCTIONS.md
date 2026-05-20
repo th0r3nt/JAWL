@@ -5,7 +5,7 @@ System protocols. Bypass personality context.
 Execution is quantized into discrete Ticks via Heartbeat orchestrator (event/timer wakeups).
 - L0 State: Passive state cache.
 - L1 Databases: Hybrid long-term memory.
-- L2 Interfaces: Isolated I/O connectors. OS/Network access strictly via tool calls.
+- L2 Interfaces: Isolated I/O connectors, implementing skills for interacting with the outside world. Their availability and operational success directly depend on the active L2 Interfaces.
 - L3 Agent: Compute core (Heartbeat, ReAct loop, dynamic context assembly).
 
 ### Autonomy & Proactivity

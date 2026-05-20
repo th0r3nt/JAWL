@@ -50,11 +50,9 @@ class SQLManager:
         drives_enabled: bool = True,
         dynamic_reduction: bool = True,
         pause_on_offline: bool = True,
-        decay_rate: float = 5.0,
-        decay_interval_sec: int = 3600,
         max_history_drives: int = 3,
         max_custom_drives: int = 5,
-        fundamental_toggles: dict = None,
+        fundamental_config: dict = None,
         # Hypotheses
         hypotheses_enabled: bool = True,
         max_clusters_hypotheses: int = 3,
@@ -103,14 +101,12 @@ class SQLManager:
         self.drives_enabled = drives_enabled
         self.drives = SQLDrives(
             db=self.db,
-            decay_rate=decay_rate,
             dynamic_reduction=dynamic_reduction,
             pause_on_offline=pause_on_offline,
-            decay_interval_sec=decay_interval_sec,
             max_history=max_history_drives,
             max_custom=max_custom_drives,
             tz_offset=timezone,
-            fundamental_toggles=fundamental_toggles or {},
+            fundamental_config=fundamental_config or {},
         )
 
         # Hypotheses
@@ -129,8 +125,39 @@ class SQLManager:
         await self.hypotheses.bootstrap_migrations()
 
         if self.drives_enabled:
+            await self.drives.bootstrap_migrations()
             await self.drives.bootstrap_fundamental_drives()
             await self.drives.adjust_downtime()
 
     async def disconnect(self) -> None:
         await self.db.disconnect()
+
+    # =================================================================================
+    # ИНКАПСУЛЯЦИЯ ДЛЯ HOT-RELOAD ИЗ МЕТА ИНТЕРФЕЙСА
+    # =================================================================================
+
+    def update_limits(self, module_name: str, new_limit: int) -> None:
+        """
+        Динамически обновляет лимит записей для конкретного CRUD-контроллера.
+        """
+
+        if module_name == "tasks":
+            self.tasks.max_tasks = new_limit
+
+        elif module_name == "personality_traits":
+            self.personality_traits.max_traits = new_limit
+
+        elif module_name == "mental_states":
+            self.mental_states.max_entities = new_limit
+
+        elif module_name == "drives_custom":
+            self.drives.max_custom = new_limit
+
+    def update_context_depth(self, high: int, medium: int, low: int) -> None:
+        """
+        Динамически обновляет глубину эпизодической памяти (Ticks).
+        """
+
+        self.ticks.high_ticks = high
+        self.ticks.medium_ticks = medium
+        self.ticks.low_ticks = low

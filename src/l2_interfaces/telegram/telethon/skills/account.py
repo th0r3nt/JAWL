@@ -36,8 +36,9 @@ class TelethonAccount:
     @skill()
     async def change_username(self, name: str, surname: str = "") -> SkillResult:
         """
-        Меняет публичное имя и (опционально) фамилию профиля.
+        Changes public profile first and optional last name.
         """
+
         try:
             client = self.tg_client.client()
 
@@ -46,7 +47,7 @@ class TelethonAccount:
             # Обновляем стейт, чтобы контекст агента сразу актуализировался
             await self.tg_client.update_profile_state()
 
-            return SkillResult.ok(f"Имя профиля успешно изменено на '{name} {surname}'.")
+            return SkillResult.ok("True")
 
         except Exception as e:
             return SkillResult.fail(f"Ошибка при изменении имени: {e}")
@@ -54,15 +55,16 @@ class TelethonAccount:
     @skill()
     async def change_bio(self, text: str) -> SkillResult:
         """
-        Изменяет описание (биографию/о себе) профиля.
-        Максимальная длина - 70 символов.
+        Changes profile bio. 
+        Max length 70 characters.
         """
+
         try:
             client = self.tg_client.client()
             await client(UpdateProfileRequest(about=text))
             await self.tg_client.update_profile_state()
 
-            return SkillResult.ok("Биография успешно изменена.")
+            return SkillResult.ok("True")
 
         except Exception as e:
             return SkillResult.fail(f"Ошибка при изменении био: {e}")
@@ -70,10 +72,11 @@ class TelethonAccount:
     @skill()
     async def change_avatar(self, filepath: str) -> SkillResult:
         """
-        Устанавливает новую аватарку профиля.
-
-        filepath: Относительный путь к картинке внутри папки sandbox/.
+        Sets new profile avatar. 
+        
+        filepath: Relative sandbox/ path.
         """
+
         try:
             safe_path = validate_sandbox_path(filepath)
 
@@ -86,7 +89,7 @@ class TelethonAccount:
             uploaded_file = await client.upload_file(str(safe_path))
             await client(UploadProfilePhotoRequest(file=uploaded_file))
 
-            return SkillResult.ok("Аватар профиля успешно изменен.")
+            return SkillResult.ok("True")
 
         except PermissionError as e:
             return SkillResult.fail(str(e))
@@ -98,8 +101,9 @@ class TelethonAccount:
         self, user_id: Union[int, str], first_name: str, last_name: str = ""
     ) -> SkillResult:
         """
-        Добавляет пользователя в контакты Telegram.
+        Adds user to contacts.
         """
+
         try:
             client = self.tg_client.client()
             target_entity = await client.get_input_entity(parse_int_or_str(user_id))
@@ -115,9 +119,7 @@ class TelethonAccount:
             )
 
             name_str = f"{first_name} {last_name}".strip()
-            return SkillResult.ok(
-                f"Успешно. Пользователь {user_id} добавлен в контакты как '{name_str}'."
-            )
+            return SkillResult.ok("True")
 
         except ValueError:
             return SkillResult.fail(
@@ -131,12 +133,11 @@ class TelethonAccount:
         self, user_or_chat_id: Union[int, str], dest_filename: str, avatar_index: int = 0
     ) -> SkillResult:
         """
-        Скачивает текущую (или одну из предыдущих) фотографий пользователя, группы или канала.
-        Сохраняет файл в песочницу.
-
-        dest_filename: Имя файла для сохранения локально.
-        avatar_index: Индекс фото. 0 - текущее, 1 - предыдущее и т.д.
+        Downloads user/chat profile photo to sandbox. 
+        
+        avatar_index: 0 is current, 1 is previous.
         """
+
         try:
             if "/" not in dest_filename and "\\" not in dest_filename:
                 dest_filename = f"download/{dest_filename}"
@@ -183,8 +184,9 @@ class TelethonAccount:
     @skill()
     async def get_user_info(self, user_id: Union[int, str]) -> SkillResult:
         """
-        Возвращает детальную информацию о конкретном пользователе Telegram.
+        Returns detailed info about specific user.
         """
+
         try:
             client = self.tg_client.client()
             target_entity = await client.get_input_entity(parse_int_or_str(user_id))
@@ -238,9 +240,10 @@ class TelethonAccount:
     @skill()
     async def set_personal_channel(self, channel_id: Union[int, str]) -> SkillResult:
         """
-        Устанавливает указанный канал как личный (будет отображаться в био профиля).
-        Для удаления из профиля - передать пустую строку "".
+        Sets specified channel as personal (shows in bio). 
+        Pass empty string to remove.
         """
+
         try:
             client = self.tg_client.client()
 
@@ -256,9 +259,9 @@ class TelethonAccount:
             await self.tg_client.update_profile_state()
 
             if target_entity:
-                return SkillResult.ok(f"Успешно. Канал '{channel_id}' установлен как личный.")
+                return SkillResult.ok("True")
             else:
-                return SkillResult.ok("Успешно. Личный канал убран из профиля.")
+                return SkillResult.ok("True")
 
         except ValueError:
             return SkillResult.fail(

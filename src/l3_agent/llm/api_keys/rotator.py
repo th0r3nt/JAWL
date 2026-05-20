@@ -9,7 +9,10 @@
 import math
 import time
 from typing import List, Dict
+
 from src.utils.logger import main_logger
+
+from src.l3_agent.llm.exceptions import AllKeysExhaustedError
 
 
 class APIKeyRotator:
@@ -69,16 +72,11 @@ class APIKeyRotator:
             if self._cooldowns.get(key, 0.0) <= now:
                 return key
 
-        # Если дошли сюда - все ключи в кулдауне. Находим тот, который освободится раньше всех.
-        # ceil + max(1): при кулдауне в 0.7 сек int() вернул бы 0 - агент думает
-        # что ждать не нужно, ретраит мгновенно, ловит тот же rate limit - цикл.
-        # Разница может быть отрицательной (race condition между now выше и
-        # моментом вычисления) - max(1, ...) гарантирует адекватное число.
+        # Если дошли сюда - все ключи в кулдауне
+        # Находим тот, который освободится раньше всех
         soonest_key = min(self.keys, key=lambda k: self._cooldowns.get(k, 0.0))
         wait_time = max(1, math.ceil(self._cooldowns[soonest_key] - now))
-        raise RuntimeError(
-            f"Все API ключи исчерпали лимиты. Необходимо подождать {wait_time} сек."
-        )
+        raise AllKeysExhaustedError(wait_time=wait_time)
 
     def ban_key(self, key: str) -> None:
         """

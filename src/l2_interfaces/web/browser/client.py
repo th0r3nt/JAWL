@@ -9,6 +9,7 @@ Stateful-менеджер Headless-браузера (Playwright).
 import time
 import sys
 import asyncio
+import urllib.parse
 from pathlib import Path
 from typing import Any, Optional
 from playwright.async_api import async_playwright, Browser, BrowserContext, Page, Playwright
@@ -26,7 +27,11 @@ class WebBrowserClient:
     """
 
     def __init__(
-        self, state: WebBrowserState, config: WebBrowserConfig, data_dir: Path
+        self,
+        state: WebBrowserState,
+        config: WebBrowserConfig,
+        data_dir: Path,
+        proxy_url: Optional[str] = None,
     ) -> None:
         """
         Инициализирует менеджер браузера.
@@ -51,6 +56,8 @@ class WebBrowserClient:
 
         self.last_activity_time: float = time.time()
         self._lock = asyncio.Lock()
+
+        self.proxy_url = proxy_url
 
     async def start(self) -> None:
         """Вызывается при старте системы (браузер физически не запускается до первого обращения)."""
@@ -120,6 +127,20 @@ class WebBrowserClient:
                 "viewport": {"width": 1920, "height": 1080},
                 "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
             }
+            
+            # Настраиваем прокси для Playwright
+            if self.proxy_url:
+                parsed = urllib.parse.urlparse(self.proxy_url)
+                # Playwright принимает socks5://...
+                scheme = "socks5" if parsed.scheme.startswith("socks") else parsed.scheme
+                
+                proxy_settings = {"server": f"{scheme}://{parsed.hostname}:{parsed.port}"}
+                if parsed.username:
+                    proxy_settings["username"] = parsed.username
+                if parsed.password:
+                    proxy_settings["password"] = parsed.password
+                    
+                context_kwargs["proxy"] = proxy_settings
 
             # Подхватываем сохраненную сессию (куки, авторизации), если она есть
             if self.state_file.exists():
@@ -178,7 +199,7 @@ class WebBrowserClient:
                 self.state.viewport = truncate_text(
                     snapshot,
                     15000,
-                    "...[Страница слишком длинная: обрезана. Для дальнейшего просмотра - скролл]",
+                    "...[Страница слишком длинная, обрезана. Для дальнейшего просмотра - скролл]",
                 )
             else:
                 self.state.viewport = (
@@ -188,27 +209,30 @@ class WebBrowserClient:
             self.state.viewport = f"Ошибка построения дерева элементов: {e}"
 
     async def get_context_block(self, **kwargs: Any) -> str:
-        """Провайдер контекста для агента."""
+        """
+        Провайдер контекста для агента.
+        """
+
+        desc = "Description: browser (Playwright) for interactive webpages."
         if not self.state.is_online:
-            return "### WEB BROWSER [OFF]\nThe interface is disabled."
+            return f"### WEB BROWSER [OFF]\n{desc}\nThe interface is disabled."
 
         if not self.state.is_open:
-            return (
-                "### WEB BROWSER [ON]\nБраузер закрыт. Для запуска - вызвать навык навигации."
-            )
+            return f"### WEB BROWSER [ON]\n{desc}\nThe browser is closed."
 
         history_str = (
             "\n".join(f"  - {h}" for h in self.state.history)
             if self.state.history
-            else "  Пусто"
+            else "  Empty"
         )
 
         return f"""### WEB BROWSER [ON]
-* Текущая вкладка: {self.state.page_title}
+{desc}
+* Current tab: {self.state.page_title}
 * URL: {self.state.current_url}
-* Последние действия:
+* Recent actions:
 {history_str}
 
-* Видимые элементы (AOM):
+* Visible AOM-elements:
 {self.state.viewport}
 """

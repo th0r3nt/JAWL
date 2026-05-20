@@ -10,12 +10,11 @@ from src.l3_agent.skills.schema import ActionCall
 @pytest.fixture
 def runner(mock_subconscious_deps):
     return SubconsciousRunner(
-        llm_client=mock_subconscious_deps["llm_client"],
+        executor=mock_subconscious_deps["executor"],
         model_name="cheap-model",
         sql_manager=mock_subconscious_deps["sql_manager"],
         vector_manager=mock_subconscious_deps["vector_manager"],
         graph_manager=mock_subconscious_deps["graph_manager"],
-        token_tracker=mock_subconscious_deps["token_tracker"],
         root_dir=mock_subconscious_deps["root_dir"],
         max_steps=2,
     )
@@ -81,15 +80,12 @@ async def test_runner_rbac_guard(mock_registry, mock_call_skill, runner):
 async def test_runner_loop_termination(runner):
     """Тест: Цикл прерывается при пустом массиве actions (штатное завершение)."""
 
-    # Мокаем LLM, чтобы она вернула пустой массив действий
-    mock_session = AsyncMock()
-    mock_msg = MagicMock()
-    mock_msg.tool_calls = None
-    mock_msg.content = '{"reflection": "Я всё почистил", "actions":[]}'
-    mock_session.chat.completions.create.return_value = MagicMock(
-        choices=[MagicMock(message=mock_msg)]
+    from unittest.mock import AsyncMock
+
+    # Мокаем экзекутор, чтобы он вернул пустой массив действий
+    runner.executor.execute = AsyncMock(
+        return_value='{"reflection": "Я всё почистил", "actions":[]}'
     )
-    runner.llm.get_session.return_value = mock_session
 
     # Заглушаем контекст
     runner._build_dynamic_context = AsyncMock(return_value="Контекст")
@@ -97,6 +93,6 @@ async def test_runner_loop_termination(runner):
 
     await runner.run(Pattern.FORGETTING, 10)
 
-    # LLM должна быть вызвана ровно 1 раз (т.к. сразу вернула пустой массив)
-    mock_session.chat.completions.create.assert_awaited_once()
+    # LLM (executor) должна быть вызвана ровно 1 раз
+    runner.executor.execute.assert_awaited_once()
     runner._execute_actions.assert_not_called()

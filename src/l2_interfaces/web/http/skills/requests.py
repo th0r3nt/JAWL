@@ -45,10 +45,10 @@ class WebHTTPRequests:
         self, url: str, method: str = "GET", headers: Optional[dict] = None
     ) -> SkillResult:
         """
-        Совершает HTTP запрос к эндпоинту.
-
-        method: HTTP метод (GET, POST и т.д.).
-        headers: Словарь кастомных HTTP-заголовков.
+        Makes HTTP request. 
+        
+        method: HTTP method. 
+        headers: Custom HTTP headers dict.
         """
 
         limit = self.client.config.max_response_chars
@@ -89,10 +89,9 @@ class WebHTTPRequests:
     @skill()
     async def download_file(self, url: str, dest_filename: str) -> SkillResult:
         """
-        Скачивает файл из сети на диск.
-        Сохраняет в песочницу (sandbox/download/).
-
-        dest_filename: Имя, под которым файл будет сохранен.
+        Downloads file to disk (sandbox/download/). 
+        
+        dest_filename: Output filename.
         """
 
         try:
@@ -120,9 +119,7 @@ class WebHTTPRequests:
 
             main_logger.info(f"[Web HTTP] Файл {safe_path.name} скачан из {url}")
             self.client.state.add_history(f"Download: {url} -> {safe_path.name}")
-            return SkillResult.ok(
-                f"Файл успешно скачан и сохранен по пути: sandbox/{safe_path.name}"
-            )
+            return SkillResult.ok("True")
 
         except PermissionError as e:
             return SkillResult.fail(str(e))

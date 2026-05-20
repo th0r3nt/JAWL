@@ -29,11 +29,10 @@ class HostOSDocuments:
         self, filepath: str, page_start: Optional[int] = None, page_end: Optional[int] = None
     ) -> SkillResult:
         """
-        Извлекает текст из документов (.pdf, .docx).
-
-        filepath: Относительный путь к файлу в песочнице.
-        page_start: С какой страницы начать чтение (нумерация с 1). Только для PDF.
-        page_end: На какой странице закончить. Только для PDF.
+        Extracts text from .pdf/.docx. 
+        
+        filepath: Sandbox relative path. 
+        page_start/page_end: 1-based page range (PDF only).
         """
         try:
             safe_path = self.host_os.validate_path(filepath, is_write=False)

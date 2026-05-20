@@ -43,8 +43,10 @@ class SQLHypotheses:
                 main_logger.info(
                     "[SQL DB] Выполнена успешная миграция таблицы BayesianHypotheses (добавлен cluster_name)."
                 )
-            except Exception:
-                pass  # Колонка уже существует
+            except Exception as e:
+                main_logger.debug(
+                    f"[SQL DB] Миграция таблицы Tasks пропущена (возможно, колонка уже существует): {e}"
+                )
 
     def _calculate_posterior(self, prior: float, tpr: float, fpr: float) -> float:
         """
@@ -72,11 +74,11 @@ class SQLHypotheses:
         self, cluster_name: str, title: str, initial_probability: float
     ) -> SkillResult:
         """
-        Создает новую гипотезу для направленного расследования.
-
-        cluster_name: Название инцидента.
-        title: Суть гипотезы.
-        initial_probability: Стартовая уверенность от 0.01 до 0.99 (напр., 0.3 - 30%).
+        Formulates hypothesis for directed investigation. 
+        
+        cluster_name: Incident name. 
+        title: Core thesis. 
+        initial_probability: Base confidence (0.01-0.99).
         """
 
         if not (0.01 <= initial_probability <= 0.99):
@@ -126,7 +128,7 @@ class SQLHypotheses:
 
         msg = f"Гипотеза '{title}' сформулирована (ID: {hyp_id}). Текущая уверенность: {int(initial_probability * 100)}%."
         main_logger.debug(f"[SQL DB] {msg}")
-        return SkillResult.ok(msg)
+        return SkillResult.ok(f"True. ID: {hyp_id}")
 
     @skill()
     async def add_evidence(
@@ -137,11 +139,11 @@ class SQLHypotheses:
         false_positive_rate: float,
     ) -> SkillResult:
         """
-        Добавляет улику и автоматически пересчитывает математическую вероятность гипотезы (по Байесу).
-
-        evidence_desc: Что за факт был обнаружен.
-        true_positive_rate: (0.01 - 0.99). Вероятность встретить эту улику, если гипотеза верна.
-        false_positive_rate: (0.01 - 0.99). Вероятность встретить эту улику, если гипотеза ошибочна (совпадение).
+        Adds evidence and recalculates Bayesian probability. 
+        
+        evidence_desc: Found fact. 
+        true_positive_rate: (0.01-0.99) Prob if hypothesis true. 
+        false_positive_rate: (0.01-0.99) Prob if hypothesis false.
         """
 
         if not (0.01 <= true_positive_rate <= 0.99) or not (
@@ -186,12 +188,12 @@ class SQLHypotheses:
 
         msg = f"Fact added. Вероятность гипотезы '{hyp.title}' изменилась: {int(old_prob*100)}% -> {int(new_prob*100)}%."
         main_logger.debug(f"[SQL DB] {msg}")
-        return SkillResult.ok(msg)
+        return SkillResult.ok("True")
 
     @skill()
     async def resolve_hypothesis(self, hypothesis_id: str) -> SkillResult:
         """
-        Удаляет гипотезу (после подтверждения или опровержения).
+        Deletes resolved (confirmed/refuted) hypothesis.
         """
 
         async with self.db.session_factory() as session:
@@ -206,7 +208,7 @@ class SQLHypotheses:
 
         msg = f"Гипотеза '{hypothesis_id}' успешно закрыта и удалена из оперативной памяти."
         main_logger.debug(f"[SQL DB] {msg}")
-        return SkillResult.ok(msg)
+        return SkillResult.ok("True")
 
     async def get_context_block(self, **kwargs: Any) -> str:
         """

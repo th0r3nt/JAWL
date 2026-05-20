@@ -43,13 +43,10 @@ class SQLPersonalityTraits:
         context: Optional[str] = None,
     ) -> SkillResult:
         """
-        Добавляет новую приобретенную черту характера.
-
-        Args:
-            name: Название черты.
-            description: В чем она заключается.
-            reason: Событие, повлекшее формирование этой черты.
-            context: Ситуации, в которых её следует применять.
+        Adds new acquired personality trait. 
+        
+        reason: Triggering event for this trait.
+        context: Situations where this trait applies.
         """
 
         trait_id = str(uuid.uuid4())[:8]
@@ -70,12 +67,12 @@ class SQLPersonalityTraits:
             await session.commit()
 
         msg = f"Черта личности '{name}' успешно добавлена. ID: {trait_id}"
-        return SkillResult.ok(msg)
+        return SkillResult.ok(f"True. ID: {trait_id}")
 
     @skill(subconscious=[Pattern.REFLECTION])
     async def get_traits(self) -> SkillResult:
         """
-        Возвращает список всех приобретенных черт личности.
+        Returns list of all acquired personality traits.
         """
 
         async with self.db.session_factory() as session:
@@ -100,7 +97,7 @@ class SQLPersonalityTraits:
     @skill(subconscious=[Pattern.REFLECTION])
     async def remove_trait(self, trait_id: str) -> SkillResult:
         """
-        Удаляет черту личности по ID.
+        Deletes personality trait by ID.
         """
         async with self.db.session_factory() as session:
             result = await session.execute(
@@ -113,7 +110,7 @@ class SQLPersonalityTraits:
 
         msg = f"Черта личности {trait_id} удалена."
         main_logger.info(f"[SQL DB] {msg}")
-        return SkillResult.ok(msg)
+        return SkillResult.ok("True")
 
     async def get_context_block(self, **kwargs: Any) -> str:
         """

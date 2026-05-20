@@ -45,8 +45,10 @@ class SQLMentalStates:
                 main_logger.info(
                     "[SQL DB] Выполнена успешная миграция таблицы MentalStates (добавлены CRM колонки)."
                 )
-            except Exception:
-                pass  # Колонки уже существуют
+            except Exception as e:
+                main_logger.debug(
+                    f"[SQL DB] Миграция таблицы Tasks пропущена (возможно, колонка уже существует): {e}"
+                )
 
     @skill(swarm=[Subagents.ARCHIVIST], subconscious=[Pattern.REFLECTION])
     async def create_mental_state(
@@ -64,12 +66,12 @@ class SQLMentalStates:
         related_information: Optional[str] = None,
     ) -> SkillResult:
         """
-        Регистрирует новый объект/субъект в Mental State.
-
-        attitude: Субъективное отношение.
-        directives: Индивидуальные рекомендации взаимодействия.
-        epistemic_state: Theory of Mind. Карта знаний субъекта.
-        relations: Словарь связей вида {"ID_другой_сущности": "Описание связи"}.
+        Registers new subject/object in Mental States CRM. 
+        
+        attitude: Subjective stance.
+        directives: Individual interaction guidelines.
+        epistemic_state: Theory of Mind (what the subject knows).
+        relations: Dict of links {"Entity_ID": "Relation description"}.
         """
 
         if tier not in ("high", "medium", "low", "background"):
@@ -106,12 +108,12 @@ class SQLMentalStates:
 
         msg = f"Сущность '{name}' добавлена в Active CRM. ID: {state_id}"
         main_logger.debug(f"[SQL DB] {msg}")
-        return SkillResult.ok(msg)
+        return SkillResult.ok(f"True. ID: {state_id}")
 
     @skill(swarm=[Subagents.ARCHIVIST], subconscious=[Pattern.REFLECTION])
     async def get_mental_states(self) -> SkillResult:
         """
-        Возвращает список всех сущностей, их отношения и связи.
+        Returns list of all tracked entities, their attitudes, and relations.
         """
 
         async with self.db.session_factory() as session:
@@ -136,7 +138,7 @@ class SQLMentalStates:
         related_information: Optional[str] = None,
     ) -> SkillResult:
         """
-        Обновляет отдельные поля отслеживаемой сущности.
+        Updates specific fields of tracked entity.
         """
 
         if tier and tier not in ("high", "medium", "low", "background"):
@@ -180,12 +182,12 @@ class SQLMentalStates:
 
         msg = f"Сущность '{state.name}' (ID: {state_id}) обновлена."
         main_logger.debug(f"[SQL DB] {msg}")
-        return SkillResult.ok(msg)
+        return SkillResult.ok("True")
 
     @skill(swarm=[Subagents.ARCHIVIST], subconscious=[Pattern.FORGETTING])
     async def delete_mental_state(self, state_id: str) -> SkillResult:
         """
-        Удаляет сущность из БД.
+        Deletes entity from database.
         """
 
         async with self.db.session_factory() as session:
@@ -198,7 +200,7 @@ class SQLMentalStates:
 
         msg = f"Сущность с ID {state_id} удалена из радара."
         main_logger.debug(f"[SQL DB] {msg}")
-        return SkillResult.ok(msg)
+        return SkillResult.ok("True")
 
     async def get_context_block(self, **kwargs: Any) -> str:
         """

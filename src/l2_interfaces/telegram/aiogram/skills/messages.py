@@ -20,8 +20,9 @@ class AiogramMessages:
         self, chat_id: int, text: str, reply_to_message_id: Optional[int] = None
     ) -> SkillResult:
         """
-        Отправляет текстовое сообщение от лица бота.
+        Sends text message on behalf of the bot.
         """
+
         try:
             bot = self.client.bot()
 
@@ -32,7 +33,7 @@ class AiogramMessages:
             )
 
             main_logger.info(f"[Telegram Aiogram] Отправлено сообщение в {chat_id}")
-            return SkillResult.ok(f"Сообщение успешно отправлено. ID: {msg.message_id}")
+            return SkillResult.ok(f"True. ID: {msg.message_id}")
 
         except ValueError:
             return SkillResult.fail("Ошибка: ID чата должен быть числом.")
@@ -45,15 +46,16 @@ class AiogramMessages:
     @skill()
     async def delete_message(self, chat_id: int, message_id: int) -> SkillResult:
         """
-        Удаляет сообщение в чате.
-        Для удаления чужих сообщений бот должен быть администратором с правами на удаление.
+        Deletes message in chat. 
+        Requires admin privileges for other users' messages.
         """
+
         try:
             bot = self.client.bot()
             await bot.delete_message(chat_id=int(chat_id), message_id=int(message_id))
 
             main_logger.info(f"[Telegram Aiogram] Удалено сообщение {message_id} в {chat_id}")
-            return SkillResult.ok(f"Сообщение {message_id} успешно удалено.")
+            return SkillResult.ok("True")
 
         except Exception as e:
             return SkillResult.fail(f"Ошибка при удалении сообщения (Aiogram): {e}")
@@ -61,8 +63,9 @@ class AiogramMessages:
     @skill()
     async def edit_message(self, chat_id: int, message_id: int, new_text: str) -> SkillResult:
         """
-        Изменяет текст уже отправленного ботом сообщения.
+        Edits text of previously sent bot message.
         """
+
         try:
             bot = self.client.bot()
             await bot.edit_message_text(
@@ -70,20 +73,20 @@ class AiogramMessages:
             )
 
             main_logger.info(f"[Telegram Aiogram] Сообщение {message_id} отредактировано")
-            return SkillResult.ok(f"Текст сообщения {message_id} успешно изменен.")
+            return SkillResult.ok("True")
 
         except Exception as e:
             if "message is not modified" in str(e).lower():
-                return SkillResult.ok(
-                    "Сообщение не изменено (новый текст совпадает со старым)."
-                )
+                return SkillResult.ok("True")
             return SkillResult.fail(f"Ошибка при редактировании сообщения (Aiogram): {e}")
 
     @skill()
     async def pin_message(self, chat_id: int, message_id: int) -> SkillResult:
         """
-        Закрепляет сообщение в группе (нужно иметь права администратора).
+        Pins message in group. 
+        Requires admin privileges.
         """
+
         try:
             bot = self.client.bot()
             await bot.pin_chat_message(
@@ -93,15 +96,16 @@ class AiogramMessages:
             main_logger.info(
                 f"[Telegram Aiogram] Сообщение {message_id} закреплено в {chat_id}"
             )
-            return SkillResult.ok(f"Сообщение {message_id} успешно закреплено.")
+            return SkillResult.ok("True")
         except Exception as e:
             return SkillResult.fail(f"Ошибка при закреплении сообщения (Aiogram): {e}")
 
     @skill()
     async def unpin_message(self, chat_id: int, message_id: int) -> SkillResult:
         """
-        Открепляет ранее закрепленное сообщение.
+        Unpins previously pinned message.
         """
+        
         try:
             bot = self.client.bot()
             await bot.unpin_chat_message(chat_id=int(chat_id), message_id=int(message_id))
@@ -109,6 +113,6 @@ class AiogramMessages:
             main_logger.info(
                 f"[Telegram Aiogram] Сообщение {message_id} откреплено в {chat_id}"
             )
-            return SkillResult.ok(f"Сообщение {message_id} успешно откреплено.")
+            return SkillResult.ok("True")
         except Exception as e:
             return SkillResult.fail(f"Ошибка при откреплении сообщения (Aiogram): {e}")

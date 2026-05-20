@@ -10,7 +10,7 @@ async def test_moderation_ban_global(mock_tg_client):
     res = await skills.ban_user(user_id=123)
 
     assert res.is_success is True
-    assert "глобальный ЧС" in res.message
+    assert res.message == "True"
 
 
 @pytest.mark.asyncio
@@ -21,7 +21,7 @@ async def test_moderation_ban_in_chat(mock_tg_client):
     res = await skills.ban_user(user_id=123, chat_id=-100500)
 
     assert res.is_success is True
-    assert "забанен в чате" in res.message
+    assert res.message == "True"
     mock_tg_client.client().edit_permissions.assert_called_once_with(
         -100500, 123, view_messages=False
     )
@@ -35,7 +35,7 @@ async def test_moderation_kick_user(mock_tg_client):
     res = await skills.kick_user(user_id=123, chat_id=-100500)
 
     assert res.is_success is True
-    assert "выгнан (kick)" in res.message
+    assert res.message == "True"
     mock_tg_client.client().kick_participant.assert_called_once_with(-100500, 123)
 
 
@@ -47,7 +47,7 @@ async def test_moderation_mute_user(mock_tg_client):
     res = await skills.mute_user(user_id=123, chat_id=-100500, duration_minutes=60)
 
     assert res.is_success is True
-    assert "замучен на 60 минут" in res.message
+    assert res.message == "True"
 
     call_args = mock_tg_client.client().edit_permissions.call_args
     assert call_args[0] == (-100500, 123)

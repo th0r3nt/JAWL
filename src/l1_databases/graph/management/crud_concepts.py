@@ -80,7 +80,7 @@ class GraphCRUD:
         self, name: str, description: str, category: ConceptCategory = "CONCEPT"
     ) -> SkillResult:
         """
-        Добавляет новый узел или обновляет существующий (Upsert).
+        Adds new or updates existing concept node in Knowledge Graph.
         """
         async with self.db.write_lock:
 
@@ -120,7 +120,7 @@ class GraphCRUD:
                 final_name = await asyncio.to_thread(_sync_manage)
                 msg = f"Концепт '{final_name}' (Тип: {category}) сохранен в граф."
                 main_logger.info(f"[Graph DB] {msg}")
-                return SkillResult.ok(msg)
+                return SkillResult.ok("True")
             except Exception as e:
                 return SkillResult.fail(f"Ошибка БД: {e}")
 
@@ -132,8 +132,9 @@ class GraphCRUD:
         self, source_name: str, target_name: str, relation: RelationType, description: str = ""
     ) -> SkillResult:
         """
-        Создает связь между двумя узлами. Если узлов нет — они создаются автоматически.
+        Creates relation edge between two graph nodes. Missing nodes are auto-created.
         """
+
         if relation not in GRAPH_EDGE_TABLES:
             return SkillResult.fail(f"Неизвестный тип связи: {relation}")
 
@@ -186,7 +187,7 @@ class GraphCRUD:
                 link_str = await asyncio.to_thread(_sync_link)
                 msg = f"Связь обновлена: {link_str}"
                 main_logger.info(f"[Graph DB] {msg}")
-                return SkillResult.ok(msg)
+                return SkillResult.ok("True")
             except Exception as e:
                 return SkillResult.fail(f"Ошибка связывания: {e}")
 
@@ -196,7 +197,7 @@ class GraphCRUD:
     )
     async def get_concept_neighborhood(self, name: str) -> SkillResult:
         """
-        Ищет узел и возвращает все его связи.
+        Searches graph node by name and returns its description and all relations.
         """
 
         def _sync_explore() -> str:
@@ -261,7 +262,7 @@ class GraphCRUD:
         self, source_name: str, target_name: str, relation: Optional[RelationType] = None
     ) -> SkillResult:
         """
-        Удаляет связь(и) между двумя узлами.
+        Removes link(s) between two graph nodes.
         """
         async with self.db.write_lock:
 
@@ -292,14 +293,14 @@ class GraphCRUD:
             try:
                 msg = await asyncio.to_thread(_sync_remove_link)
                 main_logger.info(f"[Graph DB] {msg}")
-                return SkillResult.ok(msg)
+                return SkillResult.ok("True")
             except Exception as e:
                 return SkillResult.fail(f"Ошибка удаления связи: {e}")
 
     @skill(swarm=[Subagents.ARCHIVIST], subconscious=[Pattern.FORGETTING])
     async def erase_concept(self, name: str) -> SkillResult:
         """
-        Полностью стирает узел и его связи из базы данных.
+        Fully erases concept node and its relations from the database.
         """
 
         async with self.db.write_lock:
@@ -344,14 +345,14 @@ class GraphCRUD:
             try:
                 msg = await asyncio.to_thread(_sync_erase)
                 main_logger.info(f"[Graph DB] {msg}")
-                return SkillResult.ok(msg)
+                return SkillResult.ok("True")
             except Exception as e:
                 return SkillResult.fail(f"Ошибка жесткого удаления: {e}")
 
     @skill(swarm=[Subagents.ARCHIVIST], subconscious=[Pattern.FORGETTING])
     async def archive_concept(self, name: str) -> SkillResult:
         """
-        Мягкое удаление. Скрывает узел из поиска и графа связей, но оставляет в базе.
+        Performs soft deletion. Hides node from search and graph, but keeps it in database.
         """
         async with self.db.write_lock:
 
@@ -370,7 +371,7 @@ class GraphCRUD:
             try:
                 success = await asyncio.to_thread(_sync_archive)
                 if success:
-                    return SkillResult.ok(f"Концепт '{name}' заархивирован.")
+                    return SkillResult.ok("True")
                 return SkillResult.fail(f"Концепт '{name}' не найден.")
             except Exception as e:
                 return SkillResult.fail(f"Ошибка при архивации: {e}")

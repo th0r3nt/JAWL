@@ -42,42 +42,42 @@ class Events:
 
     TELETHON_MESSAGE_INCOMING = EventConfig(
         name="TELETHON_MESSAGE_INCOMING",
-        description="Входящее сообщение в Telegram (Telethon).",
+        description="Входящее сообщение.",
         level=EventLevel.HIGH,
         requires_attention=True,
     )
 
     TELETHON_GROUP_MENTION = EventConfig(
         name="TELETHON_GROUP_MENTION",
-        description="Упоминание в Telegram (Telethon).",
+        description="Упоминание.",
         level=EventLevel.MEDIUM,
         requires_attention=True,
     )
 
     TELETHON_MESSAGE_REACTION = EventConfig(
         name="TELETHON_MESSAGE_REACTION",
-        description="Входящее эмодзи-реакция на сообщение в Telegram (Telethon).",
+        description="Эмодзи-реакция на сообщение.",
         level=EventLevel.LOW,
         requires_attention=False,
     )
 
     TELETHON_CHANNEL_MESSAGE = EventConfig(
         name="TELETHON_CHANNEL_MESSAGE",
-        description="Обычное сообщение в канале (Telethon).",
+        description="Сообщение в канале.",
         level=EventLevel.BACKGROUND,
         requires_attention=False,
     )
 
     TELETHON_CHAT_ACTION = EventConfig(
         name="TELETHON_CHAT_ACTION",
-        description="Системное действие в чате (вход/выход юзера, смена названия, закреп и т.д.).",
+        description="Системное действие в чате.",
         level=EventLevel.LOW,
         requires_attention=False,
     )
 
     TELETHON_GROUP_MESSAGE = EventConfig(
         name="TELETHON_GROUP_MESSAGE",
-        description="Обычное сообщение в чате.",
+        description="Сообщение в чате.",
         level=EventLevel.BACKGROUND,
         requires_attention=False,
     )

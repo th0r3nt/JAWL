@@ -100,7 +100,7 @@ def calculate_crypto_tax(profit: float, rate: float = 13.0) -> dict:
     exec_report = await execute_skill([exec_action])
 
     # 6. ПРОВЕРКА РЕЗУЛЬТАТОВ (ACSERTS)
-    assert "Action [Custom.crypto_tax]" in exec_report
+    assert "* Custom.crypto_tax:" in exec_report
     assert "870.0" in exec_report  # net (1000 - 13%)
     assert "130.0" in exec_report  # tax
 

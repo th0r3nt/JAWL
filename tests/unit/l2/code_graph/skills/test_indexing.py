@@ -86,3 +86,29 @@ async def test_indexing_process_imports_resolution(tmp_path, indexing_skill):
         c[0][0] == "test_proj::pkg/core.py" and c[0][1] == "test_proj::pkg/utils.py"
         for c in import_calls
     ), "Относительный импорт (с точкой) не срезолвлен."
+
+
+@pytest.mark.asyncio
+async def test_indexing_syntax_error_resilience(tmp_path, indexing_skill):
+    """Тест: Если AST-парсер натыкается на файл с синтаксической ошибкой, он просто пропускает его, не роняя индексацию всего проекта."""
+
+    project_dir = tmp_path / "broken_project"
+    project_dir.mkdir()
+
+    # Хороший файл
+    (project_dir / "good.py").write_text("def my_func(): pass", encoding="utf-8")
+
+    # Плохой файл (SyntaxError)
+    (project_dir / "broken.py").write_text(
+        "def broken_func(   # забыл закрыть скобку", encoding="utf-8"
+    )
+
+    import asyncio
+
+    stats = await asyncio.to_thread(
+        indexing_skill._parse_and_build_sync, project_dir, "test_proj"
+    )
+
+    # Индексатор должен проглотить ошибку, распарсить 1 хороший файл и 1 функцию в нем
+    assert stats["files"] == 1
+    assert stats["functions"] == 1

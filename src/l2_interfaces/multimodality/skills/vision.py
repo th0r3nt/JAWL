@@ -18,9 +18,9 @@ class VisionSkills:
     @skill()
     async def look_at_image(self, filepath: str) -> SkillResult:
         """
-        Размещает системный маркер изображения.
-
-        filepath: Относительный путь к картинке внутри директории `sandbox/`.
+        Places system image marker. 
+        
+        filepath: Relative path within `sandbox/`.
         """
         try:
             # Используем секьюрный гейткипер из Host OS

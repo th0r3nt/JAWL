@@ -29,9 +29,9 @@ class HostOSWriter:
         self, filepath: str, content: str, description: str = None
     ) -> SkillResult:
         """
-        Создает новый файл или полностью перезаписывает существующий.
-
-        description: лаконичное описание содержимого файла.
+        Creates or fully overwrites file. 
+        
+        description: Brief content summary.
         """
 
         try:
@@ -59,9 +59,7 @@ class HostOSWriter:
 
             size_str = format_size(safe_path.stat().st_size)
             main_logger.info(f"[Host OS] Перезаписан файл: {safe_path.name} ({size_str})")
-            return SkillResult.ok(
-                f"Файл {safe_path.name} успешно перезаписан. Записано: {len(content)} симв. Размер: {size_str}.{desc_msg}"
-            )
+            return SkillResult.ok("True")
 
         except PermissionError as e:
             return SkillResult.fail(str(e))
@@ -73,7 +71,7 @@ class HostOSWriter:
     @require_access(HostOSAccessLevel.SANDBOX)
     async def append_to_file(self, filepath: str, content: str) -> SkillResult:
         """
-        Безопасно добавляет текст в конец существующего файла.
+        Safely appends text to file end.
         """
 
         try:
@@ -99,9 +97,7 @@ class HostOSWriter:
 
             size_str = format_size(safe_path.stat().st_size)
             main_logger.info(f"[Host OS] Дополнен файл (append): {safe_path.name}")
-            return SkillResult.ok(
-                f"Текст успешно добавлен в конец файла {safe_path.name}. Размер: {size_str}."
-            )
+            return SkillResult.ok("True")
 
         except PermissionError as e:
             return SkillResult.fail(str(e))
@@ -113,7 +109,7 @@ class HostOSWriter:
     @require_access(HostOSAccessLevel.SANDBOX)
     async def delete_file(self, filepath: str) -> SkillResult:
         """
-        Удаляет указанный файл (не папки).
+        Deletes file (not directories).
         """
 
         try:
@@ -131,7 +127,7 @@ class HostOSWriter:
             safe_path.unlink()
 
             main_logger.info(f"[Host OS] Удален файл: {safe_path.name} ({size_str})")
-            return SkillResult.ok(f"Файл {safe_path.name} ({size_str}) успешно удален.")
+            return SkillResult.ok("True")
 
         except PermissionError as e:
             return SkillResult.fail(str(e))
@@ -143,7 +139,7 @@ class HostOSWriter:
     @require_access(HostOSAccessLevel.SANDBOX)
     async def delete_directory(self, path: str) -> SkillResult:
         """
-        Удаляет указанную директорию вместе со всем её содержимым.
+        Deletes directory and all contents.
         """
 
         try:
@@ -166,9 +162,7 @@ class HostOSWriter:
 
             await asyncio.to_thread(shutil.rmtree, safe_path)
             main_logger.info(f"[Host OS] Удалена директория: {safe_path.name}")
-            return SkillResult.ok(
-                f"Директория {safe_path.name} и всё её содержимое успешно удалены."
-            )
+            return SkillResult.ok("True")
 
         except PermissionError as e:
             return SkillResult.fail(str(e))
@@ -180,7 +174,7 @@ class HostOSWriter:
     @require_access(HostOSAccessLevel.SANDBOX)
     async def create_directories(self, paths: Union[str, List[str]]) -> SkillResult:
         """
-        Создает одну или несколько директорий.
+        Creates directory/directories.
         """
 
         if isinstance(paths, str):
@@ -219,14 +213,15 @@ class HostOSWriter:
 
         main_logger.info(f"[Host OS] Созданы директории: {', '.join(created)}")
 
-        return SkillResult.ok(msg)
+        return SkillResult.ok("True")
 
     @skill()
     @require_access(HostOSAccessLevel.SANDBOX)
     async def move_or_rename(self, source_path: str, destination_path: str) -> SkillResult:
         """
-        Перемещает/переименовывает файл/директорию.
+        Moves/renames file or directory.
         """
+
         try:
             # Проверяем оба пути через гейткипер ОС (и источник, и назначение)
             safe_src = self.host_os.validate_path(source_path, is_write=True)
@@ -246,7 +241,7 @@ class HostOSWriter:
             main_logger.info(
                 f"[Host OS] Перемещен/переименован объект: {safe_src.name} -> {safe_dst.name}"
             )
-            return SkillResult.ok(f"Успешно. Объект перемещен по пути: {safe_dst.as_posix()}")
+            return SkillResult.ok("True")
 
         except PermissionError as e:
             return SkillResult.fail(str(e))

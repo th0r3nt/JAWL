@@ -8,7 +8,7 @@ CRUD-контроллер для управления внутренними п�
 import uuid
 from typing import TYPE_CHECKING, Any
 from datetime import datetime, timezone, timedelta
-from sqlalchemy import select, func, desc
+from sqlalchemy import select, func, desc, text
 
 from src.utils.logger import main_logger
 from src.utils.dtime import format_datetime
@@ -30,37 +30,49 @@ class SQLDrives:
         db: "SQLDB",
         dynamic_reduction: bool = True,
         pause_on_offline: bool = True,
-        decay_rate: float = 2.5,
-        decay_interval_sec: int = 3600,
         max_history: int = 3,
         max_custom: int = 5,
         tz_offset: int = 0,
-        fundamental_toggles: dict = None,
+        fundamental_config: dict = None,
     ) -> None:
         """
         Инициализирует контроллер мотиваторов.
 
         Args:
             db: Подключение к SQLite.
-            decay_rate: Процент роста дефицита за один интервал.
-            decay_interval_sec: Интервал обновления дефицита (в секундах).
             max_history: Лимит хранимых рефлексий на один драйв.
             max_custom: Максимальное количество кастомных (созданных агентом) драйвов.
             tz_offset: Смещение временной зоны.
-            fundamental_toggles: состояние фундаментальных мотиваций (вкл/выкл).
+            fundamental_config: конфигурации (скорости и состояния) базовых драйвов.
         """
+
         self.db = db
 
         self.dynamic_reduction = dynamic_reduction
         self.pause_on_offline = pause_on_offline
-        self.decay_rate = decay_rate
-        self.decay_interval_sec = decay_interval_sec
 
         self.max_history = max_history
         self.max_custom = max_custom
-        self.fundamental_toggles = fundamental_toggles or {}
+        self.fundamental_config = fundamental_config or {}
 
         self.tz_offset = tz_offset
+
+    async def bootstrap_migrations(self) -> None:
+        """Мягкая миграция для добавления колонки decay_interval_sec в старые БД."""
+        async with self.db.engine.begin() as conn:
+            try:
+                await conn.execute(
+                    text(
+                        "ALTER TABLE drives ADD COLUMN decay_interval_sec INTEGER DEFAULT 3600"
+                    )
+                )
+                main_logger.info(
+                    "[SQL DB] Выполнена успешная миграция таблицы Drives (добавлен decay_interval_sec)."
+                )
+            except Exception as e:
+                main_logger.debug(
+                    f"[SQL DB] Миграция таблицы Drives пропущена (возможно, колонка уже существует): {e}"
+                )
 
     async def bootstrap_fundamental_drives(self) -> None:
         """
@@ -84,7 +96,12 @@ class SQLDrives:
 
         async with self.db.session_factory() as session:
             for key, drive_def in fundamental_defs.items():
-                is_enabled = self.fundamental_toggles.get(key, False)
+                drive_cfg = self.fundamental_config.get(key, {})
+                is_enabled = drive_cfg.get("enabled", False)
+                decay_cfg = drive_cfg.get("decay", {})
+                rate = decay_cfg.get("rate", 10.0)
+                interval = decay_cfg.get("interval_sec", 900)
+
                 res = await session.execute(
                     select(DriveTable).where(DriveTable.name == drive_def["name"])
                 )
@@ -97,11 +114,18 @@ class SQLDrives:
                         name=drive_def["name"],
                         type="fundamental",
                         description=drive_def["description"],
-                        decay_rate=self.decay_rate,
+                        decay_rate=rate,
+                        decay_interval_sec=interval,
                         last_satisfied_at=datetime.now(timezone.utc),
                         recent_reflections=[],
                     )
                     session.add(new_drive)
+
+                elif is_enabled and existing_drive:
+                    # Динамически обновляем настройки, если пользователь изменил их в YAML
+                    existing_drive.decay_rate = rate
+                    existing_drive.decay_interval_sec = interval
+
                 elif not is_enabled and existing_drive:
                     # Драйв выключен, но есть в БД -> удаляем
                     await session.delete(existing_drive)
@@ -113,12 +137,12 @@ class SQLDrives:
         self, drive_name: str, amount: int, reflection_summary: str
     ) -> SkillResult:
         """
-        Снижает дефицит указанного мотиватора (насыщение потребности).
-        Рекомендуется удовлетворять потребности итеративно.
+        Reduces drive deficit.
 
-        1-5% - Поверхностные действия.
-        10-15% - Значимые действия.
-        15-25% - Крупные свершения.
+        Recommended iterative satisfaction:
+        1-9% (superficial),
+        10-15% (meaningful),
+        16-25% (major achievements).
         """
 
         amount = max(1, min(100, amount))
@@ -141,21 +165,27 @@ class SQLDrives:
 
             # Защита от legacy/кривых данных: decay_rate обязан быть > 0, иначе математика
             # ниже рассыпается: current_deficit выйдет отрицательным или получим ZeroDivisionError.
-            if drive.decay_rate <= 0:
+            if drive.decay_rate <= 0 or drive.decay_interval_sec <= 0:
                 return SkillResult.fail(
-                    f"Драйв '{drive.name}' имеет невалидный decay_rate={drive.decay_rate}. "
-                    f"Ожидается положительное число. Пересоздайте драйв с корректным decay_rate."
+                    f"Драйв '{drive.name}' имеет невалидные настройки (rate={drive.decay_rate}, interval={drive.decay_interval_sec}). "
+                    f"Ожидаются положительные числа."
                 )
 
             # Высчитываем текущий дефицит через нелинейную модель
-            current_deficit = self._calculate_deficit(last_sat, now, drive.decay_rate)
+            current_deficit = self._calculate_deficit(
+                last_sat, now, drive.decay_rate, drive.decay_interval_sec
+            )
 
             # Считаем новый дефицит после удовлетворения
             new_deficit = max(0.0, current_deficit - amount)
 
-            # Высчитываем время (intervals), когда дефицит был бы равен new_deficit
-            intervals_ago = self._calculate_intervals_for_deficit(new_deficit, drive.decay_rate)
-            drive.last_satisfied_at = now - timedelta(seconds=intervals_ago * self.decay_interval_sec)
+            # Высчитываем время, когда дефицит был бы равен new_deficit
+            intervals_ago = self._calculate_intervals_for_deficit(
+                new_deficit, drive.decay_rate
+            )
+            drive.last_satisfied_at = now - timedelta(
+                seconds=intervals_ago * drive.decay_interval_sec
+            )
 
             time_str = format_datetime(now, self.tz_offset, "%m-%d %H:%M")
             entry = f"[{time_str}] Снижен на {amount}%: {reflection_summary}"
@@ -167,23 +197,25 @@ class SQLDrives:
             await session.commit()
 
         main_logger.debug(f"[SQL DB] Дефицит драйва '{drive.name}' снижен на {amount}%.")
-        return SkillResult.ok(
-            f"Дефицит драйва '{drive.name}' успешно снижен на {amount}%. Текущий остаток: {int(new_deficit)}/100"
-        )
+        return SkillResult.ok("True")
 
     @skill()
     async def create_custom_drive(
-        self, name: str, description: str, decay_rate: float = 2.5
+        self,
+        name: str,
+        description: str,
+        decay_rate: float = 10.0,
+        decay_interval_sec: int = 900,
     ) -> SkillResult:
         """
-        Создает новую кастомную потребность-мотиватор.
+        Creates custom drive/motivator.
         """
 
-        # decay_rate упадет в деление в satisfy_drive, поэтому корень валидации здесь.
-        if decay_rate <= 0:
+        # Валидация
+        if decay_rate <= 0 or decay_interval_sec <= 0:
             return SkillResult.fail(
-                f"decay_rate должен быть положительным числом, получено {decay_rate}. "
-                f"Нулевая или отрицательная скорость дефицита ломает математику драйва."
+                f"decay_rate и decay_interval_sec должны быть положительными числами. "
+                f"Получено: rate={decay_rate}, interval={decay_interval_sec}."
             )
 
         async with self.db.session_factory() as session:
@@ -201,6 +233,7 @@ class SQLDrives:
                 type="custom",
                 description=description,
                 decay_rate=decay_rate,
+                decay_interval_sec=decay_interval_sec,
                 last_satisfied_at=datetime.now(timezone.utc),
                 recent_reflections=[],
             )
@@ -208,12 +241,12 @@ class SQLDrives:
             await session.commit()
 
         main_logger.debug(f"[SQL DB] Создан кастомный драйв '{name}'.")
-        return SkillResult.ok(f"Кастомный драйв '{name}' успешно создан.")
+        return SkillResult.ok("True")
 
     @skill()
     async def delete_custom_drive(self, drive_name: str) -> SkillResult:
         """
-        Удаляет кастомный мотиватор.
+        Deletes custom drive.
         """
 
         async with self.db.session_factory() as session:
@@ -234,7 +267,7 @@ class SQLDrives:
             await session.commit()
 
         main_logger.debug(f"[SQL DB] Удален кастомный драйв '{drive_name}'.")
-        return SkillResult.ok(f"Драйв '{drive_name}' удален.")
+        return SkillResult.ok("True")
 
     def _get_drive_semantic_state(self, name: str, deficit: int, description: str) -> str:
         """
@@ -276,7 +309,7 @@ class SQLDrives:
 
         lines = [
             "## INTERNAL PSYCHOLOGICAL STATE",
-            "Внутренние самоощущения системы, сформированные на основе дефицита внутренних метрик:\n",
+            "Internal self-perceptions of the system, formed on the basis of a deficit of internal metrics:\n",
         ]
 
         now = datetime.now(timezone.utc)
@@ -288,17 +321,19 @@ class SQLDrives:
                 else d.last_satisfied_at
             )
 
-            deficit = self._calculate_deficit(last_sat, now, d.decay_rate)
+            deficit = self._calculate_deficit(
+                last_sat, now, d.decay_rate, d.decay_interval_sec
+            )
             deficit_int = int(deficit)
 
             semantic_state = self._get_drive_semantic_state(d.name, deficit_int, d.description)
 
-            # Выводим драйв в формате: * [CURIOSITY]: Текст состояния. (Дефицит: X%)
-            lines.append(f"* [{d.name}; Дефицит: {deficit_int}%]: \n{semantic_state}")
+            # Выводим драйв в формате: * [CURIOSITY]: Текст состояния. (Deficit: X%)
+            lines.append(f"* [{d.name}; Deficit: {deficit_int}%]: \n{semantic_state}")
 
             # Оставляем историю рефлексий, чтобы LLM понимала, что она делала недавно для закрытия этой потребности
             if d.recent_reflections:
-                lines.append("  *Последние уменьшения дефицита:*")
+                lines.append("  * Recent deficit reductions:*")
                 for ref in d.recent_reflections[
                     :2
                 ]:  # Берем только 2 последних, чтобы не спамить
@@ -314,13 +349,13 @@ class SQLDrives:
     # =======================================================================================
 
     def _calculate_deficit(
-        self, last_sat: datetime, now: datetime, decay_rate: float
+        self, last_sat: datetime, now: datetime, decay_rate: float, decay_interval_sec: int
     ) -> float:
         """
         Прямая математика: вычисляет текущий процент дефицита от прошедшего времени.
         """
 
-        intervals = (now - last_sat).total_seconds() / self.decay_interval_sec
+        intervals = (now - last_sat).total_seconds() / max(1, decay_interval_sec)
 
         if not self.dynamic_reduction:
             return min(100.0, intervals * decay_rate)
@@ -383,12 +418,12 @@ class SQLDrives:
             )
 
             downtime = now - last_tick_time
-            
+
             # Если даунтайм больше 1 минуты, компенсируем
             if downtime.total_seconds() > 60:
                 drives_res = await session.execute(select(DriveTable))
                 drives = drives_res.scalars().all()
-                
+
                 adjusted = 0
                 for d in drives:
                     sat_time = (
@@ -396,14 +431,16 @@ class SQLDrives:
                         if d.last_satisfied_at.tzinfo is None
                         else d.last_satisfied_at
                     )
-                    
-                    # Если драйв был обновлен (или создан) после последнего тика, не трогаем его
-                    if sat_time >= last_tick_time:
+
+                    # Игнорируем только те драйвы, которые были изменены строго после остановки системы
+                    if sat_time > last_tick_time:
                         continue
-                        
+
                     d.last_satisfied_at = sat_time + downtime
                     adjusted += 1
-                    
+
                 if adjusted > 0:
                     await session.commit()
-                    main_logger.info(f"[SQL DB] Даунтайм ({int(downtime.total_seconds())} сек) компенсирован для {adjusted} мотиваторов.")
+                    main_logger.info(
+                        f"[SQL DB] Даунтайм ({int(downtime.total_seconds())} сек) компенсирован для {adjusted} мотиваторов."
+                    )

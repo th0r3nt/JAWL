@@ -26,7 +26,6 @@ def recover_deploy_crashes(root_dir: Path):
     """
     Механизм воскрешения: откатывает сломанный код, если процесс умер во время деплоя.
     """
-
     backup_dir = root_dir / "src" / "utils" / "local" / "data" / "deploy_backup"
     active_flag = backup_dir / ".deploy_active"
 
@@ -35,7 +34,6 @@ def recover_deploy_crashes(root_dir: Path):
         print("[*] Агент сломал код к чертям. Инициирован автоматический откат исходников.")
 
         try:
-            # Восстанавливаем оригиналы
             for r, d, files in os.walk(backup_dir):
                 if "__pycache__" in r:
                     continue
@@ -51,7 +49,6 @@ def recover_deploy_crashes(root_dir: Path):
                     target_path.parent.mkdir(parents=True, exist_ok=True)
                     shutil.copy2(b_path, target_path)
 
-            # Удаляем новые файлы
             manifest = backup_dir / ".newfiles_manifest"
             if manifest.exists():
                 with open(manifest, "r", encoding="utf-8") as f:
@@ -65,10 +62,8 @@ def recover_deploy_crashes(root_dir: Path):
                             else:
                                 target.unlink(missing_ok=True)
 
-            # 3. Чистим
             shutil.rmtree(backup_dir, ignore_errors=True)
 
-            # 4. Пишем webhook агенту в песочницу, чтобы он проснулся и понял, что умер
             events_dir = root_dir / "sandbox" / ".jawl_events"
             events_dir.mkdir(parents=True, exist_ok=True)
             evt_id = str(uuid.uuid4())
@@ -93,8 +88,13 @@ def setup_and_run() -> None:
     venv_dir = root_dir / "venv"
     req_file = root_dir / "requirements.txt"
 
-    # Страховка от смерти агента
     recover_deploy_crashes(root_dir)
+
+    # Защита от конфликтов окружения: если скрипт запущен на 3.13,
+    # а внутри будет 3.11, переменные окружения могут сломать пути поиска (Segmentation Fault)
+    child_env = os.environ.copy()
+    child_env.pop("PYTHONPATH", None)
+    child_env.pop("PYTHONHOME", None)
 
     # =========================================================
     # Если мы ВНЕ виртуального окружения (Глобальный Python)
@@ -102,32 +102,6 @@ def setup_and_run() -> None:
 
     if not is_venv():
         if not venv_dir.exists():
-
-            # GUARD: Защита от слишком новых версий Python
-            if sys.version_info >= (3, 13):
-                print("\n[!] Внимание: Вы используете очень новую версию Python (3.13+).")
-                print(
-                    "[!] Многие ИИ-библиотеки еще не выпустили под нее скомпилированные бинарники."
-                )
-                print(
-                    "[!] Установка может зависнуть на этапе 'Preparing metadata' или завершиться ошибкой компиляции (Rust/C++)."
-                )
-                print("[!] Настоятельно рекомендуется использовать Python 3.11 или 3.12.\n")
-
-                answer = (
-                    input("Вы уверены, что хотите рискнуть и продолжить установку? (y/N): ")
-                    .strip()
-                    .lower()
-                )
-                if answer not in ("y", "yes", "д", "да"):
-                    print(
-                        "Установка отменена. Пожалуйста, запустите скрипт через Python 3.11 или 3.12."
-                    )
-                    sys.exit(0)
-                print("\n")
-
-            # ----------------------------------------------------
-
             print("\n[*] JAWL Bootstrapper: Инициализация.")
             print("[*] Создание виртуального окружения (venv).")
             venv.create(venv_dir, with_pip=True)
@@ -140,38 +114,109 @@ def setup_and_run() -> None:
 
             if req_file.exists():
                 print("[*] Обновление pip.")
-                # Принудительно обновляем pip, чтобы он корректно подтягивал свежие wheels (.whl)
                 subprocess.run(
                     [str(venv_python), "-m", "pip", "install", "--upgrade", "pip"],
                     stdout=subprocess.DEVNULL,
+                    check=False,
                 )
 
                 print(
-                    "\n[*] Установка зависимостей из requirements.txt. Пожалуйста, подождите несколько минут.\n\n"
+                    "\n[*] Установка зависимостей из requirements.txt.\n"
                 )
-                # Проверяем успешность установки
+
+                # Пытаемся поставить пакеты стандартным способом
                 result = subprocess.run(
-                    [str(venv_python), "-m", "pip", "install", "-r", str(req_file)]
+                    [str(venv_python), "-m", "pip", "install", "-r", str(req_file)],
+                    check=False,
                 )
+
+                # FALLBACK LOGIC 
+                # Аварийное спасение через uv
                 if result.returncode != 0:
-                    print("\n\n[!] Ошибка при первичной установке зависимостей.")
-                    print("[!] Изучите ошибки pip выше.")
-                    if os.name == "nt":
-                        input("Нажмите Enter для выхода.")
-                    sys.exit(1)
+                    print("\n" + "=" * 60)
+                    print(
+                        "[!] Ошибка: Не удалось установить зависимости (сборка C++/Rust пакетов)."
+                    )
+                    print("[i] Вероятно, вы используете новую версию Python (например, 3.13),")
+                    print("    для которой еще не выпущены предкомпилированные бинарники.")
+                    print("=" * 60 + "\n")
+
+                    answer = (
+                        input(
+                            "[?] Использовать пакетный менеджер 'uv' для автоматического скачивания \n"
+                            "    стабильной версии Python 3.11 и быстрой установки? [y/N]: "
+                        )
+                        .strip()
+                        .lower()
+                    )
+
+                    if answer in ("y", "yes", "д", "да"):
+                        print("\n[*] Установка uv.")
+                        subprocess.run(
+                            [sys.executable, "-m", "pip", "install", "uv"], check=True
+                        )
+
+                        print("[*] Удаление сломанного окружения.")
+                        shutil.rmtree(venv_dir, ignore_errors=True)
+
+                        print("[*] uv: Создание виртуальной среды (Python 3.11).")
+                        subprocess.run(
+                            [
+                                sys.executable,
+                                "-m",
+                                "uv",
+                                "venv",
+                                "--python",
+                                "3.11",
+                                str(venv_dir),
+                            ],
+                            check=True,
+                        )
+
+                        print("[*] uv: Установка зависимостей.")
+                        uv_result = subprocess.run(
+                            [
+                                sys.executable,
+                                "-m",
+                                "uv",
+                                "pip",
+                                "install",
+                                "--python",
+                                str(venv_python),
+                                "-r",
+                                str(req_file),
+                            ],
+                            check=False,
+                        )
+
+                        if uv_result.returncode != 0:
+                            print(
+                                "\n[!] Критическая ошибка: uv также не смог установить пакеты."
+                            )
+                            if os.name == "nt":
+                                input("Нажмите Enter для выхода.")
+                            sys.exit(1)
+
+                        print("\n[+] Зависимости успешно установлены через uv.")
+                    else:
+                        print(
+                            "\n[!] Установка прервана. Рекомендуется установить Python 3.11 вручную."
+                        )
+                        if os.name == "nt":
+                            input("Нажмите Enter для выхода.")
+                        sys.exit(1)
 
                 print("\n\n[*] Установка завершена.\n")
 
-        # Определяем путь к python внутри venv
         venv_python = (
             venv_dir / "Scripts" / "python.exe"
             if os.name == "nt"
             else venv_dir / "bin" / "python"
         )
 
-        # Запускаем этот же скрипт через venv
+        # Передаем очищенный env в дочерний процесс
         exit_code = subprocess.call(
-            [str(venv_python), str(root_dir / "jawl.py")] + sys.argv[1:]
+            [str(venv_python), str(root_dir / "jawl.py")] + sys.argv[1:], env=child_env
         )
 
         sys.exit(exit_code)
@@ -182,14 +227,10 @@ def setup_and_run() -> None:
 
     sys.path.append(str(root_dir))
 
-    # Механизм самовосстановления: если модулей нет, докачиваем их и проактивно стартуем
     try:
         from src.cli.menu import main_menu
         from src.cli.screens.logs import logs_screen
         from src.cli.screens.terminal_chat import _open_terminal_chat
-
-        # Принудительно импортируем ядро. Это заставит интерпретатор
-        # проверить наличие ВООБЩЕ ВСЕХ библиотек из requirements.txt до запуска меню
         import src.main  # noqa: F401
 
     except ModuleNotFoundError as e:
@@ -202,25 +243,21 @@ def setup_and_run() -> None:
             sys.exit(1)
 
         print(
-            f"\n\n[*] Сбой: отсутствует модуль {e.name}. Похоже, зависимости были повреждены."
+            f"\n\n[*] Сбой: отсутствует модуль {e.name}. Запуск автоматического восстановления."
         )
-        print("[*] Запуск автоматического восстановления.")
         time.sleep(2)
 
-        # Обновляем pip перед автовосстановлением
         subprocess.run(
             [sys.executable, "-m", "pip", "install", "--upgrade", "pip"],
             stdout=subprocess.DEVNULL,
+            check=False,
         )
-
-        # Проверяем код возврата при восстановлении
-        result = subprocess.run([sys.executable, "-m", "pip", "install", "-r", str(req_file)])
+        result = subprocess.run(
+            [sys.executable, "-m", "pip", "install", "-r", str(req_file)], check=False
+        )
 
         if result.returncode != 0:
             print("\n\n[!] Критическая ошибка: pip не смог восстановить зависимости.")
-            print(
-                "[!] Изучите логи выше. Возможно, версия Python несовместима с библиотеками."
-            )
             if os.name == "nt":
                 input("Нажмите Enter для выхода.")
             sys.exit(1)
@@ -228,28 +265,22 @@ def setup_and_run() -> None:
         print("\n\n[*] Зависимости успешно восстановлены. Запуск CLI.")
         time.sleep(1)
 
-        # Перезапускаем сами себя (с флагом восстановления), чтобы Python подтянул новые пути
-        env = os.environ.copy()
-        env["JAWL_RECOVERY_ATTEMPTED"] = "1"
+        child_env["JAWL_RECOVERY_ATTEMPTED"] = "1"
         exit_code = subprocess.call(
-            [sys.executable, str(root_dir / "jawl.py")] + sys.argv[1:], env=env
+            [sys.executable, str(root_dir / "jawl.py")] + sys.argv[1:], env=child_env
         )
         sys.exit(exit_code)
 
-    # Если всё импортировалось успешно - проверяем флаги
     log_arg = next((arg for arg in sys.argv if arg.startswith("--logs")), None)
-    
+
     if log_arg:
         if "-" in log_arg:
-            # Парсим тип из флага --logs-agent -> agent
             log_type = log_arg.split("-")[-1]
             logs_screen(log_type)
         else:
             logs_screen("main")
-
     elif "--terminal" in sys.argv:
         _open_terminal_chat()
-
     elif "--version" in sys.argv:
         print(f"JAWL Framework v{__version__}")
         sys.exit(0)
@@ -260,11 +291,9 @@ def setup_and_run() -> None:
 if __name__ == "__main__":
     try:
         setup_and_run()
-
     except KeyboardInterrupt:
         print("\nОстановка загрузчика.")
         sys.exit(0)
-
     except Exception:
         import traceback
 

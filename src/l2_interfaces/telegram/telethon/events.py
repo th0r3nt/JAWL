@@ -271,7 +271,7 @@ class TelethonEvents:
         return res_str
 
     # ==========================================================
-    # ОБРАБОТЧИКИ (HANDLERS)
+    # ОБРАБОТЧИКИ
     # ==========================================================
 
     async def _on_outgoing_message(self, event: events.NewMessage.Event) -> None:

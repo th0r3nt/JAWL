@@ -25,11 +25,10 @@ class TelethonModeration:
     @skill()
     async def ban_user(self, user_id: int, chat_id: Optional[int] = None) -> SkillResult:
         """
-        Банит пользователя.
-
-        - Если chat_id не передан: добавляет юзера в личный ЧС.
-        - Если chat_id передан: исключает юзера из группы/канала.
+        Bans user. 
+        If chat_id omitted, blocks globally in personal blacklist.
         """
+
         try:
             client = self.tg_client.client()
             target_user = int(user_id)
@@ -45,7 +44,7 @@ class TelethonModeration:
                 )
 
             main_logger.info(msg)
-            return SkillResult.ok(msg)
+            return SkillResult.ok("True")
 
         except ValueError:
             return SkillResult.fail("Ошибка: ID пользователя и чата должны быть числами.")
@@ -55,11 +54,10 @@ class TelethonModeration:
     @skill()
     async def unban_user(self, user_id: int, chat_id: Optional[int] = None) -> SkillResult:
         """
-        Разблокирует пользователя.
-
-        - Если chat_id не передан: разбанивает из личного ЧС.
-        - Если chat_id передан: разбанивает в группе.
+        Unbans user. 
+        If chat_id omitted, unblocks from personal blacklist.
         """
+
         try:
             client = self.tg_client.client()
             target_user = int(user_id)
@@ -75,7 +73,7 @@ class TelethonModeration:
                 )
 
             main_logger.info(msg)
-            return SkillResult.ok(msg)
+            return SkillResult.ok("True")
 
         except ValueError:
             return SkillResult.fail("Ошибка: ID пользователя и чата должны быть числами.")
@@ -85,7 +83,7 @@ class TelethonModeration:
     @skill()
     async def kick_user(self, user_id: int, chat_id: int) -> SkillResult:
         """
-        Выгоняет пользователя из группы.
+        Kicks user from group.
         """
 
         try:
@@ -97,7 +95,7 @@ class TelethonModeration:
 
             msg = f"[Telegram Telethon] Пользователь {target_user} выгнан (kick) из чата {target_chat}."
             main_logger.info(msg)
-            return SkillResult.ok(msg)
+            return SkillResult.ok("True")
 
         except ValueError:
             return SkillResult.fail("Ошибка: ID пользователя и чата должны быть числами.")
@@ -109,7 +107,7 @@ class TelethonModeration:
         self, user_id: int, chat_id: int, duration_minutes: int = 0
     ) -> SkillResult:
         """
-        Выдает Мут - запрещает пользователю писать сообщения в группе.
+        Mutes user in group, preventing message sending.
         """
         try:
             client = self.tg_client.client()
@@ -131,7 +129,7 @@ class TelethonModeration:
             )
             msg = f"[Telegram Telethon] Пользователь {target_user} замучен {duration_str} в чате {target_chat}."
             main_logger.info(msg)
-            return SkillResult.ok(msg)
+            return SkillResult.ok("True")
 
         except ValueError:
             return SkillResult.fail("Ошибка: Значения должны быть числами.")
@@ -143,10 +141,8 @@ class TelethonModeration:
         self, limit: int = 50, chat_id: Optional[int] = None
     ) -> SkillResult:
         """
-        Возвращает список заблокированных пользователей.
-
-        - Если chat_id не передан: выводит личный ЧС.
-        - Если chat_id передан: выводит ЧС группы/канала.
+        Returns banned users list. 
+        If chat_id omitted, returns personal blacklist.
         """
 
         try:

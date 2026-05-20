@@ -19,11 +19,11 @@ class WebRSSClient:
 
     def _update_feeds_status(self):
         if not self.config.feeds:
-            self.state.feeds_status = "Нет настроенных RSS-лент."
+            self.state.feeds_status = "No RSS feeds configured."
             return
 
         feed_lines = [f"- {f.name} ({f.url})" for f in self.config.feeds]
-        self.state.feeds_status = f"Отслеживаемые ленты ({len(feed_lines)}):\n" + "\n".join(
+        self.state.feeds_status = f"Tracked feeds ({len(feed_lines)}):\n" + "\n".join(
             feed_lines
         )
 
@@ -39,11 +39,13 @@ class WebRSSClient:
         return await asyncio.to_thread(_fetch)
 
     async def get_context_block(self, **kwargs) -> str:
+        desc = "Description: RSS/Atom feed parsing and tracking."
         if not self.state.is_online:
-            return "### WEB RSS [OFF]\nThe interface is disabled."
+            return f"### WEB RSS [OFF]\n{desc}\nThe interface is disabled."
 
         return (
             f"### WEB RSS [ON]\n"
-            f"* Статус: {self.state.feeds_status}\n\n"
-            f"* Последние новости:\n{self.state.latest_news}"
+            f"{desc}\n"
+            f"* Status: {self.state.feeds_status}\n\n"
+            f"* Recent News:\n{self.state.latest_news}"
         )

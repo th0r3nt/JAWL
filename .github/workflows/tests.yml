@@ -1,34 +1,43 @@
 name: JAWL Tests
 
-# Запускать при пушах в ветки main/master и при создании Pull Request-ов
 on:
   push:
-    branches: [ "main", "master" ]
+    branches: [ "main", "master", "beta-*" ] # Добавил поддержку твоих веток из _docs
   pull_request:
     branches: [ "main", "master" ]
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    name: Python ${{ matrix.python-version }} on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false # Если тест упадет на Windows, Ubuntu всё равно добежит до конца (удобно для дебага)
+      matrix:
+        # Тестируем на всех заявленных ОС
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        # Тестируем на 3.11 (целевая), а также проверяем совместимость с 3.12 и 3.13
+        python-version: ["3.11", "3.12", "3.13"]
 
     steps:
     - name: Клонирование кода
       uses: actions/checkout@v4
 
-    - name: Установка Python 3.10
+    - name: Установка uv
+      uses: astral-sh/setup-uv@v3
+      with:
+        enable-cache: true
+        cache-dependency-glob: "requirements.txt" # Кэш сбросится только если поменяются зависимости
+
+    - name: Настройка Python ${{ matrix.python-version }}
       uses: actions/setup-python@v5
       with:
-        python-version: "3.10"
-        cache: "pip" # Ускоряет установку, кэшируя библиотеки
+        python-version: ${{ matrix.python-version }}
 
-    - name: Установка зависимостей
-      run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
+    - name: Установка зависимостей через uv
+      # Флаг --system ставит пакеты прямо в окружение раннера, чтобы не возиться с активацией venv в CI
+      run: uv pip install --system -r requirements.txt
 
     - name: Запуск автотестов
-      # Указываем PYTHONPATH, чтобы pytest корректно видел папку src/
       env:
         PYTHONPATH: .
-      run: |
-        pytest -q tests/
+      run: pytest -q tests/

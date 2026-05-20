@@ -34,5 +34,5 @@ async def test_edge_get_context_block(edge_client: EdgeClient):
     block = await edge_client.get_context_block()
 
     assert "EDGE TTS [ON]" in block
-    assert "Microsoft Edge Cloud TTS" in block
+    assert "Microsoft Edge API" in block
     assert "ru-RU-SvetlanaNeural" in block

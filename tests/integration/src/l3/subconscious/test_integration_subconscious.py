@@ -10,7 +10,6 @@ from src.utils.settings import (
     SubconsciousPatternsConfig,
     SubconsciousPatternConfig,
 )
-from src.utils.token_tracker import TokenTracker
 
 from src.l0_state.agent.state import AgentState
 from src.l3_agent.subconscious.orchestrator import SubconsciousOrchestrator
@@ -32,12 +31,10 @@ def integration_deps(tmp_path: Path):
 
     orchestrator = SubconsciousOrchestrator(
         config=config,
-        llm_client=MagicMock(),
+        executor=MagicMock(),
         sql_manager=MagicMock(),
         vector_manager=MagicMock(),
         graph_manager=MagicMock(),
-        sql_ticks=MagicMock(),
-        token_tracker=TokenTracker(),
         event_bus=bus,
         agent_state=agent_state,
         root_dir=tmp_path,

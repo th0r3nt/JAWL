@@ -22,11 +22,12 @@ class CodeGraphClient:
 
     async def get_context_block(self, **kwargs: Any) -> str:
         """Блок для системного промпта агента."""
+        desc = "Description: Parsing Python directory AST-trees and constructing dependency/relationship graphs for semantic search."
         if not self.state.is_online:
-            return "### CODE GRAPH [OFF]\nThe interface is disabled."
+            return f"### CODE GRAPH [OFF]\n{desc}\nThe interface is disabled."
 
         if not self.state.active_indexes:
-            return "### CODE GRAPH [ON]\nАктивных графов кодовых баз не обнаружено."
+            return f"### CODE GRAPH [ON]\n{desc}\nNo active code base graphs were found."
 
         lines = ["Загруженные архитектурные индексы проектов:"]
         for pid, path in self.state.active_indexes.items():
@@ -34,7 +35,7 @@ class CodeGraphClient:
             lines.append(f"* Index ID: '{pid}' -> указывает на директорию: '{path}'")
 
         return (
-            "### CODE GRAPH [ON]\n"
-            "Для семантического поиска и навигации по коду - использовать Index ID.\n\n"
+            f"### CODE GRAPH [ON]\n{desc}\n"
+            "For semantic search and code navigation - use Index ID.\n\n"
             + "\n".join(lines)
         )

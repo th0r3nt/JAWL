@@ -25,9 +25,9 @@ class HostOSSearch:
     @require_access(HostOSAccessLevel.SANDBOX)
     async def list_directory(self, path: str = ".", max_depth: int = 1) -> SkillResult:
         """
-        Показывает содержимое директории.
-
-        max_depth: насколько глубоко заглядывать во вложенные папки (0 - только текущая папка и т.д.)
+        Lists directory contents. 
+        
+        max_depth: Subfolder scan depth (0 = current only).
         """
         limit = self.host_os.config.file_list_limit
 
@@ -146,7 +146,7 @@ class HostOSSearch:
     @require_access(HostOSAccessLevel.SANDBOX)
     async def search_files(self, pattern: str, path: str = ".") -> SkillResult:
         """
-        Поиск файлов по маске (например, '*.py', 'log_*.txt').
+        Searches files by glob pattern (e.g., '*.py', 'log_*.txt').
         """
 
         limit = self.host_os.config.file_list_limit
@@ -217,7 +217,8 @@ class HostOSSearch:
         recursive: bool = True,
     ) -> SkillResult:
         """
-        Глобальный поиск. Ищет указанный текст (строку) внутри всех файлов в директории.
+        Global search. 
+        Finds exact text string across all files in directory.
         """
 
         if not search_string:

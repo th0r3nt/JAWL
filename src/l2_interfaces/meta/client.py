@@ -92,26 +92,28 @@ class MetaClient:
         Провайдер контекста для ContextRegistry.
         Отдает агенту список его мета-возможностей и текущий Access Level.
         """
+        desc = "Description: Dynamic framework configuration and custom skills."
 
         access_levels_desc = (
-            "Существующие уровни доступа: \n"
-            "- 0/SAFE: Базовые настройки.\n"
-            "- 1/CONFIGURATOR: Управление памятью и продвинутые настройки конфигурации.\n"
-            "- 2/ARCHITECT: Управление системой и интерфейсами.\n"
-            "- 3/CREATOR: Регистрация кастомных скриптов как нативных навыков."
+            "Existing access levels: \n"
+            "- 0/SAFE: Basic settings.\n"
+            "- 1/CONFIGURATOR: Memory management and advanced configuration settings.\n"
+            "- 2/ARCHITECT: System and interface management.\n"
+            "- 3/CREATOR: Registering custom scripts as native skills."
         )
 
         models_str = (
-            ", ".join(self.available_models) if self.available_models else "Список пуст"
+            ", ".join(self.available_models) if self.available_models else "The list is empty"
         )
 
-        custom_status = "отключены"
+        custom_status = "off"
         if self.custom_skills_enabled:
-            custom_status = "включены (требуется 3/CREATOR)"
+            custom_status = "on (need '3/CREATOR' access level)"
 
         return (
             f"### META [ON]\n"
-            f"* Access Level: {self.access_level} (текущий уровень) \n{access_levels_desc}\n\n"
+            f"{desc}\n"
+            f"* Access Level: {self.access_level} (current level) \n{access_levels_desc}\n\n"
             f"* Custom Skills: {custom_status}\n"
             f"* Available LLM models: [{models_str}]"
         )

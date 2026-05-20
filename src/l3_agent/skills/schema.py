@@ -36,11 +36,11 @@ class AgentResponse(BaseModel):
 
         parts = []
         if self.observation.strip():
-            parts.append(f"[Observation]: {self.observation.strip()}")
+            parts.append(f"\n[Observation]: {self.observation.strip()}")
         if self.reasoning.strip():
-            parts.append(f"[Reasoning]: {self.reasoning.strip()}")
+            parts.append(f"\n[Reasoning]: {self.reasoning.strip()}")
         if self.reflection.strip():
-            parts.append(f"[Reflection]: {self.reflection.strip()}")
+            parts.append(f"\n[Reflection]: {self.reflection.strip()}")
         return "\n".join(parts)
 
 

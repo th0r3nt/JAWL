@@ -14,7 +14,7 @@ class WebHooksSkills:
     @skill()
     async def read_webhook_payload(self, hook_id: str) -> SkillResult:
         """
-        Читает полный payload входящего вебхука.
+        Reads full payload of inbound webhook.
         """
 
         for hook in self.client.state.recent_hooks:
@@ -39,7 +39,7 @@ class WebHooksSkills:
     @skill()
     async def clear_webhooks_history(self) -> SkillResult:
         """
-        Очищает историю входящих вебхуков в системном промпте.
+        Clears inbound webhook history in system prompt.
         """
 
         count = len(self.client.state.recent_hooks)
@@ -47,12 +47,12 @@ class WebHooksSkills:
         self.client.state.preview_lines.clear()
 
         main_logger.info(f"[Web Hooks] История очищена ({count} записей удалено).")
-        return SkillResult.ok(f"История вебхуков успешно очищена. Удалено {count} записей.")
+        return SkillResult.ok("True")
 
     @skill()
     async def get_webhooks_by_source(self, source: str) -> SkillResult:
         """
-        Возвращает список вебхуков, отфильтрованных по источнику.
+        Returns webhooks filtered by source.
         """
 
         filtered = [

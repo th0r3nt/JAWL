@@ -29,7 +29,7 @@ class HostOSNetwork:
     @require_access(HostOSAccessLevel.OBSERVER)
     async def ping_host(self, host: str, count: int = 4) -> SkillResult:
         """
-        Проверяет доступность узла через ICMP Ping.
+        Checks host availability via ICMP Ping.
         """
 
         # Защита от shell-инъекций: убираем спецсимволы
@@ -77,7 +77,7 @@ class HostOSNetwork:
     @require_access(HostOSAccessLevel.OBSERVER)
     async def check_port(self, host: str, port: int, timeout: int = 3) -> SkillResult:
         """
-        Проверяет доступность TCP-порта.
+        Checks TCP port availability.
         """
 
         try:
@@ -107,7 +107,7 @@ class HostOSNetwork:
     @require_access(HostOSAccessLevel.OBSERVER)
     async def list_active_connections(self, state: str = "LISTEN") -> SkillResult:
         """
-        Показывает активные сетевые соединения на хосте.
+        Lists host's active network connections.
         """
 
         try:
@@ -139,7 +139,7 @@ class HostOSNetwork:
     @require_access(HostOSAccessLevel.OBSERVER)
     async def resolve_dns(self, domain: str) -> SkillResult:
         """
-        Возвращает IP-адреса, привязанные к домену.
+        Returns IP addresses bound to domain.
         """
 
         try:

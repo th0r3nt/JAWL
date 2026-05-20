@@ -32,15 +32,14 @@ class MetaCreator:
         parameters_dict: Dict[str, str],
     ) -> SkillResult:
         """
-        Компилирует прокси-обертку для функции из песочницы и
-        внедряет её как полноправный инструмент.
-
-        skill_name: Желаемое имя для вызова (префикс 'Custom.' добавится системой).
-        description: Инструкция к навыку.
-        filepath: Относительный путь к скрипту в 'sandbox/'.
-        func_name: Имя целевой функции внутри скрипта.
-        parameters_dict: JSON-схема аргументов (напр., `{"limit": "int = 10"}`).
+        Compiles proxy wrapper for sandbox function and injects it as native tool. 
+        
+        skill_name: Desired callable name. 
+        filepath: Relative sandbox path. 
+        func_name: Target function name. 
+        parameters_dict: JSON schema args.
         """
+
         success, result_or_err = self.registry.register_skill(
             skill_name, description, filepath, func_name, parameters_dict
         )
@@ -54,9 +53,7 @@ class MetaCreator:
     @skill()
     async def remove_custom_skill(self, skill_name: str) -> SkillResult:
         """
-        Удаляет созданный ранее кастомный навык по его полному имени.
-
-        skill_name: Имя навыка (включая 'Custom.').
+        Removes previously created custom skill by full name.
         """
         success, err = self.registry.unregister_skill(skill_name)
 
@@ -67,7 +64,7 @@ class MetaCreator:
     @skill()
     async def get_custom_skills(self) -> SkillResult:
         """
-        Возвращает список всех зарегистрированных кастомных навыков и их маппинг.
+        Returns list of all registered custom skills and their mappings.
         """
         
         skills = self.registry.get_all_skills()
@@ -86,12 +83,12 @@ class MetaCreator:
     @skill()
     async def set_dashboard_block(self, name: str, markdown_content: str) -> SkillResult:
         """
-        Инжектит статический Markdown-блок прямо в приборную панель L0 State.
-        Используется для создания кастомных "мониторов" (цены, статусы серверов, ToDo-листы).
-
-        name: Уникальный заголовок дашборда.
-        markdown_content: Содержимое блока (будет добавлено в системном промпте).
+        Injects static Markdown block into system context. 
+        
+        name: Unique dashboard title. 
+        markdown_content: Block content.
         """
+
         await self.client.bus.publish(
             Events.SYSTEM_DASHBOARD_UPDATE, name=name, content=markdown_content
         )
@@ -100,7 +97,8 @@ class MetaCreator:
     @skill()
     async def remove_dashboard_block(self, name: str) -> SkillResult:
         """
-        Удаляет кастомный блок из системного контекста.
+        Removes custom block from system context.
         """
+        
         await self.client.bus.publish(Events.SYSTEM_DASHBOARD_UPDATE, name=name, content="")
         return SkillResult.ok(f"Дашборд '{name}' удален.")

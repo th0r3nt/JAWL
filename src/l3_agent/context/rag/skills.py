@@ -24,7 +24,7 @@ class MemoryRecallSkill:
     @skill()
     async def recall_information(self, queries: List[str]) -> SkillResult:
         """
-        Выполняет поиск по внутренней базе знаний, мыслей и связей.
+        Searches internal knowledge, thoughts, and relation database.
         """
         if not queries:
             return SkillResult.fail("Ошибка: Массив запросов не может быть пустым.")

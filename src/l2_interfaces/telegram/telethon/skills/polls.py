@@ -22,10 +22,9 @@ class TelethonPolls:
         self, chat_id: int, question: str, options: List[str]
     ) -> SkillResult:
         """
-        Создает опрос в чате.
-
-        options: Массив вариантов ответа (от 2 до 10 штук).
+         Creates poll in chat. Options array length 2-10.
         """
+
         if len(options) < 2 or len(options) > 10:
             return SkillResult.fail(
                 "Ошибка: Количество вариантов ответа должно быть от 2 до 10."
@@ -51,7 +50,7 @@ class TelethonPolls:
             msg = await client.send_message(int(chat_id), file=InputMediaPoll(poll=poll))
 
             main_logger.info(f"[Telegram Telethon] Создан опрос '{question}' в чате {chat_id}")
-            return SkillResult.ok(f"Опрос успешно создан. ID сообщения: {msg.id}")
+            return SkillResult.ok(f"True. ID: {msg.id}")
 
         except Exception as e:
             return SkillResult.fail(f"Ошибка при создании опроса: {e}")
@@ -59,10 +58,9 @@ class TelethonPolls:
     @skill()
     async def get_poll_results(self, chat_id: int, message_id: int) -> SkillResult:
         """
-        Читает статистику опроса.
-
-        message_id: ID сообщения с опросом.
+        Reads poll statistics.
         """
+
         try:
             client = self.tg_client.client()
             msg = await client.get_messages(int(chat_id), ids=int(message_id))
@@ -95,9 +93,7 @@ class TelethonPolls:
         self, chat_id: int, message_id: int, option_indices: List[int]
     ) -> SkillResult:
         """
-        Отдает голос в опросе.
-
-        option_indices: Массив индексов ответов (начиная с 0) для голоса.
+        Votes in poll using option indices (0-based).
         """
 
         try:
@@ -131,7 +127,7 @@ class TelethonPolls:
             main_logger.info(
                 f"[Telegram Telethon] Оставлен голос в опросе {message_id} (чат {chat_id})"
             )
-            return SkillResult.ok("Голос успешно учтен.")
+            return SkillResult.ok("True")
 
         except Exception as e:
             return SkillResult.fail(f"Ошибка при голосовании: {e}")
@@ -139,7 +135,7 @@ class TelethonPolls:
     @skill()
     async def close_poll(self, chat_id: int, message_id: int) -> SkillResult:
         """
-        Закрывает созданный опрос, запрещая голосование.
+        Closes created poll, preventing further voting.
         """
 
         try:
@@ -152,7 +148,7 @@ class TelethonPolls:
                 )
 
             if msg.poll.poll.closed:
-                return SkillResult.ok("Опрос уже был закрыт ранее.")
+                return SkillResult.ok("True")
 
             poll = msg.poll.poll
             poll.closed = True
@@ -162,7 +158,7 @@ class TelethonPolls:
             )
 
             main_logger.info(f"[Telegram Telethon] Опрос {message_id} закрыт (чат {chat_id})")
-            return SkillResult.ok("Опрос успешно закрыт.")
+            return SkillResult.ok("True")
 
         except Exception as e:
             return SkillResult.fail(f"Ошибка при закрытии опроса: {e}")

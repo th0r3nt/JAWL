@@ -11,7 +11,7 @@ async def test_drives_bootstrap_and_context(drives_manager):
     assert "Curiosity" in context
     assert "Social" in context
     assert "Mastery" in context
-    assert "Дефицит: " in context
+    assert "Deficit: " in context
 
 
 @pytest.mark.asyncio
@@ -27,7 +27,7 @@ async def test_drives_satisfy_drive(drives_manager):
         reflection_summary="Прочитала статью на Хабре про вектора.",
     )
     assert res.is_success is True
-    assert "снижен на 50%" in res.message
+    assert res.message == "True"
 
     context = await drives_manager.get_context_block()
     assert "Прочитала статью на Хабре про вектора." in context
@@ -61,3 +61,66 @@ async def test_drives_cannot_delete_fundamental(drives_manager):
     res_del = await drives_manager.delete_custom_drive("Social")
     assert res_del.is_success is False
     assert "Базовые (Fundamental) драйвы нельзя удалить" in res_del.message
+
+
+@pytest.mark.asyncio
+async def test_drives_semantic_matrix_escalation(drives_manager):
+    """
+    Интеграционный тест: Эскалация семантического состояния при росте дефицита.
+    Проверяет, как сухие проценты превращаются в текстовые ощущения (1-5 стадия).
+    """
+    await drives_manager.bootstrap_fundamental_drives()
+
+    # 1. Сброс (Дефицит ~0%)
+    await drives_manager.satisfy_drive("curiosity", 100, "Полный сброс")
+
+    context_stage1 = await drives_manager.get_context_block()
+
+    # Ищем фразу из 1-й стадии (Интеллектуальная пресыщенность)
+    assert (
+        "Intellectual satiety" in context_stage1
+        or "Интеллектуальная пресыщенность" in context_stage1
+    )
+
+    # 2. Перематываем время на 10 интервалов вперед
+    # В фикстуре decay_rate = 5.0, значит дефицит должен стать ~50% (3-я стадия)
+    from datetime import datetime, timezone, timedelta
+
+    async with drives_manager.db.session_factory() as session:
+        from sqlalchemy import select
+        from src.l1_databases.sql.tables import DriveTable
+
+        result = await session.execute(
+            select(DriveTable).where(DriveTable.name == "Curiosity")
+        )
+        drive = result.scalar_one()
+
+        # Искусственно стареем драйв на 10 интервалов
+        drive.last_satisfied_at = datetime.now(timezone.utc) - timedelta(
+            seconds=drive.decay_interval_sec * 10
+        )
+        await session.commit()
+
+    context_stage3 = await drives_manager.get_context_block()
+
+    # Ищем фразу из 3-й стадии (Легкий информационный голод)
+    assert (
+        "Mild information hunger" in context_stage3
+        or "Mild lack of external stimuli" in context_stage3
+    )
+
+    # 3. Доводим систему до максимума (Дефицит 100%)
+    async with drives_manager.db.session_factory() as session:
+        result = await session.execute(
+            select(DriveTable).where(DriveTable.name == "Curiosity")
+        )
+        drive = result.scalar_one()
+        drive.last_satisfied_at = datetime.now(timezone.utc) - timedelta(
+            seconds=drive.decay_interval_sec * 50
+        )
+        await session.commit()
+
+    context_stage5 = await drives_manager.get_context_block()
+
+    # Ищем фразу из 5-й стадии (Информационная депривация)
+    assert "Information deprivation" in context_stage5 or "Chaos" in context_stage5

@@ -70,10 +70,9 @@ class GithubLocalGit:
         self, owner: str, repo: str, dest_folder: str
     ) -> SkillResult:
         """
-        Клонирует удаленный репозиторий в локальную песочницу с сохранением директории `.git`.
-        Позволяет вносить изменения и отправлять коммиты.
-
-        dest_folder: Имя целевой папки внутри `sandbox/`.
+        Clones remote repository to local sandbox preserving .git directory. 
+        
+        dest_folder: Target folder name inside sandbox/ directory.
         """
         try:
             safe_path = validate_sandbox_path(dest_folder)
@@ -125,11 +124,10 @@ class GithubLocalGit:
         self, repo_folder: str, branch_name: str, create_new: bool = False
     ) -> SkillResult:
         """
-        Переключает локальный репозиторий на другую ветку.
-
-        repo_folder: Папка в песочнице, где лежит клонированный репо.
-        branch_name: Название ветки.
-        create_new: Если True, создаст новую ветку от текущей.
+        Switches local repository to another branch. 
+        
+        repo_folder: Sandbox folder with cloned repo. 
+        create_new: If True, creates new branch.
         """
         try:
             safe_path = validate_sandbox_path(repo_folder)
@@ -162,12 +160,11 @@ class GithubLocalGit:
         self, repo_folder: str, commit_message: str, branch_name: str
     ) -> SkillResult:
         """
-        Индексирует все изменения, создает коммит и пушит в origin.
-
-        repo_folder: Папка в песочнице с репозиторием.
-        commit_message: Описание коммита.
-        branch_name: Имя ветки, в которую нужно сделать пуш.
+        Stages all changes, creates commit, and pushes to origin. 
+        
+        repo_folder: Sandbox folder with repo.
         """
+        
         if not self.github.token:
             return SkillResult.fail(
                 "Ошибка: Для выполнения 'git push' необходим GITHUB_TOKEN."

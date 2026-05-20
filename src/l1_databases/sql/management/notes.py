@@ -42,8 +42,7 @@ class SQLNotes:
     @skill()
     async def add_note(self, content: str) -> SkillResult:
         """
-        Создает новую оперативную заметку.
-        Заметка будет всегда отображаться в системном контексте.
+        Creates note. Stays permanently in system context.
         """
 
         if not content or not content.strip():
@@ -64,12 +63,12 @@ class SQLNotes:
 
         msg = f"Заметка успешно создана (ID: {note_id})."
         main_logger.debug(f"[SQL DB] {msg}")
-        return SkillResult.ok(msg)
+        return SkillResult.ok(f"True. ID: {note_id}")
 
     @skill()
     async def update_note(self, note_id: str, content: str) -> SkillResult:
         """
-        Полностью перезаписывает текст существующей заметки по её ID.
+        Fully overwrites note text by ID.
         """
         if not content or not content.strip():
             return SkillResult.fail("Ошибка: Текст заметки не может быть пустым.")
@@ -87,13 +86,14 @@ class SQLNotes:
 
         msg = f"Заметка '{note_id}' успешно обновлена."
         main_logger.debug(f"[SQL DB] {msg}")
-        return SkillResult.ok(msg)
+        return SkillResult.ok("True")
 
     @skill()
     async def delete_note(self, note_id: str) -> SkillResult:
         """
-        Удаляет заметку по её ID.
+        Deletes note by ID.
         """
+
         async with self.db.session_factory() as session:
             result = await session.execute(delete(NoteTable).where(NoteTable.id == note_id))
             await session.commit()
@@ -103,12 +103,12 @@ class SQLNotes:
 
         msg = f"Заметка '{note_id}' удалена."
         main_logger.debug(f"[SQL DB] {msg}")
-        return SkillResult.ok(msg)
+        return SkillResult.ok("True")
 
     @skill()
     async def list_all_notes(self) -> SkillResult:
         """
-        Читает полное содержимое всех текущих заметок.
+        Reads full content of all current notes.
         """
 
         async with self.db.session_factory() as session:

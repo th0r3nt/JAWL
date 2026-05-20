@@ -26,8 +26,9 @@ class HostOSEditor:
         self, filepath: str, match_string: str, exact_match: bool = False
     ) -> SkillResult:
         """
-        Удаляет из файла все строки, которые содержат подстроку 'match_string'.
-        Если exact_match=True, строка должна совпадать полностью (без учета пробелов по краям).
+        Deletes lines containing 'match_string'. 
+        
+        exact_match: Requires full string match (ignoring edge whitespace).
         """
 
         try:
@@ -65,7 +66,7 @@ class HostOSEditor:
 
             if is_success:
                 main_logger.info(f"[Host OS] Удалены строки в файле: {safe_path.name}")
-                return SkillResult.ok(msg)
+                return SkillResult.ok("True")
             else:
                 return SkillResult.fail(msg)
 
@@ -80,11 +81,10 @@ class HostOSEditor:
         self, filepath: str, search_block: str, replace_block: str
     ) -> SkillResult:
         """
-        Точечная модификация файла.
-        Экономит токены и снижает риск повреждения большого файла при полной перезаписи.
-
-        search_block: Точная копия заменяемого фрагмента.
-        replace_block: Новый кусок кода, который встанет на место старого.
+        Targeted file modification. Saves tokens/reduces corruption risk vs full rewrite. 
+        
+        search_block: Exact fragment to replace. 
+        replace_block: New code insert.
         """
 
         if not search_block:
@@ -126,7 +126,7 @@ class HostOSEditor:
 
             if is_success:
                 main_logger.info(f"[Host OS] Пропатчен файл: {safe_path.name}")
-                return SkillResult.ok(msg)
+                return SkillResult.ok("True")
             else:
                 return SkillResult.fail(msg)
 

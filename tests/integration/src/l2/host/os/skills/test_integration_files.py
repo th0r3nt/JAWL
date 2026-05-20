@@ -77,7 +77,7 @@ async def test_os_files_create_directories(os_client):
     assert res.is_success is True
     assert (os_client.sandbox_dir / "docs").exists()
     assert (os_client.sandbox_dir / "src" / "api" / "v1").exists()
-    assert "Успешно созданы директории: docs, v1" in res.message
+    assert res.message == "True"
 
 
 @pytest.mark.asyncio

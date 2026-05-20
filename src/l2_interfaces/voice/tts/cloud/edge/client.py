@@ -88,29 +88,31 @@ class EdgeClient:
         Формирует блок состояния для системного промпта агента.
         """
 
+        desc = "Description: TTS generation via Microsoft Edge API."
+
         if not self.state.is_online:
-            return "### EDGE TTS [OFF]\nThe interface is disabled."
+            return f"### EDGE TTS [OFF]\n{desc}\nThe interface is disabled."
 
         main_voice_str = self.voice_manager.main_voice
 
         # Формируем список доступных голосов (лимитируем вывод, чтобы не выжечь токены)
         voices_cache = self.state.available_voices_cache
         if not voices_cache:
-            available_str = "  Кэш пуст."
+            available_str = "  Cache is empty."
         elif len(voices_cache) > 10:
             display_voices = voices_cache[:10]
             available_str = "\n".join(f"  - {v}" for v in display_voices)
-            available_str += f"\n  ...и еще {len(voices_cache) - 10} голосов скрыто."
-        else:
+            available_str += f"\n  ...and {len(voices_cache) - 10} more votes hidden."
+        else:   
             available_str = "\n".join(f"  - {v}" for v in voices_cache)
 
         return f"""### EDGE TTS [ON]
-* Провайдер: Microsoft Edge Cloud TTS
+{desc}
 
-* Основной голос (по умолчанию): {main_voice_str}
-* Доступные голоса:
+* Main voice (default): {main_voice_str}
+* Available voices:
 {available_str}
 
-* История генераций:
+* Generation history:
 {self.state.recent_history}
 """

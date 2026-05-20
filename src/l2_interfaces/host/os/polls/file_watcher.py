@@ -7,6 +7,7 @@
 import asyncio
 import difflib
 import json
+import time
 from pathlib import Path
 from typing import Any
 
@@ -92,7 +93,8 @@ class FileWatcher:
         self._last_sandbox_files = set()
         self._batch_queue: dict[str, Any] = {}
         self._batch_task: asyncio.Task | None = None
-        self._batch_delay: float = 2.0  # Окно группировки событий
+        self._batch_delay: float = 3.0
+        self._last_event_time: float = 0.0  # Трекер времени последнего события
 
         self._file_cache: dict[str, str] = {}
         self._diff_size_limit = 1024 * 100  # Макс 100 КБ для кэша одного файла
@@ -191,11 +193,29 @@ class FileWatcher:
 
     async def handle_file_system_event(self, sys_event_config, filepath: str):
         self._batch_queue[filepath] = sys_event_config
+        self._last_event_time = time.time()
         if self._batch_task is None or self._batch_task.done():
             self._batch_task = asyncio.create_task(self._process_batch())
 
     async def _process_batch(self):
-        await asyncio.sleep(self._batch_delay)
+        start_time = time.time()
+        max_hold_time = 15.0  # Жесткий лимит удержания очереди
+
+        while True:
+            now = time.time()
+            time_since_last = now - self._last_event_time
+            time_since_start = now - start_time
+
+            # Если тишина длится 3 секунды ИЛИ мы ждем уже 15 секунд - сбрасываем батч
+            if time_since_last >= self._batch_delay or time_since_start >= max_hold_time:
+                break
+
+            # Вычисляем, сколько еще спать (до наступления тишины или до хард-лимита)
+            sleep_time = min(
+                self._batch_delay - time_since_last, max_hold_time - time_since_start
+            )
+            await asyncio.sleep(max(0.1, sleep_time))  # max() защищает от отрицательного сна
+
         queue_snapshot = self._batch_queue.copy()
         self._batch_queue.clear()
 
@@ -308,8 +328,13 @@ class FileWatcher:
                         diff_msg = f"(Зафиксирован: {size} байт)"
 
                     self._file_cache[filepath] = new_content
-            except (UnicodeDecodeError, Exception):
+            except UnicodeDecodeError:
+                # Ожидаемо для картинок/бинарников, логировать не нужно
                 pass
+            except Exception as e:
+                main_logger.debug(
+                    f"[Host OS FileWatcher] Не удалось вычислить diff для файла {filepath}: {e}"
+                )
 
         action_word = (
             "создан" if sys_event_config == Events.HOST_OS_FILE_CREATED else "изменен"
@@ -374,17 +399,22 @@ class FileWatcher:
 
             try:
                 # Строим дерево
-                lines = self.tree_builder.build_tree(path_obj, use_emojis=True, max_depth=fw_depth)
-                
+                lines = self.tree_builder.build_tree(
+                    path_obj, use_emojis=True, max_depth=fw_depth
+                )
+
                 if len(lines) > max_tree_lines:
                     lines = lines[:max_tree_lines] + [
                         f"└── ...[Дерево обрезано: показано {max_tree_lines} элементов]"
                     ]
-                    
+
                 tree_str = f"{path_obj.name}/\n" + "\n".join(lines)
                 tracked_trees_blocks.append(tree_str)
-            except Exception:
-                pass
+
+            except Exception as e:
+                main_logger.debug(
+                    f"[Host OS FileWatcher] Ошибка обновления структуры дерева: {e}"
+                )
 
         if tracked_trees_blocks:
             self.state.tracked_dirs_trees = "\n\n".join(tracked_trees_blocks)

@@ -35,7 +35,7 @@ class HostOSDesktop:
     @require_access(HostOSAccessLevel.SANDBOX)
     async def open_url_in_browser(self, url: str) -> SkillResult:
         """
-        [GUI] Открывает указанную ссылку в дефолтном веб-браузере ОС.
+        [GUI] Opens URL in default OS browser.
         """
 
         try:
@@ -44,7 +44,7 @@ class HostOSDesktop:
 
             success = await asyncio.to_thread(webbrowser.open, url)
             if success:
-                return SkillResult.ok(f"Ссылка {url} успешно открыта в браузере.")
+                return SkillResult.ok("True")
             return SkillResult.fail(
                 "Браузер не найден или ОС не поддерживает данную операцию."
             )
@@ -56,7 +56,7 @@ class HostOSDesktop:
     @require_access(HostOSAccessLevel.SANDBOX)
     async def open_path_in_explorer(self, path: str = ".") -> SkillResult:
         """
-        [GUI] Открывает указанную директорию или файл в графическом проводнике (Explorer/Finder).
+        [GUI] Opens path in system file explorer.
         """
         try:
             safe_path = self.host_os.validate_path(path, is_write=False)
@@ -72,9 +72,7 @@ class HostOSDesktop:
                     subprocess.run(["xdg-open", str(safe_path)])
 
             await asyncio.to_thread(_open_native)
-            return SkillResult.ok(
-                f"Объект '{safe_path.name}' успешно открыт в графическом интерфейсе ОС."
-            )
+            return SkillResult.ok("True")
 
         except PermissionError as e:
             return SkillResult.fail(str(e))
@@ -86,7 +84,7 @@ class HostOSDesktop:
     @require_access(HostOSAccessLevel.SANDBOX)
     async def send_notification(self, title: str, message: str) -> SkillResult:
         """
-        [GUI] Отправляет системное Push-уведомление.
+        [GUI] Sends system push notification.
         """
         try:
 
@@ -117,7 +115,7 @@ class HostOSDesktop:
 
             # Запускаем как фоновую задачу, так как вызов может блокироваться на пару секунд
             asyncio.create_task(asyncio.to_thread(_notify))
-            return SkillResult.ok("Уведомление успешно отправлено.")
+            return SkillResult.ok("True")
 
         except FileNotFoundError:
             return SkillResult.fail(
@@ -133,10 +131,10 @@ class HostOSDesktop:
         self, filename: str, with_grid: bool = False, grid_step: int = 100
     ) -> SkillResult:
         """
-        [GUI] Делает скриншот главного экрана и сохраняет его в песочницу.
-
-        with_grid: Накладывает контрастную координатную сетку поверх скриншота.
-        grid_step: Шаг сетки в пикселях. Если нужна большая точность клика - поставить 40.
+        [GUI] Captures main screen screenshot and saves to sandbox. 
+        
+        with_grid: Overlays coordinate grid. 
+        grid_step: Grid step in pixels.
         """
         try:
             if "/" not in filename and "\\" not in filename:
@@ -155,9 +153,7 @@ class HostOSDesktop:
                     draw_image_grid(safe_path, step=grid_step)
 
             await asyncio.to_thread(_grab)
-            return SkillResult.ok(
-                f"Скриншот успешно сделан и сохранен по пути: {safe_path.resolve()}"
-            )
+            return SkillResult.ok("True")
 
         except OSError:
             return SkillResult.fail(
@@ -172,7 +168,7 @@ class HostOSDesktop:
     @require_access(HostOSAccessLevel.SANDBOX)
     async def lock_screen(self) -> SkillResult:
         """
-        [GUI] Блокирует экран.
+        [GUI] Locks screen.
         """
         try:
 
@@ -191,7 +187,7 @@ class HostOSDesktop:
                         raise FileNotFoundError("Команда блокировки экрана не найдена.")
 
             await asyncio.to_thread(_lock)
-            return SkillResult.ok("Экран успешно заблокирован.")
+            return SkillResult.ok("True")
 
         except FileNotFoundError as e:
             return SkillResult.fail(f"Не удалось заблокировать экран (GUI недоступен): {e}")
@@ -203,7 +199,7 @@ class HostOSDesktop:
     @require_access(HostOSAccessLevel.SANDBOX)
     async def click_coordinates(self, x: int, y: int) -> SkillResult:
         """
-        [GUI] Выполняет левый клик по координатам монитора.
+        [GUI] Performs left mouse click at monitor coordinates.
         """
 
         def _click():
@@ -230,7 +226,7 @@ class HostOSDesktop:
 
         try:
             success, msg = await asyncio.to_thread(_click)
-            return SkillResult.ok(msg) if success else SkillResult.fail(msg)
+            return SkillResult.ok("True") if success else SkillResult.fail(msg)
 
         except Exception as e:
             return SkillResult.fail(f"Ошибка при клике мыши: {e}")
@@ -239,7 +235,7 @@ class HostOSDesktop:
     @require_access(HostOSAccessLevel.SANDBOX)
     async def type_text(self, text: str) -> SkillResult:
         """
-        [GUI] Печатает переданный текст.
+        [GUI] Types specified text via keyboard.
         """
 
         def _type():
@@ -276,7 +272,7 @@ class HostOSDesktop:
 
         try:
             success, msg = await asyncio.to_thread(_type)
-            return SkillResult.ok(msg) if success else SkillResult.fail(msg)
+            return SkillResult.ok("True") if success else SkillResult.fail(msg)
 
         except Exception as e:
             return SkillResult.fail(f"Ошибка при вводе текста: {e}")
@@ -285,7 +281,7 @@ class HostOSDesktop:
     @require_access(HostOSAccessLevel.SANDBOX)
     async def play_audio(self, filepath: str) -> SkillResult:
         """
-        [GUI] Воспроизводит аудиофайл.
+        [GUI] Plays audio file.
         """
         try:
             # Пропускаем через гейткипер (только из sandbox/)
@@ -312,7 +308,7 @@ class HostOSDesktop:
 
             # Вызываем в отдельном потоке, хотя Popen и startfile не блокируют выполнение
             await asyncio.to_thread(_play)
-            return SkillResult.ok(f"Аудиофайл {safe_path.name} успешно запущен.")
+            return SkillResult.ok("True")
 
         except PermissionError as e:
             return SkillResult.fail(str(e))
@@ -329,7 +325,7 @@ class HostOSDesktop:
     @require_access(HostOSAccessLevel.SANDBOX)
     async def get_clipboard(self) -> SkillResult:
         """
-        [GUI] Читает текущий системный буфер обмена.
+        [GUI] Reads system clipboard.
         """
         import base64
 
@@ -382,7 +378,7 @@ class HostOSDesktop:
     @require_access(HostOSAccessLevel.SANDBOX)
     async def set_clipboard(self, text: str) -> SkillResult:
         """
-        [GUI] Помещает текст в системный буфер обмена.
+        [GUI] Writes text to system clipboard.
         """
         import base64
 
@@ -416,9 +412,7 @@ class HostOSDesktop:
                             raise FileNotFoundError("xclip/xsel не найдены")
 
             await asyncio.to_thread(_write_clipboard)
-            return SkillResult.ok(
-                f"Текст успешно скопирован в буфер обмена (Длина: {len(text)} симв.)."
-            )
+            return SkillResult.ok("True")
 
         except FileNotFoundError:
             return SkillResult.fail(
@@ -431,7 +425,7 @@ class HostOSDesktop:
     @require_access(HostOSAccessLevel.SANDBOX)
     async def list_active_windows(self) -> SkillResult:
         """
-        [GUI] Возвращает список заголовков видимых и активных окон OS.
+        [GUI] Lists visible/active OS window titles.
         """
 
         def _list():
@@ -492,7 +486,7 @@ class HostOSDesktop:
     @require_access(HostOSAccessLevel.SANDBOX)
     async def maximize_active_window(self) -> SkillResult:
         """
-        [GUI] Разворачивает текущее активное окно на весь экран.
+        [GUI] Maximizes active window.
         """
 
         def _maximize():
@@ -526,7 +520,7 @@ class HostOSDesktop:
 
         try:
             success, msg = await asyncio.to_thread(_maximize)
-            return SkillResult.ok(msg) if success else SkillResult.fail(msg)
+            return SkillResult.ok("True") if success else SkillResult.fail(msg)
         except Exception as e:
             return SkillResult.fail(f"Ошибка при развертывании окна: {e}")
 
@@ -534,7 +528,7 @@ class HostOSDesktop:
     @require_access(HostOSAccessLevel.SANDBOX)
     async def focus_window(self, title_substring: str) -> SkillResult:
         """
-        [GUI] Переключает фокус на окно, заголовок которого содержит указанную подстроку.
+        [GUI] Focuses window containing title substring.
         """
 
         def _focus():
@@ -579,7 +573,7 @@ class HostOSDesktop:
 
         try:
             success, msg = await asyncio.to_thread(_focus)
-            return SkillResult.ok(msg) if success else SkillResult.fail(msg)
+            return SkillResult.ok("True") if success else SkillResult.fail(msg)
 
         except Exception as e:
             return SkillResult.fail(f"Ошибка при переключении фокуса: {e}")
@@ -587,8 +581,8 @@ class HostOSDesktop:
     @skill()
     @require_access(HostOSAccessLevel.SANDBOX)
     async def press_hotkey(self, hotkey: str) -> SkillResult:
-        """[GUI] Эмулирует нажатие горячих клавиш.
-        Например: 'alt+tab', 'enter'.
+        """
+        [GUI] Emulates hotkey press (e.g., 'alt+tab', 'enter').
         """
 
         def _press():

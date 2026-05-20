@@ -52,13 +52,8 @@ class SubagentReport:
         self, subagent_id: str, role: str, report: str
     ) -> SkillResult:
         """
-        Отправляет финальный подробный отчет о проделанной работе главному агенту.
-        Обязательно к выводу когда задача полностью выполнена, чтобы завершить рабочий процесс.
-
-        Args:
-            subagent_id: Ваш выданный системный ID (возьмите из первоначальной задачи).
-            role: Ваша выданная роль (например, 'coder', 'web_researcher').
-            report: Детальный Markdown-отчет о выполненной задаче и результатах.
+        Submits detailed final Markdown report to Main Agent. 
+        Mandatory call upon task completion to safely terminate subagent loop.
         """
 
         try:

@@ -62,10 +62,10 @@ def test_context_builder_format_single_event_proactive():
     # Proactive OFF (по умолчанию)
     agent_state.proactive_guidance = False
     res_off = builder._format_single_event("HEARTBEAT", {})
-    assert "Рекомендуется проактивное выполнение действий" not in res_off
+    assert "Proactive action execution is recommended" not in res_off
 
     # Proactive ON
     agent_state.proactive_guidance = True
     res_on = builder._format_single_event("HEARTBEAT", {})
-    assert "Рекомендуется проактивное выполнение действий" in res_on
-    assert "Векторы активности могут включать" in res_on
+    assert "Proactive action execution is recommended" in res_on
+    assert "Activity vectors may include" in res_on

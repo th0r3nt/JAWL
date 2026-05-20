@@ -106,10 +106,9 @@ class HostOSExecution:
     @require_access(HostOSAccessLevel.OBSERVER)
     async def execute_script(self, filepath: str) -> SkillResult:
         """
-        Запускает скрипт в изолированном окружении.
-        Автоматически перехватывает STDOUT и STDERR.
-
-        filepath: Относительный или абсолютный путь.
+        Runs script in isolated environment. Captures STDOUT/STDERR. 
+        
+        filepath: Rel/abs path.
         """
 
         timeout = self.host_os.config.execution_timeout_sec
@@ -218,7 +217,7 @@ class HostOSExecution:
     @require_access(HostOSAccessLevel.ROOT)
     async def execute_shell_command(self, command: str) -> SkillResult:
         """
-        Запускает сырую bash/cmd команду в терминале OS.
+        Executes raw bash/cmd command in host OS terminal.
         """
 
         # Защита от самоубийства
@@ -274,9 +273,9 @@ class HostOSExecution:
     @require_access(HostOSAccessLevel.OBSERVER)
     async def run_pytest(self, target_path: str = "tests/") -> SkillResult:
         """
-        Запуск тестирования pytest для указанных тестов.
-
-        target_path: Путь к конкретному файлу или директории (по умолчанию 'tests/').
+        Runs pytest. 
+        
+        target_path: File/dir path (default 'tests/').
         """
         try:
             safe_path = self.host_os.validate_path(target_path, is_write=False)
@@ -332,7 +331,7 @@ class HostOSExecution:
     @require_access(HostOSAccessLevel.ROOT)
     async def kill_process(self, pid: int) -> SkillResult:
         """
-        Принудительно завершает процесс OS.
+        Forcefully terminates OS process.
         """
 
         try:
@@ -366,7 +365,7 @@ class HostOSExecution:
     @require_access(HostOSAccessLevel.OBSERVER)
     async def start_daemon(self, filepath: str, name: str, description: str) -> SkillResult:
         """
-        Запускает Python-скрипт как демон.
+        Starts Python script as background daemon.
         """
 
         try:
@@ -447,7 +446,7 @@ class HostOSExecution:
     @require_access(HostOSAccessLevel.OBSERVER)
     async def stop_daemon(self, pid: int) -> SkillResult:
         """
-        Останавливает работающий фоновый демон.
+        Stops running background daemon by PID.
         """
         try:
             registry = self.host_os.get_daemons_registry()
@@ -487,13 +486,11 @@ class HostOSExecution:
         self, filepath: str, func_name: str, kwargs: dict = None
     ) -> SkillResult:
         """
-        Изолированный RPC-вызов. Позволяет инамически запустить конкретную функцию
-        внутри Python-скрипта в песочнице, передать ей аргументы и получить ответ.
-
-        Args:
-            filepath: Путь к .py скрипту.
-            func_name: Имя вызываемой функции внутри скрипта.
-            kwargs: Словарь именованных аргументов для передачи в функцию.
+        Isolated RPC call. Dynamically executes specific function in sandbox Python script. 
+        
+        filepath: .py path. 
+        func_name: Target function. 
+        kwargs: Named arguments dict.
         """
 
         if not isinstance(kwargs, dict):

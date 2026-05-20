@@ -27,9 +27,9 @@ async def test_vector_search_wrapper_deduplication():
     pt2 = MagicMock(id="point_B", score=0.7, payload={"text": "Fact B", "tags": []})
 
     # База знаний вернула point_A с низким скором
-    mock_knowledge.db.client.search = AsyncMock(return_value=[pt1_low, pt2])
+    mock_knowledge.db.client.query_points = AsyncMock(return_value=[pt1_low, pt2])
     # База мыслей вернула point_A с высоким скором (например, мысль более релевантна)
-    mock_thoughts.db.client.search = AsyncMock(return_value=[pt1_high])
+    mock_thoughts.db.client.query_points = AsyncMock(return_value=[pt1_high])
 
     # Запускаем батчевый поиск по одному вектору
     results = await wrapper.search_batch([[0.1, 0.2, 0.3]])

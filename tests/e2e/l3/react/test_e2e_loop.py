@@ -7,6 +7,7 @@ from src.l1_databases.sql.db import SQLDB
 from src.l1_databases.sql.management.tasks.crud import SQLTasks
 from src.l1_databases.sql.management.ticks import SQLTicks
 
+from src.l3_agent.llm.executor import LLMExecutor
 from src.l3_agent.prompt.builder import PromptBuilder
 from src.l3_agent.context.registry import ContextRegistry, ContextSection
 from src.l3_agent.context.builder import ContextBuilder
@@ -89,14 +90,14 @@ async def test_e2e_react_loop_creates_task_and_saves_tick(tmp_path: Path):
     mock_bus = MagicMock()
     mock_bus.publish = AsyncMock()
 
+    llm_executor = LLMExecutor(llm_client, token_tracker)
     loop = ReactLoop(
-        llm_client=llm_client,
+        executor=llm_executor,
         prompt_builder=prompt_builder,
         context_builder=context_builder,
         agent_state=agent_state,
         sql_ticks=sql_ticks,
         vector_manager=vector_manager,
-        token_tracker=token_tracker,
         tools=ACTION_SCHEMA,
         event_bus=mock_bus,
     )
@@ -135,7 +136,7 @@ async def test_e2e_react_loop_creates_task_and_saves_tick(tmp_path: Path):
     assert last_tick.actions[0]["parameters"]["title"] == "E2E Интеграция"
 
     # Проверяем, что результат успешный
-    assert "создана" in last_tick.results.get("execution_report", "").lower()
+    assert "true. id" in last_tick.results.get("execution_report", "").lower()
 
     # Очищаем БД
     await db.disconnect()

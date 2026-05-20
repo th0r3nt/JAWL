@@ -28,7 +28,7 @@ def test_os_events_check_sandbox_tree(os_client):
     folder_a = os_client.sandbox_dir / "folder_a"
     folder_a.mkdir()
     (folder_a / "file1.txt").touch()
-    (os_client.sandbox_dir / "root_file.log").touch()
+    (os_client.sandbox_dir / "root_file.txt").touch()
 
     # Обращаемся к поллеру файлов
     events.files._update_file_trees()
@@ -36,7 +36,7 @@ def test_os_events_check_sandbox_tree(os_client):
     assert "sandbox/" in state.sandbox_files
     assert "folder_a" in state.sandbox_files
     assert "file1.txt" in state.sandbox_files
-    assert "root_file.log" in state.sandbox_files
+    assert "root_file.txt" in state.sandbox_files
     assert "├──" in state.sandbox_files or "└──" in state.sandbox_files
 
 

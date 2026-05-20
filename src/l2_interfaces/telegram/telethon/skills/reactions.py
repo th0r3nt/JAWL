@@ -19,7 +19,7 @@ class TelethonReactions:
     @skill()
     async def set_reaction(self, chat_id: int, message_id: int, reaction: str) -> SkillResult:
         """
-        Ставит эмодзи-реакцию на сообщение.
+        Sets emoji reaction on message.
         """
         try:
             client = self.tg_client.client()
@@ -35,7 +35,7 @@ class TelethonReactions:
             main_logger.info(
                 f"[Telegram Telethon] Реакция '{reaction}' поставлена на сообщение {message_id} в чате {chat_id}"
             )
-            return SkillResult.ok(f"Реакция '{reaction}' успешно установлена.")
+            return SkillResult.ok("True")
 
         except Exception as e:
             msg = f"Ошибка при установке реакции: {e}"
@@ -48,7 +48,7 @@ class TelethonReactions:
     @skill()
     async def remove_reaction(self, chat_id: int, message_id: int) -> SkillResult:
         """
-        Убирает реакцию с сообщения.
+        Removes reaction from message.
         """
 
         try:
@@ -62,7 +62,7 @@ class TelethonReactions:
             main_logger.info(
                 f"[Telegram Telethon] Реакция снята с сообщения {message_id} в чате {chat_id}"
             )
-            return SkillResult.ok("Реакция успешно удалена.")
+            return SkillResult.ok("True")
 
         except Exception as e:
             return SkillResult.fail(f"Ошибка при удалении реакции: {e}")

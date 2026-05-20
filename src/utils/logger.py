@@ -1,3 +1,4 @@
+import copy
 import logging
 import sys
 from typing import List
@@ -29,10 +30,17 @@ class LogColors:
 
 class ColorFormatter(logging.Formatter):
     """
-    Кастомный форматтер логов.
-    Раскрашивает префиксы в терминале и обрезает сообщения для консоли,
-    сохраняя полный текст для файлов.
+    Потокобезопасный форматтер логов без побочных эффектов.
+    Применяет ANSI-раскраску для терминала на основе уровня важности
+    или уникальных префиксов сообщений, сохраняя ограничения по длине.
     """
+    
+    LEVEL_COLORS = {
+        logging.DEBUG: LogColors.GRAY,
+        logging.WARNING: LogColors.YELLOW,
+        logging.ERROR: LogColors.RED,
+        logging.CRITICAL: LogColors.RED,
+    }
 
     PREFIX_COLORS = {
         "[Heartbeat]": LogColors.BRIGHT_MAGENTA,
@@ -53,26 +61,41 @@ class ColorFormatter(logging.Formatter):
         self.max_console_length = max_console_length
 
     def format(self, record: logging.LogRecord) -> str:
-        original_msg = record.msg
-        try:
-            msg_str = str(original_msg)
-            # Обрезка только для вывода в StreamHandler (терминал)
-            if len(msg_str) > self.max_console_length:
-                record.msg = (
-                    msg_str[: self.max_console_length]
-                    + f"\n{LogColors.GRAY}...[Вывод обрезан для терминала]{LogColors.RESET}"
-                )
-
-            log_message = super().format(record)
-            if record.levelno >= logging.ERROR:
-                return f"{LogColors.RED}{log_message}{LogColors.RESET}"
-
-            for prefix, color in self.PREFIX_COLORS.items():
+        # Создаем поверхностную копию записи, чтобы не мутировать исходный объект
+        # и не ломать логирование в файлы у других хендлеров
+        rec = copy.copy(record)
+        
+        # Безопасно извлекаем исходную строку сообщения
+        msg_str = rec.getMessage()
+        
+        # Выполняем обрезку для консоли только на изолированной копии
+        if len(msg_str) > self.max_console_length:
+            truncated_msg = (
+                msg_str[: self.max_console_length]
+                + f"\n{LogColors.GRAY}...[Вывод обрезан для терминала]{LogColors.RESET}"
+            )
+            rec.msg = truncated_msg
+            rec.args = ()  # Сбрасываем аргументы, так как сообщение уже отформатировано
+        
+        # Форматируем строку лога стандартными средствами
+        log_message = super().format(rec)
+        
+        # Определяем цвет на основе уровня лога или поиска префиксов
+        color = ""
+        if rec.levelno in self.LEVEL_COLORS:
+            color = self.LEVEL_COLORS[rec.levelno]
+        else:
+            # Честный проход по словарю префиксов без преждевременных выходов
+            for prefix, prefix_color in self.PREFIX_COLORS.items():
                 if prefix in msg_str:
-                    return f"{color}{log_message}{LogColors.RESET}"
-            return log_message
-        finally:
-            record.msg = original_msg
+                    color = prefix_color
+                    break  # Нашли совпадение — выходим из цикла
+
+        # Оборачиваем в ANSI-код, если цвет определен
+        if color:
+            return f"{color}{log_message}{LogColors.RESET}"
+            
+        return log_message
 
 
 def setup_subsystem_logger(name: str, log_file: str, propagate: bool = True) -> logging.Logger:

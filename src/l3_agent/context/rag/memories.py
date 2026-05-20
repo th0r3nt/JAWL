@@ -6,7 +6,6 @@
 и Графовой БД. Найденные факты и связи инжектятся прямо в системный промпт.
 """
 
-import re
 from typing import Dict, Any, List, TYPE_CHECKING
 
 from src.utils.settings import RAGConfig
@@ -21,7 +20,6 @@ if TYPE_CHECKING:
     from src.l1_databases.vector.management.thoughts import VectorThoughts
     from src.l1_databases.vector.embedding import EmbeddingModel
     from src.l1_databases.graph.manager import GraphManager
-    from src.l2_interfaces.telegram.telethon.state import TelethonState
     from src.l0_state.agent.state import AgentState
 
 
@@ -36,12 +34,10 @@ class RAGMemories:
         vector_thoughts: "VectorThoughts",
         graph_manager: "GraphManager",
         embedding_model: "EmbeddingModel",
-        telethon_state: "TelethonState",
         agent_state: "AgentState",
         rag_config: RAGConfig,
     ) -> None:
 
-        self.telethon_state = telethon_state
         self.agent_state = agent_state
         self.config = rag_config
 
@@ -111,13 +107,6 @@ class RAGMemories:
                 match_msg = last_evt.get("raw_text") or last_evt.get("message", "")
                 if len(match_msg) > 15 or len(match_msg.split()) > 3:
                     input_texts.add(match_msg.strip())
-
-            # Достаем имена из активных чатов (UNREAD)
-            for line in self.telethon_state.last_chats.split("\n"):
-                if "UNREAD:" in line:
-                    match_name = re.search(r"\]\s+(.+?)\s*\(ID:", line)
-                    if match_name:
-                        input_texts.add(match_name.group(1).strip())
 
         # ==================================================================
         # Сбор текстов между шагами ReAct цикла

@@ -64,13 +64,10 @@ class VectorCodeAST:
         """
         Семантический поиск по докстрингам внутри указанного проекта.
         """
-
         if not self.db.client:
             return []
 
         query_vector = await self.embedding_model.get_embedding(query)
-
-        # Фильтруем строго по проекту
         query_filter = models.Filter(
             must=[
                 models.FieldCondition(
@@ -79,14 +76,17 @@ class VectorCodeAST:
             ]
         )
 
-        results = await self.db.client.search(
+        search_result = await self.db.client.query_points(
             collection_name=self.collection.name,
-            query_vector=query_vector,
+            query=query_vector,
             query_filter=query_filter,
             limit=limit,
             score_threshold=self.similarity_threshold,
             with_payload=True,
         )
+
+        # Поддерживаем обратную совместимость и моки в тестах
+        points = search_result.points if hasattr(search_result, "points") else search_result
 
         return [
             {
@@ -95,7 +95,7 @@ class VectorCodeAST:
                 "type": res.payload.get("type"),
                 "text": res.payload.get("text"),
             }
-            for res in results
+            for res in points
         ]
 
     async def delete_project(self, project_id: str) -> None:

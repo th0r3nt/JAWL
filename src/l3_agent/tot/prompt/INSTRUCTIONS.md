@@ -47,5 +47,7 @@ System switched to Tree of Thoughts (ToT) mode. Task: deep analysis of logs and 
 
 ### Critical Note:
 This tree is a guide, not a template. It demonstrates flexibility, invariance, and realistic simulation of varied outcomes. Adapt to the specific task context.
-
 The system has full autonomy in determining simulation depth. Terminate branches upon logical dead-ends or success. Avoid artificial symmetry or bloat.
+
+### Strictly prohibited:
+Drawing ASCII trees (e.g., ├── or └──) in your output, names, or descriptions. The system's internal Pydantic parser will render the visual tree automatically based on your structured JSON data. You must focus solely on raw data generation.

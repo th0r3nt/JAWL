@@ -12,7 +12,7 @@
 
 ### 1. Включение через CLI (Рекомендуется)
 Самый простой способ управлять интерфейсами - запустить скрипт `jawl.py` и в главном меню выбрать:
-👉 **"⚙️ Мастер настройки интерфейсов"**
+👉 **"⚙️ Мастер настройки"**
 Там можно включать и выключать модули пробелом/энтером. Изменения автоматически запишутся в файл `config/interfaces.yaml`.
 
 ### 2. Ключи и авторизация (.env)
@@ -32,7 +32,7 @@
 
 Мы строго соблюдаем **SOLID** и изоляцию слоев. Агент (L3) ничего не знает о библиотеках (L2). Он общается с интерфейсом только через зарегистрированные навыки (Skills) и видит его статус через приборную панель (L0 State).
 
-Создание нового интерфейса (например, `Discord`) всегда состоит из 5 шагов.
+Система использует паттерн **Plugin Discovery**. Создание нового интерфейса (например, `Discord`) всегда состоит из 5 шагов.
 
 ### Шаг 1. Структура папок и Стейт (L0)
 Создайте папку в `src/l2_interfaces/discord/` со следующей структурой:
@@ -42,9 +42,8 @@ discord/
 │   ├── __init__.py
 │   └── messages.py     # Навыки (руки агента)
 ├── __init__.py
-├── bootstrap.py        # Инициализатор
+├── plugin.py           # Инициализатор плагина
 ├── client.py           # Менеджер соединения
-├── events.py           # Фоновые слушатели (уши агента)
 └── state.py            # Приборная панель (L0 State)
 ```
 
@@ -55,28 +54,26 @@ discord/
 class DiscordState:
     def __init__(self, recent_limit: int = 10):
         self.is_online = False
-        self.last_messages = "Пусто." # Будет хранить последние сообщения с интерфейса
+        self.last_messages = "Пусто."
 ```
-
-Зарегистрируйте инициализацию этого стейта в `src/builder.py` внутри метода `build_l0_state()`.
 
 ### Шаг 2. Написание Клиента (`client.py`)
 Клиент инкапсулирует подключение к API и хранит ссылку на стейт (L0). 
-Обязательный метод - `get_context_block`. Это то, что агент будет "видеть" в своем системном промпте на каждом тике.
 
 ```python
+from typing import Any
 from src.l2_interfaces.discord.state import DiscordState
 
 class DiscordClient:
     def __init__(self, state: DiscordState, token: str):
         self.state = state
         self.token = token
-        self.state.is_online = True
 
     async def get_context_block(self, **kwargs) -> str:
+        desc = "Description: Discord API connector."
         if not self.state.is_online:
-            return "### DISCORD [OFF]\nThe interface is disabled."
-        return f"### DISCORD [ON]\nПоследние сообщения:\n{self.state.last_messages}"
+            return f"### DISCORD [OFF]\n{desc}\nThe interface is disabled."
+        return f"### DISCORD [ON]\n{desc}\nПоследние сообщения:\n{self.state.last_messages}"
 ```
 
 ### Шаг 3. Написание Навыков (`skills/messages.py`)
@@ -96,43 +93,66 @@ class DiscordMessages:
         """Отправляет текстовое сообщение в указанный канал Discord."""
         try:
             # логика отправки через self.client...
-            return SkillResult.ok(f"Сообщение отправлено в канал {channel_id}.")
+            return SkillResult.ok("True")
         except Exception as e:
             return SkillResult.fail(f"Ошибка отправки: {e}")
 ```
 
-### Шаг 4. Сборка (`bootstrap.py`)
-В `bootstrap.py` мы связываем всё воедино и отдаем системе.
+### Шаг 4. Сборка (`plugin.py`)
+В `plugin.py` мы связываем всё воедино. Система автоматически найдет этот файл и загрузит плагин, если он включен в `interfaces.yaml`.
 
 ```python
-from typing import List, Any
+from typing import List, Any, Dict, Optional
+from src.utils.logger import main_logger
+from src.l2_interfaces.base import BaseInterface
 from src.l3_agent.skills.registry import register_instance
 from src.l3_agent.context.registry import ContextSection
+from src.system.container import SystemContainer
+from src.utils.settings import InterfacesConfig
+
+from src.l2_interfaces.discord.state import DiscordState
 from src.l2_interfaces.discord.client import DiscordClient
 from src.l2_interfaces.discord.skills.messages import DiscordMessages
 
-def setup_discord(system, token: str) -> List[Any]:
-    client = DiscordClient(state=system.discord_state, token=token)
-    
-    # 1. Даем агенту "руки"
-    register_instance(DiscordMessages(client))
-    
-    # 2. Даем агенту "глаза" (Контекст)
-    system.context_registry.register_provider(
-        name="discord", 
-        provider_func=client.get_context_block, 
-        section=ContextSection.INTERFACES
-    )
-    
-    # 3. Возвращаем компоненты жизненного цикла (если у клиента есть start/stop)
-    return [client]
-```
+class DiscordPlugin(BaseInterface):
+    @property
+    def name(self) -> str:
+        return "DISCORD"
 
-### Шаг 5. Регистрация в Ядре
-Осталось только вызвать `setup_discord` внутри `src/l2_interfaces/initializer.py`.
+    @property
+    def description(self) -> str:
+        return "Connects to Discord API."
+
+    def is_enabled(self, config: InterfacesConfig) -> bool:
+        # Для этого нужно добавить discord: DiscordConfig в settings.py
+        return getattr(config, "discord", False)
+
+    def setup(self, container: SystemContainer, env_vars: Dict[str, Optional[str]]) -> List[Any]:
+        token = env_vars.get("DISCORD_TOKEN")
+        if not token:
+            self.register_off_provider(container.context_registry)
+            return []
+
+        state = DiscordState()
+        container.l0_states["discord"] = state
+        
+        client = DiscordClient(state=state, token=token)
+        
+        # Регистрируем скиллы
+        register_instance(DiscordMessages(client))
+        
+        # Регистрируем провайдер контекста
+        container.context_registry.register_provider(
+            name=self.name.lower(), 
+            provider_func=client.get_context_block, 
+            section=ContextSection.INTERFACES
+        )
+        
+        main_logger.info("[Discord] Интерфейс загружен.")
+        return [client] # Возвращаем компоненты с методами start() и stop()
+```
 
 ### 📌 Чек-лист хорошего интерфейса:
 - [ ] **Никакого хардкода токенов**. Всё берется из `.env` и прокидывается через параметры.
 - [ ] **Защита контекста**. Если функция читает историю или файл, ставьте `truncate_text`, чтобы не выжечь лимит токенов LLM огромной портянкой текста.
 - [ ] **DRY & KISS**. Выносите общие функции (например парсинг URL) в `src/utils/`.
-```

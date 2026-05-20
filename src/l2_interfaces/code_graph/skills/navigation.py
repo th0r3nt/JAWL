@@ -33,10 +33,9 @@ class CodeGraphNavigation:
         self, project_id: str, query: str, limit: Optional[int] = None
     ) -> SkillResult:
         """
-        Семантический поиск по докстрингам классов и функций проекта.
-        Полезно, если нет информации о названии функции, но есть информация о том, что она должна делать.
-
-        query: Смысловой текстовый запрос.
+        Semantic search over docstrings. Useful when function purpose is known but name isn't. 
+        
+        query: Semantic text query.
         """
 
         if project_id not in self.client.state.active_indexes:
@@ -76,10 +75,9 @@ class CodeGraphNavigation:
     @skill(swarm=[Subagents.CODER, Subagents.QA_ENGINEER])
     async def trace_dependencies(self, project_id: str, target_name: str) -> SkillResult:
         """
-        Поиск "радиуса поражения" (Blast Radius). Показывает, в каких файлах импортируется
-        указанный файл, или какие функции находятся внутри класса.
-
-        target_name: Имя файла (например 'src/main.py') или полный путь к классу ('src/main.py::MyClass').
+        Blast radius search. Shows where target is imported or class contents. 
+        
+        target_name: Filename or class path (e.g., 'src/main.py::MyClass').
         """
 
         if project_id not in self.client.state.active_indexes:
@@ -140,9 +138,9 @@ class CodeGraphNavigation:
     @skill(swarm=[Subagents.CODER, Subagents.QA_ENGINEER])
     async def get_file_structure(self, project_id: str, filepath: str) -> SkillResult:
         """
-        Мгновенно возвращает классы и методы файла без полного чтения кода.
-
-        filepath: Относительный путь к файлу в фреймворке (например 'src/main.py').
+        Instantly returns file classes/methods without full code read. 
+        
+        filepath: Relative path (e.g., 'src/main.py').
         """
 
         if project_id not in self.client.state.active_indexes:

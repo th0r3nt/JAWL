@@ -63,3 +63,42 @@ async def test_close_browser_cleans_up(browser_client, mock_playwright):
     assert browser_client.browser is None
     assert browser_client.state.is_open is False
     assert "закрыт" in browser_client.state.viewport
+
+
+@pytest.mark.asyncio
+@patch("src.l2_interfaces.web.browser.client.async_playwright")
+async def test_ensure_browser_with_http_proxy(mock_apw, browser_client, mock_playwright):
+    """Тест: Playwright корректно принимает HTTP прокси без авторизации."""
+    pw_mock, browser_mock, context_mock, _ = mock_playwright
+    mock_apw.return_value.start = AsyncMock(return_value=pw_mock)
+
+    browser_client.proxy_url = "http://127.0.0.1:8080"
+    await browser_client.ensure_browser()
+
+    # Проверяем, что в new_context улетел словарь proxy
+    call_kwargs = browser_mock.new_context.call_args[1]
+    assert "proxy" in call_kwargs
+    assert call_kwargs["proxy"]["server"] == "http://127.0.0.1:8080"
+    assert "username" not in call_kwargs["proxy"]
+
+
+@pytest.mark.asyncio
+@patch("src.l2_interfaces.web.browser.client.async_playwright")
+async def test_ensure_browser_with_socks5_auth_proxy(
+    mock_apw, browser_client, mock_playwright
+):
+    """Тест: Playwright парсит логин/пароль и приводит схему socks5h -> socks5."""
+    pw_mock, browser_mock, context_mock, _ = mock_playwright
+    mock_apw.return_value.start = AsyncMock(return_value=pw_mock)
+
+    # Используем socks5h (часто дают провайдеры для резолва DNS на стороне прокси)
+    browser_client.proxy_url = "socks5h://admin:qwerty@192.168.1.1:1080"
+    await browser_client.ensure_browser()
+
+    call_kwargs = browser_mock.new_context.call_args[1]
+    proxy_settings = call_kwargs["proxy"]
+
+    # Playwright принимает только socks5, проверяем нормализацию
+    assert proxy_settings["server"] == "socks5://192.168.1.1:1080"
+    assert proxy_settings["username"] == "admin"
+    assert proxy_settings["password"] == "qwerty"

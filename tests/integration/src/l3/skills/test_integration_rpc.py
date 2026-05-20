@@ -64,3 +64,44 @@ def calculate_metrics(cpu_load: int, user: str) -> dict:
     assert "Admin" in rpc_res.message
     assert "190" in rpc_res.message  # 95 * 2
     assert "Возвращенный результат (Return)" in rpc_res.message
+
+
+@pytest.mark.asyncio
+async def test_integration_rpc_error_handling(tmp_path: Path):
+    """
+    Тест: Если агент пытается вызвать несуществующую функцию,
+    RPC Wrapper не падает с системным крашем, а корректно отдает JSON с Traceback'ом.
+    """
+    from src.utils._tools import get_project_root
+
+    real_root = get_project_root()
+
+    # ФИКС: Создаем директории перед копированием файлов
+    template_dst = tmp_path / "src" / "utils" / "templates" / "rpc_wrapper.py"
+    guard_dst = tmp_path / "src" / "utils" / "templates" / "_sandbox_guard.py"
+    template_dst.parent.mkdir(parents=True, exist_ok=True)
+
+    shutil.copy2(real_root / "src" / "utils" / "templates" / "rpc_wrapper.py", template_dst)
+    shutil.copy2(real_root / "src" / "utils" / "templates" / "_sandbox_guard.py", guard_dst)
+
+    config = HostOSConfig(access_level=HostOSAccessLevel.ROOT, execution_timeout_sec=5)
+    client = HostOSClient(base_dir=tmp_path, config=config, state=HostOSState(), timezone=3)
+
+    writer = HostOSWriter(client)
+    executor = HostOSExecution(client)
+
+    # Агент пишет скрипт только с одной функцией
+    await writer.write_file("sandbox/math.py", "def add(a, b): return a+b")
+
+    # Агент ошибается и вызывает несуществующую функцию 'multiply'
+    rpc_res = await executor.execute_sandbox_func(
+        filepath="sandbox/math.py",
+        func_name="multiply",
+        kwargs={"a": 5, "b": 5},
+    )
+
+    # Обертка должна перехватить AttributeError, а execute_sandbox_func должна вернуть Fail
+    assert rpc_res.is_success is False
+    assert "AttributeError" in rpc_res.message
+    assert "нет функции 'multiply'" in rpc_res.message
+    assert "Traceback" in rpc_res.message

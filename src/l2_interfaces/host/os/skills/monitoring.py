@@ -18,9 +18,9 @@ class HostOSMonitoring:
     @require_access(HostOSAccessLevel.SANDBOX)
     async def track_directory(self, path: str) -> SkillResult:
         """
-        Начинает отслеживание изменений в указанной директории (создание, удаление, изменение файлов).
-        Закрепляет дерево файлов папки.
-        Крайне полезно и рекомендовано использовать этот навык, чтобы держать нужную файловую структуру перед глазами.
+        Starts tracking directory changes (creates/deletes/modifications). 
+        Pins file tree. 
+        Highly recommended for keeping structure visible.
         """
         try:
             # Гейткипер проверит, имеет ли агент права на чтение этой папки
@@ -28,10 +28,10 @@ class HostOSMonitoring:
 
             success = self.events.track_path(str(safe_path))
             if not success:
-                return SkillResult.ok(f"Директория {safe_path.name} уже отслеживается.")
+                return SkillResult.ok("True")
 
             main_logger.info(f"[Host OS] Начато отслеживание директории: {safe_path}")
-            return SkillResult.ok(f"Успешно. Директория {safe_path} теперь отслеживается.")
+            return SkillResult.ok("True")
 
         except ValueError as e:
             return SkillResult.fail(str(e))
@@ -46,7 +46,7 @@ class HostOSMonitoring:
     @require_access(HostOSAccessLevel.SANDBOX)
     async def untrack_directory(self, path: str) -> SkillResult:
         """
-        Прекращает отслеживание директории.
+        Stops directory tracking.
         """
 
         try:
@@ -59,7 +59,7 @@ class HostOSMonitoring:
                 )
 
             main_logger.info(f"[Host OS] Прекращено отслеживание директории: {safe_path}")
-            return SkillResult.ok(f"Успешно. Директория {safe_path} больше не отслеживается.")
+            return SkillResult.ok("True")
 
         except ValueError as e:
             return SkillResult.fail(str(e))
@@ -72,7 +72,7 @@ class HostOSMonitoring:
     @require_access(HostOSAccessLevel.SANDBOX)
     async def get_tracked_directories(self) -> SkillResult:
         """
-        Возвращает список всех отслеживаемых директорий.
+        Returns list of tracked directories.
         """
 
         tracked = list(self.events._watches.keys())

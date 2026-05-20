@@ -49,7 +49,7 @@ class TelethonChats:
     @skill()
     async def get_chats(self, limit: int = 10) -> SkillResult:
         """
-        Возвращает список последних чатов, отсортированных по активности.
+        Returns list of recent chats sorted by activity.
         """
 
         try:
@@ -115,7 +115,7 @@ class TelethonChats:
     @skill()
     async def get_unread_chats(self, limit: int = 20) -> SkillResult:
         """
-        Возвращает список непрочитанных чатов.
+        Returns list of unread chats.
         """
 
         try:
@@ -168,7 +168,7 @@ class TelethonChats:
         self, chat_id: Union[int, str], limit: int = 10, topic_id: Optional[int] = None
     ) -> SkillResult:
         """
-        Читает историю переписки указанного чата без сброса флага UNREAD.
+        Reads chat history without removing Unread flag.
         """
         try:
             client = self.tg_client.client()
@@ -234,8 +234,7 @@ class TelethonChats:
         self, chat_id: Union[int, str], topic_id: Optional[int] = None
     ) -> SkillResult:
         """
-        Помечает все сообщения в чате как прочитанные.
-        Полезно, чтобы убрать маркер UNREAD.
+        Marks all messages in chat as read.
         """
 
         try:
@@ -255,7 +254,7 @@ class TelethonChats:
             else:
                 await self._mark_chat_read(client, target_entity, topic_id)
 
-            return SkillResult.ok(f"Чат {chat_id} успешно помечен как прочитанный.")
+            return SkillResult.ok("True")
 
         except Exception as e:
             return SkillResult.fail(f"Ошибка при пометке чата {chat_id} как прочитанного: {e}")
@@ -263,8 +262,7 @@ class TelethonChats:
     @skill()
     async def search_public_chats(self, query: str, limit: int = 5) -> SkillResult:
         """
-        Осуществляет глобальный поиск по Telegram.
-        Ищет публичные группы и каналы.
+        Performs global Telegram search for public groups/channels.
         """
 
         try:
@@ -295,7 +293,7 @@ class TelethonChats:
     @skill()
     async def get_chat_info(self, chat_id: Union[int, str]) -> SkillResult:
         """
-        Получает расширенную информацию о чате.
+        Returns extended chat information.
         """
 
         try:
@@ -342,7 +340,7 @@ class TelethonChats:
     @skill()
     async def join_chat(self, link_or_username: str) -> SkillResult:
         """
-        Вступает в открытый канал/группу (по юзернейму) или закрытый (по t.me/joinchat/ хэшу).
+        Joins public or private chat by username or invite link.
         """
 
         try:
@@ -359,24 +357,24 @@ class TelethonChats:
             else:
                 await client(JoinChannelRequest(target))
 
-            return SkillResult.ok(f"Успешно вступили в чат: {target}")
+            return SkillResult.ok("True")
 
         except Exception as e:
             if "USER_ALREADY_PARTICIPANT" in str(e):
-                return SkillResult.ok(f"Вы уже состоите в этом чате ({target}).")
+                return SkillResult.ok("True")
             return SkillResult.fail(f"Ошибка при вступлении в чат: {e}")
 
     @skill()
     async def leave_chat(self, chat_id: Union[int, str]) -> SkillResult:
         """
-        Отписывается от канала/выходит из группы.
+        Leaves channel/group.
         """
 
         try:
             client = self.tg_client.client()
             entity = await client.get_input_entity(parse_int_or_str(chat_id))
             await client(LeaveChannelRequest(entity))
-            return SkillResult.ok(f"Успешно покинули чат {chat_id}.")
+            return SkillResult.ok("True")
         except ValueError:
             return SkillResult.fail("Ошибка: Некорректный формат ID чата.")
         except Exception as e:
@@ -385,7 +383,7 @@ class TelethonChats:
     @skill()
     async def join_channel_discussion(self, channel_id: Union[int, str]) -> SkillResult:
         """
-        Вступает в супергруппу-дискуссию переданного канала.
+        Joins discussion supergroup linked to specified channel.
         """
 
         try:
@@ -401,15 +399,13 @@ class TelethonChats:
 
             await client(JoinChannelRequest(await client.get_input_entity(linked_chat_id)))
 
-            return SkillResult.ok(
-                f"Успешное вступление в группу обсуждений (ID: {linked_chat_id})."
-            )
+            return SkillResult.ok("True")
 
         except ValueError:
             return SkillResult.fail("Ошибка: Некорректный ID канала.")
         except Exception as e:
             if "USER_ALREADY_PARTICIPANT" in str(e):
-                return SkillResult.ok("Вы уже состоите в группе обсуждений этого канала.")
+                return SkillResult.ok("True")
             return SkillResult.fail(f"Ошибка при вступлении в обсуждение: {e}")
 
     @skill()
@@ -417,7 +413,7 @@ class TelethonChats:
         self, chat_id: Union[int, str], users: list[Union[int, str]]
     ) -> SkillResult:
         """
-        Добавляет пользователей в группу/канал.
+        Invites users to group/channel.
         """
 
         if not users:
@@ -438,7 +434,7 @@ class TelethonChats:
 
             await client(InviteToChannelRequest(channel=chat_entity, users=user_entities))
 
-            return SkillResult.ok(f"Успешно. Пользователи {users} приглашены в чат {chat_id}.")
+            return SkillResult.ok("True")
 
         except Exception as e:
             msg = str(e)
@@ -449,7 +445,7 @@ class TelethonChats:
             if "CHAT_ADMIN_REQUIRED" in msg:
                 return SkillResult.fail("Ошибка: Нет прав на приглашение в этот чат.")
             if "USER_ALREADY_PARTICIPANT" in msg:
-                return SkillResult.ok("Запрос выполнен, пользователи уже состоят в чате.")
+                return SkillResult.ok("True")
             if "USER_NOT_MUTUAL_CONTACT" in msg:
                 return SkillResult.fail(
                     "Ошибка: Пользователя можно пригласить только если вы взаимные контакты."

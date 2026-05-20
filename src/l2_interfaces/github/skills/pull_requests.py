@@ -22,7 +22,7 @@ class GithubPullRequests:
         self, owner: str, repo: str, state: str = "open", per_page: int = 10
     ) -> SkillResult:
         """
-        Возвращает список Pull Requests репозитория.
+        Returns list of repository Pull Requests.
         """
 
         try:
@@ -52,8 +52,7 @@ class GithubPullRequests:
         self, owner: str, repo: str, pull_number: int
     ) -> SkillResult:
         """
-        Запрашивает Diff конкретного Pull Request'а.
-
+        Fetches Diff of specific Pull Request.
         """
 
         try:
@@ -87,10 +86,10 @@ class GithubPullRequests:
         self, owner: str, repo: str, title: str, head: str, base: str = "main", body: str = ""
     ) -> SkillResult:
         """
-        Создает новый Pull Request.
-
-        head: Ветка, из которой переносить изменения.
-        base: Ветка, куда вливать изменения.
+        Creates new Pull Request. 
+        
+        head: Branch containing changes. 
+        base: Branch to merge into.
         """
 
         if not self.client.config.agent_account:
@@ -111,7 +110,7 @@ class GithubPullRequests:
             self.client.state.add_history(f"create_pr: {owner}/{repo} #{pr_num}")
             main_logger.info(f"[Github] Создан Pull Request #{pr_num} в {owner}/{repo}")
 
-            return SkillResult.ok(f"Pull Request успешно создан. URL: {data.get('html_url')}")
+            return SkillResult.ok(f"True. URL: {data.get('html_url')}")
 
         except Exception as e:
             return SkillResult.fail(f"Ошибка при создании Pull Request: {e}")

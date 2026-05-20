@@ -46,8 +46,10 @@ class SQLTasks:
                 main_logger.info(
                     "[SQL DB] Выполнена успешная миграция таблицы Tasks (добавлен quadrant)."
                 )
-            except Exception:
-                pass  # Колонка уже существует
+            except Exception as e:
+                main_logger.debug(
+                    f"[SQL DB] Миграция таблицы Tasks пропущена (возможно, колонка уже существует): {e}"
+                )
 
     def _validate_tags(self, tags: Any) -> tuple[bool, str, list[str]]:
         """
@@ -92,11 +94,11 @@ class SQLTasks:
         due_date_str: Optional[str] = None,
     ) -> SkillResult:
         """
-        Создает новую долгосрочную задачу в матрице Эйзенхауэра.
-
-        dependencies: Массив ID задач, без которых текущая не может быть выполнена.
-        subtasks: Чек-лист внутренних микрозадач. Важно для отслеживания процесса работы.
-        due_date_str: Дедлайн в формате 'YYYY-MM-DD HH:MM'.
+        Creates long-term Eisenhower matrix task. 
+        
+        dependencies: Blocking task IDs. 
+        subtasks: Progress tracking checklist. 
+        due_date_str: 'YYYY-MM-DD HH:MM' deadline.
         """
 
         if quadrant not in [1, 2, 3, 4]:
@@ -146,14 +148,14 @@ class SQLTasks:
 
         msg = f"Задача '{title}' создана (Квадрант {quadrant}). ID: {task_id}"
         main_logger.debug(f"[SQL DB] {msg}")
-        return SkillResult.ok(msg)
+        return SkillResult.ok(f"True. ID: {task_id}")
 
     @skill()
     async def move_task_to_quadrant(
         self, task_id: str, new_quadrant: Literal[1, 2, 3, 4]
     ) -> SkillResult:
         """
-        Перемещает существующую задачу в другой квадрант матрицы Эйзенхауэра.
+        Moves task to new Eisenhower quadrant.
         """
 
         if new_quadrant not in [1, 2, 3, 4]:
@@ -172,7 +174,7 @@ class SQLTasks:
 
         msg = f"Задача {task_id} перемещена из Квадранта {old_quadrant} в Квадрант {new_quadrant}."
         main_logger.debug(f"[SQL DB] {msg}")
-        return SkillResult.ok(msg)
+        return SkillResult.ok("True")
 
     @skill()
     async def update_task(
@@ -190,7 +192,7 @@ class SQLTasks:
         context: Optional[str] = None,
     ) -> SkillResult:
         """
-        Обновляет параметры существующей задачи.
+        Updates existing task parameters.
         """
 
         if status and status not in STATUS_EMOJIS.keys():
@@ -236,12 +238,12 @@ class SQLTasks:
 
         msg = f"Задача {task_id} успешно обновлена."
         main_logger.debug(f"[SQL DB] {msg}")
-        return SkillResult.ok(msg)
+        return SkillResult.ok("True")
 
     @skill()
     async def delete_task(self, task_id: str) -> SkillResult:
         """
-        Удаляет задачу из БД.
+        Deletes task from DB.
         """
 
         async with self.db.session_factory() as session:
@@ -252,7 +254,7 @@ class SQLTasks:
 
         msg = f"Задача {task_id} удалена."
         main_logger.debug(f"[SQL DB] {msg}")
-        return SkillResult.ok(msg)
+        return SkillResult.ok("True")
 
     async def get_context_block(self, **kwargs: Any) -> str:
         """

@@ -22,10 +22,10 @@ class BrowserExtraction:
         full_page: bool = False,
     ) -> SkillResult:
         """
-        Делает скриншот текущей страницы и инжектит картинку в контекст.
-
-        with_grid: Накладывает координатную сетку поверх изображения.
-        grid_step: Шаг сетки. Для более точной - 40.
+        Captures and injects page screenshot into context. 
+        
+        with_grid: Overlays coordinate grid. 
+        grid_step: Grid interval (40 for higher precision).
         """
 
         try:
@@ -62,7 +62,7 @@ class BrowserExtraction:
     @skill()
     async def extract_text(self) -> SkillResult:
         """
-        Извлекает весь текст с текущей страницы.
+        Extracts all text from current page.
         """
 
         try:

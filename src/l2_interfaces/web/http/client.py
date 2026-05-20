@@ -9,7 +9,8 @@ class WebHTTPClient:
         self.state.is_online = True
 
     async def get_context_block(self, **kwargs) -> str:
+        desc = "Description: Raw HTTP requests and file downloading."
         if not self.state.is_online:
-            return "### WEB HTTP [OFF]\nThe interface is disabled."
+            return f"### WEB HTTP [OFF]\n{desc}\nThe interface is disabled."
 
-        return f"### WEB HTTP [ON]\n* История запросов:\n{self.state.http_history}"
+        return f"### WEB HTTP [ON]\n{desc}\n* Query history:\n{self.state.http_history}"

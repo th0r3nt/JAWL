@@ -13,13 +13,12 @@ class HostTerminalMessages:
     @skill()
     async def send_message_to_terminal(self, text: str) -> SkillResult:
         """
-        Отправляет текстовое сообщение на экран локального терминала (если он открыт).
-        Поддерживает Markdown-разметку.
+        Sends markdown text to local terminal display.
         """
 
         try:
             await self.client.broadcast_message(text)
-            return SkillResult.ok("Сообщение успешно отправлено в терминал.")
+            return SkillResult.ok("True")
         
         except Exception as e:
             return SkillResult.fail(f"Ошибка при отправке в терминал: {e}")
@@ -27,7 +26,7 @@ class HostTerminalMessages:
     @skill()
     async def read_terminal_history(self, limit: int = 15) -> SkillResult:
         """
-        Возвращает историю последних сообщений из терминала.
+        Returns recent terminal message history.
         """
 
         try:

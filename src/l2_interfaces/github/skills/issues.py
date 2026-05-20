@@ -25,7 +25,7 @@ class GithubIssues:
         per_page: int = 10,
     ) -> SkillResult:
         """
-        Возвращает список issues репозитория.
+        Returns list of repository issues.
         """
 
         try:
@@ -54,7 +54,7 @@ class GithubIssues:
         self, owner: str, repo: str, issue_number: int
     ) -> SkillResult:
         """
-        Читает issue и комментарии к нему.
+        Reads issue and its comments.
         """
 
         try:
@@ -97,7 +97,7 @@ class GithubIssues:
         self, owner: str, repo: str, title: str, body: str = ""
     ) -> SkillResult:
         """
-        Создает issue в репозитории.
+        Creates new issue in repository.
         """
 
         if not self.client.config.agent_account:
@@ -114,7 +114,7 @@ class GithubIssues:
             issue_num = data.get("number")
             self.client.state.add_history(f"create_issue: {owner}/{repo} #{issue_num}")
             main_logger.info(f"[Github] Создан Issue #{issue_num} в {owner}/{repo}")
-            return SkillResult.ok(f"Issue успешно создано. URL: {data.get('html_url')}")
+            return SkillResult.ok(f"True. URL: {data.get('html_url')}")
         except Exception as e:
             return SkillResult.fail(f"Ошибка при создании issue: {e}")
 
@@ -124,7 +124,7 @@ class GithubIssues:
         self, owner: str, repo: str, issue_number: int, body: str
     ) -> SkillResult:
         """
-        Добавляет комментарий к Issue или Pull Request.
+        Adds comment to Issue/Pull Request.
         """
 
         if not self.client.config.agent_account:
@@ -140,6 +140,6 @@ class GithubIssues:
             )
             self.client.state.add_history(f"add_comment: {owner}/{repo} #{issue_number}")
             main_logger.info(f"[Github] Оставлен коммент в #{issue_number} ({owner}/{repo})")
-            return SkillResult.ok(f"Комментарий успешно добавлен. URL: {data.get('html_url')}")
+            return SkillResult.ok(f"True. URL: {data.get('html_url')}")
         except Exception as e:
             return SkillResult.fail(f"Ошибка при добавлении комментария: {e}")

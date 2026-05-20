@@ -22,9 +22,8 @@ class HostOSMetadata:
     @require_access(HostOSAccessLevel.SANDBOX)
     async def set_file_description(self, filepath: str, description: str) -> SkillResult:
         """
-        Привязывает текстовое описание к любому локальному файлу.
-        Полезно для сохранения информации о содержимом картинок, видео, сложных архивов, скриптов или логов,
-        чтобы в будущем понимать их суть без повторного чтения/просмотра.
+        Binds text description to local file. 
+        Useful for persisting context of images/media/archives/logs to prevent re-reading.
         """
 
         try:
@@ -38,7 +37,7 @@ class HostOSMetadata:
             await asyncio.to_thread(self.host_os.set_file_metadata, rel_path, clean_desc)
 
             main_logger.info(f"[Host OS] Добавлено описание для файла: {safe_path.name}")
-            return SkillResult.ok(f"Описание успешно привязано к файлу {safe_path.name}.")
+            return SkillResult.ok("True")
 
         except PermissionError as e:
             return SkillResult.fail(str(e))

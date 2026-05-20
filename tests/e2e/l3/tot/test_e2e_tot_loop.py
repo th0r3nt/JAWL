@@ -1,9 +1,13 @@
 import pytest
 from unittest.mock import AsyncMock, MagicMock
 
-from src.l0_state.agent.state import AgentState
-from src.l3_agent.react.loop import ReactLoop
 from src.utils.settings import TreeOfThoughtsConfig
+
+from src.l0_state.agent.state import AgentState
+
+from src.l3_agent.react.loop import ReactLoop
+
+from src.l3_agent.llm.executor import LLMExecutor
 from src.l3_agent.context.builder import ContextBuilder
 from src.l3_agent.context.registry import ContextRegistry, ContextSection
 from src.l3_agent.tot.generator import ToTGenerator
@@ -62,14 +66,14 @@ async def test_e2e_react_loop_with_tot_auto():
     mock_bus = MagicMock()
     mock_bus.publish = AsyncMock()
 
+    llm_executor = LLMExecutor(mock_main_llm, MagicMock())
     loop = ReactLoop(
-        llm_client=mock_main_llm,
+        executor=llm_executor,
         prompt_builder=MagicMock(),
         context_builder=context_builder,
         agent_state=agent_state,
         sql_ticks=mock_sql_ticks,
         vector_manager=MagicMock(),
-        token_tracker=MagicMock(),
         tools=[],
         event_bus=mock_bus,
         tot_config=tot_config,

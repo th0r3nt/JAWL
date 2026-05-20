@@ -28,10 +28,10 @@ class DeepResearch:
     @skill(swarm=[Subagents.WEB_RESEARCHER])
     async def deep_research(self, queries: List[str]) -> SkillResult:
         """
-        Массированный параллельный сбор фактов.
-        Принимает массив поисковых запросов, параллельно гуглит их,
-        собирает уникальные ссылки, читает страницы и возвращает отчет.
+        Mass parallel fact-gathering. 
+        Takes search queries, googles concurrently, extracts unique links, reads pages, returns report.
         """
+        
         if not queries:
             return SkillResult.fail("Ошибка: Список запросов пуст.")
 

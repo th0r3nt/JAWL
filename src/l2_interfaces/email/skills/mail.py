@@ -27,7 +27,7 @@ class EmailSkills:
     @skill()
     async def read_email(self, uid: int) -> SkillResult:
         """
-        Скачивает и читает полное содержимое письма по его UID.
+        Downloads and reads full email content.
         """
 
         def _read() -> Tuple[bool, str]:
@@ -65,10 +65,7 @@ class EmailSkills:
     @skill()
     async def send_email(self, to_email: str, subject: str, body: str) -> SkillResult:
         """
-        Отправляет текстовое письмо на указанный электронный адрес.
-
-        to_email: Адрес получателя.
-        subject: Тема письма.
+        Sends a text email to the specified email address.
         """
 
         def _send() -> None:
@@ -91,7 +88,7 @@ class EmailSkills:
     @skill()
     async def delete_email(self, uid: int) -> SkillResult:
         """
-        Удаляет письмо из почтового ящика по UID.
+        Deletes email from mailbox.
         """
 
         def _delete() -> None:

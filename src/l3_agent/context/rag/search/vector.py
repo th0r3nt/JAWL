@@ -1,8 +1,3 @@
-"""
-Обёртка для поиска по векторной базе (Qdrant) в рамках механизма GraphRAG.
-Скрывает в себе логику массовых (батчевых) запросов и дедупликации результатов.
-"""
-
 import asyncio
 from typing import List, Dict, Any
 
@@ -25,7 +20,6 @@ class VectorSearchWrapper:
             vector_thoughts: Контроллер базы мыслей.
             top_k: Количество возвращаемых результатов на ОДИН поисковый вектор.
         """
-
         self.vector_knowledge = vector_knowledge
         self.vector_thoughts = vector_thoughts
         self.top_k = top_k
@@ -50,6 +44,7 @@ class VectorSearchWrapper:
                 }, ...
             ]
         """
+
         if not query_vectors:
             return []
 
@@ -59,9 +54,9 @@ class VectorSearchWrapper:
             # Ищем в базе знаний
             if self.vector_knowledge.db.client:
                 tasks.append(
-                    self.vector_knowledge.db.client.search(
+                    self.vector_knowledge.db.client.query_points(
                         collection_name=self.vector_knowledge.collection.name,
-                        query_vector=vector,
+                        query=vector,
                         limit=self.top_k,
                         score_threshold=self.vector_knowledge.similarity_threshold,
                         with_payload=True,
@@ -71,9 +66,9 @@ class VectorSearchWrapper:
             # Ищем в базе мыслей
             if self.vector_thoughts.db.client:
                 tasks.append(
-                    self.vector_thoughts.db.client.search(
+                    self.vector_thoughts.db.client.query_points(
                         collection_name=self.vector_thoughts.collection.name,
-                        query_vector=vector,
+                        query=vector,
                         limit=self.top_k,
                         score_threshold=self.vector_thoughts.similarity_threshold,
                         with_payload=True,
@@ -94,7 +89,12 @@ class VectorSearchWrapper:
             # Определяем, из какой коллекции пришел результат (задачи чередуются: 0-knowledge, 1-thoughts, 2-knowledge...)
             collection_name = "knowledge" if i % 2 == 0 else "thoughts"
 
-            for point in search_result:
+            # query_points возвращает QueryResponse, извлекаем ScoredPoint
+            points = (
+                search_result.points if hasattr(search_result, "points") else search_result
+            )
+
+            for point in points:
                 point_id = str(point.id)
                 score = float(point.score)
                 text = point.payload.get("text", "")

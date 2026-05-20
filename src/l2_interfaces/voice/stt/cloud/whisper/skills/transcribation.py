@@ -23,20 +23,15 @@ class CloudWhisperSTTTranscribation:
     ALLOWED_EXTENSIONS = {".mp3", ".mp4", ".mpeg", ".mpga", ".m4a", ".wav", ".webm"}
 
     def __init__(self, client: CloudWhisperSTTClient, host_os: HostOSClient) -> None:
-        """
-        Args:
-            client: Клиент API Whisper.
-            host_os: Гейткипер ОС для безопасного резолва путей к файлам.
-        """
         self.client = client
         self.host_os = host_os
 
     @skill(swarm=[Subagents.WEB_RESEARCHER, Subagents.CODER])
     async def transcribe_audio(self, filepath: str) -> SkillResult:
         """
-        Извлекает и распознает речь из медиафайла.
-
-        filepath: Относительный путь к файлу внутри папки `sandbox/`.
+        Extracts and transcribes speech from media file. 
+        
+        filepath: Relative path within sandbox/.
         """
         try:
             # 1. Валидируем путь через гейткипер

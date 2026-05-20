@@ -50,30 +50,19 @@ def test_tot_schema_parsing():
 @pytest.mark.asyncio
 async def test_tot_generator_rules_injection():
     """Тест: Генератор корректно вставляет динамические "мягкие" правила в промпт LLM."""
-    mock_llm = MagicMock()
-    mock_session = AsyncMock()
-
-    # Заглушка ответа модели
-    mock_msg = MagicMock()
-    mock_tool_call = MagicMock()
-    mock_tool_call.function.arguments = '{"branches": []}'
-    mock_msg.tool_calls = [mock_tool_call]
-
-    mock_session.chat.completions.create.return_value = MagicMock(
-        choices=[MagicMock(message=mock_msg)]
-    )
-    mock_llm.get_session.return_value = mock_session
-
+    mock_executor = AsyncMock()
+    mock_executor.execute.return_value = '{"branches": []}'
+    mock_executor.tracker = MagicMock()
     # Корректно мокаем реестр контекста, чтобы ._providers.keys() не падал
     mock_registry = MagicMock()
     mock_registry.gather_all = AsyncMock(return_value={})
     mock_registry._providers = {}
 
     mock_sql_ticks = MagicMock()
-    mock_sql_ticks.get_context_block = AsyncMock(return_value="Fake Ticks")
+    mock_sql_ticks.get_full_context_block = AsyncMock(return_value="Fake Ticks")
 
     generator = ToTGenerator(
-        llm_client=mock_llm,
+        executor=mock_executor,
         model_name="test",
         branches_count=4,  # 4 макро-ветки
         simulations_per_branch=3,  # 3 сценария на ветку
@@ -82,7 +71,6 @@ async def test_tot_generator_rules_injection():
         context_registry=mock_registry,
         agent_state=AgentState(),
         sql_ticks=mock_sql_ticks,
-        token_tracker=MagicMock(),
         root_dir=Path("."),
         timezone=3,
     )
@@ -90,7 +78,7 @@ async def test_tot_generator_rules_injection():
     await generator.generate("TEST", {}, [], task_description="Особая задача")
 
     # Достаем отправленные сообщения
-    call_args = mock_session.chat.completions.create.call_args[1]
+    call_args = mock_executor.execute.call_args[1]
     messages = call_args["messages"]
     user_prompt = messages[1]["content"]
 
@@ -116,10 +104,10 @@ def test_tot_generator_markdown_formatting():
     )
 
     mock_sql_ticks = MagicMock()
-    mock_sql_ticks.get_context_block = AsyncMock(return_value="Fake Ticks")
+    mock_sql_ticks.get_full_context_block = AsyncMock(return_value="Fake Ticks")
 
     generator = ToTGenerator(
-        llm_client=MagicMock(),
+        executor=MagicMock(),
         model_name="test",
         branches_count=2,
         simulations_per_branch=1,
@@ -128,7 +116,6 @@ def test_tot_generator_markdown_formatting():
         context_registry=MagicMock(),
         agent_state=AgentState(),
         sql_ticks=mock_sql_ticks,
-        token_tracker=MagicMock(),
         root_dir=Path("."),
         timezone=3,
     )
@@ -136,46 +123,52 @@ def test_tot_generator_markdown_formatting():
     result = generator._format_markdown(tree)
 
     # Проверяем структуру дерева
-    assert '├── Макро-стратегия №1: "План А" -> Делаем быстро' in result
+    assert '├── №1: "План А" -> Делаем быстро' in result
     assert "│   * Плюсы: [+] Скорость" in result
-    assert "│   └── Микро-симуляция №1.1: Осложнение -> Всё сломалось" in result
+    assert "│   └── №1.1: Осложнение -> Всё сломалось" in result
     assert "│\n│" in result  # Проверяем пустую разделительную линию
-    assert '└── Макро-стратегия №2: "План Б" -> Делаем медленно' in result
+    assert '└── №2: "План Б" -> Делаем медленно' in result
 
 
 @pytest.mark.asyncio
 async def test_tot_generator_call_llm_success():
-    """Тест: Генератор успешно вызывает LLM и достает аргументы из tool_calls."""
-    mock_llm = MagicMock()
-    mock_session = AsyncMock()
-
-    mock_msg = MagicMock()
-    mock_tool_call = MagicMock()
-    mock_tool_call.function.arguments = '{"branches": []}'
-    mock_msg.tool_calls = [mock_tool_call]
-
-    mock_session.chat.completions.create.return_value = MagicMock(
-        choices=[MagicMock(message=mock_msg)]
+    """Тест: Генератор успешно вызывает LLMExecutor и парсит JSON-ответ."""
+    mock_executor = AsyncMock()
+    # Имитируем успешный возврат валидного JSON дерева
+    mock_executor.execute.return_value = (
+        '{"branches": [{"name": "Plan", "description": "Desc"}]}'
     )
-    mock_llm.get_session.return_value = mock_session
+    mock_executor.tracker = MagicMock()
 
     mock_sql_ticks = MagicMock()
-    mock_sql_ticks.get_context_block = AsyncMock(return_value="Fake Ticks")
+    mock_sql_ticks.get_full_context_block = AsyncMock(return_value="Fake Ticks")
+
+    # Корректно мокаем реестр контекста, чтобы ._providers.keys() не падал
+    mock_registry = MagicMock()
+    mock_registry.gather_all = AsyncMock(return_value={})
+    mock_registry._providers = {}
+
+    mock_sql_ticks = MagicMock()
+    mock_sql_ticks.get_full_context_block = AsyncMock(return_value="Fake Ticks")
 
     generator = ToTGenerator(
-        llm_client=mock_llm,
+        executor=mock_executor,
         model_name="test",
         branches_count=3,
         simulations_per_branch=2,
         max_depth=2,
         prompt_builder=MagicMock(),
-        context_registry=MagicMock(),
+        context_registry=mock_registry,
         agent_state=AgentState(),
         sql_ticks=mock_sql_ticks,
-        token_tracker=MagicMock(),
         root_dir=Path("."),
         timezone=3,
     )
 
-    res = await generator._call_llm([{"role": "user", "content": "test"}])
-    assert res == '{"branches": []}'
+    res = await generator.generate("TEST", {}, [])
+
+    # Проверяем, что парсер сработал и вернул отформатированный Markdown
+    assert res is not None
+    assert "TREE OF THOUGHTS" in res
+    assert "Plan" in res
+    mock_executor.execute.assert_awaited_once()

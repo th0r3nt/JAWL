@@ -32,7 +32,7 @@ async def test_mental_states_crud(mental_states_manager):
     assert res_del.is_success is True
 
     res_get_empty = await mental_states_manager.get_mental_states()
-    assert "Список сущностей пуст" in res_get_empty.message
+    assert "The list of entities is empty" in res_get_empty.message
 
 
 @pytest.mark.asyncio

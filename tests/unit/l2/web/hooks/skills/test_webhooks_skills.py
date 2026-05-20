@@ -50,7 +50,7 @@ async def test_clear_webhooks_history(hooks_client):
     res = await skill.clear_webhooks_history()
 
     assert res.is_success is True
-    assert "Удалено 2 записей" in res.message
+    assert res.message == "True"
     assert len(hooks_client.state.recent_hooks) == 0
     assert len(hooks_client.state.preview_lines) == 0
 

@@ -26,9 +26,9 @@ class CalendarManagement:
     @skill()
     async def add_one_time_alarm(self, title: str, datetime_str: str) -> SkillResult:
         """
-        Создает разовый будильник.
-
-        datetime_str: Время в формате 'YYYY-MM-DD HH:MM'.
+        Creates one-time alarm. 
+        
+        datetime_str: Format 'YYYY-MM-DD HH:MM'.
         """
         try:
             # Парсим строку с учетом часового пояса системы
@@ -44,7 +44,7 @@ class CalendarManagement:
             )
 
             main_logger.info(f"[Calendar] Добавлен разовый таймер '{title}' на {datetime_str}")
-            return SkillResult.ok(f"Разовый будильник успешно установлен (ID: {ev_id[:8]}).")
+            return SkillResult.ok(f"True. ID: {ev_id[:8]}")
 
         except ValueError:
             return SkillResult.fail(
@@ -56,9 +56,9 @@ class CalendarManagement:
     @skill()
     async def add_interval_alarm(self, title: str, interval_minutes: int) -> SkillResult:
         """
-        Создает регулярный таймер, который будет срабатывать каждые N минут начиная от текущего момента.
-
-        interval_minutes: Интервал в минутах (например, 2880 = каждые два дня).
+        Creates recurring timer triggering every N minutes from now. 
+        
+        interval_minutes: Interval (e.g., 2880 = 2 days).
         """
         if interval_minutes < 1:
             return SkillResult.fail("Ошибка: Интервал должен быть не менее 1 минуты.")
@@ -80,7 +80,7 @@ class CalendarManagement:
             main_logger.info(
                 f"[Calendar] Добавлен интервальный таймер '{title}' (каждые {interval_minutes} мин)"
             )
-            return SkillResult.ok(f"Интервальный таймер успешно установлен (ID: {ev_id[:8]}).")
+            return SkillResult.ok(f"True. ID: {ev_id[:8]}")
 
         except Exception as e:
             return SkillResult.fail(f"Ошибка при создании таймера: {e}")
@@ -90,11 +90,12 @@ class CalendarManagement:
         self, title: str, time_str: str, interval_days: int = 1
     ) -> SkillResult:
         """
-        Создает будильник, который будет активироваться в конкретное время суток с заданным шагом в днях.
-
-         time_str: Время в формате 'HH:MM'.
-        interval_days: Частота в днях (1 = каждый день, 7 = раз в неделю).
+        Creates recurring daily/weekly alarm. 
+        
+        time_str: Format 'HH:MM'. 
+        interval_days: Step in days (1 = daily, 7 = weekly).
         """
+
         if interval_days < 1:
             return SkillResult.fail("Ошибка: interval_days должен быть >= 1.")
 
@@ -126,9 +127,7 @@ class CalendarManagement:
             main_logger.info(
                 f"[Calendar] Добавлен повторяющийся таймер '{title}' (в {time_str}, каждые {interval_days} дн.)"
             )
-            return SkillResult.ok(
-                f"Повторяющийся таймер успешно установлен (ID: {ev_id[:8]})."
-            )
+            return SkillResult.ok(f"True. ID: {ev_id[:8]}")
 
         except ValueError:
             return SkillResult.fail("Ошибка: Неверный формат времени. Используйте 'HH:MM'.")
@@ -138,7 +137,9 @@ class CalendarManagement:
 
     @skill()
     async def get_alarms(self) -> SkillResult:
-        """Возвращает список всех существующих будильников и таймеров."""
+        """
+        Returns list of all alarms/timers.
+        """
 
         events = self.client.get_all_events()
         if not events:
@@ -163,7 +164,7 @@ class CalendarManagement:
     @skill()
     async def delete_alarm(self, alarm_id: str) -> SkillResult:
         """
-        Удаляет существующий будильник/таймер.
+        Deletes existing alarm/timer.
         """
 
         events = self.client.get_all_events()
@@ -175,4 +176,4 @@ class CalendarManagement:
 
         self.client.update_events(filtered)
         main_logger.info(f"[Calendar] Удален таймер ID: {alarm_id}")
-        return SkillResult.ok(f"Будильник {alarm_id} успешно удален.")
+        return SkillResult.ok("True")

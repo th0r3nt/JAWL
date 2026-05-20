@@ -10,7 +10,7 @@ import email.message
 import re
 
 from src.utils._tools import clean_html
-
+from src.utils.logger import main_logger
 
 def decode_mime_header(header_value: str) -> str:
     """
@@ -76,8 +76,11 @@ def extract_text_from_email(msg: email.message.Message) -> str:
                         text_parts.append(decoded_body)
                     elif content_type == "text/html":
                         html_parts.append(decoded_body)
-            except Exception:
-                pass
+            except Exception as e:
+                main_logger.debug(
+                    f"[Email MIME] Не удалось декодировать MIME-часть ({part.get_content_type()}): {e}"
+                )
+
     else:
         try:
             body = msg.get_payload(decode=True)

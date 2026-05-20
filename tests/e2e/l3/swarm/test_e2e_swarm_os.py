@@ -25,6 +25,8 @@ from src.l2_interfaces.host.os.client import HostOSClient, HostOSAccessLevel
 from src.l2_interfaces.host.os.skills.files.reader import HostOSReader
 from src.l2_interfaces.host.os.skills.files.editor import HostOSEditor
 
+from src.l3_agent.llm.executor import LLMExecutor
+
 from src.l3_agent.swarm.spawn import SwarmManager
 from src.l3_agent.swarm.skills.report import SubagentReport
 from src.l3_agent.skills.registry import register_instance, clear_registry
@@ -164,13 +166,14 @@ async def test_e2e_swarm_refactoring_task(tmp_path: Path):
     # ВЫПОЛНЕНИЕ
     # ==========================
 
+    llm_executor = LLMExecutor(mock_llm, tracker)
+
     with patch("src.l3_agent.swarm.spawn.SwarmPromptBuilder") as mock_builder:
         mock_builder.return_value.build.return_value = "System Prompt"
         manager = SwarmManager(
-            llm_client=mock_llm,
+            executor=llm_executor,
             swarm_config=swarm_config,
             root_dir=tmp_path,
-            token_tracker=tracker,
         )
 
     # Фиксируем ID для теста

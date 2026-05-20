@@ -55,13 +55,15 @@ def drives_manager(memory_db):
     # Ставим маленькие лимиты для теста
     return SQLDrives(
         db=memory_db,
-        decay_rate=5.0,
         pause_on_offline=True,
-        decay_interval_sec=3600,
         max_history=3,
         max_custom=2,
         tz_offset=3,
-        fundamental_toggles={"curiosity": True, "social": True, "mastery": True},
+        fundamental_config={
+            "curiosity": {"enabled": True, "decay": {"rate": 5.0, "interval_sec": 3600}},
+            "social": {"enabled": True, "decay": {"rate": 5.0, "interval_sec": 3600}},
+            "mastery": {"enabled": True, "decay": {"rate": 5.0, "interval_sec": 3600}},
+        },
     )
 
 

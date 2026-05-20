@@ -11,8 +11,17 @@ def is_ignored(path: Path) -> bool:
         ".venv",
         "env",
         ".git",
+        "logs",
+        "vector",
+        "graph",
+        "sql",
+        ".jawl_events",
+        "browser_profile",
     }
-    ignore_exts = {".pyc", ".pyo", ".pyd", ".tmp", ".swp"}
+    ignore_exts = {
+        ".pyc", ".pyo", ".pyd", ".tmp", ".swp", 
+        ".log", ".db", ".sqlite", ".sqlite3", "-journal", "-wal"
+    }
 
     if path.suffix in ignore_exts or path.name.endswith("~"):
         return True

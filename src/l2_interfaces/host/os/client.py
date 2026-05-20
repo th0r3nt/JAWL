@@ -286,8 +286,11 @@ class HostOSClient:
         Провайдер контекста для ContextRegistry.
         Отдает отформатированный блок телеметрии, файловой системы и воркспейса.
         """
+        
+        desc = "Description: Host operating system access (files, processes, shell, network)."
+
         if not self.state.is_online:
-            return "### HOST OS [OFF]\nThe interface is disabled."
+            return f"### HOST OS [OFF]\n{desc}\nThe interface is disabled."
 
         framework_block = ""
         if self.access_level >= HostOSAccessLevel.OBSERVER and self.state.framework_files:
@@ -384,7 +387,7 @@ class HostOSClient:
 
         tracked_dirs_block = ""
         if self.state.tracked_dirs_trees:
-            tracked_dirs_block = f"* Tracked Directories:\n{self.state.tracked_dirs_trees}\n"
+            tracked_dirs_block = f"\n{self.state.tracked_dirs_trees}\n"
         else:
             tracked_dirs_block = "There are no watched directories."
 
@@ -393,6 +396,7 @@ class HostOSClient:
 
         return f"""
 ### HOST OS [ON]
+{desc}
 
 * Current Datetime: {self.state.datetime}
 

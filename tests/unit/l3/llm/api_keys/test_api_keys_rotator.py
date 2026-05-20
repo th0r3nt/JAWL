@@ -9,7 +9,7 @@ import pytest
 from unittest.mock import patch
 
 from src.l3_agent.llm.api_keys.rotator import APIKeyRotator
-
+from src.l3_agent.llm.exceptions import AllKeysExhaustedError
 
 @pytest.fixture
 def mock_keys() -> list[str]:
@@ -85,7 +85,7 @@ def test_rotator_all_keys_exhausted(mock_time, mock_keys: list[str]) -> None:
     rotator.cooldown_key("key2", 60)
     rotator.cooldown_key("key3", 60)
 
-    with pytest.raises(RuntimeError, match="Все API ключи исчерпали лимиты"):
+    with pytest.raises(AllKeysExhaustedError, match="Все API ключи исчерпали лимиты"):
         rotator.get_next_key()
 
 
@@ -102,7 +102,7 @@ def test_rotator_subsecond_wait_never_zero(mock_time, mock_keys: list[str]) -> N
     # Все ключи уйдут в кулдаун на 0.7 секунды
     rotator._cooldowns = {k: 100.7 for k in mock_keys}
 
-    with pytest.raises(RuntimeError) as exc:
+    with pytest.raises(AllKeysExhaustedError) as exc:
         rotator.get_next_key()
 
     msg = str(exc.value)
@@ -117,7 +117,7 @@ def test_rotator_wait_time_rounds_up(mock_time, mock_keys: list[str]) -> None:
     rotator = APIKeyRotator(mock_keys)
     rotator._cooldowns = {k: 103.4 for k in mock_keys}
 
-    with pytest.raises(RuntimeError, match="подождать 4 сек"):
+    with pytest.raises(AllKeysExhaustedError, match="подождать 4 сек"):
         rotator.get_next_key()
 
 
@@ -133,7 +133,7 @@ def test_rotator_wait_time_small_negative_race(mock_time, mock_keys: list[str]) 
     # Все в будущем чтобы петля выше ничего не вернула
     rotator._cooldowns = {k: 100.3 for k in mock_keys}
 
-    with pytest.raises(RuntimeError) as exc:
+    with pytest.raises(AllKeysExhaustedError) as exc:
         rotator.get_next_key()
     msg = str(exc.value)
     assert "-" not in msg.split("подождать", 1)[1]

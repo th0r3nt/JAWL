@@ -90,7 +90,13 @@ class VectorDB:
         main_logger.info(f"[Vector DB] База данных инициализирована по пути: {self.db_path}")
 
     async def disconnect(self) -> None:
-        """Корректно закрывает базу данных при выключении системы."""
+        """Корректно закрывает базу данных при выключении системы и освобождает File Locks."""
         if self.client:
+            try:
+                # Явно закрываем клиент, чтобы portalocker отпустил файлы БД
+                await self.client.close()
+            except Exception as e:
+                main_logger.debug(f"[Vector DB] Ошибка при закрытии клиента: {e}")
+
             self.client = None
             main_logger.info("[Vector DB] Подключение к базе данных закрыто.")

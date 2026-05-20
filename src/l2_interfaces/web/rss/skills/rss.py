@@ -18,7 +18,7 @@ class WebRSSSkills:
     @skill()
     async def list_feeds(self) -> SkillResult:
         """
-        Возвращает список отслеживаемых RSS-лент.
+        Lists tracked RSS feeds.
         """
 
         if not self.client.config.feeds:
@@ -33,7 +33,7 @@ class WebRSSSkills:
     @skill()
     async def read_feed(self, url: str, limit: int = 5) -> SkillResult:
         """
-        Читает XML-ленту.
+        Reads XML RSS/Atom feed.
         """
 
         try:

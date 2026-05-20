@@ -8,7 +8,6 @@ from src.utils.settings import (
 )
 from src.l0_state.agent.state import AgentState
 from src.utils.event.bus import EventBus
-from src.utils.token_tracker import TokenTracker
 
 
 @pytest.fixture
@@ -34,17 +33,13 @@ def mock_subconscious_deps(mock_subconscious_config, tmp_path):
     sql = MagicMock()
     vector = MagicMock()
     graph = MagicMock()
-    llm = MagicMock()
-    tracker = MagicMock(spec=TokenTracker)
 
     return {
         "config": mock_subconscious_config,
-        "llm_client": llm,
+        "executor": MagicMock(),  # <--- Добавлено
         "sql_manager": sql,
         "vector_manager": vector,
         "graph_manager": graph,
-        "sql_ticks": MagicMock(),
-        "token_tracker": tracker,
         "event_bus": bus,
         "agent_state": agent_state,
         "root_dir": tmp_path,

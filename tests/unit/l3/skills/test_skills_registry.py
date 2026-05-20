@@ -78,8 +78,8 @@ async def test_execute_skill_success(mock_plain_func):
 
     report = await execute_skill(actions=actions)
 
-    assert "Action [mock.plain_func]: Plain: Hello" in report
-    assert "Action [mock.class_func]: Agent: World" in report
+    assert "* mock.plain_func: Plain: Hello" in report
+    assert "* mock.class_func: Agent: World" in report
 
 
 @pytest.mark.asyncio
@@ -90,7 +90,7 @@ async def test_execute_skill_ignores_extra_kwargs(mock_plain_func):
         )
     ]
     report = await execute_skill(actions=actions)
-    assert "Action [mock.plain_func]: Plain: Valid" in report
+    assert "* mock.plain_func: Plain: Valid" in report
 
 
 @pytest.mark.asyncio
@@ -109,9 +109,9 @@ async def test_execute_skill_mixed_results(mock_plain_func):
 
     report = await execute_skill(actions)
 
-    assert "Action [mock.plain_func]: Plain: A" in report
-    assert "Action [mock.unknown_func]: Скилл 'mock.unknown_func' не найден" in report
-    assert "Action [mock.fail_func]: Внутренняя ошибка навыка: Критический сбой" in report
+    assert "* mock.plain_func: Plain: A" in report
+    assert "* mock.unknown_func: Скилл 'mock.unknown_func' не найден" in report
+    assert "* mock.fail_func: Внутренняя ошибка навыка: Критический сбой" in report
 
 
 @pytest.fixture

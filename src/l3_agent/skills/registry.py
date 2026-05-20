@@ -14,7 +14,7 @@ import logging
 
 from pydantic import create_model, BaseModel, ValidationError
 
-from src.utils.logger import main_logger, agent_logger
+from src.utils.logger import agent_logger
 from src.utils._tools import truncate_text
 from src.utils.settings import SubconsciousConfig
 
@@ -283,8 +283,11 @@ def get_skills_library(subconscious_config: Optional[SubconsciousConfig] = None)
             try:
                 if not visibility_check(instance):
                     continue
-            except Exception:
-                pass
+            except Exception as e:
+                # Ошибка в кастомном декораторе видимости
+                agent_logger.warning(
+                    f"[Skills Registry] Исключение в __visibility_check__ для {skill_name}: {e}"
+                )
 
         active_docs.append(doc)
 
@@ -327,9 +330,7 @@ async def execute_skill(
         tasks.append(call_skill(name, params, logger=logger))
 
     results = await asyncio.gather(*tasks)
-    report = [
-        f"\n* Action [{actions[i].tool_name}]: {res.message}" for i, res in enumerate(results)
-    ]
+    report = [f"* {actions[i].tool_name}: {res.message}" for i, res in enumerate(results)]
     return "\n".join(report)
 
 

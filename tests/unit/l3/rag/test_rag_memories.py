@@ -42,7 +42,6 @@ async def test_rag_memories_context_extraction():
         vector_thoughts=mock_thoughts,
         graph_manager=MagicMock(),
         embedding_model=MagicMock(),
-        telethon_state=mock_telethon_state,
         agent_state=mock_agent_state,
         rag_config=rag_config,
     )
@@ -88,7 +87,6 @@ async def test_rag_memories_uses_raw_text():
         vector_thoughts=mock_thoughts,
         graph_manager=MagicMock(),
         embedding_model=MagicMock(),
-        telethon_state=mock_telethon_state,
         agent_state=mock_agent_state,
         rag_config=rag_config,
     )
