@@ -330,9 +330,17 @@ def is_agent_running() -> bool:
     Returns:
         bool: True, если агент запущен. False в противном случае.
     """
-
     lock_file = get_lock_file_path()
     pid_file = get_pid_file_path()
+
+    # Если файлов нет - агент гарантированно не работает
+    if not lock_file.exists() or not pid_file.exists():
+        try:
+            pid_file.unlink(missing_ok=True)
+            lock_file.unlink(missing_ok=True)
+        except Exception:
+            pass
+        return False
 
     is_locked = False
     try:
@@ -350,8 +358,12 @@ def is_agent_running() -> bool:
 
                 fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
                 fcntl.flock(fd, fcntl.LOCK_UN)
-    except (IOError, OSError, PermissionError):
-        is_locked = True
+    except (IOError, OSError, PermissionError) as e:
+        # Если папка была удалена между проверкой .exists() и open(), игнорируем ошибку
+        if isinstance(e, FileNotFoundError):
+            is_locked = False
+        else:
+            is_locked = True
 
     if is_locked:
         return True
