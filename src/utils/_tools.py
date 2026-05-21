@@ -1,4 +1,13 @@
+"""
+Helper and Utility Tools for the JAWL Framework.
+
+Provides common utility functions for file size formatting, secure sandbox path validation
+(Gatekeeper), text truncation safeguards, HTML stripping, coordinate grid overlays,
+and OS-level exclusive locking (Mutex).
+"""
+
 import os
+import json
 from pathlib import Path
 from typing import Union, Optional, IO
 import re
@@ -9,13 +18,13 @@ from src.utils.logger import main_logger
 
 def format_size(size_bytes: int) -> str:
     """
-    Конвертирует размер из байтов в человекочитаемый формат (B, KB, MB, GB, TB, PB).
+    Converts bytes into a human-readable size string.
 
     Args:
-        size_bytes (int): Размер файла в байтах.
+        size_bytes (int): File size in bytes.
 
     Returns:
-        str: Отформатированная строка с подходящей единицей измерения.
+        str: Human-readable size with appropriate unit.
     """
 
     if size_bytes < 0:
@@ -34,17 +43,18 @@ def format_size(size_bytes: int) -> str:
 
 def validate_sandbox_path(filepath: str | Path) -> Path:
     """
-    Гейткипер песочницы: разрешает работу с файлами строго внутри папки sandbox/.
-    Защищает от Path Traversal атак (выхода за пределы директории через '../').
+    Sandbox path validator and Gatekeeper.
+    Restricts file actions strictly within the designated sandbox/ directory,
+    protecting the system from path traversal attempts.
 
     Args:
-        filepath (str | Path): Относительный или абсолютный путь, запрошенный агентом.
+        filepath (str | Path): Relative or absolute path requested by the agent.
 
     Returns:
-        Path: Физический, очищенный и разрешенный абсолютный путь.
+        Path: Resolved absolute physical path within the sandbox bounds.
 
     Raises:
-        PermissionError: Если запрошенный путь пытается выйти за пределы sandbox/.
+        PermissionError: If the requested path escapes the sandbox directory.
     """
 
     sandbox_dir = (Path.cwd() / "sandbox").resolve()
@@ -57,7 +67,7 @@ def validate_sandbox_path(filepath: str | Path) -> Path:
     resolved = (sandbox_dir / path_str).resolve()
     if not resolved.is_relative_to(sandbox_dir):
         raise PermissionError(
-            "Доступ запрещен: можно работать с файлами только в пределах папки sandbox/"
+            "Access denied: you can work with files strictly within the sandbox/ folder"
         )
 
     return resolved
@@ -65,14 +75,14 @@ def validate_sandbox_path(filepath: str | Path) -> Path:
 
 def parse_int_or_str(value: Union[int, str]) -> Union[int, str]:
     """
-    Утилитный метод для преобразования строковых ID (например, Telegram) в числа.
-    Если строку невозможно конвертировать в int (например, это @username), возвращает очищенную строку.
+    Safely converts string IDs to integers.
+    If the value cannot be parsed to an int, returns the stripped raw string.
 
     Args:
-        value (Union[int, str]): Исходное значение ID.
+        value (Union[int, str]): Raw ID value.
 
     Returns:
-        Union[int, str]: Числовой ID или строковый юзернейм.
+        Union[int, str]: Integer value or clean string username/identifier.
     """
 
     try:
@@ -84,22 +94,18 @@ def parse_int_or_str(value: Union[int, str]) -> Union[int, str]:
 def truncate_text(
     text: str,
     max_chars: int,
-    suffix: str = "\n... [Вывод обрезан. Превышен лимит символов]",
+    suffix: str = "\n... [Output truncated. Character limit exceeded]",
 ) -> str:
     """
-    Универсальная защита контекста агента от переполнения гигантскими текстами.
-
-    Гарантирует, что длина результата не превышает ``max_chars`` (с учетом
-    длины суффикса). Если ``max_chars`` меньше длины суффикса, суффикс тоже
-    обрезается, чтобы вписаться в лимит.
+    Safeguards the agent's context window by truncating extremely long texts.
 
     Args:
-        text (str): Исходный длинный текст.
-        max_chars (int): Максимально допустимое количество символов (жесткий потолок).
-        suffix (str, optional): Строка, которая будет добавлена в конец при обрезке.
+        text (str): Raw target text.
+        max_chars (int): Maximum allowed characters ceiling limit.
+        suffix (str, optional): Appended truncation notice string.
 
     Returns:
-        str: Оригинальный или усеченный текст с суффиксом, длиной строго <= max_chars.
+        str: Truncated or original text conforming strictly to max_chars limit.
     """
 
     if max_chars <= 0:
@@ -117,10 +123,10 @@ def truncate_text(
 
 def get_project_root() -> Path:
     """
-    Вычисляет и гарантированно возвращает абсолютный путь к корню проекта JAWL.
+    Resolves and returns the absolute path of the JAWL framework root directory.
 
     Returns:
-        Path: Абсолютный путь директории фреймворка.
+        Path: Absolute path of the framework directory.
     """
 
     return Path(__file__).resolve().parent.parent.parent
@@ -128,10 +134,10 @@ def get_project_root() -> Path:
 
 def get_pid_file_path() -> Path:
     """
-    Возвращает единый путь к PID-файлу для всех модулей системы.
+    Returns the unified physical path to the runtime PID file.
 
     Returns:
-        Path: Путь к файлу agent.pid.
+        Path: Path to the agent.pid file.
     """
 
     return get_project_root() / "src" / "utils" / "local" / "data" / "agent.pid"
@@ -139,7 +145,10 @@ def get_pid_file_path() -> Path:
 
 def get_lock_file_path() -> Path:
     """
-    Возвращает путь к файлу блокировки (Mutex) для защиты от двойного запуска.
+    Returns the unified physical path to the Mutex lock file.
+
+    Returns:
+        Path: Path to the agent.lock file.
     """
 
     return get_project_root() / "src" / "utils" / "local" / "data" / "agent.lock"
@@ -147,14 +156,13 @@ def get_lock_file_path() -> Path:
 
 def clean_html(raw_html: str) -> str:
     """
-    Выполняет мощную и быструю очистку текста от HTML-мусора для экономии токенов LLM.
-    Вырезает <script>, <style>, комментарии, теги и декодирует HTML-сущности.
+    Strips raw HTML tags, inline CSS styles, JS blocks, and comments to save context tokens.
 
     Args:
-        raw_html (str): Сырая строка с HTML-разметкой.
+        raw_html (str): Source HTML markup.
 
     Returns:
-        str: Чистый текст, готовый для внедрения в промпт агента.
+        str: Sanitized clean text.
     """
 
     if not raw_html:
@@ -173,9 +181,12 @@ def clean_html(raw_html: str) -> str:
 
 def draw_image_grid(image_path: str | Path, step: int = 100) -> None:
     """
-    Накладывает высококонтрастную полупрозрачную координатную сетку на изображение.
-    Используется навыком take_screenshot для точного визуального позиционирования
-    элементов мультимодальными моделями (Vision LLM).
+    Draws a semi-transparent grid overlay with coordinate labels on an image.
+    Used by take_screenshot for visual positioning in Multimodal Vision LLMs.
+
+    Args:
+        image_path (str | Path): Path to the target image.
+        step (int): Grid line spacing step in pixels.
     """
 
     from PIL import Image, ImageDraw
@@ -194,6 +205,7 @@ def draw_image_grid(image_path: str | Path, step: int = 100) -> None:
             for y in range(0, height, step):
                 text = f"{x},{y}"
                 text_w = len(text) * 6
+                text_w = min(text_w, width - x - 4)  # Clamp bounds protection
                 text_h = 10
 
                 draw.rectangle(
@@ -207,7 +219,12 @@ def draw_image_grid(image_path: str | Path, step: int = 100) -> None:
 
 def dump_prompt_to_file(filename: str, messages: list, meta_header: str = "") -> None:
     """
-    Сохраняет контекст (prompts) в Markdown-файл для отладки.
+    Dumps the compiled system prompt context to a Markdown file for debugging.
+
+    Args:
+        filename (str): Target output file path.
+        messages (list): Array of API formatted message dicts.
+        meta_header (str): Header text block.
     """
     try:
         file_path = Path(filename)
@@ -226,12 +243,19 @@ def dump_prompt_to_file(filename: str, messages: list, meta_header: str = "") ->
                 )
                 f.write(f"### Role: {role}\n{content}\n\n---\n")
     except Exception as e:
-        main_logger.error(f"[System] Не удалось сохранить промпт в {filename}: {e}")
+        main_logger.error(f"[System] Failed to save prompt to {filename}: {e}")
 
 
 def get_python_module_docstring(filepath: Path, max_length: int = 150) -> str:
     """
-    Извлекает module-level docstring из Python файла.
+    Extracts the module-level docstring from a Python file.
+
+    Args:
+        filepath (Path): Target Python file.
+        max_length (int): Characters output ceiling limit.
+
+    Returns:
+        str: Formatted module docstring or empty string.
     """
     if filepath.suffix.lower() != ".py":
         return ""
@@ -258,8 +282,8 @@ def get_python_module_docstring(filepath: Path, max_length: int = 150) -> str:
 
 class SystemInstanceLock:
     """
-    Эксклюзивная блокировка инстанса (Mutex) через отдельный lock-файл.
-    Кроссплатформенная реализация: msvcrt (Windows) и fcntl (Unix).
+    Exclusive system instance process lock (Mutex) using a physical lock file.
+    Cross-platform implementation utilizing msvcrt (Windows) and fcntl (Unix).
     """
 
     def __init__(self, lock_file: Path):
@@ -267,17 +291,20 @@ class SystemInstanceLock:
         self._file: Optional[IO] = None
 
     def acquire(self) -> bool:
-        """Пытается эксклюзивно заблокировать файл. Возвращает True при успехе."""
+        """
+        Attempts to acquire an exclusive lock.
+
+        Returns:
+            bool: True if the lock was successfully acquired, False otherwise.
+        """
         self.lock_file.parent.mkdir(parents=True, exist_ok=True)
         try:
-            # Открываем в a+, чтобы создать файл, если его нет, но читать/писать
             self._file = open(self.lock_file, "a+", encoding="utf-8")
             fd = self._file.fileno()
 
             if os.name == "nt":
                 import msvcrt
 
-                # Блокируем 1 байт с начала файла
                 self._file.seek(0)
                 msvcrt.locking(fd, msvcrt.LK_NBLCK, 1)
             else:
@@ -285,7 +312,6 @@ class SystemInstanceLock:
 
                 fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
 
-            # Записываем наш PID для истории
             self._file.seek(0)
             self._file.truncate()
             self._file.write(str(os.getpid()))
@@ -299,7 +325,7 @@ class SystemInstanceLock:
             return False
 
     def release(self) -> None:
-        """Снимает блокировку и закрывает файл."""
+        """Saves current state and releases the acquired lock."""
         if self._file:
             try:
                 fd = self._file.fileno()
@@ -324,16 +350,15 @@ class SystemInstanceLock:
 
 def is_agent_running() -> bool:
     """
-    Проверяет, работает ли процесс агента на самом деле.
-    Использует проверку File Lock ОС для 100% гарантии.
+    Verifies if an active instance of the agent is currently running.
+    Utilizes OS file lock verification for precise results.
 
     Returns:
-        bool: True, если агент запущен. False в противном случае.
+        bool: True if the agent is running, False otherwise.
     """
     lock_file = get_lock_file_path()
     pid_file = get_pid_file_path()
 
-    # Если файлов нет - агент гарантированно не работает
     if not lock_file.exists() or not pid_file.exists():
         try:
             pid_file.unlink(missing_ok=True)
@@ -344,7 +369,6 @@ def is_agent_running() -> bool:
 
     is_locked = False
     try:
-        # Пытаемся получить лок на файл-мьютекс
         with open(lock_file, "a+", encoding="utf-8") as f:
             fd = f.fileno()
             if os.name == "nt":
@@ -359,7 +383,6 @@ def is_agent_running() -> bool:
                 fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
                 fcntl.flock(fd, fcntl.LOCK_UN)
     except (IOError, OSError, PermissionError) as e:
-        # Если папка была удалена между проверкой .exists() и open(), игнорируем ошибку
         if isinstance(e, FileNotFoundError):
             is_locked = False
         else:
@@ -368,7 +391,6 @@ def is_agent_running() -> bool:
     if is_locked:
         return True
 
-    # Если лок свободен - агент "умер" (или не запускался). Чистим за собой мусор.
     try:
         pid_file.unlink(missing_ok=True)
         lock_file.unlink(missing_ok=True)
@@ -376,3 +398,47 @@ def is_agent_running() -> bool:
         pass
 
     return False
+
+
+def get_system_uptime_path() -> Path:
+    """
+    Returns the path to the system uptime file.
+
+    Returns:
+        Path: Path to system_uptime.json.
+    """
+    return get_project_root() / "src" / "utils" / "local" / "data" / "system_uptime.json"
+
+
+def update_last_active_time() -> None:
+    """
+    Writes the current Unix timestamp to system_uptime.json.
+    Used for tracking exact offline downtime.
+    """
+    import time
+
+    try:
+        path = get_system_uptime_path()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump({"last_active_at": time.time()}, f)
+    except Exception as e:
+        main_logger.debug(f"[System] Failed to write last active metadata: {e}")
+
+
+def get_last_active_time() -> Optional[float]:
+    """
+    Reads the last saved active timestamp from system_uptime.json.
+
+    Returns:
+        Optional[float]: Unix timestamp or None if file doesn't exist.
+    """
+    try:
+        path = get_system_uptime_path()
+        if path.exists():
+            with open(path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                return data.get("last_active_at")
+    except Exception:
+        pass
+    return None

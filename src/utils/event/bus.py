@@ -8,12 +8,12 @@ from src.utils.logger import main_logger
 
 class EventBus:
     """
-    Асинхронная локальная шина событий (Pub/Sub).
-    Позволяет модулям общаться друг с другом без жесткой связности (Loose Coupling).
-    Поддерживает как синхронные, так и асинхронные обработчики.
+    Asynchronous Local Event Bus (Pub/Sub).
+    Enables loose coupling between modules.
+    Supports both synchronous and asynchronous listeners.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.listeners: dict[str, list[Callable[..., Any]]] = {}
         self.background_tasks: set[asyncio.Task] = set()
 
@@ -23,23 +23,23 @@ class EventBus:
         for res in results:
             if isinstance(res, Exception):
                 main_logger.error(
-                    f"[System] Ошибка в обработчике события '{event_name}': {res}"
+                    f"[System] Error in event listener for '{event_name}': {res}"
                 )
 
     def subscribe(self, event: EventConfig, handler: Callable[..., Any]) -> None:
-        """Подписывает функцию на событие."""
+        """Binds a callable listener to an event."""
 
         if event.name not in self.listeners:
             self.listeners[event.name] = []
 
         self.listeners[event.name].append(handler)
-        main_logger.debug(f"[System] Подписка: '{handler.__name__}' -> '{event.name}'")
+        main_logger.debug(f"[System] Subscription: '{handler.__name__}' -> '{event.name}'")
 
     async def publish(self, event: EventConfig, *args: Any, **kwargs: Any) -> None:
-        """Публикует событие."""
+        """Publishes an event to the bus."""
 
         if event.name not in self.listeners:
-            main_logger.debug(f"[System] На событие '{event.name}' никто не подписан.")
+            main_logger.debug(f"[System] Event '{event.name}' has no active subscriptions.")
             return
 
         handlers = self.listeners[event.name]
@@ -58,7 +58,7 @@ class EventBus:
             background_task.add_done_callback(self.background_tasks.discard)
 
     def unsubscribe(self, event: EventConfig, handler: Callable[..., Any]) -> None:
-        """Отписывает функцию от события."""
+        """Removes a subscription listener from an event."""
 
         if event.name in self.listeners:
             try:
@@ -67,7 +67,7 @@ class EventBus:
                 pass
 
     async def stop(self) -> None:
-        """Ожидает завершения всех фоновых обработчиков событий."""
+        """Awaits completion of all background task event executions."""
 
         if self.background_tasks:
             await asyncio.gather(*self.background_tasks, return_exceptions=True)

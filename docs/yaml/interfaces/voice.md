@@ -1,43 +1,43 @@
-# Настройка Голосовых интерфейсов (Voice)
+# Voice Interfaces Configuration (Voice)
 
-Интерфейс `voice` позволяет наделить агента слухом и голосом, превращая его в полноценного голосового ассистента. Включает в себя подсистемы распознавания речи (STT) и синтеза речи (TTS).
+The `voice` interface allows granting the agent hearing and a voice, turning it into a full-fledged voice assistant. It includes speech recognition (STT) and speech synthesis (TTS) subsystems.
 
-## Распознавание речи (STT: Speech-To-Text)
+## Speech Recognition (STT: Speech-To-Text)
 
-Агент может принимать аудио- и видеофайлы и извлекать из них текстовую транскрибацию.
+The agent can receive audio and video files and extract text transcriptions from them.
 
 ### Cloud Whisper
-Использует OpenAI Whisper API (или совместимые с ним сервисы, например Groq или локальный vLLM).
-Для работы требуется прописать ключ `CLOUD_WHISPER_API_KEY` в файле `.env`. Если ключ не прописан, система автоматически попробует использовать ваш основной `OPENAI_API_KEY`.
+Uses the OpenAI Whisper API (or compatible services like Groq or local vLLM).
+Requires the `CLOUD_WHISPER_API_KEY` token specified in the `.env` file. If missing, the system will automatically fall back to your main `OPENAI_API_KEY`.
 
-**Параметры (`voice.stt.cloud.whisper`):**
+**Parameters (`voice.stt.cloud.whisper`):**
 * **`enabled`**: `true` / `false`.
-* **`model`**: Название модели (по умолчанию `"whisper-1"`).
-* **`temperature`**: Температура генерации текста (по умолчанию `0.0` для максимальной точности).
-* **`timeout_sec`**: Таймаут ожидания ответа от API.
+* **`model`**: Target model name (default is `"whisper-1"`).
+* **`temperature`**: Generation creativity parameter (default is `0.0` for maximum accuracy).
+* **`timeout_sec`**: API response timeout.
 
 ---
 
-## Синтез речи (TTS: Text-To-Speech)
+## Speech Synthesis (TTS: Text-To-Speech)
 
-Агент может озвучивать свои ответы и сохранять их в виде аудиофайлов (например, отправлять вам голосовые сообщения в Telegram).
+The agent can vocalize its responses and save them as audio files (for example, to send you voice messages in Telegram).
 
-### Microsoft Edge (Бесплатный)
-Использует публичный API браузера Microsoft Edge. **Работает бесплатно и не требует никаких API ключей.**
+### Microsoft Edge (Free)
+Uses the public Microsoft Edge browser API. **Works completely for free and does not require any API keys.**
 
-**Параметры (`voice.tts.cloud.edge`):**
+**Parameters (`voice.tts.cloud.edge`):**
 * **`enabled`**: `true` / `false`.
-* **`main_voice`**: Основной голос (например, `"ru-RU-SvetlanaNeural"`, `"ru-RU-DmitryNeural"` или любой другой).
-* **`available_voices`**: Список разрешенных голосов (агент сможет выбирать голос при генерации речи).
-* **`rate`**, **`volume`**, **`pitch`**: Модуляция голоса (формат: `"+0%"`, `"-10%"`, `"+5Hz"`).
+* **`main_voice`**: Main speaking voice (for example, `"ru-RU-SvetlanaNeural"`, `"en-US-AriaNeural"`, or others).
+* **`available_voices`**: List of allowed voices (the agent can select a voice when generating speech).
+* **`rate`**, **`volume`**, **`pitch`**: Voice modulation settings (format: `"+10%"`, `"-5%"`, `"+5Hz"`).
 
-### ElevenLabs (Платный / Кастомный)
-Использует премиальный сервис ElevenLabs для максимально реалистичной и эмоциональной генерации речи.
-Требует указания `ELEVENLABS_API_KEY` в файле `.env`.
+### ElevenLabs (Paid / Custom)
+Uses the premium ElevenLabs service for highly realistic and emotional speech generation.
+Requires `ELEVENLABS_API_KEY` specified in the `.env` file.
 
-**Параметры (`voice.tts.cloud.elevenlabs`):**
+**Parameters (`voice.tts.cloud.elevenlabs`):**
 * **`enabled`**: `true` / `false`.
-* **`tts_model`**: Используемая модель (рекомендуется `"eleven_multilingual_v2"`).
-* **`main_voice`**: ID основного голоса (можно взять из панели управления ElevenLabs).
-* **`available_voices`**: Список ID дополнительных голосов, из которых агент сможет выбирать.
-* **`stability`** и **`similarity_boost`**: Настройки выразительности и клонирования (от `0.0` до `1.0`).
+* **`tts_model`**: Target model (recommended is `"eleven_multilingual_v2"`).
+* **`main_voice`**: ID of the primary voice (obtained from your ElevenLabs dashboard).
+* **`available_voices`**: List of additional voice IDs the agent can choose from.
+* **`stability`** and **`similarity_boost`**: Voice clarity and emotional variance parameters (from `0.0` to `1.0`).

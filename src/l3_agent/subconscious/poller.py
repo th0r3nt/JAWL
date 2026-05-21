@@ -1,13 +1,13 @@
-# ФАЙЛ: src/l3_agent/subconscious/poller.py
 """
-Поллер подсознания.
+Subconscious Poller.
 
-Следит за течением времени (тиками) и генерирует триггеры для запуска паттернов.
-Осуществляет непрерывную синхронизацию состояния счетчиков с L0 State.
+Tracks ticks (wakeup steps) of the main agent and fires triggers
+to launch subconscious background patterns according to configured schedules.
+Synchronizes tick progress metrics with L0 State.
 """
 
 from typing import Dict
-from src.utils.logger import main_logger, subc_logger
+from src.utils.logger import subc_logger
 from src.utils.event.bus import EventBus
 from src.utils.event.registry import Events
 from src.utils.settings import SubconsciousConfig
@@ -16,28 +16,28 @@ from src.l3_agent.subconscious.schema import Pattern
 
 
 class SubconsciousPoller:
-    """Тихий счетчик тактов. Работает в фоне и будит подсознание по расписанию."""
+    """Quiet tick counter. Runs in the background and wakes up the subconscious on schedule."""
 
     def __init__(
         self, agent_state: AgentState, event_bus: EventBus, config: SubconsciousConfig
     ) -> None:
         """
-        Инициализирует поллер и сразу синхронизирует лимиты с L0 State.
+        Initializes the poller and immediately synchronizes limits with L0 State.
         """
+
         self.agent_state = agent_state
         self.bus = event_bus
         self.config = config
 
-        # Храним счетчики: {Pattern.CONSOLIDATION: 0, ...}
         self.counters: Dict[Pattern, int] = {p: 0 for p in Pattern}
 
-        # Первичная инициализация счетчиков в AgentState, чтобы они были видны с первого такта
         self._update_state_counters()
 
     def _update_state_counters(self) -> None:
         """
-        Формирует вложенный словарь со счетчиками лимитов и транслирует его в L0.
+        Compiles nested dictionary of limit counters and broadcasts it to L0.
         """
+        
         cfg_patterns = self.config.patterns
         limits_map = {
             Pattern.CONSOLIDATION: cfg_patterns.consolidation,
@@ -57,8 +57,8 @@ class SubconsciousPoller:
 
     async def on_tick_saved(self, **kwargs) -> None:
         """
-        Хендлер события REACT_TICK_SAVED.
-        Инкрементирует счетчики и пуляет триггеры, если пришло время.
+        Handler for the REACT_TICK_SAVED event.
+        Increments counters and dispatches wakeup triggers on limit matches.
         """
 
         if not self.config.enabled:
@@ -66,7 +66,6 @@ class SubconsciousPoller:
 
         cfg_patterns = self.config.patterns
 
-        # Конфиг для каждого паттерна
         limits = {
             Pattern.CONSOLIDATION: cfg_patterns.consolidation,
             Pattern.REFLECTION: cfg_patterns.reflection,
@@ -85,12 +84,10 @@ class SubconsciousPoller:
                 self.counters[pattern] = 0
                 triggered_patterns.append(pattern)
 
-        # Синхронизируем счетчики с L0 State
         self._update_state_counters()
 
-        # Отправляем триггеры в шину событий
         for pattern in triggered_patterns:
-            log = f"[Subconscious] Паттерн '{pattern.value.upper()}' достиг лимита тиков. Отправка триггера."
+            log = f"[Subconscious] Pattern '{pattern.value.upper()}' reached tick limit. Dispatching trigger."
             subc_logger.info(log)
-            
+
             await self.bus.publish(Events.SUBCONSCIOUS_TRIGGERED, pattern=pattern)

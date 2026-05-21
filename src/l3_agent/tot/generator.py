@@ -1,6 +1,8 @@
 """
-Генератор дерева мыслей (ToT Generator).
-Оркестрирует сборку отфильтрованного контекста, вызов LLM и форматирование результата.
+Tree of Thoughts (ToT) Generator.
+
+Gathers context from active registries, injects raw historical action logs,
+and invokes the LLM using a custom JSON schema to simulate recursive tree branches.
 """
 
 import asyncio
@@ -22,7 +24,7 @@ from src.l3_agent.tot.schema import TOT_SCHEMA, TreeResponse, ThoughtBranch
 
 
 class ToTGenerator:
-    """Генератор стратегических веток."""
+    """Strategic thought tree simulator and builder."""
 
     def __init__(
         self,
@@ -34,7 +36,6 @@ class ToTGenerator:
         sql_ticks: SQLTicks,
         root_dir: Path,
         timezone: int,
-        # Настройка дерева
         branches_count: int,
         simulations_per_branch: int,
         max_depth: int,
@@ -53,14 +54,12 @@ class ToTGenerator:
         self.simulations_per_branch = simulations_per_branch
         self.max_depth = max_depth
 
-        personality_prompt = prompt_builder._gather_markdown("personality")
-
         prompt_path = root_dir / "src" / "l3_agent" / "tot" / "prompt" / "INSTRUCTIONS.md"
         tot_instructions = (
             prompt_path.read_text(encoding="utf-8").strip() if prompt_path.exists() else ""
         )
 
-        self.system_prompt = f"{personality_prompt}\n\n\n{tot_instructions}".strip()
+        self.system_prompt = f"{tot_instructions}".strip()
 
     async def generate(
         self,
@@ -70,10 +69,10 @@ class ToTGenerator:
         task_description: str = "",
     ) -> Optional[str]:
         """
-        Генерирует Markdown блок с деревом мыслей на основе текущей ситуации.
+        Generates a Markdown block describing simulated thoughts branches.
         """
 
-        log = f"[Tree of Thoughts] Запуск генерации дерева мыслей (Модель: {self.model_name})."
+        log = f"[Tree of Thoughts] Initiated thoughts tree generation (Model: {self.model_name})."
         tot_logger.info(log)
 
         context = await self._build_filtered_context(event_name, payload, missed_events)
@@ -81,7 +80,7 @@ class ToTGenerator:
         target_focus = (
             task_description
             if task_description
-            else "Провести стратегический анализ текущей ситуации и предложить оптимальные пути."
+            else "Perform a strategic analysis of the current situation and suggest optimal paths."
         )
 
         full_context = f"""
@@ -91,10 +90,10 @@ class ToTGenerator:
 {target_focus}
 
 # DIRECTIVE
-1. Рекомендовано сгенерировать примерно ~{self.branches_count} макро-стратегий (веток верхнего уровня).
-2. Рекомендованная глубина вложенности симуляции: ~{self.max_depth} (где макро-стратегия - 1).
-3. Ветви сценарии динамически: в среднем по {self.simulations_per_branch} подварианта, но система должна сама решать, где нужно углубиться, а где ветка тупиковая или привела к логическому финалу.
-4. Поля минусов и плюсов путей/сценариев необязательны. Рекомендуется заполнять их только там, где действительно имеет смысл проводить Cost-Benefit анализ.
+1. You are advised to simulate approximately {self.branches_count} macro-strategies.
+2. The recommended nested simulation depth is: {self.max_depth}.
+3. Branch scenarios dynamically: averaging {self.simulations_per_branch} sub-paths per node.
+4. The pros and cons fields are optional but recommended for Cost-Benefit analysis.
         """.strip()
 
         messages = [
@@ -111,23 +110,29 @@ class ToTGenerator:
             logger=tot_logger,
             log_prefix="[Tree of Thoughts LLM]",
             tools=TOT_SCHEMA,
+            tool_choice={"type": "function", "function": {"name": "submit_tree"}},
         )
         if not raw_json:
             return None
+        
+        stripped = raw_json.strip()
+        if not stripped.startswith("{"):
+            tot_logger.warning(f"[Tree of Thoughts] Invalid JSON response: {raw_json}")
+            return None
 
         try:
-            parsed = TreeResponse.model_validate_json(raw_json)
+            parsed = TreeResponse.model_validate_json(stripped)
             return self._format_markdown(parsed)
 
         except Exception as e:
-            log = f"[Tree of Thoughts] Ошибка парсинга дерева мыслей: {e}"
+            log = f"[Tree of Thoughts] Tree of Thoughts parsing error: {e}"
             tot_logger.error(log)
 
             return None
 
-    # ====================================================================================
-    # СЛУЖЕБНЫЕ МЕТОДЫ
-    # ====================================================================================
+    # -------------------------------------------------------------------------
+    # Private Helpers
+    # -------------------------------------------------------------------------
 
     async def _build_filtered_context(
         self, event_name: str, payload: Dict[str, Any], missed_events: List[Dict[str, Any]]
@@ -160,7 +165,7 @@ class ToTGenerator:
             if section in allowed_sections and name in all_blocks:
                 filtered_blocks.append(all_blocks[name])
 
-        # Инъекция сырых логов (Raw Ticks) для полного понимания результатов прошлых шагов
+        # Inject raw action logs (Raw Ticks) for detailed historical awareness
         ticks_block = await self.sql_ticks.get_full_context_block(limit=10)
         filtered_blocks.insert(-1, ticks_block)
 
@@ -168,7 +173,7 @@ class ToTGenerator:
 
     def _format_markdown(self, tree: TreeResponse) -> str:
         """
-        Превращает рекурсивный объект в классическое ASCII-дерево.
+        Converts a recursive TreeResponse object into an ASCII tree structure.
         """
 
         if not tree.branches:
@@ -186,11 +191,10 @@ class ToTGenerator:
         ):
             connector = "└── " if is_last else "├── "
 
-            # Формирование названия узла
             if depth == 0:
-                node_title = f'№{prefix}: "{branch.name}"'
+                node_title = f'No.{prefix}: "{branch.name}"'
             elif depth == 1:
-                node_title = f"№{prefix}: {branch.name}"
+                node_title = f"No.{prefix}: {branch.name}"
             else:
                 node_title = f"{prefix}: {branch.name}"
 
@@ -203,11 +207,11 @@ class ToTGenerator:
 
             if branch.pros:
                 pros_str = " ".join(f"[+] {p}" for p in branch.pros)
-                lines.append(f"{child_indent}* Плюсы: {pros_str}")
+                lines.append(f"{child_indent}* Pros: {pros_str}")
 
             if branch.cons:
                 cons_str = " ".join(f"[-] {c}" for c in branch.cons)
-                lines.append(f"{child_indent}* Минусы: {cons_str}")
+                lines.append(f"{child_indent}* Cons: {cons_str}")
 
             if branch.sub_branches:
                 total_subs = len(branch.sub_branches)

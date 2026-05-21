@@ -94,7 +94,7 @@ async def test_rag_memories_uses_raw_text():
 
     payload = {
         "sender_name": "Alice",
-        "message": "[Фотография][Переслано от: Бот] Вот сам текст",
+        "message": "[Photo][Переслано от: Бот] Вот сам текст",
         "raw_text": "Вот сам текст",
     }
 
@@ -103,7 +103,7 @@ async def test_rag_memories_uses_raw_text():
     # Проверяем, что в оркестратор ушел именно чистый текст
     called_texts = mock_orchestrator.run.call_args[0][0]
     assert "Вот сам текст" in called_texts
-    assert "[Фотография][Переслано от: Бот] Вот сам текст" not in called_texts
+    assert "[Photo][Переслано от: Бот] Вот сам текст" not in called_texts
 
 
 # ===================================================================

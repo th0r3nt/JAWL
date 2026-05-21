@@ -1,7 +1,8 @@
 """
-Guard-декораторы для проверки прав доступа.
-Защищают системные вызовы на уровне методов, предотвращая выполнение
-опасных функций, если у агента недостаточно прав.
+Guard decorators for verifying access rights.
+
+Protect system calls at the method level, preventing execution
+of dangerous functions if the agent has insufficient privileges.
 """
 
 from functools import wraps
@@ -13,15 +14,15 @@ from src.l2_interfaces.host.os.client import HostOSAccessLevel
 
 def require_access(level: HostOSAccessLevel) -> Callable[..., Any]:
     """
-    Guard-декоратор для проверки уровня доступа к ОС (Role-Based Access Control).
+    Guard decorator for verifying OS access level (Role-Based Access Control).
 
     Args:
-        level: Минимальный требуемый уровень доступа для выполнения функции.
-               Например, HostOSAccessLevel.OPERATOR.
+        level: Minimum required access level to execute the function.
+               E.g., HostOSAccessLevel.OPERATOR.
 
     Returns:
-        Обёртка-декоратор. Если прав не хватает, функция не выполняется
-        и возвращается SkillResult.fail с подробным объяснением.
+        Wrapper decorator. If privileges are insufficient, the function is not executed
+        and SkillResult.fail is returned with a detailed explanation.
     """
 
     def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
@@ -29,17 +30,17 @@ def require_access(level: HostOSAccessLevel) -> Callable[..., Any]:
         async def wrapper(self: Any, *args: Any, **kwargs: Any) -> SkillResult:
             client = getattr(self, "host_os", None)
             if not client:
-                return SkillResult.fail("[Guard] Внутренняя ошибка: не найден HostOSClient.")
+                return SkillResult.fail("[Guard] Internal error: HostOSClient not found.")
 
             if client.access_level < level:
                 return SkillResult.fail(
-                    f"Отказано в доступе. Для этого действия требуется Access Level >= {level.value} ({level.name}). "
-                    f"Текущий уровень доступа: {client.access_level.value} ({client.access_level.name})."
+                    f"Access denied. This action requires Access Level >= {level.value} ({level.name}). "
+                    f"Current access level: {client.access_level.value} ({client.access_level.name})."
                 )
             return await func(self, *args, **kwargs)
 
-        # Сохраняем требуемый уровень доступа в атрибутах функции
-        # Это используется в get_skills_library() для динамического скрытия недоступных навыков из промпта
+        # Save the required access level in the function attributes
+        # This is used in get_skills_library() to dynamically hide unavailable skills from the prompt
         wrapper.__required_os_level__ = level.value
         return wrapper
 

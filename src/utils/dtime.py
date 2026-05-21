@@ -1,9 +1,9 @@
 """
-Утилиты для работы со временем и часовыми поясами.
+Utilities for Working with Time and Timezones.
 
-Обеспечивают консистентное форматирование дат, вычисление смещений (timezone offsets)
-и человекочитаемое представление временных интервалов (uptime).
-Используются во всех слоях фреймворка для логирования и формирования контекста.
+Provides consistent formatting of dates, calculation of offsets,
+and a human-readable representation of time intervals (uptime/duration).
+Used across all framework layers for logging and context generation.
 """
 
 from datetime import datetime, timezone, timedelta
@@ -12,28 +12,28 @@ from typing import Optional
 
 def get_timezone(offset_hours: int) -> timezone:
     """
-    Возвращает объект timezone с заданным смещением в часах относительно UTC.
+    Returns a timezone object with the specified offset in hours relative to UTC.
 
     Args:
-        offset_hours (int): Смещение часового пояса (например, 3 для МСК, -5 для EST).
+        offset_hours (int): Timezone offset (e.g., 3 for MSK, -5 for EST).
 
     Returns:
-        timezone: Объект временной зоны datetime.
+        timezone: The datetime timezone object.
     """
-    
+
     return timezone(timedelta(hours=offset_hours))
 
 
 def get_now_formatted(offset_hours: int, fmt: str = "%Y-%m-%d %H:%M:%S") -> str:
     """
-    Возвращает текущую дату и время в виде отформатированной строки с учетом часового пояса.
+    Returns the current date and time as a formatted string considering the timezone offset.
 
     Args:
-        offset_hours (int): Смещение часового пояса относительно UTC.
-        fmt (str, optional): Формат строки даты/времени. По умолчанию "%Y-%m-%d %H:%M:%S".
+        offset_hours (int): Timezone offset relative to UTC.
+        fmt (str, optional): Date/time format string. Defaults to "%Y-%m-%d %H:%M:%S".
 
     Returns:
-        str: Отформатированная строка текущего времени.
+        str: Formatted string of the current time.
     """
 
     tz = get_timezone(offset_hours)
@@ -44,16 +44,15 @@ def format_timestamp(
     timestamp: float, offset_hours: int, fmt: str = "%Y-%m-%d %H:%M:%S"
 ) -> str:
     """
-    Форматирует UNIX-timestamp в читаемую строку с учетом часового пояса системы.
+    Formats a UNIX timestamp into a readable string considering the system's timezone.
 
     Args:
-        timestamp (float): UNIX-время в секундах.
-        offset_hours (int): Смещение часового пояса относительно UTC.
-        fmt (str, optional): Шаблон форматирования. По умолчанию "%Y-%m-%d %H:%M:%S".
+        timestamp (float): UNIX timestamp in seconds.
+        offset_hours (int): Timezone offset relative to UTC.
+        fmt (str, optional): Formatting template. Defaults to "%Y-%m-%d %H:%M:%S".
 
     Returns:
-        str: Отформатированная строка даты/времени.
-
+        str: Formatted date/time string.
     """
     tz = get_timezone(offset_hours)
     return datetime.fromtimestamp(timestamp, tz=tz).strftime(fmt)
@@ -61,16 +60,16 @@ def format_timestamp(
 
 def format_datetime(dt: datetime, offset_hours: int, fmt: str = "%Y-%m-%d %H:%M:%S") -> str:
     """
-    Применяет заданное смещение к существующему объекту datetime и возвращает строку.
-    Если переданный объект наивный (без timezone), он принудительно трактуется как UTC.
+    Applies the specified offset to an existing datetime object and returns a string.
+    If the passed object is naive (no timezone info), it is strictly treated as UTC first.
 
     Args:
-        dt (datetime): Исходный объект даты/времени.
-        offset_hours (int): Требуемое смещение часового пояса.
-        fmt (str, optional): Шаблон форматирования. По умолчанию "%Y-%m-%d %H:%M:%S".
+        dt (datetime): Source date/time object.
+        offset_hours (int): Target timezone offset.
+        fmt (str, optional): Formatting template. Defaults to "%Y-%m-%d %H:%M:%S".
 
     Returns:
-        str: Отформатированная строка с примененным часовым поясом.
+        str: Formatted string with the applied timezone.
     """
 
     if dt.tzinfo is None:
@@ -83,54 +82,46 @@ def safe_format_timestamp(
     timestamp: Optional[float], offset_hours: int, fmt: str = "%Y-%m-%d %H:%M:%S"
 ) -> str:
     """
-    Безопасная обертка для форматирования UNIX-timestamp.
-    Гарантирует отсутствие исключений при передаче пустого значения (None).
+    Safe wrapper for formatting a UNIX timestamp.
+    Guarantees no exceptions if a None value is passed.
 
     Args:
-        timestamp (Optional[float]): UNIX-время в секундах или None.
-        offset_hours (int): Смещение часового пояса относительно UTC.
-        fmt (str, optional): Шаблон форматирования. По умолчанию "%Y-%m-%d %H:%M:%S".
+        timestamp (Optional[float]): UNIX timestamp in seconds or None.
+        offset_hours (int): Timezone offset relative to UTC.
+        fmt (str, optional): Formatting template. Defaults to "%Y-%m-%d %H:%M:%S".
 
     Returns:
-        str: Отформатированное время или строка "Неизвестно", если timestamp равен None.
+        str: Formatted date/time, or the string "Unknown" if the timestamp is None.
     """
 
     if timestamp is None:
-        return "Неизвестно"
+        return "Unknown"
     return format_timestamp(timestamp, offset_hours, fmt)
 
 
 def _pluralize_days(n: int) -> str:
     """
-    Определяет правильное склонение слова "день" для русского языка на основе числа.
+    Determines the correct plural form of the word 'day' in English.
 
     Args:
-        n (int): Количество дней.
+        n (int): Number of days.
 
     Returns:
-        str: Одно из слов: "день", "дня", "дней".
+        str: "day" if n is 1, else "days".
     """
-    mod100 = abs(n) % 100
-    if 11 <= mod100 <= 14:
-        return "дней"
-    mod10 = mod100 % 10
-    if mod10 == 1:
-        return "день"
-    if 2 <= mod10 <= 4:
-        return "дня"
-    return "дней"
+    return "day" if abs(n) == 1 else "days"
 
 
 def seconds_to_duration_str(seconds: int | float) -> str:
     """
-    Переводит длительность в секундах в человекочитаемый формат аптайма.
-    Пример вывода: "5 дней, 12:04:30" или "01:15:00".
+    Converts duration in seconds to a human-readable uptime format.
+    Example output: "5 days, 12:04:30" or "01:15:00".
 
     Args:
-        seconds (int | float): Общее количество секунд.
+        seconds (int | float): Total seconds.
 
     Returns:
-        str: Отформатированная строка продолжительности времени.
+        str: Formatted duration string.
     """
     total = max(int(seconds), 0)
     hours, remainder = divmod(total, 3600)

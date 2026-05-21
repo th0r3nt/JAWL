@@ -1,8 +1,8 @@
 """
-Навыки для отправки низкоуровневых HTTP/REST запросов.
+Skills for sending low-level HTTP/REST requests.
 
-Используются для взаимодействия с внешними JSON/API сервисами
-и прямого скачивания файлов без накладных расходов полноценного браузера.
+Used for interacting with external JSON/API services
+and direct file downloading without the overhead of a full browser.
 """
 
 import asyncio
@@ -24,18 +24,18 @@ _ALLOWED_URL_SCHEMES = ("http", "https")
 
 
 def _ensure_http_scheme(url: str) -> Optional[str]:
-    """Проверяет безопасность протокола (блокирует попытки загрузить file://)."""
+    """Verifies protocol safety (blocks attempts to load file://)."""
     scheme = urllib.parse.urlparse(url).scheme.lower()
     if scheme not in _ALLOWED_URL_SCHEMES:
         return (
-            f"Запрещённая схема URL: '{scheme or '<пусто>'}'. "
-            "Разрешены только http:// и https://."
+            f"Forbidden URL scheme: '{scheme or '<empty>'}'. "
+            "Only http:// and https:// are allowed."
         )
     return None
 
 
 class WebHTTPRequests:
-    """Навыки для отправки сырых HTTP-запросов и скачивания файлов."""
+    """Skills for sending raw HTTP requests and downloading files."""
 
     def __init__(self, client: WebHTTPClient) -> None:
         self.client = client
@@ -45,9 +45,9 @@ class WebHTTPRequests:
         self, url: str, method: str = "GET", headers: Optional[dict] = None
     ) -> SkillResult:
         """
-        Makes HTTP request. 
-        
-        method: HTTP method. 
+        Makes HTTP request.
+
+        method: HTTP method.
         headers: Custom HTTP headers dict.
         """
 
@@ -77,20 +77,20 @@ class WebHTTPRequests:
         try:
             status_code, content = await asyncio.to_thread(_make_request)
             main_logger.info(
-                f"[Web HTTP] {method.upper()} запрос к {url} (Статус: {status_code})"
+                f"[Web HTTP] {method.upper()} request to {url} (Status: {status_code})"
             )
 
             self.client.state.add_history(f"{method.upper()} {url} (Status: {status_code})")
-            return SkillResult.ok(f"Статус: {status_code}\n\nТело ответа:\n{content}")
+            return SkillResult.ok(f"Status: {status_code}\n\nResponse body:\n{content}")
 
         except Exception as e:
-            return SkillResult.fail(f"Ошибка при HTTP-запросе: {e}")
+            return SkillResult.fail(f"Error during HTTP request: {e}")
 
     @skill()
     async def download_file(self, url: str, dest_filename: str) -> SkillResult:
         """
-        Downloads file to disk (sandbox/download/). 
-        
+        Downloads file to disk (sandbox/download/).
+
         dest_filename: Output filename.
         """
 
@@ -102,7 +102,7 @@ class WebHTTPRequests:
             if "/" not in dest_filename and "\\" not in dest_filename:
                 dest_filename = f"sandbox/_system/download/{dest_filename}"
 
-            # Защищаем систему - пишем только в песочницу
+            # Protect the system - write only to the sandbox
             safe_path = validate_sandbox_path(dest_filename)
             safe_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -117,7 +117,7 @@ class WebHTTPRequests:
 
             await asyncio.to_thread(_download)
 
-            main_logger.info(f"[Web HTTP] Файл {safe_path.name} скачан из {url}")
+            main_logger.info(f"[Web HTTP] File {safe_path.name} downloaded from {url}")
             self.client.state.add_history(f"Download: {url} -> {safe_path.name}")
             return SkillResult.ok("True")
 
@@ -125,4 +125,4 @@ class WebHTTPRequests:
             return SkillResult.fail(str(e))
 
         except Exception as e:
-            return SkillResult.fail(f"Ошибка при скачивании файла: {e}")
+            return SkillResult.fail(f"Error during file downloading: {e}")

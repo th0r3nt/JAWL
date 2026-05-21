@@ -22,7 +22,7 @@ async def test_code_graph_client_context(cg_client):
     cg_client.state.is_online = False
     assert "[OFF]" in await cg_client.get_context_block()
 
-    # Онлайн, но пусто
+    # Онлайн, но emptyо
     cg_client.state.is_online = True
     assert "No active code base graphs were found." in await cg_client.get_context_block()
 

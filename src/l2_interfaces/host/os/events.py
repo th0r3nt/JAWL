@@ -1,3 +1,9 @@
+"""
+Facade for managing Host OS background workers.
+
+Orchestrates telemetry, daemon, and file system pollers.
+"""
+
 from src.utils.event.bus import EventBus
 from src.utils.logger import main_logger
 
@@ -11,8 +17,8 @@ from src.l2_interfaces.host.os.polls.file_watcher import FileWatcher
 
 class HostOSEvents:
     """
-    Фасад для управления фоновыми воркерами Host OS.
-    Оркестрирует поллеры телеметрии, демонов и файловой системы.
+    Facade for managing Host OS background workers.
+    Orchestrates telemetry, daemon, and file system pollers.
     """
 
     def __init__(self, host_os_client: HostOSClient, state: HostOSState, event_bus: EventBus):
@@ -20,36 +26,36 @@ class HostOSEvents:
         self.state = state
         self.bus = event_bus
 
-        # Инициализируем специализированные воркеры
+        # Initialize specialized workers
         self.telemetry = TelemetryPoller(client=self.client, state=self.state)
         self.daemons = DaemonsPoller(client=self.client, state=self.state, bus=self.bus)
         self.files = FileWatcher(client=self.client, state=self.state, bus=self.bus)
 
     async def start(self) -> None:
         """
-        Запускает всех воркеров.
+        Starts all workers.
         """
 
         self.telemetry.start()
         self.daemons.start()
         self.files.start()
-        main_logger.info("[Host OS] Мониторинги запущены.")
+        main_logger.info("[Host OS] Monitors started.")
 
     async def stop(self) -> None:
         """
-        Корректно останавливает всех воркеров.
+        Correctly stops all workers.
         """
 
         self.telemetry.stop()
         self.daemons.stop()
         await self.files.stop()
 
-        main_logger.info("[Host OS] Мониторинг остановлен.")
+        main_logger.info("[Host OS] Monitoring stopped.")
         self.state.is_online = False
 
     # ==========================================================
-    # ДЕЛЕГИРОВАНИЕ МЕТОДОВ ДЛЯ НАВЫКОВ АГЕНТА
-    # Эти методы вызываются из HostOSMonitoring (skills/monitoring.py)
+    # DELEGATING METHODS FOR AGENT SKILLS
+    # These methods are called from HostOSMonitoring (skills/monitoring.py)
     # ==========================================================
 
     def track_path(self, path_str: str, save: bool = True) -> bool:
@@ -60,5 +66,5 @@ class HostOSEvents:
 
     @property
     def _watches(self):
-        """Необходимо для навыка get_tracked_directories."""
+        """Required for get_tracked_directories skill."""
         return self.files._watches

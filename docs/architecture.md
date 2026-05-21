@@ -1,57 +1,57 @@
-# 🏗 Архитектура JAWL: От L0 до L3
+# 🏗 JAWL Architecture: From L0 to L3
 
-Фреймворк JAWL спроектирован с жестким соблюдением принципов SOLID. Главная концепция системы - изоляция слоев. "Мозг" агента (LLM) не должен ничего знать о том, как реализованы HTTP-запросы или SQL-таблицы. Он общается с внешним миром исключительно через стандартизированный интерфейс навыков (Skills) и контекст (State).
+The JAWL framework is designed with strict adherence to SOLID principles. The core concept of the system is the isolation of layers. The agent's "brain" (LLM) should know nothing about how HTTP requests or SQL tables are implemented. It communicates with the outside world exclusively through a standardized interface of skills (Skills) and context (State).
 
-Система разделена на 4 концептуальных уровня и объединена единой шиной событий.
-
----
-
-## 🟢 L0: State (Слой состояния)
-**Суть:** Пассивная приборная панель агента. 
-**Директория:** `src/l0_state/agent/` (для агента).
-
-Этот слой хранит MRU-кэши (Most Recently Used) и текущие снимки состояния интерфейсов (например, последние 10 сообщений из Telegram, текущие открытые файлы в песочнице, загрузка CPU). 
-Для соблюдения принципа высокой связности (High Cohesion) состояния интерфейсов хранятся внутри их собственных пакетов, тогда как состояние самого ядра живет в `l0_state`.
-
-**Строгое правило L0:** классы State не имеют права выполнять I/O операции, сетевые запросы или тяжелые вычисления. Они только хранят данные. 
-
-Когда агент просыпается, сборщик контекста моментально собирает данные из L0 и формирует системный промпт. Это избавляет агента от необходимости тратить токены (и время) на вызовы функций вроде `get_system_status()` или `read_chat()`.
-
-## 🟡 L1: Databases (Слой памяти)
-**Суть:** Локальное хранилище данных.
-**Директория:** `src/l1_databases/`
-
-Слой разделен на две части, обеспечивая агента долгосрочной памятью:
-1. **SQL (SQLite):** Когнитивная и структурная память. Хранит точные реляционные данные: текущие задачи (Tasks), приобретенные черты характера (Traits), отслеживание внешних сущностей (Mental States) и историю собственных действий (Ticks).
-2. **Vector DB (Qdrant + FastEmbed):** Семантическая память. Работает локально на CPU. Хранит фрагменты знаний (Knowledge) и логические выводы (Thoughts). Позволяет агенту автоматически вспоминать релевантную информацию благодаря встроенному механизму RAG.
-
-## 🟠 L2: Interfaces (Слой интерфейсов)
-**Суть:** Органы чувств и руки агента (Окна во внешний мир).
-**Директория:** `src/l2_interfaces/`
-
-Именно здесь реализуется бизнес-логика взаимодействия с API (Telegram, GitHub, Email, Host OS). Каждый интерфейс собирается по единому паттерну из 5 компонентов и является полностью самодостаточным модулем:
-* `state.py` - Приборная панель интерфейса (L0).
-* `plugin.py` - Точка входа плагина (наследует BaseInterface). Занимается внедрением зависимостей (DI) в контейнер.
-* `client.py` - Управление соединением, токенами и привязка к L0 State.
-* `events.py` - Фоновые поллеры и слушатели (уши агента). Ждут внешних триггеров и кидают их в EventBus.
-* `skills/` - Декорированные методы (`@skill()`), которые превращаются в JSON Schema для вызова со стороны LLM (руки агента).
-
-Сборка происходит динамически (Plugin Discovery). Ядро сканирует папку, находит плагины и инициализирует их, если они включены в `interfaces.yaml`.
-
-## 🔴 L3: Agent Core (Слой ядра)
-**Суть:** Центральная нервная система и Мозг.
-**Директория:** `src/l3_agent/`
-
-Слой, не зависящий от конкретных реализаций API. Содержит:
-* **LLM Executor & Key Rotator:** Работа с API нейросетей, обработка Rate Limits (429) и автоматическая ротация ключей.
-* **Prompt Builder:** Сборка личности агента из разрозненных `.md` файлов.
-* **Context Builder & RAG:** Сборка динамического контекста из L0 State и Векторной БД.
-* **React Loop:** Главный цикл `Reasoning and Acting`. Парсинг ответов модели, защита от галлюцинаций через `Pydantic Guard Layer` и вызов запрошенных скиллов.
-* **Heartbeat:** Оркестратор времени. Вычисляет, сколько агенту спать до следующего планового тика, и умеет экстренно будить цикл при поступлении критических событий из EventBus.
+The system is divided into 4 conceptual layers and unified by a single event bus.
 
 ---
 
-## ⚡ EventBus (Шина событий)
-Система имеет событийно-ориентированную архитектуру (Event-Driven). Интерфейсы (L2) не вызывают агента (L3) напрямую. Вместо этого фоновые поллеры публикуют события в `EventBus` (например, `EMAIL_INCOMING`). 
+## 🟢 L0: State (State Layer)
+**Essence:** Passive agent dashboard.
+**Directory:** `src/l0_state/agent/` (for the agent).
 
-`Heartbeat` слушает эти события. Каждое событие имеет свой уровень важности (от `BACKGROUND` до `CRITICAL`). В зависимости от уровня, Heartbeat применяет повышающий коэффициент (`EventAccelerationConfig`) и срезает время сна агента. Если событие критическое - агент просыпается немедленно, прерывая текущий сон.
+This layer stores MRU (Most Recently Used) caches and current state snapshots of interfaces (for example, the last 10 messages from Telegram, current open files in the sandbox, CPU load). 
+To maintain the High Cohesion principle, the states of interfaces are stored within their own packages, while the state of the core itself resides in `l0_state`.
+
+**Strict L0 Rule:** State classes are prohibited from executing I/O operations, network requests, or heavy computations. They only store data.
+
+When the agent wakes up, the context builder instantly gathers data from L0 and compiles the system prompt. This eliminates the need for the agent to waste tokens (and time) on function calls like `get_system_status()` or `read_chat()`.
+
+## 🟡 L1: Databases (Memory Layer)
+**Essence:** Local data storage.
+**Directory:** `src/l1_databases/`
+
+The layer is divided into two parts, providing the agent with long-term memory:
+1. **SQL (SQLite):** Cognitive and structural memory. Stores exact relational data: current tasks (Tasks), acquired character traits (Traits), tracking of external entities (Mental States), and history of its own actions (Ticks).
+2. **Vector DB (Qdrant + FastEmbed):** Semantic memory. Runs locally on the CPU. Stores fragments of knowledge (Knowledge) and logical conclusions (Thoughts). Allows the agent to automatically recall relevant information thanks to the built-in RAG mechanism.
+
+## 🟠 L2: Interfaces (Interfaces Layer)
+**Essence:** Sensory organs and hands of the agent (Windows to the outside world).
+**Directory:** `src/l2_interfaces/`
+
+This is where the business logic of interacting with external APIs (Telegram, GitHub, Email, Host OS) is implemented. Each interface is assembled according to a unified pattern of 5 components and is a completely self-sufficient module:
+* `state.py` - Interface dashboard (L0).
+* `plugin.py` - Plugin entry point (inherits from BaseInterface). Handles dependency injection (DI) into the container.
+* `client.py` - Connection, token management, and binding to L0 State.
+* `events.py` - Background pollers and listeners (the agent's ears). They wait for external triggers and dispatch them to the EventBus.
+* `skills/` - Decorated methods (`@skill()`) that turn into JSON Schema for LLM invocation (the agent's hands).
+
+Assembly occurs dynamically (Plugin Discovery). The core scans the folder, finds plugins, and initializes them if they are enabled in `interfaces.yaml`.
+
+## 🔴 L3: Agent Core (Core Layer)
+**Essence:** Central nervous system and Brain.
+**Directory:** `src/l3_agent/`
+
+The layer, independent of specific API implementations. Contains:
+* **LLM Executor & Key Rotator:** Integration with neural network APIs, handling Rate Limits (429), and automatic key rotation.
+* **Prompt Builder:** Compiling the agent's personality from separate `.md` files.
+* **Context Builder & RAG:** Compiling dynamic context from L0 State and the Vector Database.
+* **React Loop:** Main `Reasoning and Acting` cycle. Parsing model responses, protecting against hallucinations via the `Pydantic Guard Layer`, and executing requested skills.
+* **Heartbeat:** Time orchestrator. Calculates how long the agent should sleep until the next scheduled tick and is capable of urgently waking up the cycle upon receiving critical events from the EventBus.
+
+---
+
+## ⚡ EventBus (Event Bus)
+The system has an Event-Driven architecture. Interfaces (L2) do not invoke the agent (L3) directly. Instead, background pollers publish events to the `EventBus` (for example, `EMAIL_INCOMING`).
+
+`Heartbeat` listens to these events. Each event has its own level of importance (from `BACKGROUND` to `CRITICAL`). Depending on the level, Heartbeat applies an acceleration multiplier (`EventAccelerationConfig`) and reduces the agent's sleep time. If the event is critical, the agent wakes up immediately, interrupting its current sleep.

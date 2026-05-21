@@ -63,7 +63,7 @@ async def test_integration_eventbus_to_runner(integration_deps):
     if bus.background_tasks:
         await asyncio.gather(*bus.background_tasks)
 
-    # Лимит равен 2, поэтому Раннер еще не должен запуститься
+    # Лимит равен 2, поэтому Раннер еще не должен заemptyиться
     orchestrator.runner.run.assert_not_called()
     assert agent_state.subconscious_counters[Pattern.CONSOLIDATION.value]["current"] == 1
 

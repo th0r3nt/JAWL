@@ -1,9 +1,8 @@
 """
-Интерактивное редактирование YAML конфигураций.
+Interactive YAML Configuration Editor.
 
-Реализует рекурсивный обход вложенных словарей и списков (CommentedMap/CommentedSeq).
-Обеспечивает приведение типов (Type Coercion) на лету и сохраняет оригинальные
-комментарии файла.
+Recursively traverses deep yaml maps/sequences, preserving comments,
+and handles real-time type coercion (bool, int, float, str) on user input.
 """
 
 from pathlib import Path
@@ -22,17 +21,17 @@ from src.cli.widgets.ui import (
 
 class YamlEditor:
     """
-    Универсальный визуальный редактор YAML файлов.
-    Поддерживает навигацию вглубь (drilling down) и редактирование примитивов.
+    Universal visual editor for YAML files.
+    Supports deep drilling down navigation and editing of primitive scalars.
     """
 
-    def __init__(self, file_path: Path, title: str = "Редактор конфигурации") -> None:
+    def __init__(self, file_path: Path, title: str = "Configuration Editor") -> None:
         """
-        Инициализирует редактор.
+        Initializes the editor.
 
         Args:
-            file_path: Абсолютный путь к целевому .yaml файлу.
-            title: Заголовок для отображения в UI.
+            file_path: Absolute physical path to the target .yaml.
+            title: Title text for the UI header.
         """
 
         self.file_path = file_path
@@ -42,23 +41,22 @@ class YamlEditor:
         self.yaml.preserve_quotes = True
 
         self.data = self._load()
-        # Стек навигации. Например: ["system", "db", "sql"]
         self.current_path: List[Union[str, int]] = []
         self.style = get_custom_style()
 
     def _load(self) -> Any:
         """
-        Безопасно загружает YAML.
+        Safely loads the YAML map structure.
         """
 
         if not self.file_path.exists():
-            raise FileNotFoundError(f"Файл не найден: {self.file_path}")
+            raise FileNotFoundError(f"File not found: {self.file_path}")
         with open(self.file_path, "r", encoding="utf-8") as f:
             return self.yaml.load(f)
 
     def _save(self) -> None:
         """
-        Сохраняет структуру обратно на диск с сохранением комментариев.
+        Saves the memory tree back to disk, preserving comments.
         """
 
         with open(self.file_path, "w", encoding="utf-8") as f:
@@ -66,7 +64,7 @@ class YamlEditor:
 
     def _get_current_node(self) -> Any:
         """
-        Возвращает ссылку на текущий уровень вложенности на основе стека навигации.
+        Retrieves reference of the current nested node based on navigation stack.
         """
 
         node = self.data
@@ -76,16 +74,16 @@ class YamlEditor:
 
     def _get_path_string(self) -> str:
         """
-        Человекочитаемый путь.
+        Formats a human-readable path breadcrumb.
         """
 
         if not self.current_path:
-            return "Корень"
+            return "Root"
         return " > ".join(str(p) for p in self.current_path)
 
     def run(self) -> None:
         """
-        Главный цикл работы редактора.
+        Main interactive editor loop.
         """
 
         while True:
@@ -95,7 +93,7 @@ class YamlEditor:
             path_str = self._get_path_string()
 
             prompt_msg = (
-                f"{self.title}\n Текущий путь: [{path_str}]\n\n Выберите ключ для изменения:"
+                f"{self.title}\n Current Path: [{path_str}]\n\n Select a key to modify:"
             )
 
             if isinstance(node, dict):
@@ -103,7 +101,6 @@ class YamlEditor:
             elif isinstance(node, list):
                 keep_running = self._handle_list_view(node, prompt_msg)
             else:
-                # Fallback, хотя сюда попасть не должны
                 keep_running = False
 
             if not keep_running:
@@ -111,17 +108,16 @@ class YamlEditor:
 
     def _handle_dict_view(self, node: dict, prompt_msg: str) -> bool:
         """
-        Отрисовывает меню для словаря (dict/CommentedMap).
-        Возвращает False, если пользователь хочет выйти из редактора полностью.
+        Renders a dictionary key selection menu.
         """
-        
+
         choices = []
 
         for key, val in node.items():
             if isinstance(val, dict):
                 choices.append(questionary.Choice(f" {key}/", key))
             elif isinstance(val, list):
-                choices.append(questionary.Choice(f" {key} ({len(val)} элементов)", key))
+                choices.append(questionary.Choice(f" {key} ({len(val)} items)", key))
             elif isinstance(val, bool):
                 status = "ON" if val else "OFF"
                 choices.append(questionary.Choice(f" {key}: {status}", key))
@@ -130,7 +126,7 @@ class YamlEditor:
 
         choices.append(questionary.Separator(" "))
 
-        back_label = "[x] Сохранить и выйти" if not self.current_path else "↩ Назад"
+        back_label = "[x] Save and Exit" if not self.current_path else "↩ Back"
         choices.append(questionary.Choice(back_label, "_back_"))
 
         choice = questionary.select(
@@ -138,19 +134,18 @@ class YamlEditor:
             choices=choices,
             style=self.style,
             qmark="",
-            instruction="\n Используйте стрелочки ↑/↓ и Enter\n",
+            instruction="\n Use arrows ↑/↓ and Enter\n",
         ).ask()
 
         if choice is None or choice == "_back_":
             if not self.current_path:
-                return False  # Выход из редактора
+                return False
             self.current_path.pop()
             return True
 
-        # Если выбрали ключ
         selected_val = node[choice]
         if isinstance(selected_val, (dict, list)):
-            self.current_path.append(choice)  # Проваливаемся глубже
+            self.current_path.append(choice)
         else:
             self._edit_scalar(node, choice, selected_val)
 
@@ -158,23 +153,22 @@ class YamlEditor:
 
     def _handle_list_view(self, node: list, prompt_msg: str) -> bool:
         """
-        Отрисовывает меню для списка (list/CommentedSeq).
-        Поддерживает добавление и удаление примитивных элементов (строк).
+        Renders a sequence list view. Supporting items insertions/deletion.
         """
-        choices = [questionary.Choice(" Добавить элемент", "_add_")]
+        choices = [questionary.Choice(" Add Item", "_add_")]
 
         if node:
-            choices.append(questionary.Choice(" Удалить элемент", "_del_"))
-            choices.append(questionary.Separator("--- Текущие элементы ---"))
+            choices.append(questionary.Choice(" Delete Item", "_del_"))
+            choices.append(questionary.Separator("--- Current Items ---"))
 
             for i, val in enumerate(node):
                 if isinstance(val, (dict, list)):
-                    choices.append(questionary.Choice(f" Элемент [{i}]", i))
+                    choices.append(questionary.Choice(f" Item [{i}]", i))
                 else:
                     choices.append(questionary.Choice(f" [{i}]: {val}", i))
 
         choices.append(questionary.Separator(" "))
-        choices.append(questionary.Choice("↩ Назад", "_back_"))
+        choices.append(questionary.Choice("↩ Back", "_back_"))
 
         choice = questionary.select(
             prompt_msg, choices=choices, style=self.style, qmark="", instruction=" "
@@ -185,7 +179,7 @@ class YamlEditor:
             return True
 
         if choice == "_add_":
-            new_val = questionary.text("Введите новое строковое значение:").ask()
+            new_val = questionary.text("Enter new string value:").ask()
             if new_val:
                 node.append(new_val)
                 self._save()
@@ -195,17 +189,16 @@ class YamlEditor:
             del_choices = [
                 questionary.Choice(f"[{i}]: {val}", i) for i, val in enumerate(node)
             ]
-            del_choices.append(questionary.Choice("Отмена", "_cancel_"))
+            del_choices.append(questionary.Choice("Cancel", "_cancel_"))
 
             to_del = questionary.select(
-                "Какой элемент удалить?", choices=del_choices, style=self.style, qmark=""
+                "Which item to delete?", choices=del_choices, style=self.style, qmark=""
             ).ask()
             if to_del != "_cancel_" and to_del is not None:
                 node.pop(to_del)
                 self._save()
             return True
 
-        # Редактирование или проваливание в конкретный элемент списка
         selected_val = node[choice]
         if isinstance(selected_val, (dict, list)):
             self.current_path.append(choice)
@@ -218,31 +211,27 @@ class YamlEditor:
         self, parent_node: Union[dict, list], key: Union[str, int], current_val: Any
     ) -> None:
         """
-        Вызывает промпт изменения скалярного значения (bool, int, float, str).
-        Сразу применяет Type Coercion и сохраняет файл.
+        Prompts user for modifications. Applies immediate type coercion.
         """
 
         clear_screen()
         print(
-            f" Редактирование: {key}\n Текущее значение: {current_val} ({type(current_val).__name__})\n"
+            f" Editing: {key}\n Current Value: {current_val} ({type(current_val).__name__})\n"
         )
 
-        # Для Boolean инвертируем напрямую, без ввода текста
         if isinstance(current_val, bool):
             parent_node[key] = not current_val
             self._save()
             return
 
-        # Для чисел и строк запрашиваем текстовый ввод
         new_val_str = questionary.text(
-            "Новое значение:", default=str(current_val), style=self.style
+            "New Value:", default=str(current_val), style=self.style
         ).ask()
 
         if new_val_str is None:
-            return  # Отмена (Ctrl+C)
+            return
 
         try:
-            # Type Coercion
             if isinstance(current_val, int):
                 new_val = int(new_val_str)
             elif isinstance(current_val, float):
@@ -252,13 +241,10 @@ class YamlEditor:
 
             parent_node[key] = new_val
             self._save()
-            print_success("Значение успешно обновлено.")
+            print_success("Value successfully updated.")
 
         except ValueError:
-            print_error(
-                f"Ошибка типа. Ожидается {type(current_val).__name__}. Изменения отменены."
-            )
-            # Пауза, чтобы юзер успел прочитать ошибку перед перерисовкой экрана
+            print_error(f"Type error. Expected {type(current_val).__name__}. Changes aborted.")
             import time
 
             time.sleep(2)

@@ -140,7 +140,7 @@ async def test_e2e_swarm_refactoring_task(tmp_path: Path):
         )
     ]
 
-    # Шаг 4: Агент завершает работу (возвращает пустой массив actions)
+    # Шаг 4: Агент завершает работу (возвращает empty actions list actions)
     msg_step_4 = MagicMock()
     msg_step_4.content = None
     msg_step_4.tool_calls = [
@@ -211,4 +211,4 @@ async def test_e2e_swarm_refactoring_task(tmp_path: Path):
     kwargs = mock_bus_listener.call_args[1]
     assert kwargs["subagent_id"] == "test_id"
     assert kwargs["role"] == "coder"
-    assert "завершил делегированную задачу" in kwargs["message"]
+    assert "completed the delegated task" in kwargs["message"]

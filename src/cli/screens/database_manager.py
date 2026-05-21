@@ -1,3 +1,11 @@
+"""
+Database Manager CLI Screen.
+
+Provides an interactive control panel for local database inspection and CRUD.
+Enables management of SQL (Tasks, Traits, Mental States, Drives) and
+Vector DB (Knowledge, Thoughts) collections.
+"""
+
 import sqlite3
 import shutil
 import uuid
@@ -36,10 +44,6 @@ SETTINGS_EXAMPLE = ROOT_DIR / "config" / "settings.example.yaml"
 yaml = YAML()
 yaml.preserve_quotes = True
 
-# ==================================================================
-# УТИЛИТЫ
-# ==================================================================
-
 
 def _get_settings() -> dict:
     try:
@@ -56,20 +60,20 @@ def _save_settings(settings: dict):
 
 
 def _ensure_settings_exists() -> bool:
-    """Проверяет наличие файла settings.yaml, если нет - копирует example."""
+    """Creates base settings.yaml from template if missing."""
 
     if not SETTINGS_FILE.exists():
         if SETTINGS_EXAMPLE.exists():
             shutil.copy(SETTINGS_EXAMPLE, SETTINGS_FILE)
-            print_info(" Создан базовый файл конфигурации settings.yaml из .example")
+            print_info(" Created base configuration file settings.yaml from .example")
         else:
-            print_error("Не найден базовый файл конфигурации (settings.example.yaml).")
+            print_error("Base configuration template not found (settings.example.yaml).")
             return False
     return True
 
 
 def _run_sql(query: str, params: tuple = (), fetchall: bool = False, fetchone: bool = False):
-    """Выполняет сырой SQL запрос. Безопасно открывает и закрывает соединение."""
+    """Executes raw SQLite query."""
     if not SQL_DB_FILE.exists():
         return None
     conn = sqlite3.connect(SQL_DB_FILE)
@@ -139,7 +143,6 @@ def _get_graph_stats() -> dict:
     try:
         db = kuzu.Database(str(db_path))
         conn = kuzu.Connection(db)
-        # Считаем только когнитивные узлы (Concept)
         res = conn.execute("MATCH (n:Concept) RETURN count(n)")
         if res.has_next():
             stats["concepts"] = res.get_next()[0]
@@ -149,14 +152,14 @@ def _get_graph_stats() -> dict:
 
 
 # ==================================================================
-# CRUD МЕНЮ ДЛЯ SQL МОДУЛЕЙ
+# CRUD SCREEN FOR SQL MODULES
 # ==================================================================
 
 
 def _manage_sql_module(
     module_name: str, table_name: str, config_key: str, limit_key: str, display_fields: list
 ):
-    """Универсальный экран управления (Tasks, Traits, Mental States)."""
+    """Universal CRUD screen for SQL tables."""
     style = get_custom_style()
     settings = _get_settings()
     cfg = settings["system"]["db"]["sql"][config_key]
@@ -167,20 +170,20 @@ def _manage_sql_module(
         stats = _get_sql_stats()
         current_count = stats.get(table_name, 0)
 
-        print_info(f" Управление модулем {module_name} {status_str}")
-        print(f"  Записей: {current_count} / {cfg[limit_key]}\n")
+        print_info(f" Managing module {module_name} {status_str}")
+        print(f"  Records: {current_count} / {cfg[limit_key]}\n")
 
         choice = questionary.select(
-            "Выберите действие:",
+            "Select action:",
             choices=[
                 questionary.Separator(" "),
-                questionary.Choice(f"Включить/Выключить (сейчас {status_str})", "toggle"),
-                questionary.Choice("Изменить максимальный лимит", "change_limit"),
+                questionary.Choice(f"Toggle On/Off (currently {status_str})", "toggle"),
+                questionary.Choice("Change maximum limit", "change_limit"),
                 questionary.Separator(" "),
-                questionary.Choice("[+] Добавить новую запись", "add_record"),
-                questionary.Choice(f"[x] Удалить записи из {module_name}", "delete_records"),
+                questionary.Choice("[+] Add new record", "add_record"),
+                questionary.Choice(f"[x] Delete records from {module_name}", "delete_records"),
                 questionary.Separator(" "),
-                questionary.Choice("↩ Назад", "back"),
+                questionary.Choice("↩ Back", "back"),
             ],
             style=style,
             qmark="",
@@ -194,31 +197,31 @@ def _manage_sql_module(
             cfg["enabled"] = not cfg["enabled"]
             _save_settings(settings)
             print_success(
-                f"Модуль {module_name} {'включен' if cfg['enabled'] else 'выключен'}."
+                f"Module {module_name} {'enabled' if cfg['enabled'] else 'disabled'}."
             )
             wait_for_enter()
 
         elif choice == "change_limit":
             new_limit = questionary.text(
-                f"Новый лимит (сейчас {cfg[limit_key]}):", default=str(cfg[limit_key])
+                f"New limit (currently {cfg[limit_key]}):", default=str(cfg[limit_key])
             ).ask()
             if new_limit and new_limit.isdigit():
                 cfg[limit_key] = int(new_limit)
                 _save_settings(settings)
-                print_success("Лимит обновлен.")
+                print_success("Limit updated.")
             else:
-                print_error("Введено не число.")
+                print_error("Input is not a number.")
             wait_for_enter()
 
         elif choice == "add_record":
             if not SQL_DB_FILE.exists():
-                print_error("БД еще не создана. Сначала запустите агента.")
+                print_error("DB not created yet. Start the agent first.")
                 wait_for_enter()
                 continue
 
             if current_count >= cfg[limit_key]:
                 print_error(
-                    "Достигнут максимальный лимит записей. Удалите старые или увеличьте лимит."
+                    "Maximum records limit reached. Delete old records or increase limit."
                 )
                 wait_for_enter()
                 continue
@@ -226,14 +229,13 @@ def _manage_sql_module(
             record_id = str(uuid.uuid4())[:8]
 
             if table_name == "tasks":
-                title = questionary.text("Короткое название задачи:").ask()
+                title = questionary.text("Short task title:").ask()
                 if not title:
                     continue
-                desc = questionary.text("Полное описание:").ask()
+                desc = questionary.text("Full description:").ask()
                 if not desc:
                     continue
 
-                # JSON-пустышки
                 empty_list_json = "[]"
 
                 _run_sql(
@@ -253,44 +255,42 @@ def _manage_sql_module(
                         None,
                     ),
                 )
-                print_success("Задача успешно добавлена.")
+                print_success("Task successfully added.")
 
             elif table_name == "personality_traits":
-                name = questionary.text("Название черты (обязательно):").ask()
+                name = questionary.text("Trait name (required):").ask()
                 if not name:
                     continue
-                desc = questionary.text("Описание (обязательно):").ask()
+                desc = questionary.text("Description (required):").ask()
                 if not desc:
                     continue
 
                 _run_sql(
                     "INSERT INTO personality_traits (id, name, description, reason, context) VALUES (?, ?, ?, ?, ?)",
-                    (record_id, name, desc, "Добавлено вручную пользователем", None),
+                    (record_id, name, desc, "Added manually by user", None),
                 )
-                print_success("Черта личности успешно добавлена.")
+                print_success("Personality trait successfully added.")
 
             elif table_name == "mental_states":
-                name = questionary.text("Имя/Название сущности (обязательно):").ask()
+                name = questionary.text("Entity name (required):").ask()
                 if not name:
                     continue
 
                 tier = questionary.select(
-                    "Уровень важности (tier):",
+                    "Importance level (tier):",
                     choices=["high", "medium", "low", "background"],
                     style=style,
                     qmark="",
                 ).ask()
                 category = questionary.select(
-                    "Категория (category):",
+                    "Category (category):",
                     choices=["subject", "object"],
                     style=style,
                     qmark="",
                 ).ask()
 
-                desc = questionary.text("Описание (кто/что это):").ask()
-                status = questionary.text(
-                    "Текущий статус (напр. 'В ожидании', 'Online'):"
-                ).ask()
+                desc = questionary.text("Description (who/what is this):").ask()
+                status = questionary.text("Current status (e.g., 'Pending', 'Online'):").ask()
 
                 if name and desc and status:
                     now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S.%f")
@@ -298,13 +298,13 @@ def _manage_sql_module(
                         "INSERT INTO mental_states (id, name, tier, category, updated_at, description, status, context, related_information) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
                         (record_id, name, tier, category, now_str, desc, status, None, None),
                     )
-                    print_success("Сущность успешно добавлена в память.")
+                    print_success("Entity successfully added to memory.")
 
             wait_for_enter()
 
         elif choice == "delete_records":
             if not SQL_DB_FILE.exists():
-                print_error("База данных еще не создана. Сначала запустите агента.")
+                print_error("DB not created yet. Start the agent first.")
                 wait_for_enter()
                 continue
 
@@ -312,7 +312,7 @@ def _manage_sql_module(
             records = _run_sql(f"SELECT id, {fields_str} FROM {table_name}", fetchall=True)
 
             if not records:
-                print_info("Список пуст.")
+                print_info("The list is empty.")
                 wait_for_enter()
                 continue
 
@@ -320,23 +320,23 @@ def _manage_sql_module(
                 questionary.Choice(f"[{r[0]}] {r[1]} - {r[2]}", r[0]) for r in records
             ]
             del_choices.append(questionary.Separator(" "))
-            del_choices.append(questionary.Choice("↩ Отмена", "cancel"))
+            del_choices.append(questionary.Choice("↩ Cancel", "cancel"))
 
             del_id = questionary.select(
-                "Выберите запись для удаления:\n", choices=del_choices, style=style, qmark=""
+                "Select record to delete:\n", choices=del_choices, style=style, qmark=""
             ).ask()
 
             if del_id and del_id != "cancel":
                 if questionary.confirm(
-                    f"Удалить запись {del_id}?", default=False, qmark=""
+                    f"Delete record {del_id}?", default=False, qmark=""
                 ).ask():
                     _run_sql(f"DELETE FROM {table_name} WHERE id=?", (del_id,))
-                    print_success("Запись удалена.")
+                    print_success("Record deleted.")
                 wait_for_enter()
 
 
 def _manage_drives_screen():
-    """Специфичный экран для мотиваций (Drives), т.к. там можно добавлять кастомные."""
+    """Specific dashboard for system Drives."""
     style = get_custom_style()
 
     while True:
@@ -346,19 +346,19 @@ def _manage_drives_screen():
         stats = _get_sql_stats()
         status_str = "[ON]" if cfg["enabled"] else "[OFF]"
 
-        print_info(f" Управление модулем Drives {status_str}")
-        print(f"  Базовых мотиваций: {stats['drives_fund']}")
-        print(f"  Кастомных мотиваций: {stats['drives_cust']} / {cfg['max_custom_drives']}\n")
+        print_info(f" Managing Drives module {status_str}")
+        print(f"  Fundamental drives: {stats['drives_fund']}")
+        print(f"  Custom drives: {stats['drives_cust']} / {cfg['max_custom_drives']}\n")
 
         choice = questionary.select(
-            "Выберите действие:",
+            "Select action:",
             choices=[
-                questionary.Choice(f"Включить / Выключить (сейчас {status_str})", "toggle"),
-                questionary.Choice("Изменить лимит кастомных мотиваций", "change_limit"),
-                questionary.Choice("[+] Добавить новую кастомную мотивацию", "add_drive"),
-                questionary.Choice("[x] Удалить кастомную мотивацию", "del_drive"),
+                questionary.Choice(f"Toggle On/Off (currently {status_str})", "toggle"),
+                questionary.Choice("Change custom drives limit", "change_limit"),
+                questionary.Choice("[+] Add new custom drive", "add_drive"),
+                questionary.Choice("[x] Delete custom drive", "del_drive"),
                 questionary.Separator(" "),
-                questionary.Choice("↩ Назад", "back"),
+                questionary.Choice("↩ Back", "back"),
             ],
             style=style,
             qmark="",
@@ -371,36 +371,40 @@ def _manage_drives_screen():
         elif choice == "toggle":
             cfg["enabled"] = not cfg["enabled"]
             _save_settings(settings)
-            print_success(f"Модуль Drives {'включен' if cfg['enabled'] else 'выключен'}.")
+            print_success(f"Drives module {'enabled' if cfg['enabled'] else 'disabled'}.")
             wait_for_enter()
 
         elif choice == "change_limit":
             new_limit = questionary.text(
-                "Новый лимит:", default=str(cfg["max_custom_drives"])
+                "New limit:", default=str(cfg["max_custom_drives"])
             ).ask()
             if new_limit and new_limit.isdigit():
                 cfg["max_custom_drives"] = int(new_limit)
                 _save_settings(settings)
-                print_success("Лимит обновлен.")
+                print_success("Limit updated.")
             wait_for_enter()
 
         elif choice == "add_drive":
             if not SQL_DB_FILE.exists():
                 print_error(
-                    "БД еще не создана. Запустите агента хотя бы один раз, чтобы создать таблицы."
+                    "DB not created yet. Start the agent at least once to generate tables."
                 )
                 wait_for_enter()
                 continue
 
             if stats["drives_cust"] >= cfg["max_custom_drives"]:
-                print_error("Достигнут лимит кастомных мотиваций.")
+                print_error("Custom drives limit reached.")
                 wait_for_enter()
                 continue
 
-            name = questionary.text("Название мотивации (напр. 'Любовь к яблокам'):").ask()
-            desc = questionary.text("Описание (почему агент должен это делать):").ask()
-            decay = questionary.text("Скорость роста дефицита (от 0.1 до 100):", default="10.0").ask()
-            interval = questionary.text("Интервал роста в секундах (напр. 900):", default="900").ask()
+            name = questionary.text("Drive name (e.g., 'Apple Craving'):").ask()
+            desc = questionary.text("Description (why the agent must fulfill this):").ask()
+            decay = questionary.text(
+                "Deficit growth rate (from 0.1 to 100):", default="10.0"
+            ).ask()
+            interval = questionary.text(
+                "Growth interval in seconds (e.g., 900):", default="900"
+            ).ask()
 
             if name and desc and decay and interval:
                 try:
@@ -412,9 +416,9 @@ def _manage_drives_screen():
                         "INSERT INTO drives (id, name, type, description, decay_rate, decay_interval_sec, last_satisfied_at, recent_reflections) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
                         (d_id, name, "custom", desc, decay_float, interval_int, now_str, "[]"),
                     )
-                    print_success(f"Мотивация '{name}' успешно добавлена.")
+                    print_success(f"Drive '{name}' successfully added.")
                 except Exception as e:
-                    print_error(f"Ошибка: {e}")
+                    print_error(f"Error: {e}")
             wait_for_enter()
 
         elif choice == "del_drive":
@@ -424,33 +428,35 @@ def _manage_drives_screen():
                 "SELECT id, name, decay_rate FROM drives WHERE type='custom'", fetchall=True
             )
             if not records:
-                print_info("Кастомных мотиваций нет.")
+                print_info("No custom drives found.")
                 wait_for_enter()
                 continue
 
             del_choices = [
-                questionary.Choice(f"[{r[0]}] {r[1]} (Рост: {r[2]}%)", r[0]) for r in records
+                questionary.Choice(f"[{r[0]}] {r[1]} (Growth: {r[2]}%)", r[0]) for r in records
             ]
             del_choices.append(questionary.Separator(" "))
-            del_choices.append(questionary.Choice("↩ Отмена", "cancel"))
+            del_choices.append(questionary.Choice("↩ Cancel", "cancel"))
 
             del_id = questionary.select(
-                "Выберите мотивацию для удаления:", choices=del_choices, style=style, qmark=""
+                "Select drive to delete:", choices=del_choices, style=style, qmark=""
             ).ask()
             if del_id and del_id != "cancel":
-                if questionary.confirm("Точно удалить?", default=False, qmark="").ask():
+                if questionary.confirm(
+                    "Are you sure you want to delete?", default=False, qmark=""
+                ).ask():
                     _run_sql("DELETE FROM drives WHERE id=? AND type='custom'", (del_id,))
-                    print_success("Удалено.")
+                    print_success("Deleted.")
                 wait_for_enter()
 
 
 # ==================================================================
-# CRUD МЕНЮ ДЛЯ VECTOR DB
+# CRUD SCREEN FOR VECTOR DB
 # ==================================================================
 
 
 def _manage_vector_collection(collection_name: str):
-    """Экран управления знаниями или мыслями с пагинацией и переносом длинных строк."""
+    """Interactive vector points manager with pagination."""
     style = get_custom_style()
 
     limit_per_page = 10
@@ -462,7 +468,7 @@ def _manage_vector_collection(collection_name: str):
     while True:
         clear_screen()
         if not VECTOR_DB_DIR.exists():
-            print_error("Векторная БД не существует.")
+            print_error("Vector DB does not exist.")
             wait_for_enter()
             break
 
@@ -484,32 +490,29 @@ def _manage_vector_collection(collection_name: str):
             client.close()
 
         except Exception as e:
-            print_error(f"Ошибка чтения БД: {e}")
+            print_error(f"Error reading DB: {e}")
             wait_for_enter()
             break
 
-        # Формируем заголовок меню (он всегда будет виден над списком)
         if total > 0 and records_cache:
             start_idx = current_page_idx * limit_per_page + 1
             end_idx = start_idx + len(records_cache) - 1
             menu_title = (
-                f"Коллекция '{collection_name}' | Страница {current_page_idx + 1} | Записи {start_idx}-{end_idx} из {total}\n"
-                f" Выберите запись для удаления:\n"
+                f"Collection '{collection_name}' | Page {current_page_idx + 1} | Records {start_idx}-{end_idx} of {total}\n"
+                f" Select record to delete:\n"
             )
         else:
-            menu_title = f"Коллекция '{collection_name}' пуста.\n Выберите действие:"
+            menu_title = f"Collection '{collection_name}' is empty.\n Select action:"
 
         choices = []
         for r in records_cache:
             text = r.payload.get("text", "").replace("\n", " ")
             short_text = text[:400] + "..." if len(text) > 400 else text
 
-            wrapped_lines = textwrap.wrap(
-                short_text, width=80
-            )  # Чуть пошире, чтобы меньше строк было
+            wrapped_lines = textwrap.wrap(short_text, width=80)
 
             if not wrapped_lines:
-                label = f"[{r.id[:8]}] [Пустая запись]"
+                label = f"[{r.id[:8]}] [Empty Record]"
             else:
                 label = f"[{r.id[:8]}] {wrapped_lines[0]}"
                 indent = " " * 11
@@ -517,21 +520,19 @@ def _manage_vector_collection(collection_name: str):
                     label += f"\n{indent}{line}"
 
             choices.append(questionary.Choice(label, r.id))
-            # Воздух между записями
             choices.append(questionary.Separator(" "))
 
-        # Навигация и управление
         if current_page_idx > 0:
-            choices.append(questionary.Choice("⬅️ Предыдущая страница", "prev_page"))
+            choices.append(questionary.Choice("⬅️ Previous Page", "prev_page"))
 
         if next_offset is not None:
-            choices.append(questionary.Choice("➡️ Следующая страница", "next_page"))
+            choices.append(questionary.Choice("➡️ Next Page", "next_page"))
 
         if len(choices) > 0 and isinstance(choices[-1], questionary.Choice):
             choices.append(questionary.Separator(" "))
 
-        choices.append(questionary.Choice("🧨 Очистить всю коллекцию", "nuke"))
-        choices.append(questionary.Choice("↩ Назад", "back"))
+        choices.append(questionary.Choice("🧨 Clear Entire Collection", "nuke"))
+        choices.append(questionary.Choice("↩ Back", "back"))
 
         choice = questionary.select(
             menu_title, choices=choices, style=style, qmark="ℹ ", instruction=""
@@ -552,7 +553,7 @@ def _manage_vector_collection(collection_name: str):
 
         elif choice == "nuke":
             if questionary.confirm(
-                f"Внимание. Это удалит ВСЕ записи из {collection_name}. Вы уверены?",
+                f"Warning. This will delete ALL records from {collection_name}. Are you sure?",
                 default=False,
                 qmark="⚠️ ",
             ).ask():
@@ -571,11 +572,11 @@ def _manage_vector_collection(collection_name: str):
                 offset_history = [None]
                 next_offset = None
 
-                print_success(f"Коллекция {collection_name} очищена.")
+                print_success(f"Collection {collection_name} cleared.")
                 wait_for_enter()
 
         else:
-            if questionary.confirm("Удалить эту запись?", default=False, qmark="\n❓ ").ask():
+            if questionary.confirm("Delete this record?", default=False, qmark="\n❓ ").ask():
                 client = QdrantClient(path=str(VECTOR_DB_DIR))
                 client.delete(
                     collection_name=collection_name,
@@ -590,25 +591,25 @@ def _manage_vector_collection(collection_name: str):
                     offset_history = offset_history[: current_page_idx + 1]
                     next_offset = None
 
-                print_success("Запись удалена.")
+                print_success("Record deleted.")
                 wait_for_enter()
 
 
 # ==================================================================
-# ГЛАВНЫЙ ЭКРАН
+# MAIN SCREEN
 # ==================================================================
 
 
 def database_manager_screen() -> None:
     """
-    Открывает окно управления базами данных.
+    Main database management screen.
     """
 
-    set_window_title("JAWL - Управление базами данных")
+    set_window_title("JAWL - Database Manager")
 
     if _is_agent_running():
-        print_error("Ошибка: Нельзя управлять базами данных во время работы агента.")
-        print_info("Остановите агента в главном меню (чтобы избежать SQLite Locks).")
+        print_error("Error: Cannot manage databases while the agent is running.")
+        print_info("Stop the agent from the main menu (to avoid SQLite Locks).")
         wait_for_enter()
         return
 
@@ -636,55 +637,58 @@ def database_manager_screen() -> None:
         choices = [
             questionary.Separator("[#] SQL DB"),
             questionary.Choice(
-                f" ● Mental States {ms_on}  (Сущности: {s_stats['mental_states']}/{sql_cfg['mental_states']['max_entities']})",
+                f" ● Mental States {ms_on}  (Entities: {s_stats['mental_states']}/{sql_cfg['mental_states']['max_entities']})",
                 "ms",
             ),
             questionary.Choice(
-                f" ● Tasks         {ts_on}  (Задачи: {s_stats['tasks']}/{sql_cfg['tasks']['max_tasks']})",
+                f" ● Tasks         {ts_on}  (Tasks: {s_stats['tasks']}/{sql_cfg['tasks']['max_tasks']})",
                 "tasks",
             ),
             questionary.Choice(
-                f" ● Traits        {tr_on}  (Черты: {s_stats['personality_traits']}/{sql_cfg['personality_traits']['max_traits']})",
+                f" ● Traits        {tr_on}  (Traits: {s_stats['personality_traits']}/{sql_cfg['personality_traits']['max_traits']})",
                 "traits",
             ),
             questionary.Choice(
-                f" ● Drives        {dr_on}  (Мотиваций: {s_stats['drives_fund']} баз., {s_stats['drives_cust']}/{sql_cfg['drives']['max_custom_drives']} каст.)",
+                f" ● Drives        {dr_on}  (Drives: {s_stats['drives_fund']} fund., {s_stats['drives_cust']}/{sql_cfg['drives']['max_custom_drives']} cust.)",
                 "drives",
             ),
-            questionary.Choice(" ● Стереть базу данных", "clean_sql"),
+            questionary.Choice(" ● Erase Database", "clean_sql"),
             questionary.Separator(" "),
             questionary.Separator(" "),
             questionary.Separator("[#] Vector DB"),
             questionary.Choice(
-                f" ● Knowledge            ({v_stats['knowledge']} записей)", "knowledge"
+                f" ● Knowledge            ({v_stats['knowledge']} records)", "knowledge"
             ),
             questionary.Choice(
-                f" ● Thoughts             ({v_stats['thoughts']} записей)", "thoughts"
+                f" ● Thoughts             ({v_stats['thoughts']} records)", "thoughts"
             ),
-            questionary.Choice(" ● Стереть базу данных", "clean_vector"),
+            questionary.Choice(" ● Erase Database", "clean_vector"),
             questionary.Separator(" "),
             questionary.Separator("[#] Graph DB"),
-            questionary.Choice(f" ● Concepts             ({g_stats['concepts']} записей)", "dummy_graph_info"),
-            questionary.Choice(" ● Стереть базу данных", "clean_graph"),
+            questionary.Choice(
+                f" ● Concepts             ({g_stats['concepts']} records)", "dummy_graph_info"
+            ),
+            questionary.Choice(" ● Erase Database", "clean_graph"),
             questionary.Separator(" "),
             questionary.Separator("[#] Interfaces Cache"),
-            questionary.Choice(" ● Стереть кэш (src/utils/local/data/interfaces/)", "clean_interfaces"),
+            questionary.Choice(
+                " ● Clear cache (src/utils/local/data/interfaces/)", "clean_interfaces"
+            ),
             questionary.Separator(" "),
-            questionary.Choice("[x] Выход в главное меню", "exit"),
+            questionary.Choice("[x] Exit to main menu", "exit"),
         ]
 
         choice = questionary.select(
-            "Выберите модуль для управления:",
+            "Select module to manage:",
             choices=choices,
             style=style,
             qmark="",
-            instruction="\n (Стрелочки ↑/↓ для навигации)\n",
+            instruction="\n (Arrows ↑/↓ for navigation)\n",
         ).ask()
 
         if choice is None or choice == "exit":
             break
 
-        # SQL
         if choice == "drives":
             _manage_drives_screen()
 
@@ -711,54 +715,62 @@ def database_manager_screen() -> None:
                 ["name", "description"],
             )
 
-        # Vector
         elif choice == "knowledge":
             _manage_vector_collection("knowledge")
 
         elif choice == "thoughts":
             _manage_vector_collection("thoughts")
 
-        # Global Delete
         elif choice == "clean_sql":
             if questionary.confirm(
-                "⚠️ Вы уверены? Это необратимо удалит SQL DB.", default=False, qmark=""
+                "⚠️ Are you sure? This will irreversibly delete SQL DB.",
+                default=False,
+                qmark="",
             ).ask():
                 if SQL_DB_FILE.exists():
                     SQL_DB_FILE.unlink()
-                    print_success("База SQL очищена.")
+                    print_success("SQL Database cleared.")
                 else:
-                    print_info("База SQL уже пуста.")
+                    print_info("SQL Database is already empty.")
                 wait_for_enter()
 
         elif choice == "clean_vector":
             if questionary.confirm(
-                "⚠️ Вы уверены? Это необратимо удалит Vector DB.", default=False, qmark=""
+                "⚠️ Are you sure? This will irreversibly delete Vector DB.",
+                default=False,
+                qmark="",
             ).ask():
                 if VECTOR_DB_DIR.exists():
                     shutil.rmtree(VECTOR_DB_DIR)
-                    print_success("Векторная база очищена.")
+                    print_success("Vector Database cleared.")
                 else:
-                    print_info("Векторная база уже пуста.")
+                    print_info("Vector Database is already empty.")
                 wait_for_enter()
 
         elif choice == "clean_graph":
             if questionary.confirm(
-                "⚠️ Вы уверены? Это необратимо удалит Graph DB.", default=False, qmark=""
+                "⚠️ Are you sure? This will irreversibly delete Graph DB.",
+                default=False,
+                qmark="",
             ).ask():
                 if GRAPH_DB_DIR.exists():
                     shutil.rmtree(GRAPH_DB_DIR, ignore_errors=True)
-                    print_success("Графовая база данных успешно очищена.")
+                    print_success("Graph Database successfully cleared.")
                 else:
-                    print_info("Графовая база уже пуста.")
+                    print_info("Graph Database is already empty.")
                 wait_for_enter()
-                
+
         elif choice == "clean_interfaces":
             if questionary.confirm(
-                "⚠️ Вы уверены? Это сотрет историю браузера, сессии Telegram, настройки отслеживания папок и дашборды. Агент забудет всё, что происходило в L2 интерфейсах.", default=False, qmark=""
+                "⚠️ Are you sure? This will wipe browser history, Telegram sessions, folder tracking configurations, and custom dashboards. The agent will forget everything from L2 interfaces.",
+                default=False,
+                qmark="",
             ).ask():
                 if INTERFACES_DIR.exists():
                     shutil.rmtree(INTERFACES_DIR, ignore_errors=True)
-                    print_success("Кэш всех интерфейсов успешно удален. При следующем запуске сессии будут созданы заново.")
+                    print_success(
+                        "All interfaces cache successfully deleted. Sessions will be recreated on the next startup."
+                    )
                 else:
-                    print_info("Папка интерфейсов уже пуста.")
+                    print_info("Interfaces folder is already empty.")
                 wait_for_enter()

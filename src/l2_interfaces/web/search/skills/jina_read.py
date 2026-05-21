@@ -1,6 +1,7 @@
 """
-Движок чтения страниц Jina (Стратегия).
-Отлично справляется с обходом капч и антифрод-систем, возвращая чистый Markdown.
+Jina page reader engine (Strategy).
+
+Excellent at bypassing captchas and anti-fraud systems, returning clean Markdown.
 """
 
 import asyncio
@@ -18,13 +19,15 @@ from src.l3_agent.swarm.roles import Subagents
 
 
 class JinaReader:
-    """Парсер содержимого веб-страниц через API r.jina.ai."""
+    """Webpage content parser via r.jina.ai API."""
 
     def __init__(self, client: WebSearchClient) -> None:
         self.client = client
 
     async def read_raw(self, url: str) -> Optional[str]:
-        """Внутренний метод для чтения текста (используется DeepResearch)."""
+        """
+        Internal method for reading text (used by DeepResearch).
+        """
 
         def _fetch() -> str:
             req_url = f"https://r.jina.ai/{url}"
@@ -41,28 +44,27 @@ class JinaReader:
         """
         Reads webpage content.
         """
+
         try:
             text = await self.read_raw(url)
             if not text:
                 return SkillResult.fail(
-                    f"Ошибка: не удалось прочитать {url} (пустой ответ от Jina)."
+                    f"Error: failed to read {url} (empty response from Jina)."
                 )
 
             total_len = len(text)
             if total_len > self.client.max_page_chars:
-                text = truncate_text(text, self.client.max_page_chars, "... [Текст обрезан]")
-                main_logger.info(f"[Web] Прочитана страница (Jina, с обрезкой): {url}")
+                text = truncate_text(text, self.client.max_page_chars, "... [Truncated]")
+                main_logger.info(f"[Web] Page read (Jina, with truncation): {url}")
             else:
-                main_logger.info(f"[Web] Прочитана страница (Jina, полностью): {url}")
+                main_logger.info(f"[Web] Page read (Jina, entirely): {url}")
 
-            header = (
-                f"[Веб-страница (Jina) | Прочитано: {len(text)}/{total_len} симв.]\n{'='*40}\n"
-            )
-            self.client.state.add_history(f"Чтение страницы (Jina): {url}")
+            header = f"[Webpage (Jina) | Read: {len(text)}/{total_len} chars]\n{'='*40}\n"
+            self.client.state.add_history(f"Reading page (Jina): {url}")
             return SkillResult.ok(header + text)
 
         except urllib.error.HTTPError as e:
-            return SkillResult.fail(f"Ошибка HTTP при чтении {url}: {e.code} {e.reason}")
+            return SkillResult.fail(f"HTTP Error reading {url}: {e.code} {e.reason}")
 
         except Exception as e:
-            return SkillResult.fail(f"Ошибка парсинга страницы (Jina): {e}")
+            return SkillResult.fail(f"Page parsing error (Jina): {e}")

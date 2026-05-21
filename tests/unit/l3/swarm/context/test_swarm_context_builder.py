@@ -115,7 +115,7 @@ def test_swarm_context_builder_history_formatting(
 
     # Старый шаг должен быть обрезан. Лимит 20 символов, "[Reflection]: Old th" - это ровно 20 символов
     assert "[Reflection]: Old th" in context
-    assert "обрезаны системой" in context
+    assert "truncated by context compressor" in context
 
     # Свежий шаг не должен резаться
     assert "Fresh detailed thought that should NOT be truncated" in context

@@ -1,5 +1,5 @@
 """
-Плагин интерфейса Календаря.
+Calendar interface plugin.
 """
 
 from typing import List, Any, Dict, Optional
@@ -59,5 +59,5 @@ class CalendarPlugin(BaseInterface):
             section=ContextSection.INTERFACES,
         )
 
-        main_logger.info("[Calendar] Интерфейс загружен.")
+        main_logger.info("[Calendar] Interface loaded.")
         return [events]

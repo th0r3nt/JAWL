@@ -1,8 +1,8 @@
 """
-Клиент Meta-интерфейса.
+Client of the Meta interface.
 
-Обеспечивает агенту механизм рефлексии и возможность изменять собственную
-YAML-конфигурацию в рантайме (без прямого редактирования файлов хост-системы оператором).
+Provides the agent with a reflection mechanism and the ability to modify its own
+YAML configuration at runtime (without direct editing of host system files by the operator).
 """
 
 import os
@@ -16,7 +16,7 @@ from src.utils.logger import main_logger
 
 
 class MetaClient:
-    """Менеджер самомодификации настроек JAWL."""
+    """Manager of JAWL settings self-modification."""
 
     def __init__(
         self,
@@ -29,16 +29,16 @@ class MetaClient:
         custom_skills_enabled: bool,
     ) -> None:
         """
-        Инициализирует мета-клиент.
+        Initializes the meta client.
 
         Args:
-            agent_state: Состояние агента.
-            event_bus: Шина событий (для рассылки апдейтов конфига).
-            settings_path: Путь к settings.yaml.
-            interfaces_path: Путь к interfaces.yaml.
-            access_level: Уровень мета-доступа (0 - SAFE, ..., 3 - CREATOR).
-            available_models: Список разрешенных LLM.
-            custom_skills_enabled: Разрешено ли создавать кастомные навыки.
+            agent_state: Agent state.
+            event_bus: Event bus (to dispatch config updates).
+            settings_path: Path to settings.yaml.
+            interfaces_path: Path to interfaces.yaml.
+            access_level: Meta access level (0 - SAFE, ..., 3 - CREATOR).
+            available_models: List of allowed LLMs.
+            custom_skills_enabled: Whether creating custom skills is permitted.
         """
         self.agent_state = agent_state
         self.bus = event_bus
@@ -53,15 +53,15 @@ class MetaClient:
 
     async def update_yaml(self, file_path: Path, path_keys: List[str], new_value: Any) -> bool:
         """
-        Универсальный метод для глубокого обновления YAML файлов (settings или interfaces).
+        Universal method for deep updating of YAML files (settings or interfaces).
 
         Args:
-            file_path: Какой файл менять.
-            path_keys: Путь по вложенным ключам (например: ["llm", "temperature"]).
-            new_value: Новое значение.
+            file_path: Which file to modify.
+            path_keys: Path by nested keys (e.g.: ["llm", "temperature"]).
+            new_value: New value.
 
         Returns:
-            True, если сохранено успешно, иначе False.
+            True if saved successfully, else False.
         """
         try:
             with open(file_path, "r", encoding="utf-8") as f:
@@ -80,17 +80,17 @@ class MetaClient:
 
             return True
         except Exception as e:
-            main_logger.error(f"[Meta] Ошибка обновления {file_path.name}: {e}")
+            main_logger.error(f"[Meta] Error updating {file_path.name}: {e}")
             return False
 
     def has_env_key(self, key_name: str) -> bool:
-        """Проверяет наличие токена в переменных окружения (например 'GITHUB_TOKEN')."""
+        """Checks if a token exists in environmental variables (e.g. 'GITHUB_TOKEN')."""
         return bool(os.getenv(key_name, "").strip())
 
     async def get_context_block(self, **kwargs: Any) -> str:
         """
-        Провайдер контекста для ContextRegistry.
-        Отдает агенту список его мета-возможностей и текущий Access Level.
+        Context provider for ContextRegistry.
+        Gives the agent the list of its meta capabilities and current Access Level.
         """
         desc = "Description: Dynamic framework configuration and custom skills."
 

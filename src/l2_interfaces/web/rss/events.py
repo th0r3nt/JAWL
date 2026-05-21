@@ -1,3 +1,7 @@
+"""
+Background poller for RSS feeds.
+"""
+
 import asyncio
 
 from src.utils.logger import main_logger
@@ -10,9 +14,7 @@ from src.l2_interfaces.web.rss.client import WebRSSClient
 
 
 class WebRSSEvents:
-    """
-    Фоновый поллер для RSS-лент.
-    """
+    """Background poller for RSS feeds."""
 
     def __init__(self, client: WebRSSClient, state: WebRSSState, event_bus: EventBus):
         self.client = client
@@ -22,7 +24,7 @@ class WebRSSEvents:
         self._is_running = False
         self._polling_task = None
 
-        # Кэш просмотренных записей (URL или ID), чтобы не кидать одни и те же ивенты
+        # Cache of viewed entries (URL or ID) to avoid firing duplicate events
         self._seen_entries = set()
 
     async def start(self) -> None:
@@ -32,7 +34,7 @@ class WebRSSEvents:
         self._is_running = True
         self._polling_task = asyncio.create_task(self._loop())
         main_logger.info(
-            f"[Web RSS] Фоновый поллинг RSS-лент запущен (Интервал: {self.client.config.polling_interval_sec}с)."
+            f"[Web RSS] Background RSS feed polling started (Interval: {self.client.config.polling_interval_sec}s)."
         )
 
     async def stop(self) -> None:
@@ -42,7 +44,7 @@ class WebRSSEvents:
             self._polling_task = None
 
     async def _loop(self):
-        # При первом запуске просто собираем текущие ID, чтобы не спамить историей
+        # On the first run, simply gather current IDs to avoid spamming the history
         await self._poll_feeds(is_first_run=True)
 
         while self._is_running:
@@ -52,7 +54,7 @@ class WebRSSEvents:
             except asyncio.CancelledError:
                 break
             except Exception as e:
-                main_logger.error(f"[Web RSS] Ошибка в цикле мониторинга RSS: {e}")
+                main_logger.error(f"[Web RSS] Error in RSS monitoring loop: {e}")
 
     async def _poll_feeds(self, is_first_run: bool):
         all_latest_entries = []
@@ -70,12 +72,12 @@ class WebRSSEvents:
                     if not entry_id:
                         continue
 
-                    # Добавляем в список для приборной панели (L0 State)
-                    title = clean_html(entry.get("title", "Без заголовка"))
+                    # Add to the dashboard list (L0 State)
+                    title = clean_html(entry.get("title", "Untitled"))
                     link = entry.get("link", "")
                     all_latest_entries.append(f"- [{feed_cfg.name}] {title}\n  URL: {link}")
 
-                    # Если это новая запись и не первый запуск - публикуем ивент
+                    # If this is a new entry and not the first run - publish the event
                     if entry_id not in self._seen_entries:
                         self._seen_entries.add(entry_id)
 
@@ -85,19 +87,19 @@ class WebRSSEvents:
                                 feed_name=feed_cfg.name,
                                 title=title,
                                 link=link,
-                                message=f"Новая публикация в '{feed_cfg.name}': {title}",
+                                message=f"New publication in '{feed_cfg.name}': {title}",
                             )
 
-                # Ограничиваем размер сета, чтобы не было утечек памяти
-                limit = 1000  # TODO: перенести в yaml
+                # Limit the set size to prevent memory leaks
+                limit = 1000
                 if len(self._seen_entries) > limit:
                     self._seen_entries = set(list(self._seen_entries)[-limit:])
 
             except Exception as e:
-                main_logger.debug(f"[Web RSS] Ошибка поллинга ленты {feed_cfg.name}: {e}")
+                main_logger.debug(f"[Web RSS] Error polling feed {feed_cfg.name}: {e}")
 
-        # Обновляем приборную панель
+        # Update the dashboard
         if all_latest_entries:
-            # Показываем только последние N из всех собранных
+            # Show only the last N of all gathered
             display = all_latest_entries[: self.client.config.recent_limit]
             self.state.latest_news = "\n".join(display)

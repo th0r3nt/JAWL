@@ -58,5 +58,5 @@ async def test_events_loop_publishes_to_bus(email_events):
         Events.EMAIL_INCOMING,
         uid="99",
         sender_name="System",
-        message="Новое письмо. Тема: Alert",
+        message="New email. Subject: Alert",
     )

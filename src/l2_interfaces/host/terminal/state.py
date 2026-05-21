@@ -1,6 +1,13 @@
+"""
+L0 State for the Host Terminal interface.
+
+Stores connection status, UI connection state, and the recent messages cache.
+"""
+
+
 class HostTerminalState:
     """
-    Хранит состояние локального терминала (CLI-чата) и историю последних сообщений.
+    Stores the state of the local terminal (CLI chat) and the history of recent messages.
     """
 
     def __init__(self, context_limit: int = 15):
@@ -8,11 +15,11 @@ class HostTerminalState:
         self.is_ui_connected = False
         self.context_limit = context_limit
 
-        # Храним список строк для удобства сдвига (MRU)
+        # MRU list of strings
         self.recent_messages: list[str] = []
 
     def add_message(self, sender: str, text: str, time_str: str = ""):
-        """Добавляет сообщение в конец и сдвигает кэш, если превышен лимит."""
+        """Adds a message to the end and shifts the cache if the limit is exceeded."""
         prefix = f"[{time_str}] " if time_str else ""
         self.recent_messages.append(f"{prefix}[{sender}]: {text}")
         if len(self.recent_messages) > self.context_limit:
@@ -21,5 +28,5 @@ class HostTerminalState:
     @property
     def formatted_messages(self) -> str:
         if not self.recent_messages:
-            return "История сообщений пуста."
+            return "Message history is empty."
         return "\n".join(self.recent_messages)

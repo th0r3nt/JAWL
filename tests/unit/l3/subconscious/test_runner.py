@@ -71,18 +71,18 @@ async def test_runner_rbac_guard(mock_registry, mock_call_skill, runner):
 
     results = await runner._execute_actions(actions, Pattern.FORGETTING)
 
-    assert "Отказано в доступе" in results
-    assert "не разрешен для паттерна FORGETTING" in results
+    assert "Access denied" in results
+    assert "not allowed for the FORGETTING pattern" in results
     mock_call_skill.assert_not_called()
 
 
 @pytest.mark.asyncio
 async def test_runner_loop_termination(runner):
-    """Тест: Цикл прерывается при пустом массиве actions (штатное завершение)."""
+    """Тест: Цикл прерывается при emptyом массиве actions (штатное завершение)."""
 
     from unittest.mock import AsyncMock
 
-    # Мокаем экзекутор, чтобы он вернул пустой массив действий
+    # Мокаем экзекутор, чтобы он вернул empty actions list действий
     runner.executor.execute = AsyncMock(
         return_value='{"reflection": "Я всё почистил", "actions":[]}'
     )

@@ -1,9 +1,9 @@
 """
-Навыки саморасширения (Access Level 3: CREATOR).
+Self-expansion skills (Access Level 3: CREATOR).
 
-Уровень бога. Позволяет агенту динамически внедрять собственные Python-скрипты,
-написанные им в песочнице, как нативные инструменты фреймворка (Dynamic Skill Injection).
-Также позволяет рисовать кастомные дашборды.
+God level. Allows the agent to dynamically inject its own Python scripts,
+written in the sandbox, as native framework tools (Dynamic Skill Injection).
+Also allows drawing custom dashboards.
 """
 
 from typing import Dict
@@ -16,7 +16,7 @@ from src.l3_agent.skills.custom import CustomSkillsRegistry
 
 
 class MetaCreator:
-    """Уровень 3 (CREATOR). Регистрация скриптов агента как нативных навыков."""
+    """Level 3 (CREATOR). Registration of agent scripts as native skills."""
 
     def __init__(self, meta_client: MetaClient, registry: CustomSkillsRegistry) -> None:
         self.client = meta_client
@@ -32,11 +32,11 @@ class MetaCreator:
         parameters_dict: Dict[str, str],
     ) -> SkillResult:
         """
-        Compiles proxy wrapper for sandbox function and injects it as native tool. 
-        
-        skill_name: Desired callable name. 
-        filepath: Relative sandbox path. 
-        func_name: Target function name. 
+        Compiles proxy wrapper for sandbox function and injects it as native tool.
+
+        skill_name: Desired callable name.
+        filepath: Relative sandbox path.
+        func_name: Target function name.
         parameters_dict: JSON schema args.
         """
 
@@ -46,9 +46,9 @@ class MetaCreator:
 
         if success:
             return SkillResult.ok(
-                f"Кастомный навык '{result_or_err}' успешно зарегистрирован и теперь доступен для вызова."
+                f"Custom skill '{result_or_err}' successfully registered and is now available for execution."
             )
-        return SkillResult.fail(f"Ошибка регистрации навыка: {result_or_err}")
+        return SkillResult.fail(f"Error registering skill: {result_or_err}")
 
     @skill()
     async def remove_custom_skill(self, skill_name: str) -> SkillResult:
@@ -58,24 +58,26 @@ class MetaCreator:
         success, err = self.registry.unregister_skill(skill_name)
 
         if success:
-            return SkillResult.ok(f"Навык '{skill_name}' успешно удален из системы.")
-        return SkillResult.fail(f"Ошибка удаления навыка: {err}")
+            return SkillResult.ok(
+                f"Skill '{skill_name}' successfully removed from the system."
+            )
+        return SkillResult.fail(f"Error removing skill: {err}")
 
     @skill()
     async def get_custom_skills(self) -> SkillResult:
         """
         Returns list of all registered custom skills and their mappings.
         """
-        
+
         skills = self.registry.get_all_skills()
         if not skills:
-            return SkillResult.ok("Список кастомных навыков пуст.")
+            return SkillResult.ok("Custom skills list is empty.")
 
-        lines = ["Зарегистрированные интеграции:"]
+        lines = ["Registered integrations:"]
         for s_name, info in skills.items():
             params_str = ", ".join([f"{k}: {v}" for k, v in info.get("params", {}).items()])
             lines.append(
-                f"- {s_name} | Файл: {info['filepath']}::{info['func_name']} | Параметры: {{{params_str}}}"
+                f"- {s_name} | File: {info['filepath']}::{info['func_name']} | Parameters: {{{params_str}}}"
             )
 
         return SkillResult.ok("\n".join(lines))
@@ -83,22 +85,22 @@ class MetaCreator:
     @skill()
     async def set_dashboard_block(self, name: str, markdown_content: str) -> SkillResult:
         """
-        Injects static Markdown block into system context. 
-        
-        name: Unique dashboard title. 
+        Injects static Markdown block into system context.
+
+        name: Unique dashboard title.
         markdown_content: Block content.
         """
 
         await self.client.bus.publish(
             Events.SYSTEM_DASHBOARD_UPDATE, name=name, content=markdown_content
         )
-        return SkillResult.ok(f"Дашборд '{name}' успешно обновлен.")
+        return SkillResult.ok(f"Dashboard '{name}' successfully updated.")
 
     @skill()
     async def remove_dashboard_block(self, name: str) -> SkillResult:
         """
         Removes custom block from system context.
         """
-        
+
         await self.client.bus.publish(Events.SYSTEM_DASHBOARD_UPDATE, name=name, content="")
-        return SkillResult.ok(f"Дашборд '{name}' удален.")
+        return SkillResult.ok(f"Dashboard '{name}' deleted.")

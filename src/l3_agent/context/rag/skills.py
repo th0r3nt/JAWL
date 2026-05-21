@@ -1,6 +1,6 @@
 """
-Навыки для ручного извлечения информации из гибридной памяти (Vector-Graph RAG).
-Доступны исключительно главному агенту-оркестратору.
+Skills for manual retrieval of information from hybrid memory (Vector-Graph RAG).
+Available only for the main agent-orchestrator.
 """
 
 from typing import List
@@ -10,14 +10,14 @@ from src.l3_agent.context.rag.orchestrator import GraphRAGOrchestrator
 
 
 class MemoryRecallSkill:
-    """Навык для ручного глубокого поиска в векторно-графовой памяти."""
+    """Skill for manual deep search in vector-graph memory."""
 
     def __init__(self, orchestrator: GraphRAGOrchestrator) -> None:
         """
-        Инициализирует навык работы с памятью.
+        Initializes memory recall tool.
 
         Args:
-            orchestrator: Ядро гибридного поиска (Vector-Graph RAG).
+            orchestrator: Vector-Graph RAG orchestrator core.
         """
         self.orchestrator = orchestrator
 
@@ -26,22 +26,20 @@ class MemoryRecallSkill:
         """
         Searches internal knowledge, thoughts, and relation database.
         """
-        if not queries:
-            return SkillResult.fail("Ошибка: Массив запросов не может быть пустым.")
 
-        # Очищаем массив от пустых строк
+        if not queries:
+            return SkillResult.fail("Error: Queries list cannot be empty.")
+
         clean_queries = [q.strip() for q in queries if q and q.strip()]
 
         if not clean_queries:
-            return SkillResult.fail("Ошибка: Все переданные запросы оказались пустыми.")
+            return SkillResult.fail("Error: All passed queries are empty.")
 
-        # Оркестратор RAG изначально спроектирован для приема массивов строк
         result_md = await self.orchestrator.run(clean_queries)
 
         if not result_md:
             return SkillResult.ok(
-                f"По запросам {clean_queries} в памяти не найдено релевантной информации."
+                f"No relevant information found in memory for queries: {clean_queries}."
             )
 
-        # Возвращаем сформированный Markdown блок с результатами из вектора и графа
-        return SkillResult.ok(f"Результаты поиска в памяти:\n\n{result_md}")
+        return SkillResult.ok(f"Memory recall results:\n\n{result_md}")

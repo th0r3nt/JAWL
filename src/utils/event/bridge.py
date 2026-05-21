@@ -1,9 +1,9 @@
 """
-Мост маршрутизации системных событий.
+System Event Router Bridge.
 
-Отделяет логику подписки (EventBus) от главного файла. Слушает шину
-событий и пробрасывает триггеры в Heartbeat агента, а также обрабатывает
-системные команды на выключение/ребут и изменение конфигов в рантайме.
+De-couples subscription routing from the main loader. Listens to EventBus
+events and proxies wakeups to Heartbeat, while processing system lifecycle commands
+and runtime config changes.
 """
 
 from typing import TYPE_CHECKING, Any, Callable, Coroutine
@@ -16,15 +16,15 @@ if TYPE_CHECKING:
 
 
 class EventBridge:
-    """Маршрутизатор системных событий (Event-Driven паттерн)."""
+    """Event router and bridge (Event-Driven pattern)."""
 
     def __init__(self, container: "SystemContainer"):
         self.container = container
 
     def setup_routing(self) -> None:
-        """Подписывает Heartbeat и системные триггеры на все события из EventBus."""
+        """Subscribes Heartbeat and system handlers to EventBus events."""
 
-        # Специфичные системные подписки
+        # Specific system subscriptions
         self.container.event_bus.subscribe(
             Events.SYSTEM_SHUTDOWN_REQUESTED, self._handle_shutdown
         )
@@ -36,7 +36,7 @@ class EventBridge:
             Events.SYSTEM_DASHBOARD_UPDATE, self._handle_dashboard_update
         )
 
-        # Подписка Heartbeat на остальные события (динамическая генерация)
+        # Dynamic Heartbeat subscription mapping
         system_events = {
             Events.SYSTEM_CORE_STOP.name,
             Events.SYSTEM_SHUTDOWN_REQUESTED.name,
@@ -47,7 +47,7 @@ class EventBridge:
             if event.name in system_events:
                 continue
 
-            # Замыкание для фиксации текущего event в контексте генератора
+            # Closure to lock event reference inside loop generator
             handler = self._create_heartbeat_handler(event)
             self.container.event_bus.subscribe(event, handler)
 
@@ -55,7 +55,7 @@ class EventBridge:
         self, evt: EventConfig
     ) -> Callable[..., Coroutine[Any, Any, None]]:
         """
-        Генерирует асинхронный обработчик для перенаправления события в Heartbeat.
+        Generates async callback proxying event parameters to Heartbeat.
         """
 
         async def handler(**kwargs: Any) -> None:
@@ -70,31 +70,31 @@ class EventBridge:
         return handler
 
     # =========================================================================
-    # ОБРАБОТЧИКИ СИСТЕМНЫХ КОМАНД И КОНФИГУРАЦИЙ
+    # SYSTEM COMMANDS AND CONFIGURATION CONTROLLERS
     # =========================================================================
 
     async def _handle_config_update(self, **kwargs: Any) -> None:
         """
-        Рантайм-обновление настроек подсистем (Hot Reload).
+        Runtime configuration update handler (Hot Reload).
         """
 
         key = kwargs.get("key")
 
-        # Настройки Heartbeat
+        # Heartbeat settings
         if key in ("heartbeat_interval", "continuous_cycle"):
             if self.container.heartbeat:
                 self.container.heartbeat.update_config(key, kwargs.get("value"))
 
-        # Лимиты SQL баз данных
+        # Relational SQL limits
         elif key == "db_limit":
             module = kwargs.get("module", "")
             val = kwargs.get("value", 0)
 
             if self.container.sql:
                 self.container.sql.update_limits(module, val)
-                main_logger.info(f"[System] Рантайм-обновление лимита для {module}: {val}")
+                main_logger.info(f"[System] Runtime configuration updated for {module}: {val}")
 
-        # Глубина контекста (Ticks)
+        # Episodic context depth (Ticks)
         elif key == "context_depth":
             high = kwargs.get("high_ticks", 0)
             medium = kwargs.get("medium_ticks", 0)
@@ -104,11 +104,11 @@ class EventBridge:
                 self.container.sql.update_context_depth(high, medium, low)
 
             total = high + medium + low
-            main_logger.info(f"[System] Рантайм-обновление контекста: {total} тиков")
+            main_logger.info(f"[System] Runtime context depth updated: {total} ticks")
 
     async def _handle_dashboard_update(self, **kwargs: Any) -> None:
         """
-        Обновление или удаление кастомного блока Markdown на дашборде L0 State.
+        Updates or removes custom Markdown block in L0 State.
         """
 
         name = kwargs.get("name")
@@ -119,7 +119,7 @@ class EventBridge:
 
     async def _handle_shutdown(self, **kwargs: Any) -> None:
         """
-        Команда на выключение системы.
+        Handles system shutdown signal.
         """
 
         self.container.exit_code = 0
@@ -128,9 +128,9 @@ class EventBridge:
 
     async def _handle_reboot(self, **kwargs: Any) -> None:
         """
-        Команда на перезагрузку системы.
+        Handles system reboot signal.
         """
-        
+
         self.container.exit_code = 1
         if self.container.heartbeat:
             self.container.heartbeat.stop()

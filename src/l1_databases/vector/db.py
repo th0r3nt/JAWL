@@ -1,9 +1,9 @@
 """
-Клиент векторной базы данных Qdrant.
+Vector database client (Qdrant).
 
-Обеспечивает создание локальных In-Memory/On-Disk коллекций и защиту от
-повреждения данных. В случае изменения размерности вектора в конфигах
-система автоматически инициирует удаление старого кэша для предотвращения крашей.
+Provides creation of local In-Memory/On-Disk collections and data corruption
+protection. In case of vector dimension changes in the configs,
+the system automatically triggers deletion of the old cache to prevent crashes.
 """
 
 import shutil
@@ -15,16 +15,16 @@ from src.utils.logger import main_logger
 
 
 class VectorDB:
-    """Менеджер подключения и структуры векторной базы Qdrant."""
+    """Connection and structure manager for the Qdrant vector database."""
 
     def __init__(self, db_path: str, collections: List[str], vector_size: int) -> None:
         """
-        Инициализирует пути и параметры для подключения к Qdrant.
+        Initializes paths and parameters for connection to Qdrant.
 
         Args:
-            db_path: Путь к директории хранения файлов базы данных.
-            collections: Список имен коллекций, которые должны быть созданы ('knowledge', 'thoughts').
-            vector_size: Размерность векторов (должна строго совпадать с используемой embedding-моделью).
+            db_path: Path to the database files storage directory.
+            collections: List of collection names to be created ('knowledge', 'thoughts').
+            vector_size: Vector dimension (must strictly match the used embedding model).
         """
 
         self.db_path = Path(db_path)
@@ -34,13 +34,13 @@ class VectorDB:
 
     async def connect(self) -> None:
         """
-        Устанавливает соединение с локальной БД Qdrant.
-        При первом запуске автоматически создает коллекции и Payload Index для тегов.
-        Если обнаружено фатальное повреждение кэша базы (например, из-за изменения vector_size) —
-        выполняет принудительный Hard Reset (удаляет директорию и создает чистую базу).
+        Establishes connection to the local Qdrant DB.
+        Upon first run, automatically creates collections and Payload Index for tags.
+        If fatal corruption of the database cache is detected (e.g., due to a change in vector_size) —
+        performs a forced Hard Reset (deletes the directory and creates a clean database).
 
         Raises:
-            Exception: Если базу невозможно прочитать или пересоздать.
+            Exception: If the database cannot be read or recreated.
         """
         self.db_path.mkdir(parents=True, exist_ok=True)
 
@@ -50,19 +50,17 @@ class VectorDB:
         except Exception as e:
             if "ValidationError" in str(type(e)) or "CreateCollection" in str(e):
                 main_logger.warning(
-                    "[Vector DB] Обнаружена несовместимость версий или повреждение локальной БД. "
-                    "Инициировано автоматическое восстановление."
+                    "[Vector DB] Version incompatibility or local DB corruption detected. "
+                    "Automatic recovery initiated."
                 )
                 shutil.rmtree(self.db_path, ignore_errors=True)
                 self.db_path.mkdir(parents=True, exist_ok=True)
                 self.client = AsyncQdrantClient(path=str(self.db_path))
             else:
-                main_logger.error(
-                    f"[Vector DB] Критическая ошибка при запуске базы данных: {e}"
-                )
+                main_logger.error(f"[Vector DB] Critical error starting database: {e}")
                 raise e
 
-        # Проверяем и создаем коллекции, если их нет
+        # Check and create collections if they do not exist
         for coll in self.collections:
             if not await self.client.collection_exists(coll):
                 await self.client.create_collection(
@@ -72,10 +70,10 @@ class VectorDB:
                         distance=models.Distance.COSINE,
                     ),
                 )
-                main_logger.info(f"[Vector DB] Создана коллекция: {coll}")
+                main_logger.info(f"[Vector DB] Collection created: {coll}")
 
-            # Создаем KEYWORD индекс для тегов (Qdrant игнорирует вызов, если индекс уже существует)
-            # Это гарантирует, что поиск по tags_filter будет работать за O(1), а не O(N)
+            # Create KEYWORD index for tags (Qdrant ignores the call if the index already exists)
+            # This ensures that search by tags_filter runs in O(1) instead of O(N)
             try:
                 await self.client.create_payload_index(
                     collection_name=coll,
@@ -84,19 +82,19 @@ class VectorDB:
                 )
             except Exception as idx_err:
                 main_logger.debug(
-                    f"[Vector DB] Индекс для 'tags' в '{coll}' уже существует или произошла ошибка: {idx_err}"
+                    f"[Vector DB] Index for 'tags' in '{coll}' already exists or an error occurred: {idx_err}"
                 )
 
-        main_logger.info(f"[Vector DB] База данных инициализирована по пути: {self.db_path}")
+        main_logger.info(f"[Vector DB] Database initialized at: {self.db_path}")
 
     async def disconnect(self) -> None:
-        """Корректно закрывает базу данных при выключении системы и освобождает File Locks."""
+        """Correctly closes the database on system shutdown and releases File Locks."""
         if self.client:
             try:
-                # Явно закрываем клиент, чтобы portalocker отпустил файлы БД
+                # Explicitly close the client so portalocker releases DB files
                 await self.client.close()
             except Exception as e:
-                main_logger.debug(f"[Vector DB] Ошибка при закрытии клиента: {e}")
+                main_logger.debug(f"[Vector DB] Error closing client: {e}")
 
             self.client = None
-            main_logger.info("[Vector DB] Подключение к базе данных закрыто.")
+            main_logger.info("[Vector DB] Connection to the database closed.")

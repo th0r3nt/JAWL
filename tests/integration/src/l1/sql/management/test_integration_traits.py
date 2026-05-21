@@ -30,9 +30,9 @@ async def test_remove_trait(traits_manager):
     res_delete = await traits_manager.remove_trait(trait_id)
     assert res_delete.is_success is True
 
-    # Проверяем, что список пуст
+    # Проверяем, что список empty
     res_get = await traits_manager.get_traits()
-    assert "Список приобретенных черт личности пуст" in res_get.message
+    assert "Acquired personality traits list is empty" in res_get.message
 
 
 @pytest.mark.asyncio
@@ -43,4 +43,4 @@ async def test_add_trait_limit(traits_manager):
     # Третий должен упасть в лимит
     res_fail = await traits_manager.add_trait("Trait 3", "Desc")
     assert res_fail.is_success is False
-    assert "Достигнут лимит" in res_fail.message
+    assert "limit of acquired personality traits reached" in res_fail.message

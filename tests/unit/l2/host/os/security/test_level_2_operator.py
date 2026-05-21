@@ -14,22 +14,20 @@ def set_operator_level(os_client):
 
 def test_operator_write_framework_without_session_blocked(os_client):
     """
-    АТАКА (ОШИБКА): Агент пытается "на горячую" изменить исходный код,
-    не открыв Deploy Session. Это может привести к крашу при SyntaxError.
+    ATTACK: Changing core modules 'on the fly' without active deploy sessions.
     """
     core_file = os_client.framework_dir / "src" / "builder.py"
 
     with pytest.raises(
         PermissionError,
-        match="SYSTEM DENIED: Для изменения исходного кода фреймворка необходимо сначала открыть деплой-сессию",
+        match="SYSTEM DENIED: Modifying framework source code requires an active deploy session",
     ):
         os_client.validate_path(core_file, is_write=True)
 
 
 def test_operator_write_framework_with_session_allowed(os_client):
     """
-    ЛЕГАЛЬНО: Агент открыл сессию и модифицирует код.
-    Система должна сделать бэкап и пропустить его.
+    LEGITIMATE: Active deploy session allows core writing.
     """
     os_client.deploy_manager.is_active = True
     core_file = os_client.framework_dir / "src" / "builder.py"
@@ -37,37 +35,32 @@ def test_operator_write_framework_with_session_allowed(os_client):
     resolved = os_client.validate_path(core_file, is_write=True)
 
     assert resolved == core_file.resolve()
-    # Убеждаемся, что Гейткипер вызвал команду создания Copy-on-Write бэкапа
     os_client.deploy_manager.backup_file.assert_called_once_with(resolved)
 
 
 def test_operator_sandbox_write_ignores_session(os_client):
     """
-    ЛЕГАЛЬНО: Агент без открытой сессии пишет скрипт в песочницу.
-    Деплой-сессии требуются только для ядра, в песочнице можно творить хаос свободно.
+    LEGITIMATE: Writing to sandbox bypassing active deploy session constraints.
     """
     sandbox_file = os_client.sandbox_dir / "test_script.py"
 
-    # Пройдет успешно без PermissionError
     resolved = os_client.validate_path(sandbox_file, is_write=True)
     assert resolved == sandbox_file.resolve()
 
-    # Бэкап создаваться не должен
     os_client.deploy_manager.backup_file.assert_not_called()
 
 
 def test_operator_host_os_breach_blocked(os_client):
     """
-    АТАКА: Агент с правами изменения фреймворка пытается выйти за его пределы
-    в операционную систему хоста.
+    ATTACK: Operator agent targets files outside of framework bounds.
     """
     host_file = "C:\\Windows\\System32" if os.name == "nt" else "/etc"
 
     with pytest.raises(
         PermissionError,
-        match="OPERATOR: Доступ \\(чтение и запись\\) разрешен строго только в директории JAWL.",
+        match="OPERATOR: Access \\(read and write\\) is permitted strictly within the JAWL directory.",
     ):
         os_client.validate_path(host_file, is_write=True)
 
-    with pytest.raises(PermissionError, match="OPERATOR"):
+    with pytest.raises(PermissionError, match="OPERATOR: Access"):
         os_client.validate_path(host_file, is_write=False)

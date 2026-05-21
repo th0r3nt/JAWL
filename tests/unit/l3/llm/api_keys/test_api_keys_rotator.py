@@ -18,7 +18,7 @@ def mock_keys() -> list[str]:
 
 
 def test_rotator_init_empty_keys() -> None:
-    """При пустом списке ключей ротатор должен падать при инициализации."""
+    """При emptyом списке ключей ротатор должен падать при инициализации."""
     with pytest.raises(ValueError, match="LLM API keys not found"):
         APIKeyRotator([])
 
@@ -51,13 +51,13 @@ def test_rotator_cooldown(mock_time, mock_keys: list[str]) -> None:
     assert rotator.get_next_key() == "key2"
     assert rotator.get_next_key() == "key3"
 
-    # Круг замкнулся. key1 все еще в бане, поэтому ротатор должен пропустить его и выдать key2
+    # Круг замкнулся. key1 все еще в бане, поэтому ротатор должен проemptyить его и выдать key2
     assert rotator.get_next_key() == "key2"
 
     # Эмулируем прошествие времени: теперь time=161.0 (кулдаун key1 прошел)
     mock_time.return_value = 161.0
 
-    # После key2 идет key3, а затем key1 должен снова стать доступен
+    # После key2 идет key3, а затем key1 должен снова стать is reachable
     assert rotator.get_next_key() == "key3"
     assert rotator.get_next_key() == "key1"
 
@@ -85,13 +85,13 @@ def test_rotator_all_keys_exhausted(mock_time, mock_keys: list[str]) -> None:
     rotator.cooldown_key("key2", 60)
     rotator.cooldown_key("key3", 60)
 
-    with pytest.raises(AllKeysExhaustedError, match="Все API ключи исчерпали лимиты"):
+    with pytest.raises(AllKeysExhaustedError, match="All API keys have exhausted their limits"):
         rotator.get_next_key()
 
 
 @patch("src.l3_agent.llm.api_keys.rotator.time.time")
 def test_rotator_subsecond_wait_never_zero(mock_time, mock_keys: list[str]) -> None:
-    """При кулдауне меньше 1 сек сообщение не должно говорить 'подождать 0 сек'.
+    """При кулдауне меньше 1 сек сообщение не должно говорить 'wait 0 sec'.
 
     Раньше было int(0.7) = 0, агент думал что ожидание не требуется и шел в
     ретрай луп, получая тот же rate limit.
@@ -106,24 +106,24 @@ def test_rotator_subsecond_wait_never_zero(mock_time, mock_keys: list[str]) -> N
         rotator.get_next_key()
 
     msg = str(exc.value)
-    assert "подождать 0 сек" not in msg
-    assert "подождать 1 сек" in msg
+    assert "wait 0 sec" not in msg
+    assert "wait 1 sec" in msg
 
 
 @patch("src.l3_agent.llm.api_keys.rotator.time.time")
 def test_rotator_wait_time_rounds_up(mock_time, mock_keys: list[str]) -> None:
-    """При кулдауне 3.4 сек должно быть 'подождать 4', а не 3."""
+    """При кулдауне 3.4 сек должно быть 'wait 4', а не 3."""
     mock_time.return_value = 100.0
     rotator = APIKeyRotator(mock_keys)
     rotator._cooldowns = {k: 103.4 for k in mock_keys}
 
-    with pytest.raises(AllKeysExhaustedError, match="подождать 4 сек"):
+    with pytest.raises(AllKeysExhaustedError, match="wait 4 sec"):
         rotator.get_next_key()
 
 
 @patch("src.l3_agent.llm.api_keys.rotator.time.time")
 def test_rotator_wait_time_small_negative_race(mock_time, mock_keys: list[str]) -> None:
-    """Race condition: проверка выше по петле пропустила ключи, но на этапе min() один из
+    """Race condition: проверка выше по петле проemptyила ключи, но на этапе min() один из
     ключей уже освободился. int(отрицательного) выдавал отрицательное число в
     сообщении. Симулируем вызовом _raise_exhausted напрямую через принудительно выставленный
     max-кулдаун чуть в будущем и сдвигом часов прямо в момент min().
@@ -136,5 +136,5 @@ def test_rotator_wait_time_small_negative_race(mock_time, mock_keys: list[str]) 
     with pytest.raises(AllKeysExhaustedError) as exc:
         rotator.get_next_key()
     msg = str(exc.value)
-    assert "-" not in msg.split("подождать", 1)[1]
-    assert "подождать 1 сек" in msg
+    assert "-" not in msg
+    assert "wait 1 sec" in msg

@@ -20,7 +20,7 @@ def test_github_events_parse_event(github_events):
     }
     parsed = github_events._parse_github_event(raw_push)
     assert parsed is not None
-    assert "запушил 1 коммит" in parsed
+    assert "pushed 1 commit(s)" in parsed
     assert "Fix bugs" in parsed
 
     raw_watch = {"type": "WatchEvent"}  # Мусорный эвент

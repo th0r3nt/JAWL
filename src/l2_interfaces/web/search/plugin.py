@@ -1,5 +1,5 @@
 """
-Плагин интерфейса Web Search & Deep Research.
+Web Search and Deep Research interface plugin.
 """
 
 from typing import List, Any, Dict, Optional
@@ -54,26 +54,26 @@ class WebSearchPlugin(BaseInterface):
         if config.search_engine == "tavily":
             if tavily_api_key:
                 active_searcher = TavilySearch(client=client, api_key=tavily_api_key)
-                main_logger.info("[Web Search] Поиск через: Tavily")
+                main_logger.info("[Web Search] Search via: Tavily")
             else:
                 main_logger.warning(
-                    "[Web Search] TAVILY_API_KEY не найден. Fallback на DuckDuckGo."
+                    "[Web Search] TAVILY_API_KEY not found. Fallback to DuckDuckGo."
                 )
 
         if active_searcher is None:
             active_searcher = DuckDuckGoSearch(client=client)
-            main_logger.info("[Web Search] Поиск через: DuckDuckGo")
+            main_logger.info("[Web Search] Search via: DuckDuckGo")
 
         if config.reader_engine == "jina":
             active_reader = JinaReader(client=client)
-            main_logger.info("[Web Search] Читалка страниц: Jina Reader")
+            main_logger.info("[Web Search] Webpage reader: Jina Reader")
         else:
             if config.reader_engine != "trafilatura":
                 main_logger.warning(
-                    f"[Web Search] Неизвестная читалка '{config.reader_engine}'. Fallback на Trafilatura."
+                    f"[Web Search] Unknown reader '{config.reader_engine}'. Fallback to Trafilatura."
                 )
             active_reader = TrafilaturaReader(client=client)
-            main_logger.info("[Web Search] Читалка страниц: Trafilatura")
+            main_logger.info("[Web Search] Webpage reader: Trafilatura")
 
         deep_research = DeepResearch(
             client=client, searcher=active_searcher, reader=active_reader
@@ -89,5 +89,5 @@ class WebSearchPlugin(BaseInterface):
             section=ContextSection.INTERFACES,
         )
 
-        main_logger.info("[Web Search] Интерфейс загружен..")
+        main_logger.info("[Web Search] Interface loaded.")
         return []

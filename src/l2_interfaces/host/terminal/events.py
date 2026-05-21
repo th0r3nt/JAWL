@@ -1,7 +1,8 @@
 """
-Оркестратор событий терминала.
-Выступает мостом (Consumer) между внутренней асинхронной очередью TCP-сервера
-и глобальной шиной событий (EventBus).
+Terminal events orchestrator.
+
+Acts as a bridge (Consumer) between the internal async queue of the TCP server
+and the global EventBus of the agent.
 """
 
 import asyncio
@@ -12,7 +13,7 @@ from src.l2_interfaces.host.terminal.client import HostTerminalClient
 
 
 class HostTerminalEvents:
-    """Фоновый воркер: перекладывает сообщения и события подключения из очереди сокета в EventBus."""
+    """Background worker: forwards messages and connection events from the socket queue to EventBus."""
 
     def __init__(self, client: HostTerminalClient, event_bus: EventBus):
         self.client = client
@@ -35,19 +36,19 @@ class HostTerminalEvents:
     async def _loop(self):
         while self._is_running:
             try:
-                # Ждем данные из TCP-сервера
+                # Await data from the TCP server
                 action, payload = await self.client.incoming_queue.get()
 
-                # Публикуем соответствующее событие
+                # Publish the corresponding event
                 if action == "_CONNECTION_OPENED":
                     await self.bus.publish(
                         Events.HOST_TERMINAL_OPENED,
-                        message="Терминал чата открыт.",
+                        message="Chat terminal opened.",
                     )
                 elif action == "_CONNECTION_CLOSED":
                     await self.bus.publish(
                         Events.HOST_TERMINAL_CLOSED,
-                        message="Терминал чата закрыт.",
+                        message="Chat terminal closed.",
                     )
                 elif action == "_MESSAGE":
                     await self.bus.publish(
@@ -57,4 +58,4 @@ class HostTerminalEvents:
             except asyncio.CancelledError:
                 break
             except Exception as e:
-                main_logger.error(f"[Host OS] Ошибка в обработке терминала: {e}")
+                main_logger.error(f"[Host OS] Error processing terminal: {e}")

@@ -1,5 +1,5 @@
 """
-Навыки для безопасного чтения бинарных текстовых документов (.pdf, .docx).
+Skills for secure reading of binary text documents (.pdf, .docx).
 """
 
 import pypdf
@@ -18,7 +18,7 @@ from src.l3_agent.swarm.roles import Subagents
 
 
 class HostOSDocuments:
-    """Инструментарий для извлечения сырого текста из документов."""
+    """Tools for extracting raw text from documents."""
 
     def __init__(self, host_os_client: HostOSClient):
         self.host_os = host_os_client
@@ -29,22 +29,22 @@ class HostOSDocuments:
         self, filepath: str, page_start: Optional[int] = None, page_end: Optional[int] = None
     ) -> SkillResult:
         """
-        Extracts text from .pdf/.docx. 
-        
-        filepath: Sandbox relative path. 
+        Extracts text from .pdf/.docx.
+
+        filepath: Sandbox relative path.
         page_start/page_end: 1-based page range (PDF only).
         """
         try:
             safe_path = self.host_os.validate_path(filepath, is_write=False)
 
             if not safe_path.is_file():
-                return SkillResult.fail(f"Ошибка: Файл не найден ({safe_path.name}).")
+                return SkillResult.fail(f"Error: File not found ({safe_path.name}).")
 
             ext = safe_path.suffix.lower()
             if ext not in [".pdf", ".docx"]:
                 return SkillResult.fail(
-                    f"Ошибка: Формат '{ext}' не поддерживается этим навыком. "
-                    f"Поддерживаемые форматы: .pdf, .docx."
+                    f"Error: Format '{ext}' is not supported by this skill. "
+                    f"Supported formats: .pdf, .docx."
                 )
 
             size_str = format_size(safe_path.stat().st_size)
@@ -52,7 +52,7 @@ class HostOSDocuments:
 
             def _extract_text() -> str:
                 # ==========================
-                # Парсинг PDF
+                # PDF Parsing
                 # ==========================
                 if ext == ".pdf":
 
@@ -65,18 +65,18 @@ class HostOSDocuments:
 
                         if start_idx >= total_pages or start_idx >= end_idx:
                             raise ValueError(
-                                f"Неверный диапазон страниц. В документе всего {total_pages} стр."
+                                f"Invalid page range. The document only has {total_pages} pages."
                             )
 
                         extracted_pages = []
                         for i in range(start_idx, end_idx):
                             page_text = reader.pages[i].extract_text() or ""
-                            extracted_pages.append(f"--- Страница {i + 1} ---\n{page_text}")
+                            extracted_pages.append(f"--- Page {i + 1} ---\n{page_text}")
 
                         return "\n\n".join(extracted_pages)
 
                 # ==========================
-                # Парсинг DOCX
+                # DOCX Parsing
                 # ==========================
                 elif ext == ".docx":
 
@@ -89,24 +89,24 @@ class HostOSDocuments:
 
                 return ""
 
-            main_logger.info(f"[Host OS] Чтение документа: {safe_path.name} ({size_str})")
+            main_logger.info(f"[Host OS] Reading document: {safe_path.name} ({size_str})")
 
-            # Парсинг документов требует CPU, запускаем в отдельном пуле потоков
+            # Parsing documents requires CPU, running in a separate thread pool
             raw_text = await asyncio.to_thread(_extract_text)
 
             if not raw_text.strip():
                 return SkillResult.ok(
-                    "Документ прочитан, но текст не найден (возможно, это сканы или пустой файл)."
+                    "Document read, but no text found (possibly scans or an empty file)."
                 )
 
-            # Защита контекста от переполнения
+            # Context protection against overflow
             clean_text = truncate_text(
                 raw_text,
                 max_chars,
-                f"\n... [Текст обрезан. Достигнут лимит в {max_chars} символов]",
+                f"\n... [Text truncated. Reached limit of {max_chars} characters]",
             )
 
-            return SkillResult.ok(f"Содержимое {safe_path.name}:\n\n{clean_text}")
+            return SkillResult.ok(f"Content of {safe_path.name}:\n\n{clean_text}")
 
         except PermissionError as e:
             return SkillResult.fail(str(e))
@@ -118,5 +118,5 @@ class HostOSDocuments:
             return SkillResult.fail(str(e))
 
         except Exception as e:
-            main_logger.error(f"[Host OS] Ошибка при чтении документа: {e}")
-            return SkillResult.fail(f"Ошибка при парсинге документа: {e}")
+            main_logger.error(f"[Host OS] Error reading document: {e}")
+            return SkillResult.fail(f"Error parsing document: {e}")

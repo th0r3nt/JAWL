@@ -37,7 +37,7 @@ async def test_subagent_forces_report_submission(mock_loop_deps):
     loop.max_steps = 2
     loop.report_submitted = False
 
-    # Модель настойчиво пытается выйти (пустой массив)
+    # Модель настойчиво пытается выйти (empty actions list)
     loop.executor.execute.return_value = '{"reflection": "Я хочу уйти", "actions": []}'
 
     with patch.object(loop, "_dump_context_to_file"):
@@ -46,7 +46,7 @@ async def test_subagent_forces_report_submission(mock_loop_deps):
     assert loop.is_done is False
     assert len(loop.history) == 2
     assert "[System Error]" in loop.history[0]["results"]
-    assert "Это запрещено." in loop.history[0]["results"]
+    assert "This is forbidden." in loop.history[0]["results"]
 
 
 @pytest.mark.asyncio

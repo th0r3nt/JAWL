@@ -18,7 +18,7 @@ async def test_subagent_report_submit(tmp_path):
 
     # Проверка ответа скилла
     assert res.is_success is True
-    assert "пустой массив" in res.message
+    assert "empty actions list" in res.message
 
     # Проверка сохранения файла
     report_file = sandbox_dir / "_system" / "subagents" / "coder_abc12.md"

@@ -1,3 +1,11 @@
+"""
+Central Logging Subsystem of the JAWL Framework.
+
+Provides structured logging to physical files with automatic rotation and
+ColorFormatter console outputs that dynamically style logs based on event severity,
+and system components prefixes.
+"""
+
 import copy
 import logging
 import sys
@@ -5,12 +13,12 @@ from typing import List
 from pathlib import Path
 from logging.handlers import RotatingFileHandler
 
-# Реестр всех созданных файловых хендлеров для динамического обновления конфига
+# Registry of all created file handlers for dynamic configuration updates
 _file_handlers_registry: List[RotatingFileHandler] = []
 
 
 class LogColors:
-    """Константы ANSI-цветов для терминала."""
+    """ANSI color constants for terminal output."""
 
     RESET = "\033[0m"
     RED = "\033[31m"
@@ -30,11 +38,11 @@ class LogColors:
 
 class ColorFormatter(logging.Formatter):
     """
-    Потокобезопасный форматтер логов без побочных эффектов.
-    Применяет ANSI-раскраску для терминала на основе уровня важности
-    или уникальных префиксов сообщений, сохраняя ограничения по длине.
+    Thread-safe log formatter without side-effects.
+    Applies ANSI colors to terminal logs based on severity levels
+    or unique message prefixes, respecting length constraints.
     """
-    
+
     LEVEL_COLORS = {
         logging.DEBUG: LogColors.GRAY,
         logging.WARNING: LogColors.YELLOW,
@@ -61,51 +69,51 @@ class ColorFormatter(logging.Formatter):
         self.max_console_length = max_console_length
 
     def format(self, record: logging.LogRecord) -> str:
-        # Создаем поверхностную копию записи, чтобы не мутировать исходный объект
-        # и не ломать логирование в файлы у других хендлеров
+        # Create a shallow copy of the record to avoid mutating the original object
+        # and disrupting file logging on other handlers
         rec = copy.copy(record)
-        
-        # Безопасно извлекаем исходную строку сообщения
+
+        # Safely retrieve the raw message string
         msg_str = rec.getMessage()
-        
-        # Выполняем обрезку для консоли только на изолированной копии
+
+        # Perform truncation for the console only on the isolated copy
         if len(msg_str) > self.max_console_length:
             truncated_msg = (
                 msg_str[: self.max_console_length]
-                + f"\n{LogColors.GRAY}...[Вывод обрезан для терминала]{LogColors.RESET}"
+                + f"\n{LogColors.GRAY}...[Output truncated for terminal]{LogColors.RESET}"
             )
             rec.msg = truncated_msg
-            rec.args = ()  # Сбрасываем аргументы, так как сообщение уже отформатировано
-        
-        # Форматируем строку лога стандартными средствами
+            rec.args = ()  # Clear args since the message is already formatted
+
+        # Format the log line using standard mechanisms
         log_message = super().format(rec)
-        
-        # Определяем цвет на основе уровня лога или поиска префиксов
+
+        # Determine color based on log level or prefix search
         color = ""
         if rec.levelno in self.LEVEL_COLORS:
             color = self.LEVEL_COLORS[rec.levelno]
         else:
-            # Честный проход по словарю префиксов без преждевременных выходов
+            # Linear scan over the prefixes dictionary
             for prefix, prefix_color in self.PREFIX_COLORS.items():
                 if prefix in msg_str:
                     color = prefix_color
-                    break  # Нашли совпадение — выходим из цикла
+                    break
 
-        # Оборачиваем в ANSI-код, если цвет определен
+        # Wrap in ANSI codes if a color was identified
         if color:
             return f"{color}{log_message}{LogColors.RESET}"
-            
+
         return log_message
 
 
 def setup_subsystem_logger(name: str, log_file: str, propagate: bool = True) -> logging.Logger:
     """
-    Инициализирует логгер для подсистемы.
+    Initializes a logger for a system component.
 
     Args:
-        name: Уникальное имя логгера (напр. 'JAWL.Agent').
-        log_file: Имя файла в директории logs/.
-        propagate: Если True, дублирует записи в родительский логгер (JAWL -> main.log).
+        name: Unique logger name (e.g., 'JAWL.Agent').
+        log_file: Target file name in the logs/ directory.
+        propagate: If True, forwards entries to the parent logger (JAWL -> main.log).
     """
 
     log_dir = Path("logs")
@@ -119,11 +127,11 @@ def setup_subsystem_logger(name: str, log_file: str, propagate: bool = True) -> 
     logger.setLevel(logging.INFO)
     logger.propagate = propagate
 
-    # Формат для файлов (всегда подробный)
+    # File format (always verbose)
     file_fmt = "%(asctime)s.%(msecs)03d - %(name)s - %(levelname)s - %(message)s"
     date_fmt = "%Y-%m-%d %H:%M:%S"
 
-    # Файловый хендлер
+    # Rotating file handler
     handler = RotatingFileHandler(
         full_path, maxBytes=5 * 1024 * 1024, backupCount=1, encoding="utf-8"
     )
@@ -135,10 +143,10 @@ def setup_subsystem_logger(name: str, log_file: str, propagate: bool = True) -> 
     return logger
 
 
-# 1. Корневой логгер всей системы (main.log)
+# 1. Root logger of the entire system (main.log)
 main_logger = setup_subsystem_logger("JAWL", "main.log", propagate=False)
 
-# Добавляем вывод в консоль только для корневого логгера
+# Add stdout console stream handler to the root logger only
 console_handler = logging.StreamHandler()
 console_handler.setFormatter(
     ColorFormatter(
@@ -147,8 +155,8 @@ console_handler.setFormatter(
 )
 main_logger.addHandler(console_handler)
 
-# 2. Изолированные логгеры подсистем
-# Они пишут в свои файлы И пробрасывают в JAWL (main.log)
+# 2. Isolated subsystem loggers
+# They write to their respective files AND propagate up to JAWL (main.log)
 agent_logger = setup_subsystem_logger("JAWL.Agent", "agent.log")
 swarm_logger = setup_subsystem_logger("JAWL.Swarm", "subagents.log")
 tot_logger = setup_subsystem_logger("JAWL.ToT", "tot.log")
@@ -156,7 +164,7 @@ subc_logger = setup_subsystem_logger("JAWL.Subc", "subconscious.log")
 
 
 def apply_logger_config(max_size_mb: float, backup_count: int) -> None:
-    """Обновляет настройки ротации для всех файлов логов."""
+    """Updates file rotation limits for all registered handlers."""
     max_bytes = int(max_size_mb * 1024 * 1024)
     for handler in _file_handlers_registry:
         handler.maxBytes = max_bytes
@@ -164,6 +172,6 @@ def apply_logger_config(max_size_mb: float, backup_count: int) -> None:
 
 
 def update_log_level(level_str: str) -> None:
-    """Обновляет уровень логирования для всей иерархии JAWL."""
+    """Updates the logging verbosity level for the JAWL hierarchy."""
     lvl = getattr(logging, level_str.upper(), logging.INFO)
     logging.getLogger("JAWL").setLevel(lvl)

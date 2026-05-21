@@ -1,11 +1,9 @@
 """
-Экран первичной инициализации.
+First Boot Onboarding Screen.
 
-Проводит пользователя через базовый линейный опросник при самом первом запуске JAWL.
-
-Запрашивает имя агента, ключи API, параметры LLM и настройку Swarm-субагентов.
-
-Автоматически формирует `.env` файл и базовые YAML-конфиги.
+Guides the user through an interactive questionnaire on the very first boot.
+Asks for agent name, LLM endpoints, API keys, and swarm subagents preferences.
+Generates initial .env and configuration YAMLs automatically.
 """
 
 import shutil
@@ -31,7 +29,7 @@ SETTINGS_EXAMPLE = ROOT_DIR / "config" / "settings.example.yaml"
 
 
 def _ensure_base_files_exist() -> bool:
-    """Проверяет и создает базовые файлы из шаблонов, если их нет."""
+    """Creates mandatory config files from templates if missing."""
     files_to_check = [
         (ENV_FILE, ENV_EXAMPLE),
         (SETTINGS_FILE, SETTINGS_EXAMPLE),
@@ -45,15 +43,15 @@ def _ensure_base_files_exist() -> bool:
         if not target.exists():
             if example.exists():
                 shutil.copy2(example, target)
-                print_info(f" Создан базовый файл {target.name}")
+                print_info(f" Created base file {target.name}")
             else:
-                print_error(f"Критическая ошибка: Шаблон {example.name} не найден.")
+                print_error(f"Critical Error: Template {example.name} not found.")
                 return False
     return True
 
 
 def _update_env_file(key_map: dict) -> None:
-    """Обновляет значения в .env файле."""
+    """Updates targeted keys in the local .env file."""
     try:
         with open(ENV_FILE, "r", encoding="utf-8-sig") as f:
             lines = f.readlines()
@@ -77,7 +75,7 @@ def _update_env_file(key_map: dict) -> None:
 
 
 def _update_settings_yaml(updates: dict) -> None:
-    """Обновляет значения в settings.yaml."""
+    """Updates targeted keys in settings.yaml."""
     yaml = YAML()
     yaml.preserve_quotes = True
 
@@ -94,20 +92,18 @@ def _update_settings_yaml(updates: dict) -> None:
         with open(SETTINGS_FILE, "w", encoding="utf-8") as f:
             yaml.dump(data, f)
     except Exception as e:
-        print_error(f"Ошибка при сохранении settings.yaml: {e}")
+        print_error(f"Error saving settings.yaml: {e}")
 
 
 def _is_onboarding_needed() -> bool:
-    """Проверяет, нужно ли запускать опросник (если нет LLM_API_KEY_1 или файла .env)."""
+    """Triggers if .env or LLM_API_KEY_1 are empty."""
     if not ENV_FILE.exists():
         return True
 
     try:
         with open(ENV_FILE, "r", encoding="utf-8-sig") as f:
             content = f.read()
-            # Ищем хотя бы одну заполненную переменную (исключая пустые "")
             if 'LLM_API_KEY_1=""' in content or "LLM_API_KEY_1=\n" in content:
-                # Если URL ведет на локалхост, считаем, что всё ок (онбординг не нужен)
                 if "127.0.0.1" in content or "localhost" in content or "0.0.0.0" in content:
                     return False
                 return True
@@ -119,17 +115,16 @@ def _is_onboarding_needed() -> bool:
 
 def run_onboarding_if_needed() -> bool:
     """
-    Точка входа. Запускает линейный опросник при первом старте фреймворка.
-    Возвращает True, если можно продолжать запуск агента, False - если юзер отменил настройку.
+    First-time onboarding questionnaire loop.
     """
 
     if not _is_onboarding_needed():
         return True
 
-    set_window_title("JAWL - Первоначальная настройка")
+    set_window_title("JAWL - Initial Setup")
     clear_screen()
-    print_info(" Добро пожаловать в JAWL. Похоже, это ваш первый запуск.")
-    print_info(" Давайте выполним базовую настройку системы.\n")
+    print_info(" Welcome to JAWL. It seems this is your first startup.")
+    print_info(" Let's complete the basic system configuration.\n")
 
     if not _ensure_base_files_exist():
         return False
@@ -137,19 +132,17 @@ def run_onboarding_if_needed() -> bool:
     style = get_custom_style()
 
     print("\n")
-    # 1. Имя агента
     agent_name = questionary.text(
-        "Как назовем вашего агента? (Оставьте пустым для 'Agent'):", style=style
+        "What should we name your agent? (Leave empty for 'Agent'):", style=style
     ).ask()
     if agent_name is None:
         return False
     agent_name = agent_name.strip() or "Agent"
 
-    # 2. LLM Base URL
     print("\n")
-    print_info(" Настройка подключения к языковой модели (LLM).")
+    print_info(" Language Model (LLM) Connection Setup.")
     llm_url = questionary.text(
-        "Введите Base URL (Например, для локальной модели: 'http://127.0.0.1:11434/v1/').\nОставьте пустым для стандартного OpenAI API:",
+        "Enter Base URL (e.g., for local models: 'http://127.0.0.1:11434/v1/').\nLeave empty for standard OpenAI API:",
         style=style,
     ).ask()
     if llm_url is None:
@@ -157,32 +150,29 @@ def run_onboarding_if_needed() -> bool:
 
     is_local = "127.0.0.1" in llm_url or "localhost" in llm_url or "0.0.0.0" in llm_url
 
-    # 3. LLM API Key
     llm_key = ""
     if not is_local:
         llm_key = questionary.text(
-            "Введите ваш LLM API Key (Обязательно для облачных моделей, для локальных - пропустить):", style=style
+            "Enter your LLM API Key (Required for cloud models, skip for local):", style=style
         ).ask()
         if not llm_key:
-            print_error("Для облачных моделей API ключ обязателен. Запуск отменен.")
+            print_error("For cloud models, an API key is mandatory. Startup aborted.")
             return False
     else:
-        print_info(" Обнаружен локальный URL. API ключ не требуется.")
+        print_info(" Local URL detected. No API key required.")
         llm_key = "local_dummy_key"
 
-    # 4. Название модели
     main_model = questionary.text(
-        "Введите точное название модели для основного агента (Например: 'gemini-3.1-flash-lite', 'claude-4.6-opus', 'qwen3.6-27b'):",
+        "Enter the exact model name for the main agent (e.g., 'gemini-3.1-flash-lite', 'claude-4.6-opus'):",
         style=style,
-    ).ask() # TODO: Автоматически подтягивать доступные модели для URL, который указал пользователь, и предлагать выбрать из списка
+    ).ask()
     if not main_model:
         return False
 
-    # 5. Настройка Swarm (Субагенты)
     print("\n")
-    print_info(" Подсистема Swarm позволяет делегировать сложные задачи фоновым субагентам.")
+    print_info(" The Swarm subsystem allows delegating complex tasks to background subagents.")
     enable_swarm = questionary.confirm(
-        "Включить систему субагентов (Swarm)?", default=True, style=style
+        "Enable the subagent system (Swarm)?", default=True, style=style
     ).ask()
     if enable_swarm is None:
         return False
@@ -196,7 +186,7 @@ def run_onboarding_if_needed() -> bool:
 
     if enable_swarm:
         sub_model = questionary.text(
-            "Введите название LLM модели для субагентов (Рекомендуется дешевая и быстрая):",
+            "Enter LLM model name for subagents (Cheap and fast is recommended):",
             style=style,
         ).ask()
         if not sub_model:
@@ -206,15 +196,15 @@ def run_onboarding_if_needed() -> bool:
 
         print("\n")
         print_info(
-            " Вы можете указать отдельные API ключи для субагентов, чтобы не тратить лимиты основного ключа."
+            " You can specify separate API keys for subagents to avoid consuming main key quotas."
         )
         sub_url = questionary.text(
-            "Base URL для субагентов (оставьте пустым, чтобы использовать тот же, что и у основной модели):",
+            "Base URL for subagents (leave empty to use the same as the main model):",
             style=style,
         ).ask()
 
         sub_key = questionary.text(
-            "API Key для субагентов (оставьте пустым, чтобы использовать ключ основной модели):",
+            "API Key for subagents (leave empty to use the main model key):",
             style=style,
         ).ask()
 
@@ -223,22 +213,24 @@ def run_onboarding_if_needed() -> bool:
         if sub_key is not None and sub_key.strip():
             env_updates["SUB_LLM_API_KEY_1"] = sub_key.strip()
 
-    # 6. Настройка Tree of Thoughts
     print("\n")
-    print_info(" Подсистема Tree of Thoughts позволяет агенту генерировать и оценивать несколько стратегических вариантов перед выполнением действий, но при этом расходует больше токенов.")
+    print_info(
+        " The Tree of Thoughts subsystem allows the agent to generate and evaluate multiple strategic options before executing actions, but consumes more tokens."
+    )
     enable_tot = questionary.confirm(
-        "Включить Tree of Thoughts?", default=True, style=style
+        "Enable Tree of Thoughts?", default=True, style=style
     ).ask()
-    
+
     if enable_tot is None:
         return False
-        
+
     if enable_tot:
-        # Предлагаем модель субагентов по умолчанию, так как она обычно дешевле и быстрее
-        default_tot_model = sub_model.strip() if enable_swarm and sub_model else main_model.strip()
-        
+        default_tot_model = (
+            sub_model.strip() if enable_swarm and sub_model else main_model.strip()
+        )
+
         tot_model = questionary.text(
-            "Введите название LLM модели для Tree of Thoughts:",
+            "Enter LLM model name for Tree of Thoughts:",
             default=default_tot_model,
             style=style,
         ).ask()
@@ -247,21 +239,28 @@ def run_onboarding_if_needed() -> bool:
 
         print("\n")
         tot_mode = questionary.select(
-            "Выберите режим работы Tree of Thoughts:",
+            "Select Tree of Thoughts operating mode:",
             choices=[
-                questionary.Choice("Автоматический (каждые 5 шагов ReAct цикла + всегда на первом шаге ReAct Loop)", "auto"),
-                questionary.Choice("Ручной (агент будет использовать через отдельный вызов навыка)", "manual"),
-                questionary.Choice("Гибридный (автоматически каждые 5 шагов + по вызову навыка)", "hybrid"),
+                questionary.Choice(
+                    "Automatic (every 5 ReAct steps + always on the first ReAct loop step)",
+                    "auto",
+                ),
+                questionary.Choice(
+                    "Manual (triggered manually by the agent via skill call)", "manual"
+                ),
+                questionary.Choice(
+                    "Hybrid (automatically every 5 steps + manually on demand)", "hybrid"
+                ),
             ],
             style=style,
             qmark="",
-            instruction=" "
+            instruction=" ",
         ).ask()
         if not tot_mode:
             return False
 
         tot_branches_str = questionary.text(
-            "Сколько вариантов (веток мыслей) генерировать за один раз? (Рекомендуется 2-5):",
+            "How many thoughts branches to generate at once? (Recommended: 2-5):",
             default="3",
             style=style,
         ).ask()
@@ -271,49 +270,53 @@ def run_onboarding_if_needed() -> bool:
         try:
             tot_branches = int(tot_branches_str.strip())
         except ValueError:
-            tot_branches = 3 # Фоллбэк, если юзер введет текст вместо цифры
-            
+            tot_branches = 3
+
         settings_updates[("system", "tree_of_thoughts", "enabled")] = True
         settings_updates[("system", "tree_of_thoughts", "model")] = tot_model.strip()
         settings_updates[("system", "tree_of_thoughts", "mode")] = tot_mode
         settings_updates[("system", "tree_of_thoughts", "branches")] = tot_branches
 
-    # 7. Настройка Подсознания (Subconscious)
     print("\n")
-    print_info(" Подсистема Подсознания позволяет переложить рутинные операции по запоминанию фактов, рефлексии и забыванию неактуальных данных на фоновые микро-процессы.")
-    enable_subc = questionary.confirm(
-        "Включить Подсознание?", default=True, style=style
-    ).ask()
-    
+    print_info(
+        " The Subconscious subsystem delegates database consolidation, reflection, and memory pruning to background micro-processes."
+    )
+    enable_subc = questionary.confirm("Enable Subconscious?", default=True, style=style).ask()
+
     if enable_subc is None:
         return False
-        
+
     if enable_subc:
-        # Предлагаем модель субагентов по умолчанию (Flash Lite / Mini)
-        default_subc_model = sub_model.strip() if enable_swarm and sub_model else main_model.strip()
-        
+        default_subc_model = (
+            sub_model.strip() if enable_swarm and sub_model else main_model.strip()
+        )
+
         subc_model = questionary.text(
-            "Введите название LLM модели для Подсознания (рекомендуется самая дешевая и быстрая):",
+            "Enter LLM model name for Subconscious (The cheapest and fastest model is highly recommended):",
             default=default_subc_model,
             style=style,
         ).ask()
         if not subc_model:
             return False
-    
+
         settings_updates[("system", "subconscious", "enabled")] = True
         settings_updates[("system", "subconscious", "llm_model")] = subc_model.strip()
-        # По умолчанию включаем 3 основных паттерна
-        settings_updates[("system", "subconscious", "patterns", "consolidation", "enabled")] = True
-        settings_updates[("system", "subconscious", "patterns", "reflection", "enabled")] = True
-        settings_updates[("system", "subconscious", "patterns", "forgetting", "enabled")] = True
+        settings_updates[
+            ("system", "subconscious", "patterns", "consolidation", "enabled")
+        ] = True
+        settings_updates[("system", "subconscious", "patterns", "reflection", "enabled")] = (
+            True
+        )
+        settings_updates[("system", "subconscious", "patterns", "forgetting", "enabled")] = (
+            True
+        )
 
-    # Сохраняем все данные
     _update_env_file(env_updates)
     _update_settings_yaml(settings_updates)
 
     print("\n")
-    print_success("Первоначальная настройка успешно завершена.")
+    print_success("Initial configuration successfully completed.")
     print_info(
-        " Позже вы сможете изменить эти и другие параметры через 'Мастер настройки' в главном меню."
+        " You can modify these and other parameters later via the 'Setup Wizard' in the main menu."
     )
     return True

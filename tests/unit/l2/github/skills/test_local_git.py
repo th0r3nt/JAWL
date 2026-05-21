@@ -26,7 +26,7 @@ async def test_git_clone_success_and_masking(mock_validate, mock_exec, git_skill
     res = await git_skill.git_clone_repository("th0r3nt", "JAWL", "repo")
 
     assert res.is_success is True
-    assert "успешно склонирован" in res.message
+    assert "successfully cloned" in res.message
 
     # Убеждаемся, что токен был замаскирован в утилите
     masked = git_skill._mask_token("url with secret_token_123 inside")
@@ -67,7 +67,7 @@ async def test_git_commit_and_push(mock_validate, mock_exec, git_skill, tmp_path
     res = await git_skill.git_commit_and_push("repo", "Update logic", "main")
 
     assert res.is_success is True
-    assert "успешно зафиксированы" in res.message
+    assert "successfully committed" in res.message
     assert mock_exec.call_count == 4
 
 
@@ -83,7 +83,7 @@ async def test_git_commit_clean_tree(mock_validate, mock_exec, git_skill, tmp_pa
     mock_process_add = MagicMock(returncode=0)
     mock_process_add.communicate = AsyncMock(return_value=(b"", b""))
 
-    # Status возвращает пустоту (нет изменений)
+    # Status возвращает emptyоту (нет изменений)
     mock_process_status = MagicMock(returncode=0)
     mock_process_status.communicate = AsyncMock(return_value=(b"", b""))
 
@@ -92,5 +92,5 @@ async def test_git_commit_clean_tree(mock_validate, mock_exec, git_skill, tmp_pa
     res = await git_skill.git_commit_and_push("repo", "Update", "main")
 
     assert res.is_success is True
-    assert "Рабочее дерево чистое" in res.message
+    assert "Working tree clean" in res.message
     assert mock_exec.call_count == 2  # commit и push не вызвались

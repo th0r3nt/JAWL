@@ -1,3 +1,7 @@
+"""
+Email interface plugin.
+"""
+
 from typing import List, Any, Dict, Optional
 from src.utils.logger import main_logger
 from src.l2_interfaces.base import BaseInterface
@@ -30,7 +34,7 @@ class EmailPlugin(BaseInterface):
         password = env_vars.get("EMAIL_PASSWORD")
 
         if not account or not password:
-            main_logger.error("[Email] ACCOUNT или PASSWORD не найдены. Отключено.")
+            main_logger.error("[Email] EMAIL_ACCOUNT or EMAIL_PASSWORD not found. Disabled.")
             self.register_off_provider(container.context_registry)
             return []
 
@@ -53,6 +57,6 @@ class EmailPlugin(BaseInterface):
         container.context_registry.register_provider(
             "email", client.get_context_block, ContextSection.INTERFACES
         )
-        
-        main_logger.info("[Email] Интерфейс загружен (Plugin).")
+
+        main_logger.info("[Email] Interface loaded (Plugin).")
         return [client, events]

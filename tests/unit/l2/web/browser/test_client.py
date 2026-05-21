@@ -56,13 +56,13 @@ async def test_close_browser_cleans_up(browser_client, mock_playwright):
 
     await browser_client.close_browser()
 
-    # Проверяем сохранение сессии и закрытие
+    # Проверяем сохранение сессии и closedие
     context_mock.storage_state.assert_called_once()
     browser_mock.close.assert_called_once()
 
     assert browser_client.browser is None
     assert browser_client.state.is_open is False
-    assert "закрыт" in browser_client.state.viewport
+    assert "closed" in browser_client.state.viewport
 
 
 @pytest.mark.asyncio

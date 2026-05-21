@@ -1,64 +1,64 @@
-# 🔌 Интерфейсы (L2) в JAWL: Руководство пользователя и разработчика
+# 🔌 JAWL L2 Interfaces: User and Developer Guide
 
-Слой **L2 (Interfaces)** - это органы чувств и руки агента. Через интерфейсы агент читает файлы, отправляет сообщения, делает коммиты и сёрфит интернет. 
+The **L2 (Interfaces)** layer represents the sensory organs and hands of the agent. Through interfaces, the agent reads files, sends messages, makes commits, and surfs the Internet.
 
-Этот документ разделен на две части: для **пользователей** (как настроить готовое) и для **разработчиков** (как написать свой интерфейс, не сломав архитектуру).
-
----
-
-## 🛠 Часть 1. Для пользователей (Как включить и настроить)
-
-Все интерфейсы по умолчанию выключены, чтобы агент не лез туда, куда его не просили. 
-
-### 1. Включение через CLI (Рекомендуется)
-Самый простой способ управлять интерфейсами - запустить скрипт `jawl.py` и в главном меню выбрать:
-👉 **"⚙️ Мастер настройки"**
-Там можно включать и выключать модули пробелом/энтером. Изменения автоматически запишутся в файл `config/interfaces.yaml`.
-
-### 2. Ключи и авторизация (.env)
-Некоторым интерфейсам для работы нужны ключи API или пароли. Их нужно прописать в файле `.env` (создайте его из `.env.example`, если его еще нет).
-- **Telegram (Telethon)**: Нужны `TELETHON_API_ID` и `TELETHON_API_HASH` (берутся на my.telegram.org).
-- **Telegram (Aiogram)**: Нужен `AIOGRAM_BOT_TOKEN` от @BotFather.
-- **GitHub**: Нужен классический `GITHUB_TOKEN` (PAT) с правами `repo` и `read:user`.
-- **Email**: Нужен логин и **специальный Пароль приложения (App Password)**. Обычный пароль от почты не подойдет - Google/Yandex заблокируют вход.
-
-### 3. Ручная настройка (interfaces.yaml)
-Для тонкой настройки (лимиты, таймауты, права доступа) откройте `config/interfaces.yaml`. 
-*Самый важный параметр - `access_level` в `host_os`*. Он определяет, может ли агент стереть к чертям вам жесткий диск или он заперт в папке `sandbox/`.
+This document is divided into two parts: for **users** (how to configure what is ready) and for **developers** (how to write your own interface without breaking the architecture).
 
 ---
 
-## 🏗 Часть 2. Для разработчиков (Как создать свой интерфейс)
+## 🛠 Part 1. For Users (How to Enable and Configure)
 
-Мы строго соблюдаем **SOLID** и изоляцию слоев. Агент (L3) ничего не знает о библиотеках (L2). Он общается с интерфейсом только через зарегистрированные навыки (Skills) и видит его статус через приборную панель (L0 State).
+All interfaces are disabled by default to prevent the agent from accessing places it wasn't requested.
 
-Система использует паттерн **Plugin Discovery**. Создание нового интерфейса (например, `Discord`) всегда состоит из 5 шагов.
+### 1. Enabling via CLI (Recommended)
+The easiest way to manage interfaces is to run the `jawl.py` script and select from the main menu:
+👉 **"⚙️ Setup Wizard"**
+There, you can enable and disable modules using space/enter. Changes will be automatically written to the `config/interfaces.yaml` file.
 
-### Шаг 1. Структура папок и Стейт (L0)
-Создайте папку в `src/l2_interfaces/discord/` со следующей структурой:
+### 2. Keys and Authorization (.env)
+Some interfaces require API keys or passwords to work. These must be specified in the `.env` file (create it from `.env.example` if it doesn't exist yet).
+- **Telegram (Telethon)**: Requires `TELETHON_API_ID` and `TELETHON_API_HASH` (obtained at my.telegram.org).
+- **Telegram (Aiogram)**: Requires `AIOGRAM_BOT_TOKEN` from @BotFather.
+- **GitHub**: Requires a classic `GITHUB_TOKEN` (PAT) with `repo` and `read:user` scopes.
+- **Email**: Requires a login and a **dedicated App Password**. A regular mail password will not work - Google/Yandex will block access.
+
+### 3. Manual Configuration (interfaces.yaml)
+For fine-tuning (limits, timeouts, access rights), open `config/interfaces.yaml`.
+*The most important parameter is `access_level` in `host_os`*. It determines whether the agent can wipe your hard drive or if it is locked inside the `sandbox/` folder.
+
+---
+
+## 🏗 Part 2. For Developers (How to Create Your Own Interface)
+
+We strictly adhere to **SOLID** and layer isolation. The agent (L3) knows nothing about libraries (L2). It communicates with the interface only through registered skills (Skills) and sees its status via the dashboard (L0 State).
+
+The system uses the **Plugin Discovery** pattern. Creating a new interface (for example, `Discord`) always consists of 5 steps.
+
+### Step 1. Folder Structure and State (L0)
+Create a folder in `src/l2_interfaces/discord/` with the following structure:
 ```text
 discord/
 ├── skills/
 │   ├── __init__.py
-│   └── messages.py     # Навыки (руки агента)
+│   └── messages.py     # Skills (agent's hands)
 ├── __init__.py
-├── plugin.py           # Инициализатор плагина
-├── client.py           # Менеджер соединения
-└── state.py            # Приборная панель (L0 State)
+├── plugin.py           # Plugin initializer
+├── client.py           # Connection manager
+└── state.py            # Dashboard (L0 State)
 ```
 
-Откройте `state.py` и добавьте класс-хранилище.
-**Правило:** Стейт должен быть пассивным. Никаких I/O операций. Только кэш данных.
+Open `state.py` and add the state class.
+**Rule:** State must be passive. No I/O operations. Only data caching.
 
 ```python
 class DiscordState:
     def __init__(self, recent_limit: int = 10):
         self.is_online = False
-        self.last_messages = "Пусто."
+        self.last_messages = "Empty."
 ```
 
-### Шаг 2. Написание Клиента (`client.py`)
-Клиент инкапсулирует подключение к API и хранит ссылку на стейт (L0). 
+### Step 2. Writing the Client (`client.py`)
+The client encapsulates the connection to the API and stores a reference to the state (L0).
 
 ```python
 from typing import Any
@@ -73,12 +73,12 @@ class DiscordClient:
         desc = "Description: Discord API connector."
         if not self.state.is_online:
             return f"### DISCORD [OFF]\n{desc}\nThe interface is disabled."
-        return f"### DISCORD [ON]\n{desc}\nПоследние сообщения:\n{self.state.last_messages}"
+        return f"### DISCORD [ON]\n{desc}\nRecent messages:\n{self.state.last_messages}"
 ```
 
-### Шаг 3. Написание Навыков (`skills/messages.py`)
-Навыки - это то, что агент может вызывать. 
-**Правило:** Навыки должны возвращать объект `SkillResult`. Все методы для агента помечаются декоратором `@skill()`.
+### Step 3. Writing the Skills (`skills/messages.py`)
+Skills are what the agent can invoke.
+**Rule:** Skills must return a `SkillResult` object. All methods intended for the agent are marked with the `@skill()` decorator.
 
 ```python
 from src.l3_agent.skills.registry import skill, SkillResult
@@ -90,16 +90,16 @@ class DiscordMessages:
 
     @skill()
     async def send_message(self, channel_id: int, text: str) -> SkillResult:
-        """Отправляет текстовое сообщение в указанный канал Discord."""
+        """Sends a text message to the specified Discord channel."""
         try:
-            # логика отправки через self.client...
+            # send logic via self.client...
             return SkillResult.ok("True")
         except Exception as e:
-            return SkillResult.fail(f"Ошибка отправки: {e}")
+            return SkillResult.fail(f"Send error: {e}")
 ```
 
-### Шаг 4. Сборка (`plugin.py`)
-В `plugin.py` мы связываем всё воедино. Система автоматически найдет этот файл и загрузит плагин, если он включен в `interfaces.yaml`.
+### Step 4. Plugin Assembly (`plugin.py`)
+In `plugin.py`, we bind everything together. The system will automatically find this file and load the plugin if it is enabled in `interfaces.yaml`.
 
 ```python
 from typing import List, Any, Dict, Optional
@@ -124,7 +124,7 @@ class DiscordPlugin(BaseInterface):
         return "Connects to Discord API."
 
     def is_enabled(self, config: InterfacesConfig) -> bool:
-        # Для этого нужно добавить discord: DiscordConfig в settings.py
+        # To support this, you need to add discord: DiscordConfig to settings.py/InterfacesConfig
         return getattr(config, "discord", False)
 
     def setup(self, container: SystemContainer, env_vars: Dict[str, Optional[str]]) -> List[Any]:
@@ -138,21 +138,21 @@ class DiscordPlugin(BaseInterface):
         
         client = DiscordClient(state=state, token=token)
         
-        # Регистрируем скиллы
+        # Register skills
         register_instance(DiscordMessages(client))
         
-        # Регистрируем провайдер контекста
+        # Register context provider
         container.context_registry.register_provider(
             name=self.name.lower(), 
             provider_func=client.get_context_block, 
             section=ContextSection.INTERFACES
         )
         
-        main_logger.info("[Discord] Интерфейс загружен.")
-        return [client] # Возвращаем компоненты с методами start() и stop()
+        main_logger.info("[Discord] Interface loaded.")
+        return [client] # Return components that have start() and stop() methods
 ```
 
-### 📌 Чек-лист хорошего интерфейса:
-- [ ] **Никакого хардкода токенов**. Всё берется из `.env` и прокидывается через параметры.
-- [ ] **Защита контекста**. Если функция читает историю или файл, ставьте `truncate_text`, чтобы не выжечь лимит токенов LLM огромной портянкой текста.
-- [ ] **DRY & KISS**. Выносите общие функции (например парсинг URL) в `src/utils/`.
+### 📌 Good Interface Checklist:
+- [ ] **No token hardcoding**. Everything is extracted from `.env` and passed through arguments.
+- [ ] **Context protection**. If a function reads history or files, use `truncate_text` to prevent burning the LLM's token limit with huge text blocks.
+- [ ] **DRY & KISS**. Move shared utilities (for example, URL parsing) to `src/utils/`.

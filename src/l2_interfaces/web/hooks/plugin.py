@@ -1,6 +1,7 @@
 """
-Плагин интерфейса Web Hooks.
-Принимает входящие HTTP-соединения и кидает события в EventBus.
+Web Hooks interface plugin.
+
+Receives incoming HTTP connections and publishes events to EventBus.
 """
 
 from typing import List, Any, Dict, Optional
@@ -36,7 +37,7 @@ class WebHooksPlugin(BaseInterface):
         secret_token = env_vars.get("WEBHOOK_SECRET")
         if not secret_token:
             main_logger.error(
-                "[Web Hooks] WEBHOOK_SECRET не задан в .env. Интерфейс принудительно отключен."
+                "[Web Hooks] WEBHOOK_SECRET is not set in .env. Interface forced offline."
             )
             self.register_off_provider(container.context_registry)
             return []
@@ -63,5 +64,5 @@ class WebHooksPlugin(BaseInterface):
             section=ContextSection.INTERFACES,
         )
 
-        main_logger.info("[Web Hooks] Интерфейс загружен..")
+        main_logger.info("[Web Hooks] Interface loaded.")
         return [events]

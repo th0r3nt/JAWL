@@ -1,9 +1,8 @@
 """
-Модуль управления жизненным циклом и ритмом (пульсом) автономного агента.
+Agent Lifecycle and Rhythm (Pulse) Orchestrator.
 
-Оркестратор 'Heartbeat' отвечает за планирование ReAct-циклов,
-перехват входящих событий от интерфейсов (EventBus) и динамическое
-изменение времени сна агента (Event Acceleration).
+Responsible for scheduling ReAct reasoning loops, capturing external events
+from the EventBus, and dynamically adjusting sleep intervals (Event Acceleration).
 """
 
 import asyncio
@@ -14,6 +13,7 @@ from typing import Optional, Dict, Any, TYPE_CHECKING
 from src.utils.logger import main_logger, agent_logger
 from src.utils.event.registry import EventLevel
 from src.utils.dtime import get_now_formatted
+from src.utils._tools import update_last_active_time
 
 if TYPE_CHECKING:
     from src.l3_agent.react.loop import ReactLoop
@@ -22,8 +22,8 @@ if TYPE_CHECKING:
 
 class Heartbeat:
     """
-    Главный пульс агента.
-    Управляет таймерами запуска ReAct-цикла и реагирует на внешние раздражители.
+    Main agent pulse orchestrator.
+    Manages reasoning loop invocation schedules and triggers wakeups.
     """
 
     def __init__(
@@ -35,14 +35,14 @@ class Heartbeat:
         timezone: int,
     ) -> None:
         """
-        Инициализирует оркестратор пульса агента.
+        Initializes the heartbeat orchestrator.
 
         Args:
-            react_loop: Экземпляр главного цикла рассуждений агента.
-            heartbeat_interval: Базовое время сна (в секундах).
-            continuous_cycle: Флаг непрерывной работы без ухода в сон.
-            accel_config: Конфигурация множителей ускорения пробуждения.
-            timezone: Смещение часового пояса относительно UTC.
+            react_loop: Active reasoning loop instance.
+            heartbeat_interval: Base sleep interval in seconds.
+            continuous_cycle: Continuous execution flag without sleep.
+            accel_config: Wakeup acceleration multipliers configuration.
+            timezone: Timezone UTC offset.
         """
 
         self.react_loop = react_loop
@@ -57,26 +57,24 @@ class Heartbeat:
         self._next_tick_time: float = 0.0
         self._wake_reason: str = "HEARTBEAT"
         self._wake_payload: Dict[str, Any] = {}
-        self._wake_level: int = 0  # Приоритет текущего триггера
+        self._wake_level: int = 0
 
         self._sleep_memory: deque[Dict[str, Any]] = deque(maxlen=20)
 
-        # Ссылка на текущую выполняемую задачу ReAct-цикла
         self._active_react_task: Optional[asyncio.Task] = None
 
-        # Флаг намеренного прерывания, чтобы отличать логику агента от Ctrl+C
         self._is_interrupted: bool = False
 
     def answer_to_event(
         self, level: EventLevel, event_name: str, payload: Optional[Dict[str, Any]] = None
     ) -> None:
         """
-        Анализирует входящее событие из EventBus и принимает решение о пробуждении агента.
+        Analyzes incoming events and schedules/accelerates wakeups.
 
         Args:
-            level: Уровень важности события (EventLevel).
-            event_name: Строковое имя события.
-            payload: Дополнительные данные события (параметры).
+            level: Event severity level.
+            event_name: Triggering event name identifier.
+            payload: Event parameters.
         """
 
         now = time.time()
@@ -90,7 +88,7 @@ class Heartbeat:
             "payload": payload,
         }
 
-        # Определяем множитель важности события
+        # Determine event level multiplier
         multiplier = 1.0
         if level == EventLevel.CRITICAL:
             multiplier = self.accel_config.critical_multiplier
@@ -109,21 +107,20 @@ class Heartbeat:
 
         is_awake = self._active_react_task and not self._active_react_task.done()
 
-        # =========================================================
-        # Логика для бодрствующего в данный момент агента
-        # =========================================================
+        # ---------------------------------------------------------------------
+        # Logic for currently active (awake) agent
+        # ---------------------------------------------------------------------
 
         if is_awake:
-            # Пробрасываем событие прямо в активный цикл
+            # Inject event directly into the active cycle
             self.react_loop.add_realtime_event(event_data)
 
-            log = f"[Heartbeat] Входящее событие '{event_name}' ({level.name}) получено во время работы агента. Данные добавлены в контекст текущего цикла."
-
+            log = f"[Heartbeat] Incoming event '{event_name}' ({level.name}) received during agent execution. Data appended to context."
             agent_logger.info(log)
 
-            # Если множитель 0.0 - это жесткое прерывание текущего процесса
+            # If multiplier is 0.0, perform a hard interruption
             if multiplier <= 0.01:
-                log = f"[Heartbeat] Прерывание текущего ReAct-цикла из-за события: {event_name} ({level.name})"
+                log = f"[Heartbeat] Interrupted current ReAct cycle due to event: {event_name} ({level.name})"
                 agent_logger.warning(log)
 
                 self._wake_reason = event_name
@@ -131,26 +128,23 @@ class Heartbeat:
                 self._wake_level = level.value
                 self._is_interrupted = True
 
-                # Сбрасываем таймер в ноль, чтобы после cancel() цикл стартанул моментально
+                # Set timer to zero to restart the cycle immediately after cancel()
                 self._next_tick_time = time.time()
                 self._wake_event.set()
 
                 self._active_react_task.cancel()
 
-            # Таймер следующего сна (_next_tick_time) НЕ трогаем (если это не прерывание)
             return
 
-        # =========================================================
-        # Логика для спящего в данный момент агента
-        # =========================================================
+        # ---------------------------------------------------------------------
+        # Logic for currently sleeping agent
+        # ---------------------------------------------------------------------
 
         self._sleep_memory.append(event_data)
 
         remaining = self._next_tick_time - now
 
-        # Если множитель < 1, значит событие должно повлиять на таймер
         if multiplier < 1.0:
-            # Защита от отрицательного remaining (если Heartbeat только стартовал)
             safe_remaining = max(0.0, remaining)
 
             new_remaining = safe_remaining * multiplier
@@ -159,55 +153,52 @@ class Heartbeat:
             self._next_tick_time = now + new_remaining
             self._wake_event.set()
 
-            # Если сон срезан в ноль - это экстренное пробуждение
+            # If remaining sleep is cut to zero, execute urgent wakeup
             if new_remaining <= 0.01:
-                # Перезаписываем главную причину, только если новое событие важнее или такое же
+                # Override primary reason only if the new event is of equal or higher priority
                 if level.value >= self._wake_level:
-                    log = f"[Heartbeat] Входящее событие: '{event_name}' ({level.name}). Инициализация вызова LLM."
+                    log = f"[Heartbeat] Incoming wakeup event: '{event_name}' ({level.name}). Invoking LLM."
                     agent_logger.info(log)
 
                     self._wake_reason = event_name
                     self._wake_payload = payload
                     self._wake_level = level.value
                 else:
-                    log = f"[Heartbeat] Входящее событие: '{event_name}' ({level.name}). Сон уже прерван более приоритетным событием."
+                    log = f"[Heartbeat] Incoming event: '{event_name}' ({level.name}). Sleep already interrupted by a higher priority event."
                     agent_logger.info(log)
             else:
                 if safe_remaining > 0:
-                    log = f"[Heartbeat] Входящее событие: '{event_name}' ({level.name}). Следующий вызов LLM сокращен на {reduced_by:.1f} сек. До пробуждения: {new_remaining:.1f} сек."
+                    log = f"[Heartbeat] Incoming event: '{event_name}' ({level.name}). Next LLM execution scheduled sooner by {reduced_by:.1f} sec. Until wakeup: {new_remaining:.1f} sec."
                     agent_logger.info(log)
 
     async def start(self) -> None:
         """
-        Запускает бесконечный цикл пульса агента.
-        Управляет временем сна (asyncio.sleep) и вызовами ReAct-цикла.
+        Starts the heartbeat infinite polling loop.
         """
-
         if self._is_running:
             return
 
         self._is_running = True
-        log = "[Heartbeat] Агент переведен в автономный режим."
+        log = "[Heartbeat] Agent switched to autonomous mode."
         agent_logger.info(log)
 
         if self._next_tick_time == 0.0:
             self._next_tick_time = time.time() + self.heartbeat_interval
 
+        update_last_active_time()
+
         while self._is_running:
+            update_last_active_time()
             now = time.time()
 
             if self.continuous_cycle:
                 await asyncio.sleep(0.1)
-
             else:
                 sleep_duration = self._next_tick_time - now
-
                 if sleep_duration > 0:
                     self._wake_event.clear()
-
                     try:
                         await asyncio.wait_for(self._wake_event.wait(), timeout=sleep_duration)
-
                     except asyncio.TimeoutError:
                         if self._next_tick_time <= time.time():
                             self._wake_reason = "HEARTBEAT"
@@ -217,7 +208,6 @@ class Heartbeat:
                 missed_events = list(self._sleep_memory)
                 self._sleep_memory.clear()
 
-                # Убираем дублирование: если событие стало главным триггером, удаляем его из лога (missed_events)
                 if self._wake_reason != "HEARTBEAT":
                     for i in range(len(missed_events) - 1, -1, -1):
                         if (
@@ -227,9 +217,6 @@ class Heartbeat:
                             missed_events.pop(i)
                             break
 
-                # Устанавливаем таймер ДО начала работы агента
-                # Фоновые события, приходящие во время бодрствования,
-                # будут корректно сокращать будущий сон и высвечиваться в логах
                 self._next_tick_time = time.time() + self.heartbeat_interval
 
                 try:
@@ -241,58 +228,53 @@ class Heartbeat:
                         )
                     )
                     await self._active_react_task
-
-                    # Сбрасываем причину только если цикл завершился сам, без прерываний
                     self._wake_reason = "HEARTBEAT"
                     self._wake_payload = {}
-
+                    
                 except asyncio.CancelledError:
                     if self._is_interrupted:
-                        # Отмена инициирована нами (answer_to_event). Глотаем ошибку и идем на новый круг
-                        main_logger.info("[System] Текущий ReAct-цикл успешно прерван.")
+                        main_logger.info(
+                            "[System] Current ReAct cycle successfully cancelled."
+                        )
                         self._is_interrupted = False
                     else:
                         raise
-
                 except Exception as e:
-                    log = f"[System] Критическая ошибка в ReAct-цикле: {e}"
+                    log = f"[System] Critical error in ReAct reasoning cycle: {e}"
                     agent_logger.error(log)
-
-                    # При краше сбрасываем таймер заново, чтобы не уйти в бесконечный луп ошибок
                     self._next_tick_time = time.time() + self.heartbeat_interval
                     self._wake_reason = "HEARTBEAT"
                     self._wake_payload = {}
-
                 finally:
                     self._active_react_task = None
 
     def stop(self) -> None:
-        """Останавливает пульс агента и принудительно отменяет текущий ReAct-цикл."""
+        """Terminates heartbeat loop and cancels any running ReAct cycles."""
         self._is_running = False
         self._wake_event.set()
         if self._active_react_task and not self._active_react_task.done():
             self._is_interrupted = True
             self._active_react_task.cancel()
 
-        log = "[Heartbeat] Остановка завершена."
+        log = "[Heartbeat] Orchestrator stopped."
         agent_logger.info(log)
 
     def update_config(self, key: str, value: Any) -> None:
         """
-        Динамическое обновление настроек пульса на лету (по сигналу из EventBus).
+        Hot-reloads heartbeat parameters from EventBus.
 
         Args:
-            key: Название параметра конфигурации.
-            value: Новое значение.
+            key: Config parameter key.
+            value: Value payload.
         """
         if key == "heartbeat_interval":
             self.heartbeat_interval = int(value)
 
-            log = f"[System] Heartbeat обновил интервал на {self.heartbeat_interval} сек."
+            log = f"[System] Heartbeat updated interval to {self.heartbeat_interval} sec."
             agent_logger.info(log)
 
         elif key == "continuous_cycle":
             self.continuous_cycle = bool(value)
 
-            log = f"[System] Heartbeat обновил continuous_cycle на {self.continuous_cycle}."
+            log = f"[System] Heartbeat updated continuous_cycle to {self.continuous_cycle}."
             agent_logger.info(log)

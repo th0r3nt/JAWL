@@ -40,7 +40,7 @@ system:
   context_depth:
     high_ticks: 4
     medium_ticks: 7
-    low_ticks: 20
+    low_ticks: 10
 
     tick_action_max_chars: 500
     tick_result_max_chars: 10000

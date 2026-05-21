@@ -1,3 +1,7 @@
+"""
+System telemetry collector (CPU, RAM, Network, Time).
+"""
+
 import asyncio
 import time
 import socket
@@ -10,7 +14,7 @@ from src.l2_interfaces.host.os.client import HostOSClient
 
 
 class TelemetryPoller:
-    """Сборщик системной телеметрии (CPU, RAM, Сеть, Время)."""
+    """System telemetry collector (CPU, RAM, Network, Time)."""
 
     def __init__(self, client: HostOSClient, state: HostOSState):
         self.client = client
@@ -18,7 +22,7 @@ class TelemetryPoller:
         self._is_running = False
         self._task: asyncio.Task | None = None
 
-        # Инициализируем счетчик CPU
+        # Initialize CPU counter
         psutil.cpu_percent(interval=None)
 
     def start(self):
@@ -42,7 +46,7 @@ class TelemetryPoller:
             except asyncio.CancelledError:
                 break
             except Exception as e:
-                main_logger.error(f"[Host OS] Ошибка в цикле телеметрии: {e}")
+                main_logger.error(f"[Host OS] Error in telemetry loop: {e}")
 
             await asyncio.sleep(self.client.config.monitoring_interval_sec)
 
@@ -72,12 +76,12 @@ class TelemetryPoller:
             f"{p['name']} (PID: {p['pid']}, {round(p['memory_percent'], 1)}%)"
             for p in top_procs
         ]
-        top_str = ", ".join(proc_strings) if proc_strings else "Нет данных"
+        top_str = ", ".join(proc_strings) if proc_strings else "No data"
 
         self.state.telemetry = (
             f"CPU: {cpu}% ({self.state.cpu_name})\n"
             f"RAM: {ram_percent}% ({ram_used_gb} / {self.state.total_ram_gb} GB)\n"
-            f"Топ процессов (RAM): {top_str}"
+            f"Top processes (RAM): {top_str}"
         )
 
     async def _update_network(self):
@@ -94,6 +98,6 @@ class TelemetryPoller:
         try:
             conns = len(psutil.net_connections(kind="inet"))
         except psutil.AccessDenied:
-            conns = "Неизвестно"
+            conns = "Unknown"
 
-        self.state.network = f"Internet: {status} | Соединений: {conns}"
+        self.state.network = f"Internet: {status} | Connections: {conns}"

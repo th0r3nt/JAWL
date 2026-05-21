@@ -34,7 +34,7 @@ async def test_read_webhook_payload_not_found(hooks_client):
     res = await skill.read_webhook_payload("999")
 
     assert res.is_success is False
-    assert "не найден" in res.message
+    assert "not found" in res.message
 
 
 @pytest.mark.asyncio
@@ -70,7 +70,7 @@ async def test_get_webhooks_by_source(hooks_client):
     # 1. Ищем существующий (регистр не важен)
     res = await skill.get_webhooks_by_source("GITHUB")
     assert res.is_success is True
-    assert "Найдено 2 записей" in res.message
+    assert "Found 2 records" in res.message
     assert "GitHub Activity" in res.message
     assert "Another GitHub" in res.message
     assert "Stripe" not in res.message
@@ -78,4 +78,4 @@ async def test_get_webhooks_by_source(hooks_client):
     # 2. Ищем несуществующий
     res_empty = await skill.get_webhooks_by_source("bitbucket")
     assert res_empty.is_success is True
-    assert "не обнаружено" in res_empty.message
+    assert "No webhooks from source" in res_empty.message

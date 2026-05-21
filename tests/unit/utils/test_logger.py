@@ -3,7 +3,7 @@ from src.utils.logger import ColorFormatter, LogColors, update_log_level, main_l
 
 
 def test_color_formatter_truncation_for_console():
-    """Тест: Длинные сообщения обрезаются в консоли, но сохраняются для файла."""
+    """Test: long console messages are truncated to protect stdout buffer."""
     formatter = ColorFormatter(max_console_length=50)
 
     long_message = "A" * 100
@@ -20,20 +20,20 @@ def test_color_formatter_truncation_for_console():
     formatted_str = formatter.format(record)
 
     assert len(formatted_str) < 150
-    assert "Вывод обрезан для терминала" in formatted_str
+    assert "Output truncated for terminal" in formatted_str
 
     assert record.msg == f"[Agent Action Result] {long_message}"
 
 
 def test_color_formatter_coloring():
-    """Тест: Раскраска префиксов."""
+    """Test: Prefix coloring."""
     formatter = ColorFormatter()
     record = logging.LogRecord(
         name="test",
         level=logging.INFO,
         pathname="",
         lineno=0,
-        msg="[Thoughts] Я думаю о вечном",
+        msg="[Thoughts] Thinking about eternity",
         args=(),
         exc_info=None,
     )

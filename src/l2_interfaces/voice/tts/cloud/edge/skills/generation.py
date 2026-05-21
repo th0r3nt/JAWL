@@ -1,5 +1,5 @@
 """
-Навыки агента для синтеза речи через Microsoft Edge TTS.
+Agent skills for speech synthesis via Microsoft Edge TTS.
 """
 
 import uuid
@@ -15,13 +15,13 @@ from src.l2_interfaces.host.os.client import HostOSClient
 
 
 class EdgeTTSGeneration:
-    """Инструменты генерации речи Edge TTS."""
+    """Edge TTS speech generation tools."""
 
     def __init__(self, client: EdgeClient, host_os: HostOSClient) -> None:
         """
         Args:
-            client: Клиент Edge TTS.
-            host_os: Гейткипер для безопасного резолва путей сохранения.
+            client: Edge TTS client.
+            host_os: Gatekeeper for secure resolution of save paths.
         """
 
         self.client = client
@@ -36,57 +36,59 @@ class EdgeTTSGeneration:
         voices = self.client.state.available_voices_cache
         if not voices:
             return SkillResult.fail(
-                "Кэш голосов пуст. Возможно, отсутствует подключение к сети или интерфейс оффлайн."
+                "Voice cache is empty. Possible network loss or interface is offline."
             )
 
-        return SkillResult.ok("Доступные голоса Edge TTS:\n- " + "\n- ".join(voices))
+        return SkillResult.ok("Available Edge TTS voices:\n- " + "\n- ".join(voices))
 
     @skill()
     async def generate_speech(
         self, text: str, voice_id: Optional[str] = None, filename: Optional[str] = None
     ) -> SkillResult:
         """
-        Synthesizes and saves speech. 
-        
+        Synthesizes and saves speech.
+
         filename: Output .mp3 name.
         """
 
         if not text.strip():
-            return SkillResult.fail("Текст для озвучки не может быть пустым.")
+            return SkillResult.fail("Text for voiceover cannot be empty.")
 
         v_id = voice_id if voice_id else self.client.voice_manager.main_voice
         f_name = filename if filename else f"edge_speech_{uuid.uuid4().hex[:8]}.mp3"
 
-        # Направляем по умолчанию в системную папку загрузок песочницы
+        # Route by default to the sandbox system downloads folder
         if "/" not in f_name and "\\" not in f_name:
             f_name = f"sandbox/_system/download/{f_name}"
 
         try:
-            # Безопасно резолвим путь через гейткипер
+            # Safely resolve the path via gatekeeper
             safe_path = self.host_os.validate_path(f_name, is_write=True)
             safe_path.parent.mkdir(parents=True, exist_ok=True)
 
             main_logger.info(
-                f"[Edge TTS] Генерация речи начата (Голос: {v_id}, Файл: {safe_path.name})"
+                f"[Edge TTS] Speech generation started (Voice: {v_id}, File: {safe_path.name})"
             )
 
-            # Вызываем асинхронную генерацию
+            # Invoke asynchronous generation
             await self.client.generate_audio(text=text, voice=v_id, output_path=str(safe_path))
 
-            # Форматируем логи
+            # Format logs
             size_str = format_size(safe_path.stat().st_size)
             rel_path = safe_path.relative_to(self.host_os.sandbox_dir).as_posix()
 
-            self.client.state.add_history(f"Сгенерирован {rel_path} (size: {size_str}, text: {text})")
+            self.client.state.add_history(
+                f"Generated {rel_path} (size: {size_str}, text: {text})"
+            )
 
             return SkillResult.ok("True")
 
         except PermissionError as e:
             return SkillResult.fail(str(e))
-        
+
         except RuntimeError as e:
             return SkillResult.fail(str(e))
-        
+
         except Exception as e:
-            main_logger.error(f"[Edge TTS] Ошибка генерации: {e}")
-            return SkillResult.fail(f"Ошибка API генерации речи (Edge): {e}")
+            main_logger.error(f"[Edge TTS] Generation error: {e}")
+            return SkillResult.fail(f"Speech generation API error (Edge): {e}")

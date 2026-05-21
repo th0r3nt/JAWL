@@ -1,9 +1,9 @@
 """
-Реестр провайдеров контекста (DI контейнер для L0 State).
+Context Providers Registry (DI Container for L0 State).
 
-Обеспечивает слабую связность слоев (Loose Coupling). Интерфейсы (L2) просто регистрируют
-в нем свои методы (провайдеры), а Контекстный Билдер (L3) асинхронно опрашивает их всех
-в строго определенном порядке, заданном через `ContextSection`.
+Provides loose coupling between architectural layers. L2 interfaces register
+their callback methods (providers) here, while the ContextBuilder (L3) asynchronously
+polls them in a strict order defined by `ContextSection`.
 """
 
 import asyncio
@@ -15,11 +15,11 @@ from src.utils.logger import agent_logger
 
 class ContextSection(IntEnum):
     """
-    Определяет строгий порядок следования блоков в системном промпте.
-    Чем меньше число, тем выше блок в иерархии (важнее для LLM).
+    Defines a strict sequence of blocks inside the system prompt.
+    Lower values correspond to higher priorities for the LLM Attention mechanism.
     """
 
-    # Личность и внутреннее состояние
+    # Personality and internal state
     DRIVES = 10
     TRAITS = 20
     SKILLS = 30
@@ -27,26 +27,26 @@ class ContextSection(IntEnum):
     HYPOTHESES = 48
     NOTES = 45
 
-    # Универсальный блок для всех L2 интерфейсов
+    # Universal block for active L2 interfaces
     INTERFACES = 50
 
-    # Базы данных и память
+    # Long-term memory
     MENTAL_STATES = 110
     TASKS = 120
     RAG_MEMORIES = 130
 
-    # Последние действия
+    # Recent ticks history (episodic memory)
     RECENT_TICKS = 140
 
-    # Дерево мыслей, если используется Tree of Thoughts
+    # Monte Carlo thoughts tree (ToT simulation)
     TREE_OF_THOUGHTS = 150
 
-    # Причина пробуждения и фоновые логи
+    # Primary wakeup trigger and background log
     HEARTBEAT = 160
 
 
 class ContextRegistry:
-    """Глобальный реестр функций-провайдеров контекста."""
+    """Global registry of context provider callbacks."""
 
     def __init__(self) -> None:
         self._providers: Dict[str, Dict[str, Any]] = {}
@@ -55,17 +55,17 @@ class ContextRegistry:
         self, name: str, provider_func: Callable[..., Awaitable[str]], section: ContextSection
     ) -> None:
         """
-        Регистрирует асинхронную функцию, которая будет отдавать Markdown-блок.
+        Registers an async function designed to yield a Markdown context block.
 
         Args:
-            name: Уникальное имя провайдера (например, "host_os").
-            provider_func: Ссылка на метод (корутину).
-            section: Позиция в иерархии (ContextSection).
+            name: Unique identifier of the provider (e.g., "host_os").
+            provider_func: Callback coroutine.
+            section: Position in the hierarchy (ContextSection).
         """
 
         self._providers[name] = {"func": provider_func, "section": section}
 
-        log = f"[System] Зарегистрирован провайдер контекста: {name} (Секция: {section.name})"
+        log = f"[System] Registered context provider: {name} (Section: {section.name})"
         agent_logger.debug(log)
 
     async def gather_all(
@@ -76,22 +76,21 @@ class ContextRegistry:
         agent_state: Any,
     ) -> Dict[str, str]:
         """
-        Асинхронно опрашивает всех провайдеров и возвращает их ответы, отсортированные по приоритету.
+        Asynchronously polls all registered providers, returning their outputs sorted by priority.
 
         Args:
-            event_name: Имя события-триггера.
-            payload: Данные события.
-            missed_events: Пропущенные фоновые события.
-            agent_state: Инстанс AgentState.
+            event_name: Wakeup event name.
+            payload: Wakeup event parameters dict.
+            missed_events: Missed background events.
+            agent_state: AgentState L0 instance.
 
         Returns:
-            Словарь, где ключ - имя провайдера, значение - Markdown строка.
+            Dict[str, str]: Map of provider name to resolved Markdown block.
         """
 
         if not self._providers:
             return {}
 
-        # Сортируем по Enum значению (по возрастанию)
         sorted_names = sorted(
             self._providers.keys(), key=lambda k: self._providers[k]["section"].value
         )
@@ -111,7 +110,7 @@ class ContextRegistry:
         context_blocks = {}
         for name, res in zip(sorted_names, results):
             if isinstance(res, Exception):
-                log = f"[System] Ошибка сборки контекста в модуле '{name}': {res}"
+                log = f"[System] Context assembly error on provider '{name}': {res}"
                 agent_logger.error(log)
                 continue
 

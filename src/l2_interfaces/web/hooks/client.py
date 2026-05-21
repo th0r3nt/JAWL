@@ -1,13 +1,16 @@
+"""
+L2 client for Web Hooks interface.
+
+Manages configuration and handles system prompt preview.
+"""
+
+from typing import Any
 from src.l2_interfaces.web.hooks.state import WebHooksState
 from src.utils.settings import WebHooksConfig
 
 
 class WebHooksClient:
-    """
-    Stateful клиент для интерфейса вебхуков.
-    Хранит настройки и отдает контекстный блок.
-    Сам HTTP сервер поднимется в модуле Events.
-    """
+    """Stateful client for the webhooks interface, storing settings."""
 
     def __init__(self, state: WebHooksState, config: WebHooksConfig, secret_token: str):
         self.state = state
@@ -17,7 +20,8 @@ class WebHooksClient:
         self.state.host = config.host
         self.state.port = config.port
 
-    async def get_context_block(self, **kwargs) -> str:
+    async def get_context_block(self, **kwargs: Any) -> str:
+        """Context provider block for the system prompt."""
         desc = "Description: Local HTTP server for receiving incoming webhooks."
         if not self.state.is_online:
             return f"### WEB HOOKS [OFF]\n{desc}\nThe interface is disabled."

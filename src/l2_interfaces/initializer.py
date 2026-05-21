@@ -1,9 +1,9 @@
 """
-Главный инициализатор слоя интерфейсов (L2).
+Main initializer of the interface layer (L2).
 
-Сканирует директорию на наличие плагинов (паттерн Discovery), инициализирует их
-и собирает компоненты жизненного цикла. Для немигрированных интерфейсов
-поддерживается временный Legacy-механизм.
+Scans the directory for plugins (Discovery pattern), initializes them,
+and gathers lifecycle components. For non-migrated interfaces,
+a temporary Legacy mechanism is supported.
 """
 
 import os
@@ -23,16 +23,16 @@ def initialize_l2_interfaces(
     container: "SystemContainer", env_vars: Dict[str, Optional[str]]
 ) -> List[Any]:
     """
-    Оркестрирует запуск L2 интерфейсов.
-    1. Находит и загружает новые плагины (plugin.py).
-    2. Выполняет Legacy инициализацию для старых интерфейсов.
+    Orchestrates the launch of L2 interfaces.
+    1. Finds and loads new plugins (plugin.py).
+    2. Performs Legacy initialization for older interfaces.
 
     Args:
-        container: Главный DI-контейнер системы.
-        env_vars: Словарь с секретными токенами из .env файла.
+        container: Main system DI container.
+        env_vars: Dictionary of secret tokens from the .env file.
 
     Returns:
-        Список инициализированных компонентов для Event Loop.
+        List of initialized components for the Event Loop.
     """
 
     components: List[Any] = []
@@ -40,15 +40,15 @@ def initialize_l2_interfaces(
 
     # ================================================================
     # PLUGIN DISCOVERY SYSTEM
-    # Проходится по вложенным папкам src/l2_interfaces/,
-    # чтобы найти plugin.py
+    # Walks through nested folders of src/l2_interfaces/
+    # to find plugin.py
 
     interfaces_dir = Path(__file__).resolve().parent
-    src_dir = interfaces_dir.parent.parent  # Путь до корневой папки JAWL
+    src_dir = interfaces_dir.parent.parent  # Path to JAWL root folder
 
-    # Ищем все файлы plugin.py в папке l2_interfaces
+    # Find all plugin.py files in the l2_interfaces folder
     for plugin_path in interfaces_dir.rglob("plugin.py"):
-        # Вычисляем корректное имя модуля (например, src.l2_interfaces.web.http.plugin)
+        # Calculate the correct module name (e.g., src.l2_interfaces.web.http.plugin)
         rel_path = plugin_path.relative_to(src_dir)
         module_name = str(rel_path.with_suffix("")).replace(os.sep, ".")
 
@@ -59,7 +59,7 @@ def initialize_l2_interfaces(
                 spec.loader.exec_module(module)
 
                 # ==================================================================
-                # Поиск классов, унаследованных от BaseInterface
+                # Search for classes inherited from BaseInterface
 
                 for name, obj in inspect.getmembers(module, inspect.isclass):
                     if issubclass(obj, BaseInterface) and obj is not BaseInterface:
@@ -67,7 +67,7 @@ def initialize_l2_interfaces(
 
                         if plugin_instance.is_enabled(config):
                             main_logger.debug(
-                                f"[Discovery] Инициализация плагина {plugin_instance.name}."
+                                f"[Discovery] Initializing plugin {plugin_instance.name}."
                             )
                             lifecycle_comps = plugin_instance.setup(container, env_vars)
                             components.extend(lifecycle_comps)
@@ -75,9 +75,7 @@ def initialize_l2_interfaces(
                             plugin_instance.register_off_provider(container.context_registry)
 
             except Exception as e:
-                main_logger.error(
-                    f"[Discovery] Ошибка при загрузке плагина {plugin_path}: {e}"
-                )
+                main_logger.error(f"[Discovery] Error loading plugin {plugin_path}: {e}")
 
-    # Возвращает все компоненты, которые после будут запущены в SystemOrchestrator
+    # Returns all components that will later be started in SystemOrchestrator
     return components

@@ -1,3 +1,7 @@
+"""
+Telethon plugin for Telegram User API.
+"""
+
 from typing import List, Any, Dict, Optional
 from src.utils.logger import main_logger
 from src.l2_interfaces.base import BaseInterface
@@ -39,7 +43,7 @@ class TelethonPlugin(BaseInterface):
 
         if not api_id or not api_hash:
             main_logger.error(
-                "[Telethon] API_ID или API_HASH не найдены в .env. Интерфейс отключен."
+                "[Telethon] API_ID or API_HASH not found in .env. Interface disabled."
             )
             self.register_off_provider(container.context_registry)
             return []
@@ -85,5 +89,5 @@ class TelethonPlugin(BaseInterface):
             provider_func=client.get_context_block,
             section=ContextSection.INTERFACES,
         )
-        main_logger.info("[Telethon] Интерфейс загружен.")
+        main_logger.info("[Telethon] Interface loaded.")
         return [client, events]

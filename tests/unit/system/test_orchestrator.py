@@ -50,14 +50,14 @@ async def test_orchestrator_resilience_on_plugin_start_failure(mock_bridge, mock
 
     # Проверки:
     assert exit_code == 0
-    # Здоровый компонент должен был успешно запуститься
+    # Здоровый компонент должен был успешно заemptyиться
     good_component.start.assert_awaited_once()
 
     # В списке активных компонентов должен остаться только здоровый (чтобы потом корректно вызвался stop)
     assert len(mock_container.lifecycle_components) == 1
     assert mock_container.lifecycle_components[0] == good_component
 
-    # Heartbeat ядра всё равно должен был запуститься
+    # Heartbeat ядра всё равно должен был заemptyиться
     mock_container.heartbeat.start.assert_awaited_once()
 
 
@@ -89,7 +89,7 @@ async def test_orchestrator_stop_gracefully(mock_container):
     comp1.stop.assert_awaited_once()
     comp2.stop.assert_awaited_once()
 
-    # БД тоже закрыты
+    # БД тоже closedы
     mock_container.sql.disconnect.assert_awaited_once()
     mock_container.vector.disconnect.assert_awaited_once()
     mock_container.graph.disconnect.assert_awaited_once()

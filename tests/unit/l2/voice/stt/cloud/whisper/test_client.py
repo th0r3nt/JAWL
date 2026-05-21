@@ -56,7 +56,7 @@ async def test_whisper_client_transcribe_not_started(
     whisper_client: CloudWhisperSTTClient,
 ) -> None:
     """Тест: Защита от вызова без инициализированного клиента."""
-    with pytest.raises(RuntimeError, match="не инициализирован"):
+    with pytest.raises(RuntimeError, match="not initialized"):
         await whisper_client.transcribe(("file", b""))
 
 

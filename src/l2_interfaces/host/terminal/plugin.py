@@ -1,5 +1,5 @@
 """
-Плагин интерфейса локального терминала (Host Terminal).
+Host Terminal interface plugin.
 """
 
 from typing import List, Any, Dict, Optional
@@ -55,5 +55,5 @@ class HostTerminalPlugin(BaseInterface):
             section=ContextSection.INTERFACES,
         )
 
-        main_logger.info("[Host Terminal] Интерфейс загружен..")
+        main_logger.info("[Host Terminal] Interface loaded.")
         return [client, events]

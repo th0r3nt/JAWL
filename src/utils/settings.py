@@ -1,3 +1,11 @@
+"""
+Settings and Configurations Loader of the JAWL Framework.
+
+Provides strict Pydantic model schemas for all settings.yaml and interfaces.yaml
+configurations. Implements safe YAML parsing with duplicate key detection,
+automatic config migration, and environment-driven override fallbacks.
+"""
+
 import shutil
 import yaml
 from pathlib import Path
@@ -7,7 +15,7 @@ from yaml.constructor import ConstructorError
 from src.utils.logger import main_logger
 
 # ==========================================
-# Модели для interfaces.yaml
+# Models for interfaces.yaml
 # ==========================================
 
 
@@ -102,11 +110,9 @@ class WebHTTPConfig(BaseModel):
 
 class WebBrowserConfig(BaseModel):
     enabled: bool = False
-    headless: bool = True  # Показывать ли графическое окно (False полезно для отладки)
-    timeout_sec: int = 30  # Таймаут на загрузку страниц
-    idle_timeout_sec: int = (
-        900  # 15 минут простоя перед авто-закрытием браузера для очистки ОЗУ
-    )
+    headless: bool = True
+    timeout_sec: int = 30
+    idle_timeout_sec: int = 900
 
 
 class WebHooksConfig(BaseModel):
@@ -114,7 +120,7 @@ class WebHooksConfig(BaseModel):
     host: str = "127.0.0.1"
     port: int = 8080
     history_limit: int = 20
-    preview_max_chars: int = 200  # Максимальная длина превью для системного промпта
+    preview_max_chars: int = 200
 
 
 class RSSFeedConfig(BaseModel):
@@ -124,7 +130,7 @@ class RSSFeedConfig(BaseModel):
 
 class WebRSSConfig(BaseModel):
     enabled: bool = False
-    polling_interval_sec: int = 3600  # Раз в час по умолчанию
+    polling_interval_sec: int = 3600
     recent_limit: int = 5
     feeds: list[RSSFeedConfig] = Field(default_factory=list)
 
@@ -139,7 +145,7 @@ class WebConfig(BaseModel):
 
 class MetaConfig(BaseModel):
     enabled: bool = False
-    access_level: int = 0  # 0: SAFE, 1: CONFIGURATOR, 2: ARCHITECT, 3: CREATOR
+    access_level: int = 0
     custom_skills_enabled: bool = True
 
 
@@ -185,7 +191,6 @@ class EdgeConfig(BaseModel):
     enabled: bool = False
     main_voice: str = "ru-RU-SvetlanaNeural"
     available_voices: list[str] = Field(default_factory=list)
-    # Настройки генерации (строки со знаками +/- и % или Hz)
     rate: str = "+0%"
     volume: str = "+0%"
     pitch: str = "+0Hz"
@@ -234,7 +239,7 @@ class InterfacesConfig(BaseModel):
 
 
 # ==========================================
-# Модели для settings.yaml
+# Models for settings.yaml
 # ==========================================
 
 
@@ -386,13 +391,12 @@ class SwarmConfig(BaseModel):
 class TreeOfThoughtsConfig(BaseModel):
     enabled: bool = False
     llm_model: str = "unknown"
-    mode: str = "hybrid"  # "manual", "auto", "hybrid"
+    mode: str = "hybrid"
     auto_interval_steps: int = 5
 
-    # Настройки геометрии дерева мыслей (Осторожно: экспоненциальный рост)
-    branches: int = 3  # Количество макро-стратегий (Уровень 1)
-    simulations_per_branch: int = 2  # Количество вложенных сценариев на каждый узел
-    max_depth: int = 2  # Максимальная глубина вложенности (1 -> 1.1 -> 1.1.1)
+    branches: int = 3
+    simulations_per_branch: int = 2
+    max_depth: int = 2
 
 
 class SubconsciousPatternConfig(BaseModel):
@@ -447,12 +451,12 @@ class SettingsConfig(BaseModel):
 
 
 # ==========================================
-# Загрузчик
+# Loader
 # ==========================================
 
 
 class UniqueKeyLoader(yaml.SafeLoader):
-    """Кастомный загрузчик YAML, который падает с ошибкой при дублировании ключей."""
+    """Custom YAML loader that fails with an exception on duplicate keys."""
 
     pass
 
@@ -466,7 +470,7 @@ def construct_mapping(loader, node, deep=False):
             raise ConstructorError(
                 None,
                 None,
-                f"Обнаружен дубликат ключа '{key}' в YAML файле. Исправьте конфигурацию.",
+                f"Duplicate key '{key}' detected in YAML file. Fix the configuration.",
                 key_node.start_mark,
             )
         value = loader.construct_object(value_node, deep=deep)
@@ -480,9 +484,9 @@ UniqueKeyLoader.add_constructor(
 
 
 def load_yaml(file_path: Path) -> dict:
-    """Безопасно читает YAML файл и возвращает словарь с автофикс-кодировкой."""
+    """Safely reads a YAML file and returns a dictionary with auto-fix encoding."""
     if not file_path.exists():
-        raise FileNotFoundError(f"Конфигурационный файл не найден: {file_path}")
+        raise FileNotFoundError(f"Configuration file not found: {file_path}")
 
     try:
         with open(file_path, "r", encoding="utf-8-sig") as f:
@@ -494,19 +498,17 @@ def load_yaml(file_path: Path) -> dict:
 
 def _log_missing_defaults(model: BaseModel, prefix: str = "", file_name: str = ""):
     """
-    Рекурсивно проверяет, какие поля были установлены по дефолту (не переданы юзером),
-    и выводит аккуратное предупреждение в лог.
+    Recursively checks which fields were set to defaults (not passed by the user),
+    and outputs a clean warning to the log.
     """
-    # model_fields_set содержит только те ключи, которые были явно переданы при валидации
     missing_keys = set(model.model_fields.keys()) - model.model_fields_set
 
     if missing_keys:
         keys_str = ", ".join(f"'{prefix}{k}'" for k in missing_keys)
         main_logger.debug(
-            f"[{file_name}] Отсутствуют настройки {keys_str}. Применены значения по умолчанию."
+            f"[{file_name}] Missing configuration for {keys_str}. Default values applied."
         )
 
-    # Идем вглубь по вложенным моделям
     for key, value in model.__dict__.items():
         if isinstance(value, BaseModel):
             _log_missing_defaults(value, prefix=f"{prefix}{key}.", file_name=file_name)
@@ -514,8 +516,8 @@ def _log_missing_defaults(model: BaseModel, prefix: str = "", file_name: str = "
 
 def _deep_update_ruamel(base_map, user_map) -> bool:
     """
-    Рекурсивно проходит по базовому словарю (example) и добавляет
-    недостающие ключи в пользовательский словарь.
+    Recursively traverses the base dictionary (example) and adds
+    missing keys to the user dictionary.
     """
 
     from ruamel.yaml.comments import CommentedMap
@@ -534,15 +536,15 @@ def _deep_update_ruamel(base_map, user_map) -> bool:
 
 def _sync_yaml_file(user_file: Path, example_file: Path) -> None:
     """
-    Умная синхронизация: если в пользовательском YAML не хватает новых полей,
-    они будут скопированы из .example файла с сохранением старых настроек.
+    Smart synchronization: if the user's YAML is missing new fields,
+    they will be copied from the .example file, preserving old settings.
     """
     if not example_file.exists():
         return
 
     if not user_file.exists():
         shutil.copy(example_file, user_file)
-        main_logger.info(f"[Config] Создан базовый файл конфигурации {user_file.name}")
+        main_logger.info(f"[Config] Created base configuration file {user_file.name}")
         return
 
     from ruamel.yaml import YAML
@@ -560,16 +562,16 @@ def _sync_yaml_file(user_file: Path, example_file: Path) -> None:
             with open(user_file, "w", encoding="utf-8") as f:
                 ryaml.dump(user_data, f)
             main_logger.info(
-                f"[Config] Файл {user_file.name} автоматически обновлен (добавлены новые поля из шаблона)."
+                f"[Config] File {user_file.name} automatically updated (added new fields from template)."
             )
 
     except Exception as e:
-        main_logger.error(f"[Config] Ошибка авто-обновления {user_file.name}: {e}")
+        main_logger.error(f"[Config] Error auto-updating {user_file.name}: {e}")
 
 
 def load_config() -> tuple[SettingsConfig, InterfacesConfig]:
     """
-    Загружает, валидирует и при необходимости автоматически "лечит" настройки из YAML файлов.
+    Loads, validates, and automatically heals settings from YAML files if necessary.
     """
 
     base_dir = Path.cwd() / "config"
@@ -580,7 +582,6 @@ def load_config() -> tuple[SettingsConfig, InterfacesConfig]:
     interfaces_file = base_dir / "interfaces.yaml"
     interfaces_example = base_dir / "interfaces.example.yaml"
 
-    # Умная синхронизация (добавление пропущенных полей из example)
     _sync_yaml_file(settings_file, settings_example)
     _sync_yaml_file(interfaces_file, interfaces_example)
 

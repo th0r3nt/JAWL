@@ -1,14 +1,14 @@
 """
-Плагин (Plugin) пользовательского L2-интерфейса.
+Plugin for the custom L2 interface.
 
-Этот файл - точка входа для вашего модуля. Фреймворк автоматически найдет его (Plugin Discovery).
-Здесь происходит внедрение зависимостей (DI): мы создаем L0 State, настраиваем Клиента,
-Воркера (Events) и регистрируем Навыки (Skills).
+This file is the entry point for your module. The framework will automatically find it (Plugin Discovery).
+Dependency injection (DI) occurs here: we create the L0 State, configure the Client,
+the Worker (Events), and register the Skills.
 
-Советы для разработчиков:
-1. Не пишите здесь бизнес-логику. Plugin нужен только для "сборки" конструктора.
-2. Чтобы ваш плагин можно было включать/выключать, вам нужно добавить его структуру в
-   схемы Pydantic в `src/utils/settings.py` (в класс InterfacesConfig).
+Developer Tips:
+1. Do not write business logic here. The Plugin is only needed to "assemble" the constructor.
+2. To allow enabling/disabling your plugin, you need to add its structure to
+   Pydantic schemas in `src/utils/settings.py` (inside the InterfacesConfig class).
 """
 
 from typing import List, Any, Dict, Optional
@@ -19,7 +19,7 @@ from src.l3_agent.context.registry import ContextSection  # noqa: F401
 from src.system.container import SystemContainer
 from src.utils.settings import InterfacesConfig
 
-# В реальном коде импортируйте ваши модули:
+# In real code, import your modules:
 # from src.l2_interfaces.my_module.state import MyState
 # from src.l2_interfaces.my_module.client import MyClient
 # from src.l2_interfaces.my_module.events import MyEvents
@@ -28,8 +28,8 @@ from src.utils.settings import InterfacesConfig
 
 class ExamplePlugin(BaseInterface):
     """
-    Главный класс плагина. Наследуется от BaseInterface, что гарантирует
-    наличие нужных свойств и методов для инициализатора.
+    Main plugin class. Inherits from BaseInterface, which guarantees
+    the presence of necessary properties and methods for the initializer.
     """
 
     @property
@@ -41,53 +41,53 @@ class ExamplePlugin(BaseInterface):
         return "Test description for the agent."
 
     def is_enabled(self, config: InterfacesConfig) -> bool:
-        # В реальности здесь будет что-то вроде: return config.my_module.enabled
+        # In reality, there will be something like: return config.my_module.enabled
         return False
 
     def setup(
         self, container: SystemContainer, env_vars: Dict[str, Optional[str]]
     ) -> List[Any]:
         """
-        Инициализирует интерфейс и интегрирует его в ядро JAWL.
+        Initializes the interface and integrates it into the JAWL core.
 
         Args:
-            container: DI-контейнер фреймворка (через него мы получаем доступ к базам, шине событий).
-            env_vars: Словарь секретов (читается из .env).
+            container: Framework DI container (provides access to databases, event bus).
+            env_vars: Dictionary of secrets (read from .env).
 
         Returns:
-            List[Any]: Список компонентов жизненного цикла (обычно это client и events),
-                       у которых оркестратор вызовет методы .start() и .stop().
+            List[Any]: List of lifecycle components (usually client and events)
+                       on which the orchestrator will call .start() and .stop() methods.
         """
 
-        # 0. Извлекаем ключи
+        # 0. Extract keys
         # api_key = env_vars.get("MY_API_KEY")
         # if not api_key:
-        #     main_logger.error(f"[{self.name}] Ключ API не найден. Отключен.")
+        #     main_logger.error(f"[{self.name}] API Key not found. Disabled.")
         #     self.register_off_provider(container.context_registry)
         #     return []
 
-        # 1. Создаем стейт (приборную панель) и сохраняем его в контейнер
+        # 1. Create state (dashboard) and save it to the container
         # state = MyState()
         # container.l0_states["example"] = state
 
-        # 2. Инициализируем Клиент (Отвечает за I/O, сессии, запросы)
+        # 2. Initialize Client (handles I/O, sessions, requests)
         # client = MyClient(state=state, api_key=api_key)
 
-        # 3. Инициализируем Воркер событий (Отвечает за фоновый поллинг)
+        # 3. Initialize Event Worker (handles background polling)
         # events = MyEvents(client=client, event_bus=container.event_bus)
 
-        # 4. Регистрируем Навыки (То, что LLM сможет вызывать)
+        # 4. Register Skills (tools the LLM can call)
         # register_instance(MySkills(client))
 
-        # 5. Регистрируем Контекст (То, что LLM будет видеть на своей приборной панели)
+        # 5. Register Context (what the LLM will see on its dashboard)
         # container.context_registry.register_provider(
         #     name=self.name.lower().replace(" ", "_"),
         #     provider_func=client.get_context_block,
         #     section=ContextSection.INTERFACES,
         # )
 
-        main_logger.info(f"[{self.name}] Пользовательский интерфейс загружен.")
+        main_logger.info(f"[{self.name}] Custom interface loaded.")
 
-        # Обязательно возвращаем объекты, у которых есть async def start() и async def stop()
+        # Must return objects that have async def start() and async def stop()
         # return [client, events]
         return []

@@ -1,10 +1,9 @@
 """
-Статлесс ReAct-цикл для субагентов (SubagentLoop).
+Stateless ReAct loop for background subagents.
 
-В отличие от главного ReactLoop, цикл субагентов облегчен: он не пишет
-данные в SQLite базу (Ticks), а держит всю историю в локальной памяти (переменной)
-строго до момента завершения задачи. Оснащен "Anti-Laziness Guard" - защитой,
-не позволяющей субагенту прервать цикл без отправки отчета.
+Unlike the main ReactLoop, subagent loops are lightweight, do not commit
+events to SQLite ticks history, and run within volatile local arrays.
+Enforces reporting constraints (Anti-Laziness Guard) on execution completion.
 """
 
 import json
@@ -23,9 +22,7 @@ from src.l3_agent.swarm.roles import SubagentRole
 
 
 class SubagentLoop:
-    """
-    Облегченный Stateless ReAct-цикл для субагентов.
-    """
+    """Lightweight stateless reasoning loop."""
 
     def __init__(
         self,
@@ -40,17 +37,18 @@ class SubagentLoop:
         max_steps: int = 15,
     ) -> None:
         """
-        Инициализирует цикл субагента.
+        Initializes the subagent loop.
 
         Args:
-            subagent_id: Уникальный ID запущенного процесса.
-            role: Назначенная роль (профессия).
-            task_description: Первичная задача от Оркестратора.
-            model_name: Имя модели (обычно дешевая и быстрая, типа Flash Lite).
-            prompt_builder: Сборщик системного промпта.
-            context_builder: Сборщик локального контекста.
-            allowed_skills: Доступные навыки (ограниченные RBAC).
-            max_steps: Лимит шагов до принудительного убийства процесса (Timeout).
+            subagent_id: Process UUID identifier.
+            role: Dedicated worker role.
+            task_description: Primary task instructions.
+            executor: LLM executor instance.
+            model_name: Target model name.
+            prompt_builder: Swarm prompt builder.
+            context_builder: Swarm context builder.
+            allowed_skills: Filtered skills pool.
+            max_steps: Maximum step iterations limit before force termination.
         """
 
         self.subagent_id = subagent_id
@@ -68,34 +66,33 @@ class SubagentLoop:
         self.history: List[Dict[str, str]] = []
         self.is_done = False
 
-        # Флаг для жесткого контроля отправки отчета
         self.report_submitted = False
 
     async def run(self) -> None:
         """
-        Главный оркестратор ReAct цикла субагента.
-        Крутит цикл "Запрос к LLM -> Парсинг -> Выполнение", пока задача не завершится.
+        Core subagent ReAct execution cycle.
         """
 
-        log = f"[Swarm] Запуск субагента {self.role.id}_{self.subagent_id}."
+        log = f"[Swarm] Launching subagent {self.role.id}_{self.subagent_id}."
         swarm_logger.info(log)
 
         prompt = self.prompt_builder.build(self.role)
 
-        # Главный ReAct цикл
         step = 1
         while step <= self.max_steps and not self.is_done:
-            log = f"[Subagent ReAct] Шаг {step}/{self.max_steps}."
+            log = f"[Subagent ReAct] Step {step}/{self.max_steps}."
             swarm_logger.info(log)
 
-            # ==================================================================
-            # Сборка промпта + контекста
+            # -----------------------------------------------------------------
+            # Prompt & Context compilation
+            # -----------------------------------------------------------------
 
             messages = self._prepare_messages(prompt)
             self._dump_context_to_file(messages, step)
 
-            # ==================================================================
-            # Вызов LLM
+            # --------------------------------------------------------------
+            # LLM execution
+            # --------------------------------------------------------------
 
             raw_answer = await self.executor.execute(
                 model_name=self.model_name,
@@ -106,12 +103,13 @@ class SubagentLoop:
                 tools=ACTION_SCHEMA,
             )
             if raw_answer is None:
-                log = f"[Swarm] Критическая ошибка API у субагента {self.subagent_id}. Принудительное создание краш-репорта."
+                log = f"[Swarm] Critical LLM connection error on subagent {self.subagent_id}. Forcing crash report."
                 swarm_logger.error(log)
                 break
 
-            # ==================================================================
-            # Парсинг ответа
+            # --------------------------------------------------------------
+            # Response parsing
+            # --------------------------------------------------------------
 
             parsed_response, error_msg = self._parse_response(raw_answer)
 
@@ -132,56 +130,54 @@ class SubagentLoop:
             thoughts = parsed_response.thoughts
             actions = parsed_response.actions
 
-            # ==================================================================
-            # Если нет действий
+            # --------------------------------------------------------------
+            # Handle empty actions
+            # --------------------------------------------------------------
 
             if not actions:
                 if not self.report_submitted:
-                    log = f"[Swarm] Субагент {self.subagent_id} попытался завершить работу без отчета. Принуждаем к действию."
+                    log = f"[Swarm] Subagent {self.subagent_id} attempted to exit without submitting a final report. Forcing action."
                     swarm_logger.warning(log)
 
                     self.history.append(
                         {
                             "thoughts": thoughts,
                             "actions": "[]",
-                            "results": "[System Error]: Вы попытались завершить работу (вернули пустой массив действий), но не отправили финальный отчет. Это запрещено. Используйте сооветствующий инструмент для сдачи результатов.",
+                            "results": "[System Error]: You attempted to exit (returned an empty actions list) without submitting a final report. This is forbidden. Use the report skill to submit results.",
                         }
                     )
                     step += 1
                     continue
                 else:
-                    log = f"[Swarm] Субагент {self.role.id}_{self.subagent_id} передал пустой массив действий. Завершение."
+                    log = f"[Swarm] Subagent {self.role.id}_{self.subagent_id} returned an empty actions list. Concluding loop."
                     swarm_logger.info(log)
 
                     self.is_done = True
                     break
 
-            # ==================================================================
-            # Исполнение скиллов
+            # --------------------------------------------------------------
+            # Actions execution
+            # --------------------------------------------------------------
 
             await self._execute_and_log_actions(thoughts, actions)
             step += 1
 
-        # ===================================================================
-        # Если агент не смог выполнить задачу за макс. шагов
-
         if not self.is_done:
-            log = f"[Swarm] Субагент {self.subagent_id} достиг лимита шагов ({self.max_steps}) и был убит."
+            log = f"[Swarm] Subagent {self.subagent_id} reached max steps limit ({self.max_steps}) and was terminated."
             swarm_logger.warning(log)
 
-            # Принудительно отправляем то, что успел накопать
             await call_skill(
                 "SubagentReport.submit_final_report",
                 {
                     "subagent_id": self.subagent_id,
                     "role": self.role.id,
-                    "report": "## Timeout Error\nСубагент достиг лимита шагов и был принудительно завершен системой. Задача не выполнена до конца.",
+                    "report": "## Timeout Error\nSubagent reached the maximum step limit and was terminated. Task incomplete.",
                 },
             )
 
-    # ==================================================================================
-    # ПРИВАТНЫЕ МЕТОДЫ
-    # ==================================================================================
+    # -------------------------------------------------------------------------
+    # Private Helpers
+    # -------------------------------------------------------------------------
 
     def _prepare_messages(self, prompt: str) -> List[Dict[str, str]]:
         context = self.context_builder.build(
@@ -213,7 +209,7 @@ class SubagentLoop:
 
             if act.tool_name not in self.allowed_skills:
                 results.append(
-                    f"* {act.tool_name}: Отказано в доступе. Этот инструмент не разрешен для вашей роли."
+                    f"* {act.tool_name}: Access denied. This tool is not authorized for your role."
                 )
                 continue
 
@@ -225,7 +221,7 @@ class SubagentLoop:
                     self.report_submitted = True
 
             except Exception as e:
-                results.append(f"* {act.tool_name}: Внутренняя ошибка навыка - {e}")
+                results.append(f"* {act.tool_name}: Internal error - {e}")
 
         self.history.append(
             {

@@ -89,7 +89,7 @@ async def test_integration_auto_graphrag_context_injection(tmp_path: Path):
     assert "type:fact" in context_block
 
     # Граф должен успешно срезолвить узел, несмотря на падежи
-    assert "Узел: Стив Джобс" in context_block
+    assert "Node: Стив Джобс" in context_block
     assert "Основатель." in context_block
 
     assert "-[OWNS]-> (Apple)" in context_block

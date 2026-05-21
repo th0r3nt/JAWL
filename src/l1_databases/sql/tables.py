@@ -1,8 +1,8 @@
 """
-Декларативное описание схем реляционных таблиц (SQLAlchemy ORM).
+Declarative schema description of relational tables (SQLAlchemy ORM).
 
-Определяет структуру всех сущностей долговременной структурированной
-памяти агента (Задачи, Логи, Черты личности, Состояния и Мотиваторы).
+Defines the structure of all long-term structured memory entities
+of the agent (Tasks, Logs, Personality Traits, States, and Motivators).
 """
 
 from datetime import datetime, timezone
@@ -12,47 +12,49 @@ from sqlalchemy.types import JSON
 
 
 class Base(DeclarativeBase):
-    """Базовый класс для всех моделей SQLAlchemy."""
+    """Base class for all SQLAlchemy models."""
 
     pass
 
 
 class TaskTable(Base):
     """
-    Таблица долгосрочных задач (Tasks).
-    Используется для декомпозиции глобальных целей агента.
+    Long-term tasks table (Tasks).
+    Used for decomposing global goals of the agent.
     """
 
     __tablename__ = "tasks"
 
     id: Mapped[str] = mapped_column(primary_key=True)
-    title: Mapped[str]  # Короткое название
-    description: Mapped[str]  # Полное описание задачи
+    title: Mapped[str]  # Short title
+    description: Mapped[str]  # Full description of the task
     status: Mapped[str] = mapped_column(
         default="todo"
     )  # todo, in_progress, blocked, done, cancelled
     progress: Mapped[int] = mapped_column(default=0)  # 0-100%
 
-    # Квадрант матрицы Эйзенхауэра (1-4)
+    # Eisenhower matrix quadrant (1-4)
     quadrant: Mapped[int] = mapped_column(default=2)
 
     tags: Mapped[list[str]] = mapped_column(JSON, default=list)
     dependencies: Mapped[list[str]] = mapped_column(
         JSON, default=list
-    )  # Массив ID других задач, блокирующих эту
+    )  # Array of other task IDs blocking this one
     subtasks: Mapped[list[dict[str, Any]]] = mapped_column(
         JSON, default=list
     )  # [{"title": "...", "is_done": false}]
 
     due_date: Mapped[Optional[float]] = mapped_column(default=None)  # UNIX timestamp
-    context: Mapped[Optional[str]] = mapped_column(default=None)  # Рабочие заметки агента
+    context: Mapped[Optional[str]] = mapped_column(
+        default=None
+    )  # Operational notes of the agent
 
 
 class NoteTable(Base):
     """
-    Таблица заметок (Working Memory / Scratchpad).
-    Предназначена для хранения оперативной информации, которая всегда
-    отображается в системном промпте агента.
+    Notes table (Working Memory / Scratchpad).
+    Intended for storing operational information that is always
+    displayed in the agent's system prompt.
     """
 
     __tablename__ = "notes"
@@ -60,7 +62,7 @@ class NoteTable(Base):
     id: Mapped[str] = mapped_column(primary_key=True)
     content: Mapped[str]
 
-    # Автоматическое обновление времени при любых изменениях (onupdate)
+    # Automatic time update upon any changes (onupdate)
     updated_at: Mapped[datetime] = mapped_column(
         default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc)
     )
@@ -68,8 +70,8 @@ class NoteTable(Base):
 
 class TickTable(Base):
     """
-    Таблица тиков (логов) агента.
-    1 тик = Итерация цикла (Мысли + Массив действий + Результат выполнения).
+    Agent ticks (logs) table.
+    1 tick = Loop iteration (Thoughts + Array of actions + Execution result).
     """
 
     __tablename__ = "ticks"
@@ -79,32 +81,32 @@ class TickTable(Base):
     created_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(timezone.utc))
     thoughts: Mapped[str]
 
-    # Хранит список словарей: [{"tool_name": "func_1", "parameters": {...}}, ...]
+    # Stores list of dicts: [{"tool_name": "func_1", "parameters": {...}}, ...]
     actions: Mapped[list[dict[str, Any]]] = mapped_column(JSON)
 
-    # Хранит результаты вызовов: {"func_1": "success", "func_2": "error details"}
+    # Stores execution results: {"func_1": "success", "func_2": "error details"}
     results: Mapped[dict[str, Any]] = mapped_column(JSON)
 
 
 class PersonalityTraitTable(Base):
     """
-    Таблица приобретенных черт личности агента.
-    Позволяет агенту динамически адаптироваться под пользователя.
+    Table of acquired personality traits of the agent.
+    Allows the agent to dynamically adapt to the user.
     """
 
     __tablename__ = "personality_traits"
 
     id: Mapped[str] = mapped_column(primary_key=True)
-    name: Mapped[str]  # Название черты
-    description: Mapped[str]  # Описание черты
-    reason: Mapped[Optional[str]]  # Причина добавления (контекст формирования)
-    context: Mapped[Optional[str]]  # В каких ситуациях применять
+    name: Mapped[str]  # Trait name
+    description: Mapped[str]  # Trait description
+    reason: Mapped[Optional[str]]  # Reason for adding (context of formation)
+    context: Mapped[Optional[str]]  # Situations where this applies
 
 
 class MentalStateTable(Base):
     """
-    Таблица для отслеживания состояний важных сущностей (Mental State).
-    Аналог CRM-системы агента для отслеживания статусов серверов, людей или процессов.
+    Table for tracking states of important entities (Mental State).
+    Analogue of the agent's CRM system for tracking server, human, or process statuses.
     """
 
     __tablename__ = "mental_states"
@@ -123,56 +125,56 @@ class MentalStateTable(Base):
     context: Mapped[Optional[str]]
     related_information: Mapped[Optional[str]]
 
-    attitude: Mapped[str] = mapped_column(default="Neutral")  # Отношение агента
-    directives: Mapped[str] = mapped_column(default="")  # Правила взаимодействия
+    attitude: Mapped[str] = mapped_column(default="Neutral")  # Agent attitude
+    directives: Mapped[str] = mapped_column(default="")  # Interaction guidelines
     epistemic_state: Mapped[str] = mapped_column(
         default=""
-    )  # Theory of Mind: знание о том, что знает/не знает субъект
+    )  # Theory of Mind: knowledge of what the subject knows/does not know
     relations: Mapped[dict[str, str]] = mapped_column(
         JSON, default=dict
-    )  # Связи {"ID_СУБЪЕКТА": "Причина"}
+    )  # Relations {"SUBJECT_ID": "Reason"}
 
 
 class DriveTable(Base):
     """
-    Таблица внутренних мотиваторов агента (Drives).
-    Обеспечивает математическую модель проактивности при отсутствии команд от пользователя.
+    Table of internal motivators of the agent (Drives).
+    Provides a mathematical model of proactivity in the absence of user commands.
     """
 
     __tablename__ = "drives"
 
     id: Mapped[str] = mapped_column(primary_key=True)
     name: Mapped[str]
-    type: Mapped[str]  # "fundamental" (системные) или "custom" (созданные самим агентом)
+    type: Mapped[str]  # "fundamental" (system-level) or "custom" (created by the agent itself)
     description: Mapped[str]
 
-    decay_rate: Mapped[float]  # Скорость роста дефицита (% в интервал)
-    decay_interval_sec: Mapped[int] = mapped_column(default=3600)  # Длина интервала
+    decay_rate: Mapped[float]  # Deficit decay rate (% per interval)
+    decay_interval_sec: Mapped[int] = mapped_column(default=3600)  # Interval duration
 
-    # Время последнего удовлетворения мотивации (UTC)
+    # Time of last drive satisfaction (UTC)
     last_satisfied_at: Mapped[datetime] = mapped_column(
         default=lambda: datetime.now(timezone.utc)
     )
 
-    # Хранит список строк (последние текстовые рефлексии агента)
+    # Stores list of strings (latest reflections of the agent)
     recent_reflections: Mapped[list[str]] = mapped_column(JSON, default=list)
 
 
 class BayesianHypothesisTable(Base):
     """
-    Таблица Байесовских гипотез.
-    Используется агентом для дедуктивного расследования и вероятностного мышления.
+    Bayesian hypotheses table.
+    Used by the agent for deductive investigation and probabilistic reasoning.
     """
 
     __tablename__ = "bayesian_hypotheses"
 
     id: Mapped[str] = mapped_column(primary_key=True)
-    cluster_name: Mapped[str] = mapped_column(default="Общее расследование")
+    cluster_name: Mapped[str] = mapped_column(default="General investigation")
     title: Mapped[str]
     prior_probability: Mapped[float]
     current_probability: Mapped[float]
 
-    # Хранит список улик: [{"evidence": "Текст", "tpr": 0.9, "fpr": 0.1, "new_prob": 0.85}]
+    # Stores list of evidence: [{"evidence": "Text", "tpr": 0.9, "fpr": 0.1, "new_prob": 0.85}]
     evidence_log: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list)
 
     updated_at: Mapped[datetime] = mapped_column(

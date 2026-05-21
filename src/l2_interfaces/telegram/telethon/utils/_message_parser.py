@@ -1,8 +1,8 @@
 """
-Инструментарий для глубокого парсинга сложных MTProto-сообщений (Telethon).
+Telethon Message Parser.
 
-Преобразует объекты Message, содержащие медиа, реплаи, форварды, кнопки и
-реакции, в "плоские" и понятные для LLM текстовые строки.
+Converts complex MTProto Message objects (including forwards, replies,
+inlines, and reactions) into clean, readable Markdown strings optimized for LLM attention.
 """
 
 from typing import Optional, Tuple, Any
@@ -13,29 +13,27 @@ from src.utils._tools import truncate_text
 
 
 class TelethonMessageParser:
-    """Утилита для парсинга сообщений Telethon."""
+    """Helper for parsing and formatting Telethon MTProto messages."""
 
     @staticmethod
     async def get_sender_name(msg: Any) -> str:
         """
-        Вычисляет и форматирует имя отправителя сообщения.
-        Учитывает анонимных администраторов в каналах/группах и удаленные аккаунты.
+        Resolves sender display name, handling anonymous admins or deleted profiles.
 
         Args:
-            msg (Any): Объект Message Telethon.
+            msg: Telethon Message object.
 
         Returns:
-            str: Человекочитаемое имя или 'Unknown'.
+            str: Resolved name.
         """
+        
         sender = msg.sender
         if not sender:
             try:
-                # Пытаемся подтянуть отправителя, если его нет в локальном кэше
                 sender = await msg.get_sender()
             except Exception:
                 pass
 
-        # Обработка анонимных админов (отправитель = сам чат)
         if not sender and (msg.is_group or msg.is_channel):
             chat = msg.chat
             if not chat:
@@ -46,7 +44,7 @@ class TelethonMessageParser:
 
             if chat:
                 name = utils.get_display_name(chat)
-                return f"{name} [Анонимный Админ]"
+                return f"{name} [Anonymous Admin]"
 
         if sender:
             name = utils.get_display_name(sender)
@@ -62,16 +60,14 @@ class TelethonMessageParser:
     @staticmethod
     def determine_reply(msg: Any, topic_id: Optional[int]) -> Tuple[bool, Optional[int]]:
         """
-        Определяет, является ли сообщение ответом (реплаем), игнорируя системные
-        связи внутри топиков (forum topics).
+        Identifies whether a message is an actual reply to another message,
+        ignoring standard thread parent message bindings on Forums.
 
         Args:
-            msg (Any): Сообщение Telethon.
-            topic_id (Optional[int]): ID топика форума.
-
-        Returns:
-            Tuple[bool, Optional[int]]: (Является_ли_реплаем, ID_оригинального_сообщения)
+            msg: Telethon Message object.
+            topic_id: Thread topic ID.
         """
+
         if not msg.reply_to:
             return False, None
 
@@ -94,40 +90,46 @@ class TelethonMessageParser:
 
     @staticmethod
     def parse_media(msg: Any) -> str:
-        """Возвращает текстовый тег медиа-вложения (если есть)."""
+        """
+        Returns string tag representing attached media type.
+        """
+
         if msg.action:
-            return "[Системное сообщение]"
+            return "[System Notification]"
 
         if not msg.media:
             return ""
 
         if msg.photo:
-            return "[Фотография]"
+            return "[Photo]"
 
         if msg.sticker:
             emoji = getattr(msg.file, "emoji", "") if hasattr(msg, "file") else ""
-            return f"[Стикер {emoji}]" if emoji else "[Стикер]"
+            return f"[Sticker {emoji}]" if emoji else "[Sticker]"
 
         if getattr(msg, "gif", None):
             return "[GIF]"
 
         if msg.voice:
-            return "[Голосовое сообщение]"
+            return "[Voice Message]"
 
         if msg.video or msg.video_note:
-            return "[Видео]"
+            return "[Video]"
 
         if msg.document:
-            return "[Файл]"
+            return "[Document]"
 
         if msg.poll:
-            return "[Опрос]"
+            return "[Poll]"
 
-        return "[Медиа]"
+        return "[Media]"
 
     @staticmethod
     async def parse_forward(msg: Any) -> str:
-        """Формирует подпись, если сообщение было переслано (Forwarded)."""
+        """
+        Parses forward sender info if message is forwarded.
+        """
+
         if not getattr(msg, "fwd_from", None):
             return ""
 
@@ -141,25 +143,28 @@ class TelethonMessageParser:
             name = utils.get_display_name(fwd_sender)
             fwd_id = getattr(fwd_sender, "id", "")
             id_str = f" (ID: {fwd_id})" if fwd_id else ""
-            return f"\n  ↳[Переслано от: {name}{id_str}]"
+            return f"\n  ↳[Forwarded from: {name}{id_str}]"
 
         if getattr(msg.fwd_from, "from_name", None):
-            return f"\n  ↳[Переслано от: {msg.fwd_from.from_name} (Скрытый аккаунт)]"
+            return f"\n  ↳[Forwarded from: {msg.fwd_from.from_name} (Hidden profile)]"
 
         if getattr(msg.fwd_from, "from_id", None):
             try:
                 peer_id = utils.get_peer_id(msg.fwd_from.from_id)
-                return f"\n  ↳[Переслано от: ID {peer_id}]"
+                return f"\n  ↳[Forwarded from: ID {peer_id}]"
             except Exception:
                 pass
 
-        return "\n  ↳[Переслано]"
+        return "\n  ↳[Forwarded]"
 
     @staticmethod
     async def parse_reply(
         client: Any, target_entity: Any, is_reply: bool, reply_id: Optional[int]
     ) -> str:
-        """Парсит автора и ID сообщения, на которое был дан ответ."""
+        """
+        Parses the reply's author and original message ID.
+        """
+
         if not is_reply or not reply_id:
             return ""
 
@@ -176,13 +181,16 @@ class TelethonMessageParser:
                 orig_sender = f"Unknown (ID: {orig_msg.sender_id})"
             else:
                 orig_sender = "Unknown"
-            return f"\n  ↳ (В ответ на сообщение ID {reply_id} от {orig_sender})"
+            return f"\n  ↳ (In reply to message ID {reply_id} by {orig_sender})"
         except Exception:
-            return f"\n  ↳ (В ответ на сообщение ID {reply_id})"
+            return f"\n  ↳ (In reply to message ID {reply_id})"
 
     @staticmethod
     async def parse_reactions(client: Any, msg: Any) -> str:
-        """Парсит эмодзи-реакции под сообщением."""
+        """
+        Parses emoji reactions under the message.
+        """
+
         if not getattr(msg, "reactions", None):
             return ""
 
@@ -193,7 +201,7 @@ class TelethonMessageParser:
                 try:
                     peer = await client.get_entity(r.peer_id)
                     name = utils.get_display_name(peer) or "Unknown"
-                    r_list.append(f"{emo} от {name}")
+                    r_list.append(f"{emo} by {name}")
                 except Exception:
                     r_list.append(f"{emo}")
 
@@ -202,15 +210,15 @@ class TelethonMessageParser:
                 emo = getattr(r.reaction, "emoticon", "[CustomEmoji]")
                 r_list.append(f"{emo} x{r.count}")
 
-        return f"\n  ↳[Реакции: {', '.join(r_list)}]" if r_list else ""
+        return f"\n  ↳[Reactions: {', '.join(r_list)}]" if r_list else ""
 
     @staticmethod
     def parse_buttons(msg: Any) -> str:
-        """Парсит текст Inline-кнопок."""
+        """Parses inline keyboard button titles."""
         if not getattr(msg, "buttons", None):
             return ""
         btn_texts = [f"[{btn.text}]" for row in msg.buttons for btn in row if btn.text]
-        return f"\n  ↳[Кнопки: {', '.join(btn_texts)}]" if btn_texts else ""
+        return f"\n  ↳[Buttons: {', '.join(btn_texts)}]" if btn_texts else ""
 
     @classmethod
     async def build_string(
@@ -224,19 +232,19 @@ class TelethonMessageParser:
         truncate_text_flag: bool = False,
     ) -> str:
         """
-        Финальная сборка: объединяет все сущности в плоский Markdown текст,
-        идеально приспособленный для чтения языковой моделью.
+        Main formatter: merges all parsed message data into a single Markdown string.
         """
+
         read_status = ""
         if msg.out:
-            read_status = " [Прочитано]" if msg.id <= read_outbox_max_id else " [Не прочитано]"
+            read_status = " [Read]" if msg.id <= read_outbox_max_id else " [Unread]"
 
         sender_name = await cls.get_sender_name(msg)
         is_reply, reply_id = cls.determine_reply(msg, topic_id)
 
         text = msg.text or ""
         if truncate_text_flag:
-            text = truncate_text(text, 1000, "... [Обрезано системой]")
+            text = truncate_text(text, 1000, "... [Truncated by system]")
 
         parts = [
             cls.parse_media(msg),
@@ -247,7 +255,7 @@ class TelethonMessageParser:
             cls.parse_buttons(msg),
         ]
 
-        final_text = " ".join(filter(bool, parts)) or "[Пустое сообщение]"
+        final_text = " ".join(filter(bool, parts)) or "[Empty Message]"
         time_str = format_datetime(msg.date, timezone, fmt="%Y-%m-%d %H:%M")
 
         topic_str = ""

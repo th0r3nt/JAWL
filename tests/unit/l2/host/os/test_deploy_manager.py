@@ -20,12 +20,12 @@ def test_deploy_start_session(deploy_manager):
     assert deploy_manager.is_active is True
     assert deploy_manager.active_flag.exists()
     assert deploy_manager.manifest_file.exists()
-    assert "У вас есть 3 попытки" in msg
+    assert "You have 3 attempts" in msg
 
     # Попытка открыть вторую сессию
     success_dup, msg_dup = deploy_manager.start_session()
     assert success_dup is False
-    assert "уже активна" in msg_dup
+    assert "already active" in msg_dup
 
 
 def test_deploy_backup_file_copy_on_write(deploy_manager, tmp_path):

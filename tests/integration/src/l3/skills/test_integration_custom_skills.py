@@ -87,7 +87,7 @@ def calculate_crypto_tax(profit: float, rate: float = 13.0) -> dict:
     )
     reg_report = await execute_skill([reg_action])
 
-    assert "успешно зарегистрирован" in reg_report
+    assert "successfully registered" in reg_report
     assert "Custom.crypto_tax" in reg_report
 
     # 5. ШАГ 3: АГЕНТ ВЫЗЫВАЕТ СВОЙ НОВЫЙ НАВЫК (И МЫ ПРОВЕРЯЕМ TYPE COERCION)
@@ -105,4 +105,4 @@ def calculate_crypto_tax(profit: float, rate: float = 13.0) -> dict:
     assert "130.0" in exec_report  # tax
 
     # Убеждаемся, что RPC обертка отработала нормально
-    assert "Возвращенный результат" in exec_report
+    assert "Returned result" in exec_report

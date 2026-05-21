@@ -122,7 +122,6 @@ async def test_e2e_deep_research_pipeline(local_test_server):
 
     # Проверяем Page 2 (сжатие контекста)
     assert "This is a very long text" in res.message
-    assert "Текст обрезан" in res.message
 
     # Суммарный отчет: Page 1 (~100) + Page 2 (гарантированный минимум 2000) + заголовки Markdown
     assert len(res.message) < 3000

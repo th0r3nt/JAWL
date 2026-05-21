@@ -21,7 +21,7 @@ class SQLMentalStates:
 
     async def bootstrap_migrations(self) -> None:
         """
-        Мягкая миграция для добавления новых колонок CRM в старые базы данных.
+        Soft migration to add new CRM columns to older databases.
         """
 
         async with self.db.engine.begin() as conn:
@@ -43,11 +43,11 @@ class SQLMentalStates:
                     )
                 )
                 main_logger.info(
-                    "[SQL DB] Выполнена успешная миграция таблицы MentalStates (добавлены CRM колонки)."
+                    "[SQL DB] Successful migration of the MentalStates table (added CRM columns)."
                 )
             except Exception as e:
                 main_logger.debug(
-                    f"[SQL DB] Миграция таблицы Tasks пропущена (возможно, колонка уже существует): {e}"
+                    f"[SQL DB] Migration of the Tasks table skipped (column probably already exists): {e}"
                 )
 
     @skill(swarm=[Subagents.ARCHIVIST], subconscious=[Pattern.REFLECTION])
@@ -66,8 +66,8 @@ class SQLMentalStates:
         related_information: Optional[str] = None,
     ) -> SkillResult:
         """
-        Registers new subject/object in Mental States CRM. 
-        
+        Registers new subject/object in Mental States CRM.
+
         attitude: Subjective stance.
         directives: Individual interaction guidelines.
         epistemic_state: Theory of Mind (what the subject knows).
@@ -76,16 +76,16 @@ class SQLMentalStates:
 
         if tier not in ("high", "medium", "low", "background"):
             return SkillResult.fail(
-                "Ошибка: tier должен быть 'high', 'medium', 'low' или 'background'."
+                "Error: tier must be 'high', 'medium', 'low', or 'background'."
             )
         if category not in ("subject", "object"):
-            return SkillResult.fail("Ошибка: category должен быть 'subject' или 'object'.")
+            return SkillResult.fail("Error: category must be 'subject' or 'object'.")
 
         async with self.db.session_factory() as session:
             count_res = await session.execute(select(func.count(MentalStateTable.id)))
             if count_res.scalar_one() >= self.max_entities:
                 return SkillResult.fail(
-                    f"Достигнут лимит сущностей ({self.max_entities}). Удалите неактуальные."
+                    f"Entity limit reached ({self.max_entities}). Delete obsolete ones."
                 )
 
             state_id = str(uuid.uuid4())[:8]
@@ -106,7 +106,7 @@ class SQLMentalStates:
             session.add(new_state)
             await session.commit()
 
-        msg = f"Сущность '{name}' добавлена в Active CRM. ID: {state_id}"
+        msg = f"Entity '{name}' added to Active CRM. ID: {state_id}"
         main_logger.debug(f"[SQL DB] {msg}")
         return SkillResult.ok(f"True. ID: {state_id}")
 
@@ -143,10 +143,10 @@ class SQLMentalStates:
 
         if tier and tier not in ("high", "medium", "low", "background"):
             return SkillResult.fail(
-                "Ошибка: tier должен быть 'high', 'medium', 'low' или 'background'."
+                "Error: tier must be 'high', 'medium', 'low', or 'background'."
             )
         if category and category not in ("subject", "object"):
-            return SkillResult.fail("Ошибка: category должен быть 'subject' или 'object'.")
+            return SkillResult.fail("Error: category must be 'subject' or 'object'.")
 
         async with self.db.session_factory() as session:
             result = await session.execute(
@@ -155,7 +155,7 @@ class SQLMentalStates:
             state = result.scalar_one_or_none()
 
             if not state:
-                return SkillResult.fail(f"MentalState с ID {state_id} не найден.")
+                return SkillResult.fail(f"MentalState with ID {state_id} not found.")
 
             if tier:
                 state.tier = tier
@@ -180,7 +180,7 @@ class SQLMentalStates:
 
             await session.commit()
 
-        msg = f"Сущность '{state.name}' (ID: {state_id}) обновлена."
+        msg = f"Entity '{state.name}' (ID: {state_id}) updated."
         main_logger.debug(f"[SQL DB] {msg}")
         return SkillResult.ok("True")
 
@@ -196,15 +196,15 @@ class SQLMentalStates:
             )
             await session.commit()
             if result.rowcount == 0:
-                return SkillResult.fail(f"Сущность с ID {state_id} не найдена.")
+                return SkillResult.fail(f"Entity with ID {state_id} not found.")
 
-        msg = f"Сущность с ID {state_id} удалена из радара."
+        msg = f"Entity with ID {state_id} removed from radar."
         main_logger.debug(f"[SQL DB] {msg}")
         return SkillResult.ok("True")
 
     async def get_context_block(self, **kwargs: Any) -> str:
         """
-        Провайдер контекста для ContextRegistry.
+        Context provider for ContextRegistry.
         """
 
         res = await self.get_mental_states()

@@ -1,43 +1,42 @@
-# ФАЙЛ: docs/yaml/settings/tot.md
-# Настройка Подсознания (Tree of Thoughts)
+# Tree of Thoughts Configuration (Tree of Thoughts)
 
-Модуль `Tree of Thoughts` (MCTS — Монте-Карло поиск в древе) наделяет агента способностью к многоуровневому стратегическому планированию. Вместо линейного принятия решений, система генерирует **фрактальное дерево симуляций**, рассматривая несколько макро-стратегий и вложенных сценариев развития событий (например, «что если всё пойдет по плану» и «симуляция отказа системы») ДО выполнения физических действий.
+The `Tree of Thoughts` (MCTS — Monte Carlo Tree Search) module equips the agent with multi-level strategic planning capabilities. Instead of impulsively executing the first idea that comes to mind in a ReAct manner, the system generates a **fractal tree of simulations**, evaluating multiple macro-strategies and nested micro-scenarios (for example, "what if everything goes as planned" versus "system failure simulation") BEFORE executing physical actions.
 
-Версия `0.14.3-beta` перевела ToT на рекурсивную модель анализа: каждая ветка теперь содержит не абстрактные оценки, а конкретные списки плюсов (`pros`) и минусов/рисков (`cons`).
+The `v0.14.3-beta` version updated ToT to a recursive analysis model: each branch contains a strict list of advantages (`pros`) and disadvantages/risks (`cons`) instead of abstract complexity ratings.
 
-## Параметры (`system.tree_of_thoughts`)
+## Parameters (`system.tree_of_thoughts`)
 
-* **`enabled`**: `true` / `false`. Включение подсистемы стратегического планирования.
-* **`llm_model`**: Идентификатор модели (рекомендуется использовать быстрые модели с большим контекстом, например `gemini-1.5-flash` или `gpt-4o-mini`).
-* **`mode`**: Режим активации:
-  * `"manual"` — Дерево генерируется только при явном вызове навыка `deep_think`.
-  * `"auto"` — Автоматическая генерация на 1-м шаге ReAct-цикла и далее каждые `auto_interval_steps`.
-  * `"hybrid"` — Комбинированный режим (рекомендуется).
-* **`auto_interval_steps`**: Интервал автоматической активации подсознания (в шагах ReAct).
+* **`enabled`**: `true` / `false`. Enables the strategic planning subsystem.
+* **`llm_model`**: Model identifier (it is highly recommended to use fast, large-context models like `gemini-1.5-flash` or `gpt-4o-mini`).
+* **`mode`**: Activation mode:
+  * `"manual"` — The tree is simulated only when the `deep_think` skill is explicitly invoked by the agent.
+  * `"auto"` — Automatic simulation on the first step of the ReAct cycle and subsequently once every `auto_interval_steps`.
+  * `"hybrid"` — Combined mode (recommended).
+* **`auto_interval_steps`**: Step frequency for automatic subconscious activation (in ReAct steps).
 
-### Геометрия дерева (Архитектура симуляции)
+### Tree Geometry (Simulation Architecture)
 
-Эти параметры определяют «мощность» мыслительного процесса. **Внимание:** увеличение этих чисел ведет к экспоненциальному росту потребления токенов.
+These parameters define the "power" of the reasoning simulation. **Warning:** increasing these values leads to exponential token consumption growth.
 
-* **`branches`**: Количество **макро-стратегий** (ветки верхнего уровня). Оптимально: `2-3`.
-* **`simulations_per_branch`**: Количество **сценариев развития** для каждой ветки на каждом уровне вложенности. Оптимально: `2`.
-* **`max_depth`**: Максимальная **глубина симуляции**. 
-  * `1` — Плоский список стратегий (как в старых версиях).
-  * `2` — Стратегия -> Сценарии (1.1, 1.2).
-  * `3` — Стратегия -> Сценарии -> Дальнейшее развитие (1.1.1, 1.1.2).
-  * *Рекомендуется: `2`*.
+* **`branches`**: Number of **macro-strategies** (top-level branches). Optimal: `2-3`.
+* **`simulations_per_branch`**: Number of **nested scenarios** simulated per each branch on each nesting level. Optimal: `2`.
+* **`max_depth`**: Maximum **simulation depth**.
+  * `1` — Flat list of strategies.
+  * `2` — Strategy -> Scenarios (1.1, 1.2).
+  * `3` — Strategy -> Scenarios -> Future developments (1.1.1, 1.1.2).
+  * *Recommended: `2`*.
 
-## Взаимодействие (Навык `deep_think`)
+## Interaction (the `deep_think` skill)
 
-Главный агент может в любой момент инициировать глубокое раздумье, используя навык:
-`deep_think(task_description="Опиши конкретную проблему для анализа")`
+The main agent can initiate a deep thought cycle at any moment by calling:
+`deep_think(task_description="Describe a specific problem to analyze")`
 
-Передача `task_description` позволяет сфокусировать подсознание на конкретном узком месте (например, «проанализируй риски изменения метода авторизации»), вместо общего анализа всей ситуации.
+Passing a `task_description` focuses the subconscious on a specific bottleneck (for example, "evaluate risks of changing the authentication method") instead of a general analysis of the entire state.
 
-## Анализ результатов (Pros & Cons)
+## Result Analysis (Pros & Cons)
 
-В отличие от ранних версий, модель больше не выставляет оценки «сложность: средняя». Вместо этого она генерирует:
-1. **Pros (Плюсы)**: Конкретные выгоды и аргументы «ЗА» этот путь.
-2. **Cons (Минусы)**: Потенциальные баги, риски безопасности и причины, почему этот путь может провалиться.
+Unlike older versions, the model does not output abstract "complexity: medium" ratings. Instead, it generates:
+1. **Pros**: Clear advantages and arguments "FOR" choosing this path.
+2. **Cons**: Potential bugs, security risks, and reasons why this path might fail.
 
-Оркестратор (Главный агент) обязан изучить эти списки перед выбором итогового действия в ReAct-цикле.
+The Orchestrator (Main Agent) must analyze these lists before choosing its final physical actions in the ReAct cycle.

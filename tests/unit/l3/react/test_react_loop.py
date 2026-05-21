@@ -24,7 +24,7 @@ async def test_react_empty_actions_exit(mock_execute_skill, mock_dependencies):
     deps = mock_dependencies
     loop = ReactLoop(**deps)
 
-    # Мокаем экзекутор, чтобы он вернул пустой список действий
+    # Мокаем экзекутор, чтобы он вернул emptyой список действий
     deps["executor"].execute.return_value = (
         '{"reflection": "Мне нечего делать.", "actions": []}'
     )

@@ -1,18 +1,18 @@
-# Настройка Telegram (Telethon)
+# Telegram Configuration (Telethon)
 
-Интерфейс `telethon` позволяет агенту использовать обычный пользовательский аккаунт Telegram (Userbot). Это полезно, если вы хотите, чтобы агент общался от вашего имени, или если ему нужно читать каналы и группы, куда нельзя добавить обычного бота. Либо же, можно зарегистрировать отдельный аккаунт для агента, чтобы со стороны он выглядел как обычный пользователь.
+The `telethon` interface allows the agent to use a regular Telegram user account (Userbot). This is useful if you want the agent to communicate on your behalf, or if it needs to read channels and groups where a regular bot cannot be added. Alternatively, you can register a separate dedicated account for the agent so that it looks like a regular user.
 
-## Безопасность и Авторизация
-Для работы интерфейса необходимо получить `API_ID` и `API_HASH` на сайте [my.telegram.org](https://my.telegram.org/) и добавить их в файл `.env`:
+## Security and Authorization
+To use this interface, you must obtain an `API_ID` and `API_HASH` at [my.telegram.org](https://my.telegram.org/) and add them to the `.env` file:
 * `TELETHON_API_ID="1234567"`
-* `TELETHON_API_HASH="ваш_хеш"`
+* `TELETHON_API_HASH="your_hash_here"`
 
-При первом запуске агента в терминале появится запрос на ввод номера телефона и кода подтверждения. После успешной авторизации сессия сохранится локально в `sandbox/_system/.../` и больше не потребует кода. Ни в коем случае не передавайте файл сессии третьим лицам.
+Upon the first launch, the terminal will prompt you to enter a phone number and verification code. After successful authorization, the session is saved locally in `sandbox/_system/...` and will not require verification again. Never share your session files with third parties.
 
-## Параметры (`telegram.telethon`)
+## Parameters (`telegram.telethon`)
 
-* **`enabled`**: `true` / `false`. Включение интерфейса.
-* **`session_name`**: Намя файла сессии на жестком диске (по умолчанию `"agent_telethon"`). Если изменить, потребуется заново вводить код подтверждения.
-* **`recent_chats_limit`**: Максимальное количество последних активных чатов, которые будут отображаться на приборной панели (L0 State) агента. Защищает контекстное окно от переполнения, если у вас сотни активных диалогов.
-* **`private_chat_history_limit`**: Количество сообщений, которые автоматически подтягиваются в контекст при чтении приватного чата.
-* **`incoming_history_limit`**: Сколько последних сообщений хранить в оперативной памяти (MRU-кэш) для быстрого доступа.
+* **`enabled`**: `true` / `false`.
+* **`session_name`**: Name of the session file saved on disk (default is `"agent_telethon"`). If modified, you will need to re-enter the verification code.
+* **`recent_chats_limit`**: Maximum number of active chats displayed on the agent's dashboard (L0 State). Protects the context window from being overloaded if you have hundreds of active dialogues.
+* **`private_chat_history_limit`**: Number of messages automatically retrieved into the context when reading a private chat.
+* **`incoming_history_limit`**: How many of the latest messages are kept in memory (MRU cache) for quick access.

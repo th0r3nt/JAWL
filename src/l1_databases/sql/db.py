@@ -1,8 +1,8 @@
 """
-Модуль инициализации реляционной базы данных (SQLite).
+Relational Database Initialization Module (SQLite).
 
-Низкоуровневая обертка для асинхронного взаимодействия с SQLite.
-Управляет пулом соединений (SQLAlchemy AsyncEngine) и фабрикой сессий для всего слоя L1.
+Low-level wrapper for asynchronous interaction with SQLite.
+Manages the connection pool (SQLAlchemy AsyncEngine) and session factory for the entire L1 layer.
 """
 
 import os
@@ -14,19 +14,19 @@ from src.utils.logger import main_logger
 
 class SQLDB:
     """
-    Асинхронный менеджер инициализации SQLite.
-    Отвечает за создание таблиц, управление пулом соединений и выдачу сессий.
+    Asynchronous SQLite initialization manager.
+    Responsible for creating tables, managing the connection pool, and issuing sessions.
     """
 
     def __init__(self, db_path: str) -> None:
         """
-        Инициализирует движок базы данных и фабрику сессий.
+        Initializes the database engine and session factory.
 
         Args:
-            db_path: Абсолютный или относительный путь к файлу .db, либо ':memory:' для работы в ОЗУ.
+            db_path: Absolute or relative path to the .db file, or ':memory:' for RAM operation.
         """
 
-        # Если это не in-memory база, убеждаемся, что папка существует
+        # If this is not an in-memory database, ensure the directory exists
         if db_path != ":memory:":
             dir_name = os.path.dirname(db_path)
             if dir_name:
@@ -41,28 +41,28 @@ class SQLDB:
 
     async def connect(self) -> None:
         """
-        Создает физическое подключение к SQLite и генерирует схему таблиц, если они отсутствуют.
-        Должно вызываться строго один раз при старте жизненного цикла системы.
+        Creates a physical connection to SQLite and generates the table schema if they do not exist.
+        Must be called strictly once at the start of the system lifecycle.
 
         Raises:
-            Exception: В случае нехватки прав доступа к директории или конфликта блокировок.
+            Exception: In case of insufficient directory access rights or lock conflicts.
         """
 
         try:
             async with self.engine.begin() as conn:
                 await conn.run_sync(Base.metadata.create_all)
 
-            main_logger.info("[SQL DB] База данных успешно инициализирована.")
+            main_logger.info("[SQL DB] Database successfully initialized.")
         except Exception as e:
-            main_logger.error(f"[SQL DB] Критическая ошибка при запуске базы данных: {e}")
+            main_logger.error(f"[SQL DB] Critical error starting database: {e}")
             raise e
 
     async def disconnect(self) -> None:
         """
-        Безопасно уничтожает пул соединений (Engine) и сбрасывает незакрытые транзакции.
-        Предотвращает утечки дескрипторов (SQLite Database is locked) при перезагрузке системы.
+        Safely destroys the connection pool (Engine) and rolls back uncommitted transactions.
+        Prevents descriptor leaks (SQLite Database is locked) during system reboot.
         """
 
         if self.engine:
             await self.engine.dispose()
-            main_logger.info("[SQL DB] Подключение к базе данных закрыто.")
+            main_logger.info("[SQL DB] Connection to the database closed.")

@@ -8,7 +8,7 @@ async def test_look_at_image_success(vision_skills, mock_os_client, tmp_path):
     fake_image = tmp_path / "test.png"
     fake_image.write_bytes(b"fake_data")
 
-    # Мокаем гейткипер, чтобы он пропустил этот путь
+    # Мокаем гейткипер, чтобы он проemptyил этот путь
     mock_os_client.validate_path.return_value = fake_image
 
     res = await vision_skills.look_at_image("test.png")
@@ -29,7 +29,7 @@ async def test_look_at_image_unsupported_ext(vision_skills, mock_os_client, tmp_
     res = await vision_skills.look_at_image("test.txt")
 
     assert res.is_success is False
-    assert "не поддерживается" in res.message
+    assert "is not supported" in res.message
 
 
 @pytest.mark.asyncio

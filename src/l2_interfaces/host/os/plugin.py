@@ -1,5 +1,5 @@
 """
-Плагин интерфейса Host OS.
+Host OS interface plugin.
 """
 
 from typing import List, Any, Dict, Optional
@@ -83,5 +83,5 @@ class HostOsPlugin(BaseInterface):
             section=ContextSection.INTERFACES,
         )
 
-        main_logger.info("[Host OS] Интерфейс загружен..")
+        main_logger.info("[Host OS] Interface loaded.")
         return [events]

@@ -1,7 +1,7 @@
 """
-Фасад для слоя графовой памяти (KuzuDB).
+Facade for the graph memory layer (KuzuDB).
 
-Инкапсулирует логику запуска/остановки базы и предоставляет доступ к CRUD навыкам.
+Encapsulates database startup/shutdown logic and provides access to CRUD skills.
 """
 
 from pathlib import Path
@@ -11,7 +11,7 @@ from src.l1_databases.graph.management.crud_ast import GraphASTCRUD
 
 
 class GraphManager:
-    """Оркестратор графовой базы данных."""
+    """Graph database orchestrator."""
 
     def __init__(self, db_path: Path, max_nodes: int = 5000) -> None:
         self.db = GraphDB(db_path=str(db_path))
@@ -19,9 +19,15 @@ class GraphManager:
         self.ast_crud = GraphASTCRUD(db=self.db)
 
     async def connect(self) -> None:
-        """Открывает подключение и формирует схему KuzuDB."""
+        """
+        Opens connection and initializes the KuzuDB schema.
+        """
+
         await self.db.connect()
 
     async def disconnect(self) -> None:
-        """Безопасно закрывает соединение."""
+        """
+        Safely closes the connection.
+        """
+
         await self.db.disconnect()

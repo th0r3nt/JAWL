@@ -1,5 +1,7 @@
 """
-Навыки агента для прямой коммуникации с оператором через консоль хост-машины.
+Host Terminal communication skills.
+
+Allows sending messages directly to the operator's console and reading terminal history.
 """
 
 from src.l2_interfaces.host.terminal.client import HostTerminalClient
@@ -19,9 +21,9 @@ class HostTerminalMessages:
         try:
             await self.client.broadcast_message(text)
             return SkillResult.ok("True")
-        
+
         except Exception as e:
-            return SkillResult.fail(f"Ошибка при отправке в терминал: {e}")
+            return SkillResult.fail(f"Error sending to terminal: {e}")
 
     @skill()
     async def read_terminal_history(self, limit: int = 15) -> SkillResult:
@@ -32,11 +34,11 @@ class HostTerminalMessages:
         try:
             messages = self.client.state.recent_messages
             if not messages:
-                return SkillResult.ok("История терминала пуста.")
+                return SkillResult.ok("Terminal history is empty.")
 
-            limit = max(1, min(limit, 100))  # Защита от переполнения
+            limit = max(1, min(limit, 100))  # Protection against overflow
             recent = messages[-limit:]
 
-            return SkillResult.ok("История терминала:\n" + "\n".join(recent))
+            return SkillResult.ok("Terminal history:\n" + "\n".join(recent))
         except Exception as e:
-            return SkillResult.fail(f"Ошибка при чтении истории терминала: {e}")
+            return SkillResult.fail(f"Error reading terminal history: {e}")

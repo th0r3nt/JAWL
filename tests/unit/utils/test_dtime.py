@@ -26,7 +26,7 @@ def test_format_datetime():
 
 
 def test_safe_format_timestamp_none_returns_placeholder():
-    assert safe_format_timestamp(None, offset_hours=0) == "Неизвестно"
+    assert safe_format_timestamp(None, offset_hours=0) == "Unknown"
 
 
 def test_safe_format_timestamp_zero_is_valid():
@@ -40,12 +40,12 @@ def test_seconds_to_duration_str_no_days():
 
 
 def test_seconds_to_duration_str_pluralization():
-    assert seconds_to_duration_str(86400).startswith("1 день,")
-    assert seconds_to_duration_str(2 * 86400).startswith("2 дня,")
-    assert seconds_to_duration_str(5 * 86400).startswith("5 дней,")
-    assert seconds_to_duration_str(11 * 86400).startswith("11 дней,")
-    assert seconds_to_duration_str(21 * 86400).startswith("21 день,")
-    assert seconds_to_duration_str(22 * 86400).startswith("22 дня,")
+    assert seconds_to_duration_str(86400).startswith("1 day,")
+    assert seconds_to_duration_str(2 * 86400).startswith("2 days,")
+    assert seconds_to_duration_str(5 * 86400).startswith("5 days,")
+    assert seconds_to_duration_str(11 * 86400).startswith("11 days,")
+    assert seconds_to_duration_str(21 * 86400).startswith("21 days,")
+    assert seconds_to_duration_str(22 * 86400).startswith("22 days,")
 
 
 def test_seconds_to_duration_str_negative_clamped():

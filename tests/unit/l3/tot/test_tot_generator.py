@@ -84,9 +84,9 @@ async def test_tot_generator_rules_injection():
 
     # Проверяем инъекцию новых "мягких" правил
     assert "Особая задача" in user_prompt
-    assert "примерно ~4 макро-стратегий" in user_prompt
-    assert "Рекомендованная глубина вложенности симуляции: ~3" in user_prompt
-    assert "Ветви сценарии динамически: в среднем по 3" in user_prompt
+    assert "approximately 4 macro-strategies" in user_prompt
+    assert "The recommended nested simulation depth is: 3" in user_prompt
+    assert "Branch scenarios dynamically: averaging 3" in user_prompt
 
 
 def test_tot_generator_markdown_formatting():
@@ -123,11 +123,11 @@ def test_tot_generator_markdown_formatting():
     result = generator._format_markdown(tree)
 
     # Проверяем структуру дерева
-    assert '├── №1: "План А" -> Делаем быстро' in result
-    assert "│   * Плюсы: [+] Скорость" in result
-    assert "│   └── №1.1: Осложнение -> Всё сломалось" in result
-    assert "│\n│" in result  # Проверяем пустую разделительную линию
-    assert '└── №2: "План Б" -> Делаем медленно' in result
+    assert '├── No.1: "План А" -> Делаем быстро' in result
+    assert "│   * Pros: [+] Скорость" in result
+    assert "│   └── No.1.1: Осложнение -> Всё сломалось" in result
+    assert "│\n│" in result  # Проверяем emptyую разделительную линию
+    assert '└── No.2: "План Б" -> Делаем медленно' in result
 
 
 @pytest.mark.asyncio

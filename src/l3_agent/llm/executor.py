@@ -1,13 +1,14 @@
 """
-Изолированный исполнитель запросов к LLM.
+Isolated LLM Request Executor.
 
-Инкапсулирует логику общения с OpenAI-совместимым API:
-- Управление ретраями
-- Обработка Rate Limits и вычисление кулдауна из заголовков
-- Ротация мертвых или заблокированных ключей (HTTP 401)
-- Логирование токенов
+Encapsulates the logic of communicating with OpenAI-compatible APIs:
+- Retries management
+- Handling Rate Limits and extracting cooldown time from response headers
+- Banning dead or invalid keys (HTTP 401)
+- Counting and tracking token usage
 
-Соблюдает SRP: циклы агента (ReAct, Swarm) не знают о деталях HTTP-ошибок.
+Adheres strictly to Single Responsibility Principle (SRP): agent reasoning loops
+(ReAct, Swarm) remain completely unaware of raw HTTP errors.
 """
 
 import time
@@ -24,15 +25,15 @@ from src.utils.token_tracker import TokenTracker
 
 class LLMExecutor:
     """
-    Единая точка входа для вызова языковых моделей.
-    Скрывает всю сложность обработки сетевых ошибок.
+    Unified entry point for invoking language models.
+    Hides all complexity of handling network and API errors.
     """
 
     def __init__(self, llm_client: LLMClient, token_tracker: TokenTracker) -> None:
         """
         Args:
-            llm_client: Клиент для получения HTTP-сессий (AsyncOpenAI).
-            token_tracker: Инструмент для учета входящих и исходящих токенов.
+            llm_client: Client for retrieving HTTP sessions (AsyncOpenAI).
+            token_tracker: Tool for tracking input and output tokens.
         """
 
         self.llm = llm_client
@@ -46,25 +47,27 @@ class LLMExecutor:
         logger: logging.Logger,
         log_prefix: str,
         tools: Optional[List[Dict[str, Any]]] = None,
-        max_retries: int = 2,
+        tool_choice: Optional[str] = None, 
+        max_retries: int = 1,
         max_timeout_retries: int = 1,
     ) -> Optional[str]:
         """
-        Выполняет запрос к LLM с надежной системой повторных попыток.
+        Executes a request to the LLM with a robust retry system.
 
         Args:
-            model_name: Название модели (напр. 'gemini-3.1-flash-lite').
-            messages: Сформированный контекст (список сообщений).
-            temperature: Температура модели (0.0 - 2.0).
-            logger: Логгер целевой подсистемы (ReAct, Swarm, ToT).
-            log_prefix: Префикс для логов (напр. '[ReAct LLM]').
-            tools: Опциональная JSON Schema инструментов.
-            max_retries: Общий лимит попыток при любых ошибках.
-            max_timeout_retries: Специфичный лимит именно для таймаутов (API не отвечает).
+            model_name: Name of the target model (e.g., 'gemini-3.1-flash-lite').
+            messages: Formatted message context list.
+            temperature: Creativity parameter (0.0 to 2.0).
+            logger: Target subsystem logger (ReAct, Swarm, ToT).
+            log_prefix: Logging prefix (e.g., '[ReAct LLM]').
+            tools: Optional JSON Schema list of available tools.
+            tool_choice: Optional string to force a specific tool call.
+            max_retries: Total retry attempts limit for any exceptions.
+            max_timeout_retries: Specific retry attempts limit for timeouts.
 
         Returns:
-            Сырой текст ответа модели (или JSON-строка вызова инструмента).
-            Вернет None, если все попытки исчерпаны или произошла фатальная ошибка.
+            Optional[str]: Raw assistant response text or tool call JSON arguments.
+                          Returns None if all retries failed or a fatal error occurred.
         """
 
         self.tracker.add_input_record(messages, log_prefix=log_prefix, logger=logger)
@@ -72,40 +75,43 @@ class LLMExecutor:
 
         for attempt in range(max_retries):
             try:
-                # Получаем живую сессию из ротатора
+                # Retrieve an active authenticated session
                 session = self.llm.get_session()
 
-                # Выполняем запрос
+                # Execute request
                 kwargs = {
                     "model": model_name,
                     "messages": messages,
                     "temperature": temperature,
-                    "timeout": 120.0,
+                    "timeout": 60.0,
                 }
                 if tools:
                     kwargs["tools"] = tools
+                if tool_choice is not None:
+                    kwargs["tool_choice"] = tool_choice
 
                 response = await session.chat.completions.create(**kwargs)
 
-                # Извлекаем ответ и считаем токены
+                # Extract content and count tokens
                 raw_answer = self._extract_response_text(response)
 
                 self.tracker.add_output_record(
                     raw_answer, log_prefix=log_prefix, logger=logger
                 )
 
-                # Сырой JSON-ответ: будет парситься дальше
                 return raw_answer
 
             except AllKeysExhaustedError as e:
-                logger.warning(f"{log_prefix} Все ключи в кулдауне. Ждем {e.wait_time} сек.")
+                logger.warning(
+                    f"{log_prefix} All keys in cooldown. Waiting {e.wait_time} sec."
+                )
                 await asyncio.sleep(e.wait_time + 1)
                 continue
 
             except openai.RateLimitError as e:
                 wait_time = self._calculate_rate_limit_cooldown(e)
                 logger.warning(
-                    f"{log_prefix} Rate Limit (429). Кулдаун ключа {session.api_key[:8]} на {wait_time}с."
+                    f"{log_prefix} Rate Limit (429). Key {session.api_key[:8]} cooled down for {wait_time}s."
                 )
 
                 self.llm.rotator.cooldown_key(session.api_key, wait_time)
@@ -113,12 +119,12 @@ class LLMExecutor:
                 if self.llm.rotator.total_keys() == 1:
                     await asyncio.sleep(wait_time + 1)
                 else:
-                    await asyncio.sleep(1)  # Быстрый переход к следующему ключу
+                    await asyncio.sleep(1)  # Fast transition to the next key
                 continue
 
             except openai.AuthenticationError:
                 logger.warning(
-                    f"{log_prefix} Ключ невалиден (401). Удаление из пула ({session.api_key[:10]})."
+                    f"{log_prefix} Invalid API key (401). Removing from pool ({session.api_key[:10]})."
                 )
                 self.llm.rotator.ban_key(session.api_key)
                 continue
@@ -127,34 +133,34 @@ class LLMExecutor:
                 timeout_count += 1
                 if timeout_count >= max_timeout_retries:
                     logger.error(
-                        f"{log_prefix} API недоступно после {max_timeout_retries} таймаутов. Прерывание."
+                        f"{log_prefix} API unavailable after {max_timeout_retries} timeouts. Aborting."
                     )
                     return None
 
                 logger.warning(
-                    f"{log_prefix} Таймаут ответа API. Повтор ({timeout_count}/{max_timeout_retries})."
+                    f"{log_prefix} API request timed out. Retrying ({timeout_count}/{max_timeout_retries})."
                 )
                 continue
 
             except Exception as e:
-                # Для непредвиденных ошибок делаем паузу перед следующей попыткой
+                # Pause briefly before retry on unexpected system/network errors
                 if attempt == max_retries - 1:
-                    logger.error(f"{log_prefix} Фатальная ошибка API: {e}")
+                    logger.error(f"{log_prefix} Fatal API error: {e}")
                     return None
 
-                logger.error(f"{log_prefix} Внутренняя ошибка API: {e}. Повтор запроса.")
+                logger.error(f"{log_prefix} Internal API error: {e}. Retrying request.")
                 await asyncio.sleep(2)
                 continue
 
         return None
 
-    # =========================================================================
-    # ПРИВАТНЫЕ ХЕЛПЕРЫ
-    # =========================================================================
+    # -------------------------------------------------------------------------
+    # Private Helpers
+    # -------------------------------------------------------------------------
 
     def _extract_response_text(self, response: Any) -> str:
         """
-        Извлекает сырой текст или JSON-аргументы инструмента из ответа OpenAI.
+        Extracts raw text content or tool JSON arguments from the OpenAI response.
         """
 
         message_obj = response.choices[0].message
@@ -166,20 +172,19 @@ class LLMExecutor:
 
     def _calculate_rate_limit_cooldown(self, error: openai.RateLimitError) -> int:
         """
-        Вычисляет время заморозки ключа на основе заголовков ответа провайдера.
-        Возвращает количество секунд.
+        Calculates key freeze time based on the provider's response headers.
         """
 
-        # Если провайдер прямо говорит, что кончились деньги/квота
+        # If the provider explicitly reports insufficient funds
         err_code = getattr(error.body, "get", lambda x: None)("code")
         if err_code == "insufficient_quota" or "billing" in str(error).lower():
-            return 86400  # Бан на сутки
+            return 86400  # Freeze for 24 hours
 
-        wait_time = 30  # Дефолт
+        wait_time = 30  # Default fallback
 
         if error.response is not None:
             headers = error.response.headers
-            # Пытаемся найти специфичные заголовки OpenRouter/OpenAI/Anthropic
+            # Attempt to extract common rate limit reset headers
             retry_after = (
                 headers.get("retry-after")
                 or headers.get("x-ratelimit-reset")
@@ -193,11 +198,11 @@ class LLMExecutor:
                     else:
                         wait_time = int(float(retry_after))
 
-                    # Если провайдер (например, OpenAI) отдал timestamp в будущем
+                    # If the timestamp represents a future epoch (e.g. OpenAI)
                     if wait_time > time.time():
                         wait_time = int(wait_time - time.time())
                 except ValueError:
                     pass
 
-        # Зажимаем лимиты: не меньше 2 сек (во избежание спама) и не больше 5 минут
+        # Clamp boundaries: no less than 2s (avoid spam) and no more than 5 minutes
         return max(2, min(wait_time, 300))

@@ -44,7 +44,7 @@ async def test_watch_for_stop_file_triggers_shutdown(tmp_path):
 
     assert not stop_file.exists()
     bus.publish.assert_called_once_with(
-        Events.SYSTEM_SHUTDOWN_REQUESTED, reason="Остановка пользователем из меню"
+        Events.SYSTEM_SHUTDOWN_REQUESTED, reason="Stopped by user via CLI"
     )
 
 
@@ -85,7 +85,7 @@ def test_main_critical_exception(mock_clear, mock_load, mock_builder_cls, mock_o
     mock_builder_cls.return_value = mock_builder_instance
 
     instance = mock_orchestrator.return_value
-    instance.run = AsyncMock(side_effect=RuntimeError("Критический сбой ядра"))
+    instance.run = AsyncMock(side_effect=RuntimeError("Critical failure ядра"))
     instance.stop = AsyncMock()
 
     exit_code = asyncio.run(main())

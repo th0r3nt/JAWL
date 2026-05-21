@@ -1,6 +1,6 @@
 """
-CRUD-контроллер для Байесовских гипотез.
-Реализует математику пересчета вероятности (Теорема Байеса) и защиту от "Байесовского лока" (Правило Кромвеля).
+CRUD controller for Bayesian hypotheses.
+Implements probability recalculation mathematics (Bayes' Theorem) and protection against "Bayesian Lock" (Cromwell's Rule).
 """
 
 import uuid
@@ -18,7 +18,7 @@ if TYPE_CHECKING:
 
 class SQLHypotheses:
     """
-    Контроллер вероятностной дедукции.
+    Probabilistic deduction controller.
     """
 
     def __init__(
@@ -31,31 +31,31 @@ class SQLHypotheses:
 
     async def bootstrap_migrations(self) -> None:
         """
-        Мягкая миграция для добавления колонки cluster_name в старые базы данных.
+        Soft migration to add cluster_name column to older databases.
         """
         async with self.db.engine.begin() as conn:
             try:
                 await conn.execute(
                     text(
-                        "ALTER TABLE bayesian_hypotheses ADD COLUMN cluster_name TEXT DEFAULT 'Общий кластер'"
+                        "ALTER TABLE bayesian_hypotheses ADD COLUMN cluster_name TEXT DEFAULT 'General investigation'"
                     )
                 )
                 main_logger.info(
-                    "[SQL DB] Выполнена успешная миграция таблицы BayesianHypotheses (добавлен cluster_name)."
+                    "[SQL DB] Successful migration of the BayesianHypotheses table (added cluster_name)."
                 )
             except Exception as e:
                 main_logger.debug(
-                    f"[SQL DB] Миграция таблицы Tasks пропущена (возможно, колонка уже существует): {e}"
+                    f"[SQL DB] Migration of the Tasks table skipped (column probably already exists): {e}"
                 )
 
     def _calculate_posterior(self, prior: float, tpr: float, fpr: float) -> float:
         """
-        Теорема Байеса.
+        Bayes' Theorem.
         P(H|E) = (TPR * Prior) / (TPR * Prior + FPR * (1 - Prior))
         """
 
-        # Правило Кромвеля: зажимаем вероятности, чтобы избежать деления на ноль
-        # и необратимой 100% уверенности (оставляем шанс на чудо/ошибку)
+        # Cromwell's Rule: clip probabilities to avoid division by zero
+        # and irreversible 100% confidence (leaving a chance for miracle/error)
         prior = max(0.01, min(0.99, prior))
         tpr = max(0.01, min(0.99, tpr))
         fpr = max(0.01, min(0.99, fpr))
@@ -74,33 +74,33 @@ class SQLHypotheses:
         self, cluster_name: str, title: str, initial_probability: float
     ) -> SkillResult:
         """
-        Formulates hypothesis for directed investigation. 
-        
-        cluster_name: Incident name. 
-        title: Core thesis. 
+        Formulates hypothesis for directed investigation.
+
+        cluster_name: Incident name.
+        title: Core thesis.
         initial_probability: Base confidence (0.01-0.99).
         """
 
         if not (0.01 <= initial_probability <= 0.99):
             return SkillResult.fail(
-                "Ошибка: начальная вероятность должна быть между 0.01 и 0.99."
+                "Error: initial probability must be between 0.01 and 0.99."
             )
 
         clean_cluster = cluster_name.strip()
         if not clean_cluster:
-            clean_cluster = "Общий кластер"
+            clean_cluster = "General investigation"
 
         hyp_id = str(uuid.uuid4())[:4]
 
         async with self.db.session_factory() as session:
-            # 1. Проверка глобального лимита гипотез
+            # 1. Check global hypotheses limit
             count_res = await session.execute(select(func.count(BayesianHypothesisTable.id)))
             if count_res.scalar_one() >= self.max_hypotheses:
                 return SkillResult.fail(
-                    f"Достигнут глобальный лимит активных гипотез ({self.max_hypotheses}). Рекомендуется удалить подтвержденные/опровергнутые."
+                    f"Global active hypotheses limit reached ({self.max_hypotheses}). It is recommended to delete confirmed/refuted ones."
                 )
 
-            # 2. Проверка лимита уникальных кластеров
+            # 2. Check unique clusters limit
             clusters_res = await session.execute(
                 select(BayesianHypothesisTable.cluster_name).distinct()
             )
@@ -111,8 +111,8 @@ class SQLHypotheses:
                 and len(existing_clusters) >= self.max_clusters
             ):
                 return SkillResult.fail(
-                    f"Достигнут лимит уникальных кластеров гипотез ({self.max_clusters}). "
-                    f"Рекомендуется закрыть старые гипотезы, чтобы очистить кластер."
+                    f"Unique hypothesis clusters limit reached ({self.max_clusters}). "
+                    f"It is recommended to close old hypotheses to clear the cluster."
                 )
 
             new_hyp = BayesianHypothesisTable(
@@ -126,7 +126,7 @@ class SQLHypotheses:
             session.add(new_hyp)
             await session.commit()
 
-        msg = f"Гипотеза '{title}' сформулирована (ID: {hyp_id}). Текущая уверенность: {int(initial_probability * 100)}%."
+        msg = f"Hypothesis '{title}' formulated (ID: {hyp_id}). Current confidence: {int(initial_probability * 100)}%."
         main_logger.debug(f"[SQL DB] {msg}")
         return SkillResult.ok(f"True. ID: {hyp_id}")
 
@@ -139,19 +139,17 @@ class SQLHypotheses:
         false_positive_rate: float,
     ) -> SkillResult:
         """
-        Adds evidence and recalculates Bayesian probability. 
-        
-        evidence_desc: Found fact. 
-        true_positive_rate: (0.01-0.99) Prob if hypothesis true. 
+        Adds evidence and recalculates Bayesian probability.
+
+        evidence_desc: Found fact.
+        true_positive_rate: (0.01-0.99) Prob if hypothesis true.
         false_positive_rate: (0.01-0.99) Prob if hypothesis false.
         """
 
         if not (0.01 <= true_positive_rate <= 0.99) or not (
             0.01 <= false_positive_rate <= 0.99
         ):
-            return SkillResult.fail(
-                "Ошибка: TPR и FPR должны быть в диапазоне от 0.01 до 0.99."
-            )
+            return SkillResult.fail("Error: TPR and FPR must be in the range of 0.01 to 0.99.")
 
         async with self.db.session_factory() as session:
             result = await session.execute(
@@ -162,14 +160,14 @@ class SQLHypotheses:
             hyp = result.scalar_one_or_none()
 
             if not hyp:
-                return SkillResult.fail(f"Гипотеза с ID '{hypothesis_id}' не найдена.")
+                return SkillResult.fail(f"Hypothesis with ID '{hypothesis_id}' not found.")
 
             old_prob = hyp.current_probability
             new_prob = self._calculate_posterior(
                 old_prob, true_positive_rate, false_positive_rate
             )
 
-            # Обновляем БД (создаем новый список для корректной сериализации JSON в SQLAlchemy)
+            # Update DB (create a new list for correct JSON serialization in SQLAlchemy)
             current_log = list(hyp.evidence_log)
             current_log.append(
                 {
@@ -186,7 +184,7 @@ class SQLHypotheses:
 
             await session.commit()
 
-        msg = f"Fact added. Вероятность гипотезы '{hyp.title}' изменилась: {int(old_prob*100)}% -> {int(new_prob*100)}%."
+        msg = f"Fact added. Probability of hypothesis '{hyp.title}' changed: {int(old_prob*100)}% -> {int(new_prob*100)}%."
         main_logger.debug(f"[SQL DB] {msg}")
         return SkillResult.ok("True")
 
@@ -204,15 +202,17 @@ class SQLHypotheses:
             )
             await session.commit()
             if result.rowcount == 0:
-                return SkillResult.fail(f"Гипотеза с ID '{hypothesis_id}' не найдена.")
+                return SkillResult.fail(f"Hypothesis with ID '{hypothesis_id}' not found.")
 
-        msg = f"Гипотеза '{hypothesis_id}' успешно закрыта и удалена из оперативной памяти."
+        msg = (
+            f"Hypothesis '{hypothesis_id}' successfully closed and removed from active memory."
+        )
         main_logger.debug(f"[SQL DB] {msg}")
         return SkillResult.ok("True")
 
     async def get_context_block(self, **kwargs: Any) -> str:
         """
-        Блок для системного промпта агента.
+        Block for the agent's system prompt.
         """
 
         async with self.db.session_factory() as session:

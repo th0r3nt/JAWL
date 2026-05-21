@@ -13,7 +13,7 @@ async def test_parse_media():
     # Имитируем фото
     msg.photo = True
     msg.document = False
-    assert TelethonMessageParser.parse_media(msg) == "[Фотография]"
+    assert TelethonMessageParser.parse_media(msg) == "[Photo]"
 
     # Имитируем файл
     msg.photo = False
@@ -24,7 +24,7 @@ async def test_parse_media():
     msg.video_note = False
     msg.document = True
 
-    assert TelethonMessageParser.parse_media(msg) == "[Файл]"
+    assert TelethonMessageParser.parse_media(msg) == "[Document]"
 
 
 @pytest.mark.asyncio
@@ -45,7 +45,7 @@ async def test_build_string_full():
         m.setattr(
             TelethonMessageParser, "determine_reply", MagicMock(return_value=(False, None))
         )
-        m.setattr(TelethonMessageParser, "parse_media", MagicMock(return_value="[Фотография]"))
+        m.setattr(TelethonMessageParser, "parse_media", MagicMock(return_value="[Photo]"))
         m.setattr(TelethonMessageParser, "parse_forward", AsyncMock(return_value=""))
         m.setattr(TelethonMessageParser, "parse_reply", AsyncMock(return_value=""))
         m.setattr(TelethonMessageParser, "parse_reactions", AsyncMock(return_value=""))
@@ -57,10 +57,10 @@ async def test_build_string_full():
             client, target_entity, msg, timezone=3, read_outbox_max_id=0
         )
 
-        # Ожидаемый формат: [Время] [ID: 42] [Не прочитано] Alex: [Фотография] Смотри!
+        # Ожидаемый формат: [Время] [ID: 42] [Не прочитано] Alex: [Photo] Смотри!
         assert "[ID: 42]" in result
         assert "Alex:" in result
-        assert "[Фотография] Смотри!" in result
+        assert "[Photo] Смотри!" in result
 
 
 def test_determine_reply():
@@ -112,7 +112,7 @@ async def test_parse_reactions(mock_get_display_name):
     client.get_entity.return_value = MagicMock()
 
     res_recent = await TelethonMessageParser.parse_reactions(client, msg_recent)
-    assert "[Реакции: 🔥 от Th0r3nt]" in res_recent
+    assert "[Reactions: 🔥 by Th0r3nt]" in res_recent
 
     # 2. Формат results (когда мы вытягиваем историю через get_messages)
     msg_results = MagicMock()
@@ -129,4 +129,4 @@ async def test_parse_reactions(mock_get_display_name):
     msg_results.reactions.results = [res_obj1, res_obj2]
 
     res_history = await TelethonMessageParser.parse_reactions(client, msg_results)
-    assert "[Реакции: 👍 x10, 👎 x2]" in res_history
+    assert "[Reactions: 👍 x10, 👎 x2]" in res_history

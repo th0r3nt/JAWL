@@ -19,9 +19,9 @@ async def test_network_http_request_truncation(mock_urlopen, http_client):
     res = await skills.request("http://fake.url")
 
     assert res.is_success is True
-    assert "Статус: 200" in res.message
+    assert "Status: 200" in res.message
     # Проверяем, что сработал лимит в 100 символов (установленный в фикстуре)
-    assert "Превышен лимит символов" in res.message
+    assert "Character limit exceeded" in res.message
     assert len(res.message) < 200
 
 
@@ -45,7 +45,7 @@ async def test_http_request_blocks_non_http_schemes(mock_urlopen, http_client, u
     res = await skills.request(url)
 
     assert res.is_success is False
-    assert "Запрещённая схема" in res.message
+    assert "Forbidden URL scheme" in res.message
     mock_urlopen.assert_not_called()
 
 
@@ -65,5 +65,5 @@ async def test_download_file_blocks_non_http_schemes(mock_urlopen, http_client, 
     res = await skills.download_file(url, "leak.txt")
 
     assert res.is_success is False
-    assert "Запрещённая схема" in res.message
+    assert "Forbidden URL scheme" in res.message
     mock_urlopen.assert_not_called()

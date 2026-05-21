@@ -26,5 +26,5 @@ async def test_watchdog_closes_idle_browser(browser_client, mock_playwright):
     with patch("asyncio.sleep", side_effect=fake_sleep):
         await events._loop()
 
-    # Браузер должен быть закрыт
+    # Браузер должен быть closed
     browser_client.close_browser.assert_called_once()

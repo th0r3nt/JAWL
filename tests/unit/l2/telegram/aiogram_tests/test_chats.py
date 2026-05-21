@@ -7,9 +7,9 @@ async def test_chats_get_chats(state, mock_client):
     """Тест: get_chats возвращает данные из кэша стейта."""
     skills = AiogramChats(mock_client, state)
 
-    # Кэш пуст
+    # Кэш empty
     res_empty = await skills.get_chats()
-    assert "Список чатов пуст" in res_empty.message
+    assert "Chat list is empty" in res_empty.message
 
     # Имитируем заполненный кэш
     state._chats_cache[1] = "Chat 1"

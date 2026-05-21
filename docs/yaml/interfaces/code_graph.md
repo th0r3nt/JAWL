@@ -1,18 +1,18 @@
-# Настройка Code Graph (Agentic Introspection)
+# Code Graph Configuration (Agentic Introspection)
 
-Интерфейс `code_graph` предоставляет агенту "рентгеновское зрение" для работы с кодовыми базами (репозиториями). 
+The `code_graph` interface provides the agent with "X-ray vision" for working with codebases (repositories).
 
-## Механика работы
-Когда агент вызывает навык `index_codebase`, система (через встроенный модуль Python `ast`) сканирует указанную директорию и расщепляет все `.py` файлы на логические узлы (Files, Classes, Functions). 
-1. **Граф зависимостей:** Узлы связываются в KuzuDB ребрами `IMPORTS`, `CONTAINS` и `DEFINES`. Это позволяет агенту вычислять зависимости между файлами (например, чтобы знать, какие тесты нужно обновить после рефакторинга).
-2. **Семантический поиск:** Докстринги всех функций и классов пропускаются через локальную Embedding-модель (FastEmbed) и сохраняются в векторную базу Qdrant. Это позволяет агенту искать нужный кусок кода не по точному названию, а по его **смыслу**.
+## How it works
+When the agent invokes the `index_codebase` skill, the system (via the built-in Python `ast` module) scans the specified directory and splits all `.py` files into logical nodes (Files, Classes, Functions).
+1. **Dependency Graph:** Nodes are linked in KuzuDB by `IMPORTS`, `CONTAINS`, and `DEFINES` edges. This allows the agent to compute dependencies between files (for example, to know which tests need to be updated after refactoring).
+2. **Semantic Search:** Docstrings of all functions and classes are processed through a local embedding model (FastEmbed) and saved into the Qdrant vector database. This allows the agent to search for the required piece of code not by its exact name, but by its **meaning**.
 
-*Примечание: Порог семантического сходства (Similarity Threshold) для поиска по коду берется из общих настроек векторной базы (`settings.yaml` -> `system.db.vector.similarity_threshold`).*
+*Note: The similarity threshold for code search is extracted from the general vector database settings (`settings.yaml` -> `system.db.vector.similarity_threshold`).*
 
-## Параметры (`code_graph`)
+## Parameters (`code_graph`)
 
-* **`enabled`**: `true` / `false`. Включение подсистемы. Если выключить, агент потеряет навыки индексации и навигации по коду.
-* **`max_search_results`**: Количество результатов, возвращаемых по умолчанию при использовании навыка `search_code_semantic`. Защищает контекстное окно агента от переполнения, если совпадений слишком много.
-* **`max_structure_items`**: Лимит на количество классов и функций, возвращаемых при запросе структуры файла (`get_file_structure`). Если файл (God Object) содержит 1000 методов, вывод будет обрезан для экономии токенов.
-* **`exclude_dirs`**: Список директорий (имена папок), которые будут полностью проигнорированы парсером при индексации. 
-  * *Зачем это нужно:* Индексирование виртуальных окружений (`venv`) или папок с мусором (`node_modules`, `__pycache__`) забьет базу десятками тысяч чужих функций, замедлит поиск и запутает агента. Всегда вносите тяжелые нерелевантные папки в этот список.
+* **`enabled`**: `true` / `false`. Enables the subsystem. If disabled, the agent loses codebase indexing and navigation skills.
+* **`max_search_results`**: Number of results returned by default when using the `search_code_semantic` skill. Protects the agent's context window from overflowing if there are too many matches.
+* **`max_structure_items`**: Limit on the number of classes and functions returned when requesting file structure (`get_file_structure`). If a file (God Object) contains 1000 methods, the output will be truncated to save tokens.
+* **`exclude_dirs`**: List of directory names fully ignored by the parser during indexing.
+  * *Why this is needed:* Indexing virtual environments (`venv`) or directories with temporary files (`node_modules`, `__pycache__`) would clog the database with thousands of irrelevant third-party functions, slowing down searches and confusing the agent. Always add heavy, non-relevant folders to this list.

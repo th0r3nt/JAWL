@@ -1,6 +1,7 @@
 """
-Поисковый движок Tavily (Стратегия).
-Платный (с free тиром), сверхбыстрый и оптимизированный специально для ИИ-агентов.
+Tavily search engine (Strategy).
+
+Paid (with free tier), ultra-fast and optimized specifically for AI agents.
 """
 
 import json
@@ -16,14 +17,14 @@ from src.l3_agent.swarm.roles import Subagents
 
 
 class TavilySearch:
-    """Движок поиска ссылок через Tavily API."""
+    """Link search engine via Tavily API."""
 
     def __init__(self, client: WebSearchClient, api_key: str) -> None:
         self.client = client
         self.api_key = api_key
 
     async def search_raw(self, query: str, max_results: int = 5) -> List[Dict[str, Any]]:
-        """Внутренний метод для сырого поиска (используется DeepResearch)."""
+        """Internal method for raw search (used by DeepResearch)."""
 
         def _do_search() -> List[Dict[str, Any]]:
             url = "https://api.tavily.com/search"
@@ -43,7 +44,7 @@ class TavilySearch:
             with urllib.request.urlopen(req, timeout=self.client.timeout) as response:
                 res = json.loads(response.read().decode("utf-8"))
 
-            # Маппинг под формат DDG для совместимости в DeepResearch
+            # Mapping to DDG format for compatibility in DeepResearch
             formatted = []
             for item in res.get("results", []):
                 formatted.append(
@@ -60,20 +61,20 @@ class TavilySearch:
     @skill(swarm=[Subagents.WEB_RESEARCHER])
     async def search(self, query: str, max_results: int = 5) -> SkillResult:
         """
-        Searches web via Tavily AI. 
+        Searches web via Tavily AI.
         Returns links and short snippets.
         """
         try:
             results = await self.search_raw(query, max_results)
             if not results:
-                return SkillResult.ok(f"По запросу '{query}' ничего не найдено.")
+                return SkillResult.ok(f"Nothing found for query '{query}'.")
 
             formatted = [
                 f"Title: {r['title']}\nURL: {r['href']}\nSnippet: {r['body']}" for r in results
             ]
-            main_logger.info(f"[Web] Выполнен поиск (Tavily) по запросу: '{query}'")
-            self.client.state.add_history(f"Поиск Tavily: '{query}'")
+            main_logger.info(f"[Web] Search (Tavily) completed for query: '{query}'")
+            self.client.state.add_history(f"Tavily Search: '{query}'")
             return SkillResult.ok("\n\n".join(formatted))
 
         except Exception as e:
-            return SkillResult.fail(f"Ошибка веб-поиска (Tavily): {e}")
+            return SkillResult.fail(f"Web search error (Tavily): {e}")

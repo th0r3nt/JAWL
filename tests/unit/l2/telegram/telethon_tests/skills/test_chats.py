@@ -95,9 +95,9 @@ async def test_chats_read_chat_complex_parsing(mock_tg_client):
     telethon.utils.get_display_name = original_get_display_name
 
     assert res.is_success is True, res.message
-    assert "[Фотография] Смотри мем" in res.message
+    assert "[Photo] Смотри мем" in res.message
     # Обновленный ассерт:
-    assert "[Переслано от: Meme Channel (Скрытый аккаунт)]" in res.message
-    assert "(В ответ на сообщение ID 42 от Unknown)" in res.message
-    assert "[Реакции: 🔥 x5]" in res.message
-    assert "[Кнопки: [Лайк]]" in res.message
+    assert "[Forwarded from: Meme Channel (Hidden profile)]" in res.message
+    assert "(In reply to message ID 42 by Unknown)" in res.message
+    assert "[Reactions: 🔥 x5]" in res.message
+    assert "[Buttons: [Лайк]]" in res.message

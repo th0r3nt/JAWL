@@ -1,10 +1,9 @@
-# ФАЙЛ: src/l1_databases/sql/management/ticks.py
 """
-Сборщик и форматировщик истории действий агента (Ticks).
+Collector and formatter of agent actions history (Ticks).
 
-Логирует каждый шаг ReAct-цикла и отвечает за умную компрессию старых шагов
-в системном промпте (оставляя N последних шагов подробными, а остальные ужимая
-по количеству символов для экономии контекста).
+Logs every step of the ReAct loop and handles smart compression of older steps
+in the system prompt (leaving the N latest steps detailed, while compressing the rest
+by character count to save context space).
 """
 
 import json
@@ -25,9 +24,9 @@ if TYPE_CHECKING:
 
 class SQLTicks:
     """
-    CRUD-функции для взаимодействия с таблицей логгирования тиков агента.
-    Обеспечивает сохранение, извлечение и динамическое форматирование истории
-    в зависимости от целевой подсистемы (Главный агент или Фоновые процессы).
+    CRUD functions for interacting with the agent's tick logging table.
+    Handles saving, retrieving, and dynamic formatting of history
+    depending on the target subsystem (Main Agent or Background Processes).
     """
 
     def __init__(
@@ -44,19 +43,20 @@ class SQLTicks:
         tz_offset: int = 0,
     ) -> None:
         """
-        Инициализирует контроллер тиков и задает жесткие лимиты на размер контекста.
+        Initializes the tick controller and sets strict limits on the context size.
 
         Args:
-            db: Подключение к SQLite.
-            limit: Максимальное количество тиков (шагов), отображаемых в промпте.
-            detailed_ticks: Сколько самых свежих тиков выводить в детальном виде (без обрезки).
-            action_max_chars: Лимит символов для свежих действий.
-            result_max_chars: Лимит символов для свежих результатов.
-            thoughts_short_max_chars: Лимит символов для сжатых мыслей.
-            action_short_max_chars: Лимит символов для сжатых действий.
-            result_short_max_chars: Лимит символов для сжатых результатов.
-            tz_offset: Смещение временной зоны.
+            db: Connection to SQLite.
+            limit: Maximum number of ticks (steps) displayed in the prompt.
+            detailed_ticks: How many of the freshest ticks to output in detailed form (no truncation).
+            action_max_chars: Character limit for fresh actions.
+            result_max_chars: Character limit for fresh results.
+            thoughts_short_max_chars: Character limit for compressed thoughts.
+            action_short_max_chars: Character limit for compressed actions.
+            result_short_max_chars: Character limit for compressed results.
+            tz_offset: Timezone offset.
         """
+        
         self.db = db
         self.high_ticks = high_ticks
         self.medium_ticks = medium_ticks
@@ -75,15 +75,15 @@ class SQLTicks:
         self, thoughts: str, actions: list[dict[str, Any]], results: dict[str, Any]
     ) -> str:
         """
-        Сохраняет единичный такт работы агента в базу данных.
+        Saves a single tick of the agent's work to the database.
 
         Args:
-            thoughts: Внутренний монолог и логика агента.
-            actions: Массив вызванных инструментов и их параметров.
-            results: Ответы от инструментов или текст Traceback/ошибок.
+            thoughts: Internal monologue and logic of the agent.
+            actions: Array of invoked tools and their parameters.
+            results: Responses from tools or Traceback/error text.
 
         Returns:
-            Сгенерированный UUID сохраненного тика.
+            Generated UUID of the saved tick.
         """
 
         tick_id = str(uuid.uuid4())
@@ -99,13 +99,13 @@ class SQLTicks:
 
     async def get_ticks(self, limit: int = 5) -> List[TickTable]:
         """
-        Возвращает последние N тиков из базы данных в хронологическом порядке.
+        Returns the last N ticks from the database in chronological order.
 
         Args:
-            limit: Сколько записей извлечь.
+            limit: How many records to retrieve.
 
         Returns:
-            Список объектов TickTable.
+            List of TickTable objects.
         """
 
         async with self.db.session_factory() as session:
@@ -116,10 +116,10 @@ class SQLTicks:
 
     def _format_tick_entry(self, t: TickTable, tier: str) -> str:
         """
-        Внутренний утилитарный метод для форматирования одного тика.
+        Internal helper method to format a single tick.
 
         Returns:
-            Отформатированная Markdown-строка с мыслями, действиями и результатами.
+            Formatted Markdown string containing thoughts, actions, and results.
         """
         time_str = format_datetime(t.created_at, self.tz_offset, "%m-%d %H:%M:%S")
         step_str = (
@@ -128,17 +128,17 @@ class SQLTicks:
             else ""
         )
 
-        header = f"## TICK {time_str}{step_str}\n"
+        header = f"\n\n## TICK {time_str}{step_str}\n"
 
         thoughts_str = t.thoughts
         if tier in ("MEDIUM", "LOW") and len(thoughts_str) > self.thoughts_short_max_chars:
             thoughts_str = thoughts_str[: self.thoughts_short_max_chars] + "...[Truncated]"
 
-        # Для LOW тиков возвращаем ТОЛЬКО мысли
+        # For LOW ticks we return ONLY thoughts
         if tier == "LOW":
             return f"{header}\n### Thoughts:\n{thoughts_str}"
 
-        # MEDIUM и HIGH
+        # MEDIUM and HIGH
         action_limit = self.action_max_chars if tier == "HIGH" else self.action_short_max_chars
         actions_list = []
         actions_raw = t.actions if isinstance(t.actions, list) else [t.actions]
@@ -167,14 +167,14 @@ class SQLTicks:
 
     async def get_context_block(self, **kwargs: Any) -> str:
         """
-        Извлекает последние N тиков из базы и динамически сжимает их объем.
-        Последние 'detailed_ticks' отдаются почти полностью, остальные жестко обрезаются
-        до 'short_max_chars' для предотвращения переполнения контекстного окна LLM.
+        Extracts the last N ticks from the database and dynamically compresses their size.
+        The last 'detailed_ticks' are returned almost entirely, the rest are strictly truncated
+        to 'short_max_chars' to prevent overflowing the LLM context window.
 
-        Предназначено для использования Главным Агентом (Оркестратором).
+        Intended for use by the Main Agent (Orchestrator).
 
         Returns:
-            Готовый Markdown блок 'RECENT TICKS' для инъекции в промпт.
+            Finished Markdown block 'RECENT TICKS' for injection into the prompt.
         """
 
         total_limit = self.high_ticks + self.medium_ticks + self.low_ticks
@@ -203,18 +203,18 @@ class SQLTicks:
 
     async def get_full_context_block(self, limit: int = 10) -> str:
         """
-        Извлекает последние N тиков из базы БЕЗ применения жесткого исторического сжатия.
-        Все запрошенные тики трактуются как 'detailed', что позволяет моделям видеть
-        реальные результаты выполнения (results), а не только мысли.
+        Extracts the last N ticks from the database WITHOUT applying strict historical compression.
+        All requested ticks are treated as 'detailed', allowing models to see
+        real execution results (results) rather than just thoughts.
 
-        Предназначено для фоновых когнитивных процессов (Subconscious, Tree of Thoughts),
-        которым критически важно видеть полные причинно-следственные связи.
+        Intended for background cognitive processes (Subconscious, Tree of Thoughts),
+        which critically need to see full cause-and-effect relationships.
 
         Args:
-            limit: Максимальное количество извлекаемых тиков.
+            limit: Maximum number of extracted ticks.
 
         Returns:
-            Отформатированный Markdown лог действий.
+            Formatted Markdown actions log.
         """
 
         ticks = await self.get_ticks(limit=limit)
@@ -237,42 +237,46 @@ class SQLTicks:
         """
         try:
             tz = get_timezone(self.tz_offset)
-            
+
             dt_start = datetime.strptime(start_time, "%Y-%m-%d %H:%M:%S").replace(tzinfo=tz)
             dt_end = datetime.strptime(end_time, "%Y-%m-%d %H:%M:%S").replace(tzinfo=tz)
 
-            # SQLite при сравнении фильтров в ORM работает со строками (без таймзон)
-            # Поэтому мы переводим время в UTC и срезаем tzinfo (делаем naive datetime)
+            # SQLite works with strings (naive datetimes) for comparisons in filters
+            # Therefore we convert time to UTC and strip tzinfo (make it naive)
             utc_start = dt_start.astimezone(timezone.utc).replace(tzinfo=None)
             utc_end = dt_end.astimezone(timezone.utc).replace(tzinfo=None)
 
             if utc_start > utc_end:
-                return SkillResult.fail("Ошибка: start_time не может быть позже end_time.")
+                return SkillResult.fail("Error: start_time cannot be later than end_time.")
 
-            limit = 200  # Жесткий лимит на количество возвращаемых тиков, чтобы избежать перегрузки
+            limit = 200  # Hard limit on returned ticks count to avoid bloating the prompt
 
             async with self.db.session_factory() as session:
-                stmt = select(TickTable).where(
-                    TickTable.created_at >= utc_start,
-                    TickTable.created_at <= utc_end
-                ).order_by(TickTable.created_at.asc()).limit(limit)
+                stmt = (
+                    select(TickTable)
+                    .where(TickTable.created_at >= utc_start, TickTable.created_at <= utc_end)
+                    .order_by(TickTable.created_at.asc())
+                    .limit(limit)
+                )
 
                 result = await session.execute(stmt)
                 ticks = result.scalars().all()
 
             if not ticks:
-                return SkillResult.ok(f"За указанный период ({start_time} - {end_time}) тиков не найдено.")
+                return SkillResult.ok(
+                    f"No ticks found for the specified period ({start_time} - {end_time})."
+                )
 
             tier = "HIGH" if detail else "MEDIUM"
             blocks = [self._format_tick_entry(t, tier) for t in ticks]
 
             res_str = "\n\n".join(blocks)
             if len(ticks) == limit:
-                res_str += f"\n\n... [Достигнут лимит вывода в {limit} тиков. Рекомендуется уточнить временной диапазон для более узкого поиска]"
+                res_str += f"\n\n... [Output limit of {limit} ticks reached. It is recommended to narrow the time range for a more focused search]"
 
-            return SkillResult.ok(f"История тиков ({start_time} - {end_time}):\n\n{res_str}")
+            return SkillResult.ok(f"Tick history ({start_time} - {end_time}):\n\n{res_str}")
 
         except ValueError:
-            return SkillResult.fail("Ошибка: Неверный формат времени. Используйте 'YYYY-MM-DD HH:MM:SS'.")
+            return SkillResult.fail("Error: Invalid time format. Use 'YYYY-MM-DD HH:MM:SS'.")
         except Exception as e:
-            return SkillResult.fail(f"Внутренняя ошибка при поиске тиков: {e}")
+            return SkillResult.fail(f"Internal error searching ticks: {e}")

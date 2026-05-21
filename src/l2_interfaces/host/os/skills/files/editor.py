@@ -1,6 +1,6 @@
 """
-Навыки для точечного редактирования (патчинга) файлов.
-Экономит токены и снижает риск повреждения большого файла при полной перезаписи.
+Skills for targeted editing (patching) of files.
+Saves context tokens and reduces the risk of file corruption compared to full rewrites.
 """
 
 import asyncio
@@ -10,12 +10,13 @@ from src.utils.logger import main_logger
 from src.l2_interfaces.host.os.client import HostOSClient, HostOSAccessLevel
 from src.l2_interfaces.host.os.decorators import require_access
 
-from src.l3_agent.skills.registry import SkillResult, skill
 from src.l3_agent.swarm.roles import Subagents
+
+from src.l3_agent.skills.registry import SkillResult, skill
 
 
 class HostOSEditor:
-    """Навыки для точечного редактирования кода."""
+    """Skills for targeted code editing."""
 
     def __init__(self, host_os_client: HostOSClient):
         self.host_os = host_os_client
@@ -26,15 +27,15 @@ class HostOSEditor:
         self, filepath: str, match_string: str, exact_match: bool = False
     ) -> SkillResult:
         """
-        Deletes lines containing 'match_string'. 
-        
+        Deletes lines containing 'match_string'.
+
         exact_match: Requires full string match (ignoring edge whitespace).
         """
 
         try:
             safe_path = self.host_os.validate_path(filepath, is_write=True)
             if not safe_path.is_file():
-                return SkillResult.fail(f"Ошибка: Файл не найден ({filepath}).")
+                return SkillResult.fail(f"Error: File not found ({filepath}).")
 
             def _delete():
                 with open(safe_path, "r", encoding="utf-8") as f:
@@ -55,17 +56,17 @@ class HostOSEditor:
                     new_lines.append(line)
 
                 if deleted_count == 0:
-                    return False, "Совпадений не найдено. Ни одна строка не удалена."
+                    return False, "No matches found. No lines deleted."
 
                 with open(safe_path, "w", encoding="utf-8") as f:
                     f.writelines(new_lines)
 
-                return True, f"Успешно удалено строк: {deleted_count}."
+                return True, f"Successfully deleted lines: {deleted_count}."
 
             is_success, msg = await asyncio.to_thread(_delete)
 
             if is_success:
-                main_logger.info(f"[Host OS] Удалены строки в файле: {safe_path.name}")
+                main_logger.info(f"[Host OS] Deleted lines in file: {safe_path.name}")
                 return SkillResult.ok("True")
             else:
                 return SkillResult.fail(msg)
@@ -73,7 +74,7 @@ class HostOSEditor:
         except PermissionError as e:
             return SkillResult.fail(str(e))
         except Exception as e:
-            return SkillResult.fail(f"Ошибка при удалении строк: {e}")
+            return SkillResult.fail(f"Error deleting lines: {e}")
 
     @skill(swarm=[Subagents.CODER, Subagents.QA_ENGINEER, Subagents.SYSADMIN])
     @require_access(HostOSAccessLevel.SANDBOX)
@@ -81,38 +82,34 @@ class HostOSEditor:
         self, filepath: str, search_block: str, replace_block: str
     ) -> SkillResult:
         """
-        Targeted file modification. Saves tokens/reduces corruption risk vs full rewrite. 
-        
-        search_block: Exact fragment to replace. 
+        Targeted file modification. Saves tokens/reduces corruption risk vs full rewrite.
+
+        search_block: Exact fragment to replace.
         replace_block: New code insert.
         """
 
         if not search_block:
-            return SkillResult.fail("Ошибка: search_block не может быть пустым.")
+            return SkillResult.fail("Error: search_block cannot be empty.")
 
         try:
             safe_path = self.host_os.validate_path(filepath, is_write=True)
             if not safe_path.is_file():
-                return SkillResult.fail(f"Ошибка: Файл не найден ({filepath}).")
+                return SkillResult.fail(f"Error: File not found ({filepath}).")
 
             def _patch():
                 with open(safe_path, "r", encoding="utf-8") as f:
                     content = f.read()
 
-                # Сначала пробуем строгое совпадение
                 if search_block not in content:
-                    # Если строгий поиск не сработал - у LLM часто проблемы с концевыми переносами строк
-                    # Делаем умный fallback: чистим \r и ищем без учета пустых строк по краям
                     clean_search = search_block.replace("\r\n", "\n").strip()
                     clean_content = content.replace("\r\n", "\n")
 
                     if clean_search not in clean_content:
                         return (
                             False,
-                            "Блок для поиска (search_block) не найден в файле.",
+                            "The block to search for (search_block) was not found in the file.",
                         )
 
-                    # Если нашлось в чистом виде - берем замену
                     new_content = clean_content.replace(clean_search, replace_block.strip())
                 else:
                     new_content = content.replace(search_block, replace_block)
@@ -120,12 +117,12 @@ class HostOSEditor:
                 with open(safe_path, "w", encoding="utf-8") as f:
                     f.write(new_content)
 
-                return True, "Файл успешно пропатчен."
+                return True, "File successfully patched."
 
             is_success, msg = await asyncio.to_thread(_patch)
 
             if is_success:
-                main_logger.info(f"[Host OS] Пропатчен файл: {safe_path.name}")
+                main_logger.info(f"[Host OS] Patched file: {safe_path.name}")
                 return SkillResult.ok("True")
             else:
                 return SkillResult.fail(msg)
@@ -133,4 +130,4 @@ class HostOSEditor:
         except PermissionError as e:
             return SkillResult.fail(str(e))
         except Exception as e:
-            return SkillResult.fail(f"Ошибка при патчинге файла: {e}")
+            return SkillResult.fail(f"Error patching file: {e}")

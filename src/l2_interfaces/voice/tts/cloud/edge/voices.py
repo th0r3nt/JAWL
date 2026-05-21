@@ -1,12 +1,12 @@
 """
-Утилита конфигурации и параметров для голосов Edge TTS.
+Configuration utility and parameters for Edge TTS voices.
 """
 
 from src.utils.settings import EdgeConfig
 
 
 class EdgeVoiceManager:
-    """Хранилище настроек голоса Microsoft Edge."""
+    """Microsoft Edge voice settings storage."""
 
     def __init__(self, config: EdgeConfig) -> None:
         self.main_voice = config.main_voice

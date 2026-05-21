@@ -1,9 +1,9 @@
 """
-Фоновый поллер GitHub.
+Background GitHub poller.
 
-Мониторит уведомления (Mentions/Reviews) и активность в отслеживаемых репозиториях (Watchers).
-Использует внутренний кэш ID событий для обхода проблемы 'GitHub Eventual Consistency'
-(задержки появления логов в API).
+Monitors notifications (Mentions/Reviews) and activity in tracked repositories (Watchers).
+Uses internal event ID cache to bypass 'GitHub Eventual Consistency' issues
+(delay of logs appearing in API).
 """
 
 import asyncio
@@ -23,7 +23,7 @@ from src.l2_interfaces.github.client import GithubClient
 
 class GithubEvents:
     """
-    Фоновый мониторинг GitHub (Уведомления аккаунта + Watchers).
+    Background GitHub poller (Account Notifications + Watchers).
     """
 
     def __init__(
@@ -35,14 +35,14 @@ class GithubEvents:
         timezone: int = 0,
     ) -> None:
         """
-        Инициализирует поллер.
+        Initializes the poller.
 
         Args:
-            client: Экземпляр GithubClient.
-            state: Объект состояния интерфейса.
-            event_bus: Глобальная шина событий.
-            data_dir: Путь к хранилищу локальных данных (для персистентности Watchers).
-            timezone: Смещение часового пояса.
+            client: GithubClient instance.
+            state: Interface state object.
+            event_bus: Global event bus.
+            data_dir: Path to local data storage (for Watchers persistence).
+            timezone: Timezone offset.
         """
         self.client = client
         self.state = state
@@ -56,34 +56,34 @@ class GithubEvents:
         self._persistence_file = self.data_dir / "interfaces" / "github" / "tracked_repos.json"
         self._persistence_file.parent.mkdir(parents=True, exist_ok=True)
 
-        # Кэш просмотренных событий для обхода проблемы GitHub Eventual Consistency
+        # Cache of viewed events to bypass GitHub Eventual Consistency issues
         self._seen_event_ids: Dict[str, bool] = {}
         self._initialized_repos: set[str] = set()
 
     async def start(self) -> None:
-        """Запускает фоновый цикл проверки обновлений."""
+        """Starts the background update check cycle."""
         if self._is_running:
             return
 
         self._load_persisted_repos()
         self._is_running = True
         self._polling_task = asyncio.create_task(self._loop())
-        main_logger.info("[Github] Фоновый поллинг запущен.")
+        main_logger.info("[Github] Background polling started.")
 
     async def stop(self) -> None:
-        """Останавливает цикл проверки."""
+        """Stops the update check cycle."""
         self._is_running = False
         if self._polling_task:
             self._polling_task.cancel()
             self._polling_task = None
-        main_logger.info("[Github] Фоновый поллинг остановлен.")
+        main_logger.info("[Github] Background polling stopped.")
 
     # ==========================================================
-    # PERSISTENCE (Сохранение на диск)
+    # PERSISTENCE
     # ==========================================================
 
     def _load_persisted_repos(self) -> None:
-        """Загружает список отслеживаемых репозиториев из JSON."""
+        """Loads the list of tracked repositories from JSON."""
         if not self._persistence_file.exists():
             return
         try:
@@ -92,18 +92,18 @@ class GithubEvents:
                 if isinstance(data, dict):
                     self.state.tracked_repos = data
         except Exception as e:
-            main_logger.warning(f"[Github] Ошибка чтения tracked_repos.json: {e}")
+            main_logger.warning(f"[Github] Error reading tracked_repos.json: {e}")
 
     def save_persisted_repos(self) -> None:
-        """Сохраняет текущий список отслеживаемых репозиториев (с ватермарками)."""
+        """Saves the current list of tracked repositories (with watermarks)."""
         try:
             with open(self._persistence_file, "w", encoding="utf-8") as f:
                 json.dump(self.state.tracked_repos, f, indent=4)
         except Exception as e:
-            main_logger.error(f"[Github] Ошибка сохранения tracked_repos.json: {e}")
+            main_logger.error(f"[Github] Error saving tracked_repos.json: {e}")
 
     def _format_gh_time(self, iso_str: str) -> str:
-        """Форматирует ISO строку времени от GitHub в читаемый вид."""
+        """Formats ISO time string from GitHub into a readable format."""
         if not iso_str:
             return ""
         try:
@@ -117,7 +117,7 @@ class GithubEvents:
     # ==========================================================
 
     async def _loop(self) -> None:
-        """Главный цикл опроса GitHub API."""
+        """Main GitHub API polling loop."""
         while self._is_running:
             try:
                 if self.client.config.agent_account and self.client.token:
@@ -129,12 +129,12 @@ class GithubEvents:
             except asyncio.CancelledError:
                 break
             except Exception as e:
-                main_logger.debug(f"[Github] Ошибка в цикле мониторинга: {e}")
+                main_logger.debug(f"[Github] Error in monitoring loop: {e}")
 
             await asyncio.sleep(self.client.config.polling_interval_sec)
 
     async def _poll_account_state(self) -> None:
-        """Обновляет состояние профиля агента и проверяет непрочитанные уведомления."""
+        """Updates the agent profile state and checks unread notifications."""
         try:
             repos_data = await self.client.request(
                 "GET", "/user/repos", params={"sort": "updated", "per_page": 5}
@@ -147,7 +147,9 @@ class GithubEvents:
                     is_fork = " (Fork)" if r.get("fork") else ""
                     repo_lines.append(f"- {name}{is_fork} ({stars}⭐)")
                 self.state.own_repos = (
-                    "\n".join(repo_lines) if repo_lines else "У вас пока нет репозиториев."
+                    "\n".join(repo_lines)
+                    if repo_lines
+                    else "You don't have any repositories yet."
                 )
 
             notif_data = await self.client.request(
@@ -156,9 +158,9 @@ class GithubEvents:
             if isinstance(notif_data, list):
                 count = len(notif_data)
                 if count == 0:
-                    self.state.unread_notifications = "Нет новых уведомлений."
+                    self.state.unread_notifications = "No new notifications."
                 else:
-                    notif_lines = [f"У вас {count} непрочитанных уведомлений:"]
+                    notif_lines = [f"You have {count} unread notifications:"]
                     for n in notif_data[:3]:
                         title = n.get("subject", {}).get("title", "No title")
                         repo = (n.get("repository") or {}).get("full_name", "Unknown")
@@ -170,10 +172,10 @@ class GithubEvents:
                     self.state.unread_notifications = "\n".join(notif_lines)
 
         except Exception as e:
-            main_logger.debug(f"[Github] Ошибка фонового обновления профиля: {e}")
+            main_logger.debug(f"[Github] Error in background profile update: {e}")
 
     async def _poll_watched_repos(self) -> None:
-        """Мониторит список отслеживаемых репозиториев и генерирует системные события."""
+        """Monitors the list of tracked repositories and generates system events."""
         modified = False
 
         for repo_name, last_event_id in list(self.state.tracked_repos.items()):
@@ -185,7 +187,7 @@ class GithubEvents:
                 if not isinstance(events_data, list) or not events_data:
                     continue
 
-                events_data.reverse()  # Идем от старых к новым
+                events_data.reverse()  # Chronological order: old to new
 
                 is_first_poll = repo_name not in self._initialized_repos
                 self._initialized_repos.add(repo_name)
@@ -197,10 +199,10 @@ class GithubEvents:
                     if not event_id or event_id in self._seen_event_ids:
                         continue
 
-                    # Отмечаем как просмотренное
+                    # Mark as viewed
                     self._seen_event_ids[event_id] = True
 
-                    # Защита от утечки памяти
+                    # Memory leak protection
                     if len(self._seen_event_ids) > 1000:
                         for k in list(self._seen_event_ids.keys())[:500]:
                             del self._seen_event_ids[k]
@@ -210,22 +212,22 @@ class GithubEvents:
                     if not parsed_msg:
                         continue
 
-                    # Определяем, нужно ли триггерить систему
+                    # Determine if we need to trigger the system
                     is_new = False
                     if not last_event_id:
-                        # Только начали отслеживать репозиторий - заполняем тихо
+                        # Just started tracking the repository - populate quietly
                         is_new = False
 
                     elif is_first_poll:
-                        # Рестарт агента. Публикуем только те, что объективно больше последнего сохраненного ID
+                        # Agent restart. Publish only those that are objectively greater than the last saved ID
                         try:
                             is_new = int(event_id) > int(last_event_id)
                         except (ValueError, TypeError):
                             is_new = event_id > str(last_event_id)
 
                     else:
-                        # Рантайм. Раз мы его еще не видели (прошли проверку seen_event_ids) - значит оно новое.
-                        # Это решает проблему GitHub Eventual Consistency (когда PushEvent приходит с задержкой)
+                        # Runtime. Since we haven't seen it yet (passed the seen_event_ids check) - it means it's new.
+                        # This resolves the GitHub Eventual Consistency issue (when PushEvent arrives with a delay)
                         is_new = True
 
                     self.state.add_watcher_event(parsed_msg)
@@ -235,7 +237,7 @@ class GithubEvents:
                             Events.GITHUB_REPO_ACTIVITY, repo=repo_name, message=parsed_msg
                         )
 
-                    # Обновляем ватермарку ID для сохранения на диск
+                    # Update the ID watermark to save to disk
                     try:
                         if (
                             int(event_id) > int(highest_parsed_id)
@@ -251,13 +253,13 @@ class GithubEvents:
                     modified = True
 
             except Exception as e:
-                main_logger.debug(f"[Github] Ошибка поллинга репозитория {repo_name}: {e}")
+                main_logger.debug(f"[Github] Error polling repository {repo_name}: {e}")
 
         if modified:
             self.save_persisted_repos()
 
     def _parse_github_event(self, event: dict) -> Optional[str]:
-        """Парсит сырое событие GitHub в человекочитаемую строку."""
+        """Parses raw GitHub event into a human-readable string."""
         event_type = event.get("type")
         actor = event.get("actor", {}).get("login", "Unknown")
         repo = event.get("repo", {}).get("name", "Unknown")
@@ -272,9 +274,9 @@ class GithubEvents:
             if count == 0:
                 return None
 
-            msg = commits[0].get("message", "").split("\n")[0] if commits else "Без описания"
-            branch_str = f" в ветку {branch}" if branch else ""
-            return f"{time_prefix}[in repo: {repo}] @{actor} запушил {count} коммит(ов){branch_str}. Последний: '{msg}'"
+            msg = commits[0].get("message", "").split("\n")[0] if commits else "No description"
+            branch_str = f" to branch {branch}" if branch else ""
+            return f"{time_prefix}[in repo: {repo}] @{actor} pushed {count} commit(s){branch_str}. Last: '{msg}'"
 
         elif event_type == "IssuesEvent":
             action = payload.get("action")
@@ -301,11 +303,11 @@ class GithubEvents:
             if action != "created":
                 return None
             issue_num = payload.get("issue", {}).get("number", "?")
-            return f"{time_prefix}[in repo: {repo}] @{actor} {action} комментарий в Issue/PR #{issue_num}"
+            return f"{time_prefix}[in repo: {repo}] @{actor} {action} comment on Issue/PR #{issue_num}"
 
         elif event_type == "ReleaseEvent":
             action = payload.get("action")
             tag = payload.get("release", {}).get("tag_name", "?")
-            return f"{time_prefix}[in repo: {repo}] @{actor} {action} релиз {tag}"
+            return f"{time_prefix}[in repo: {repo}] @{actor} {action} release {tag}"
 
         return None

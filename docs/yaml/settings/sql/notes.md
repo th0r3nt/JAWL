@@ -1,20 +1,20 @@
-# Оперативная память (Working Memory / Notes)
+# Working Memory (Working Memory / Notes)
 
-Модуль `Notes` предоставляет агенту оперативную память, работающую по принципу "стикеров на мониторе". 
+The `Notes` module provides the agent with working memory, operating on the principle of "sticky notes on a monitor."
 
-В отличие от механизма RAG (Векторной базы), который работает как библиотека (нужно знать, что искать, чтобы это вспомнить), Заметки всегда находятся в поле периферийного зрения агента — они отображаются в системном промпте на каждом шаге работы.
+Unlike the RAG mechanism (Vector DB) which works like a library (you must query it to recall), Notes are always in the agent's peripheral vision - they are displayed in the system prompt on every execution step.
 
-## Зачем это нужно?
-Это критически важно для удержания контекста между длинными ReAct-циклами. Агент может использовать заметки для сохранения:
-- IP-адресов и портов, с которыми работает прямо сейчас.
-- Внутренних To-Do списков.
-- Промежуточных результатов вычислений.
-- Временных ID сообщений, топиков или задач.
-- Собственных гипотез и алгоритмов, чтобы не забыть их, если цикл отвлечется на другое событие.
+## Why Is This Needed?
+This is critically important to maintain coherence across long ReAct reasoning cycles. The agent can use notes to store:
+- IP addresses and ports it is currently interacting with.
+- Internal To-Do lists.
+- Intermediate computation results.
+- Temporary IDs of messages, topics, or tasks.
+- Active hypotheses and algorithms, so they are not forgotten if the cycle gets distracted by an external event.
 
-## Механизм сжатия
-Чтобы агент случайно не "выжег" лимит токенов (Context Window Limit), сохранив в заметку простыню текста на 10 тысяч символов, система автоматически сжимает длинные стикеры в системном промпте. Агент всегда будет видеть начало заметки, но для чтения полного текста ему придется осознанно использовать навык `list_all_notes`.
+## Compression Mechanism
+To prevent the agent from burning the context window by storing a giant 10k character text block in a note, the system automatically truncates long notes in the system prompt. The agent will see the beginning of the note, but must explicitly call `list_all_notes` to read the full text.
 
-## Параметры (`system.db.sql.notes`)
-* **`enabled`**: `true` / `false`. Включение или отключение модуля оперативной памяти.
-* **`max_notes`**: Максимальное количество одновременно существующих заметок (слотов памяти). Если лимит достигнут, агенту придется проактивно удалить неактуальные данные перед созданием новых.
+## Parameters (`system.db.sql.notes`)
+* **`enabled`**: `true` / `false`. Enables or disables the working memory notes.
+* **`max_notes`**: Maximum number of concurrent notes (memory slots). If reached, the agent must proactively delete old notes before creating new ones.

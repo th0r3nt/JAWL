@@ -1,9 +1,8 @@
 """
-Сборщик динамического контекста для субагентов.
+Subagent Context Builder.
 
-В отличие от главного агента, субагенты не имеют доступа к L0 State (перепискам,
-статусам систем и т.д.). Этот модуль генерирует для них легковесный Stateless-контекст,
-включающий только саму задачу, доступные инструменты и их собственную локальную историю действий.
+Assembles lightweight, highly focused system context for subagents,
+including active task definitions, authorized skills, and local rolling history.
 """
 
 from typing import List, Dict
@@ -13,21 +12,20 @@ from src.utils.settings import SwarmContextDepthConfig
 
 
 class SwarmContextBuilder:
-    """Сборщик легковесного контекста для субагентов (Stateless + локальная история)."""
+    """Stateless context compiler for subagents."""
 
     def __init__(
         self, role: SubagentRole, allowed_skills: List[str], config: SwarmContextDepthConfig
     ) -> None:
         """
-        Инициализирует сборщик контекста субагента.
+        Initializes the subagent context builder.
 
         Args:
-            role: Роль текущего субагента.
-            allowed_skills: Список разрешенных для этой роли навыков (RBAC).
-            config: Настройки глубины контекста (лимиты на обрезку текста).
+            role: Assigned subagent role.
+            allowed_skills: List of skills authorized for this role.
+            config: Context depth limits configuration.
         """
         self.role = role
-        # Всегда добавляем навык отправки отчета
         self.allowed_skills = allowed_skills + ["SubagentReport.submit_final_report"]
         self.config = config
 
@@ -35,44 +33,44 @@ class SwarmContextBuilder:
         self, subagent_id: str, task_description: str, history: List[Dict[str, str]]
     ) -> str:
         """
-        Собирает Markdown-текст (User Prompt) для текущего шага субагента.
+        Assembles user prompt context for the current subagent step.
 
         Args:
-            subagent_id: Уникальный идентификатор воркера.
-            task_description: Текст порученной задачи.
-            history: Локальный лог всех действий и ответов субагента за прошлые шаги.
+            subagent_id: Subagent process ID.
+            task_description: Delegated task description.
+            history: Local rolling execution history of this subagent.
 
         Returns:
-            Готовая строка контекста.
+            str: Compiled and truncated Markdown context.
         """
-        # Вытаскиваем документацию только тех скиллов, которые разрешены этой роли
+        # Extract documentation only for skills authorized for this role
         skills_docs = []
         for skill_name in self.allowed_skills:
             if skill_name in _REGISTRY:
                 skills_docs.append(_REGISTRY[skill_name]["doc_string"])
 
-        skills_str = "\n".join(skills_docs) if skills_docs else "Инструменты недоступны."
+        skills_str = "\n".join(skills_docs) if skills_docs else "No tools available."
 
         history_blocks = []
 
-        # Ограничиваем общую длину истории (гарантия, что мы не превысим max_steps)
+        # Limit total history length to fit context budget
         history = history[-self.config.max_steps :]
         total_history = len(history)
 
         for idx, step in enumerate(history):
             step_num = idx + 1
-            # Вычисляем, является ли шаг "свежим" (детальным)
+            # Check if the step qualifies as detailed (fresh)
             is_detailed = (total_history - idx) <= self.config.detailed_steps
 
             thoughts = step["thoughts"]
             actions = step["actions"]
             results = step["results"]
 
-            # Применяем лимиты в зависимости от давности шага
+            # Apply limits based on step age
             if is_detailed:
                 a_limit = self.config.action_max_chars
                 r_limit = self.config.result_max_chars
-                t_limit = 100000  # Свежие мысли не режем вообще
+                t_limit = 100000  # Fresh thoughts are not truncated
             else:
                 a_limit = self.config.action_short_max_chars
                 r_limit = self.config.result_short_max_chars
@@ -82,13 +80,13 @@ class SwarmContextBuilder:
                 if len(text) > limit:
                     return (
                         text[:limit]
-                        + f"\n... [{name} обрезаны системой сжатия контекста (> {limit} симв.)]"
+                        + f"\n... [{name} truncated by context compressor (> {limit} chars)]"
                     )
                 return text
 
-            thoughts = _truncate(thoughts, t_limit, "Мысли")
-            actions = _truncate(actions, a_limit, "Действия")
-            results = _truncate(results, r_limit, "Результаты")
+            thoughts = _truncate(thoughts, t_limit, "Thoughts")
+            actions = _truncate(actions, a_limit, "Actions")
+            results = _truncate(results, r_limit, "Results")
 
             history_blocks.append(
                 f"* STEP {step_num}\n"
@@ -98,7 +96,7 @@ class SwarmContextBuilder:
             )
 
         history_str = (
-            "\n\n".join(history_blocks) if history_blocks else "Пока нет истории действий."
+            "\n\n".join(history_blocks) if history_blocks else "No execution history yet."
         )
 
         return f"""
@@ -110,7 +108,7 @@ class SwarmContextBuilder:
 {task_description}
 
 ## AVAILABLE SKILLS
-Выданы инструменты, которые соответствуют вашей роли.
+You are authorized to use strictly the following tools:
 {skills_str}
 
 ## EXECUTION HISTORY

@@ -1,3 +1,10 @@
+"""
+Unified CLI UI Widgets and Utilities.
+
+Manages terminal screen clears, console formatting styles, OS terminal window title updates,
+and spawns isolated log and terminal windows across various OS platforms (Windows/macOS/Linux).
+"""
+
 import os
 import yaml
 import sys
@@ -36,7 +43,7 @@ SETTINGS_FILE = ROOT_DIR / "config" / "settings.yaml"
 
 
 def set_window_title(title: str) -> None:
-    """Изменяет заголовок окна консоли/терминала (кроссплатформенно)."""
+    """Updates console terminal window title (cross-platform)."""
     if os.name == "nt":
         import ctypes
 
@@ -53,7 +60,6 @@ def _get_agent_status() -> dict:
         try:
             with open(SETTINGS_FILE, "r", encoding="utf-8") as f:
                 config = yaml.safe_load(f) or {}
-                # Обращаемся к ключу main_model (раньше был просто model)
                 status["model"] = config.get("llm", {}).get("main_model", "unknown")
                 status["interval"] = config.get("system", {}).get("heartbeat_interval", 0)
         except Exception:
@@ -102,6 +108,7 @@ def draw_header(version: str = __version__) -> None:
     clear_screen()
     console.print(_build_header_panel(version))
 
+
 def launch_in_new_window(arg: str) -> None:
     script_path = ROOT_DIR / "jawl.py"
     cmd = [sys.executable, str(script_path), arg]
@@ -128,21 +135,21 @@ def launch_in_new_window(arg: str) -> None:
                     subprocess.Popen([term] + args + cmd)
                     return
 
-            print_error("Не удалось найти графический терминал. Открытие в текущем окне.")
-            print_info("Нажмите Ctrl+C в любой момент, чтобы закрыть инструмент и вернуться в главное меню.")
+            print_error("Could not find a graphical terminal. Opening in the current window.")
+            print_info(
+                "Press Ctrl+C at any moment to close the tool and return to the main menu."
+            )
             import time
 
             time.sleep(2)
             try:
                 subprocess.call(cmd)
             except KeyboardInterrupt:
-                # Игнорируем прерывание в родительском процессе, 
-                # чтобы меню не падало вместе с закрытием дочернего окна логов/терминала
                 pass
             return
 
     except Exception as e:
-        print_error(f"Ошибка при открытии нового окна: {e}")
+        print_error(f"Error opening new window: {e}")
 
 
 def flush_input() -> None:
@@ -177,7 +184,7 @@ def print_info(msg: str) -> None:
 
 
 def wait_for_enter() -> None:
-    console.print("\n[dim]Нажмите Enter для продолжения.[/dim]")
+    console.print("\n[dim]Press Enter to continue.[/dim]")
     input()
 
 

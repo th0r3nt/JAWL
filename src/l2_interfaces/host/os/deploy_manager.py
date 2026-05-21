@@ -1,3 +1,7 @@
+"""
+Manages deploy sessions, backups (Copy-on-Write), and test verifications.
+"""
+
 import sys
 import os
 import shutil
@@ -11,7 +15,7 @@ from src.utils.logger import main_logger
 
 class HostOSDeployManager:
     """
-    Управляет деплой-сессиями, бэкапами (Copy-on-Write) и проверками тестов.
+    Manages deploy sessions, backups (Copy-on-Write), and test verifications.
     """
 
     def __init__(self, framework_dir: Path, max_retries: int = 5) -> None:
@@ -29,7 +33,7 @@ class HostOSDeployManager:
 
     def start_session(self) -> Tuple[bool, str]:
         if self.is_active:
-            return False, "Деплой-сессия уже активна."
+            return False, "Deploy session is already active."
 
         self.backup_dir.mkdir(parents=True, exist_ok=True)
         self.active_flag.touch()
@@ -40,11 +44,11 @@ class HostOSDeployManager:
             self.manifest_file.touch()
 
         main_logger.info(
-            f"[Deploy] Деплой-сессия успешно инициализирована (JAWL v{__version__})."
+            f"[Deploy] Deploy session successfully initialized (JAWL v{__version__})."
         )
         return (
             True,
-            f"Деплой-сессия начата. У вас есть {self.max_retries} попытки на прохождение тестов при коммите.",
+            f"Deploy session started. You have {self.max_retries} attempts to pass tests upon commit.",
         )
 
     def backup_file(self, filepath: Path) -> None:
@@ -66,11 +70,11 @@ class HostOSDeployManager:
 
             backup_path.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(filepath, backup_path)
-            main_logger.debug(f"[Deploy] Бэкап файла: {rel_path}")
+            main_logger.debug(f"[Deploy] File backed up: {rel_path}")
         else:
             with open(self.manifest_file, "a", encoding="utf-8") as f:
                 f.write(f"{rel_path}\n")
-            main_logger.debug(f"[Deploy] Новый файл добавлен в манифест: {rel_path}")
+            main_logger.debug(f"[Deploy] New file added to manifest: {rel_path}")
 
     async def commit_session(
         self,
@@ -78,23 +82,23 @@ class HostOSDeployManager:
         force: bool = False,
     ) -> Tuple[bool, str]:
         """
-        Закрывает деплой-сессию и фиксирует изменения.
-        Автоматически запускает синтаксический анализатор (compileall) и тесты (pytest).
-        При падении тестов списывает одну попытку. Если попытки исчерпаны - вызывает rollback_session().
+        Closes the deploy session and commits changes.
+        Automatically launches the syntax analyzer (compileall) and tests (pytest).
+        If tests fail, consumes one attempt. If attempts are exhausted, calls rollback_session().
 
         Args:
-            test_path: Какие тесты запускать. По умолчанию только все unit тесты.
-            force: Если True, игнорирует падение pytest и сохраняет код (не рекомендуется).
+            test_path: Which tests to run. Defaults to all unit tests.
+            force: If True, ignores pytest failure and commits code (not recommended).
         """
 
         if not self.is_active:
-            return False, "Нет активной деплой-сессии."
+            return False, "No active deploy session."
 
         main_logger.info(
-            f"[Deploy] Запуск валидации изменений. (force={force}, target={test_path})"
+            f"[Deploy] Starting changes validation (force={force}, target={test_path})."
         )
 
-        # 1. Синтаксическая проверка (ОБЯЗАТЕЛЬНА)
+        # 1. Syntax check (MANDATORY)
         proc_syntax = await asyncio.create_subprocess_exec(
             sys.executable,
             "-m",
@@ -109,10 +113,10 @@ class HostOSDeployManager:
 
         if proc_syntax.returncode != 0:
             return self._handle_failure(
-                f"Синтаксическая ошибка (SyntaxError):\n{stderr_syntax.decode('utf-8', errors='replace')}"
+                f"Syntax Error (SyntaxError):\n{stderr_syntax.decode('utf-8', errors='replace')}"
             )
 
-        # 2. Прогон всех Юнит-тестов (Pytest)
+        # 2. Running all Unit tests (Pytest)
         test_args = test_path.split()
 
         proc_tests = await asyncio.create_subprocess_exec(
@@ -136,40 +140,40 @@ class HostOSDeployManager:
 
             if force:
                 main_logger.warning(
-                    "[Deploy] Тесты провалены, но применен FORCE-коммит. Сохранение изменений."
+                    "[Deploy] Tests failed, but FORCE commit applied. Saving changes."
                 )
                 self._cleanup()
                 return (
                     True,
-                    f"Внимание: Тесты провалены, но коммит принудительно сохранен (force=True). Лог:\n{err_msg}\n\nДеплой-сессия закрыта.",
+                    f"Warning: Tests failed, but commit is forcefully saved (force=True). Log:\n{err_msg}\n\nDeploy session closed.",
                 )
             else:
-                return self._handle_failure(f"Тесты упали:\n{err_msg}")
+                return self._handle_failure(f"Tests failed:\n{err_msg}")
 
         self._cleanup()
-        main_logger.info("[Deploy] Тесты пройдены. Изменения успешно зафиксированы.")
+        main_logger.info("[Deploy] Tests passed. Changes successfully committed.")
         return (
             True,
-            "Тесты пройдены. Код зафиксирован, деплой-сессия закрыта. Рекомендуется инициировать перезагрузку системы для применения изменений.",
+            "Tests passed. Code is committed, deploy session closed. It is recommended to initiate a system reboot to apply changes.",
         )
 
     def _handle_failure(self, error_report: str) -> Tuple[bool, str]:
         self.retries_left -= 1
         if self.retries_left > 0:
             main_logger.warning(
-                f"[Deploy] Тесты не пройдены. Осталось попыток: {self.retries_left}."
+                f"[Deploy] Tests failed. Remaining attempts: {self.retries_left}."
             )
-            msg = f"Ошибка деплоя. \n{error_report} \n\nОсталось {self.retries_left} попыток исправить ошибку."
+            msg = f"Deploy error. \n{error_report} \n\nRemaining attempts to fix the error: {self.retries_left}."
             return False, msg
         else:
-            main_logger.error("[Deploy] Попытки исчерпаны. Откат изменений.")
+            main_logger.error("[Deploy] Attempts exhausted. Rolling back changes.")
             self.rollback_session()
-            msg = f"Ошибка деплоя. \n{error_report} \n\nПопытки исчерпаны. Все изменения в коде фреймворка были автоматически удалены. Деплой-сессия закрыта."
+            msg = f"Deploy error. \n{error_report} \n\nAttempts exhausted. All changes in the framework code have been automatically reverted. Deploy session closed."
             return False, msg
 
     def rollback_session(self) -> Tuple[bool, str]:
         if not self.is_active:
-            return False, "Нет активной деплой-сессии."
+            return False, "No active deploy session."
 
         for root, dirs, files in os.walk(self.backup_dir):
             if "__pycache__" in root:
@@ -192,7 +196,7 @@ class HostOSDeployManager:
                     target = self._resolve_manifest_target(nf)
                     if target is None:
                         main_logger.warning(
-                            f"[Deploy] Пропущена небезопасная запись manifest при rollback: {nf}"
+                            f"[Deploy] Skipped unsafe manifest entry during rollback: {nf}"
                         )
                         continue
                     if target.exists():
@@ -202,20 +206,20 @@ class HostOSDeployManager:
                             target.unlink(missing_ok=True)
 
         self._cleanup()
-        main_logger.info("[Deploy] Изменения успешно откачены (Rollback).")
+        main_logger.info("[Deploy] Changes successfully rolled back (Rollback).")
         return (
             True,
-            "Откат успешно выполнен. Системные файлы восстановлены до состояния начала сессии.",
+            "Rollback completed successfully. System files restored to the state at the beginning of the session.",
         )
 
     def _resolve_manifest_target(self, manifest_entry: str) -> Path | None:
         """
-        Безопасно резолвит путь из .newfiles_manifest.
+        Safely resolves path from .newfiles_manifest.
 
-        Манифест содержит относительные пути новых файлов внутри framework_dir.
-        Если туда попадет абсолютный путь или traversal через '..', старый код мог
-        удалить произвольный файл при rollback. Поэтому любые записи вне
-        framework_dir отклоняются.
+        The manifest contains relative paths of new files inside framework_dir.
+        If an absolute path or traversal via '..' gets in there, the old code could
+        delete an arbitrary file on rollback. Therefore, any entries outside
+        framework_dir are rejected.
         """
 
         entry = manifest_entry.strip()

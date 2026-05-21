@@ -1,39 +1,39 @@
-# Внутренняя мотивация и Психология (Drives)
+# Internal Motivation and Psychology (Drives)
 
-Модуль `Drives` — это математическая модель, имитирующая человеческие потребности и психологическое состояние агента. Он предотвращает "мертвый простой" (бездействие) системы в периоды, когда пользователь не ставит ей прямых задач.
+The `Drives` module is a mathematical model simulating human needs and the psychological state of the agent. It prevents system "idling" during periods when no direct commands are received from the user.
 
-Сухая математика дефицита дополнена **5-ступенчатой семантической матрицей самоощущений**.
+The dry mathematics of the deficit is translated into a **5-step semantic self-perception matrix**.
 
-## Как это работает?
+## How It Works
 
-### 1. Математика дефицита
-Рост дефицита определяется параметрами:
-* `decay_interval_sec`: Длительность одного интервала (в секундах).
-* `decay_rate`: На сколько процентов увеличивается дефицит за один интервал.
-* `dynamic_reduction`: Нелинейный расчет. Если `true`, время насыщения (сброса) потребности динамически скалируется. Чем дольше агент находился в "стрессе" (высоком дефиците), тем больше реальных действий ему придется совершить, чтобы вернуться в спокойное состояние.
+### 1. Deficit Mathematics
+Deficit accumulation is defined by:
+* `decay_interval_sec`: Interval duration in seconds.
+* `decay_rate`: Deficit growth rate percentage per single interval.
+* `dynamic_reduction`: Non-linear model. If `true`, need satisfaction scales dynamically. The longer the agent remained in a "stressed" state (high deficit), the more active steps it will have to execute to return to a satisfied, balanced state.
 
-*Пример:* Если интервал 1200 сек (20 минут), а `decay_rate` = 10.0, то дефицит растет на 10% каждые 20 минут.
+*Example:* If the interval is 1200 sec (20 minutes) and `decay_rate` = 10.0, the deficit grows by 10% every 20 minutes.
 
-### 2. Семантические состояния
-Агент не видит сухие проценты в вакууме. Процент дефицита транслируется в текстовое "самоощущение" (от «Интеллектуальной пресыщенности» до «Информационной депривации»). Состояния описываются с шагом в 20%.
-Видя растущий дискомфорт в своем системном контексте, агент проактивно использует инструмент `satisfy_drive`, чтобы снизить дефицит (например, идет сёрфить новости, чтобы удовлетворить `Curiosity`). После этого он записывает рефлексию — осознание того, как именно его действие помогло убрать дефицит.
+### 2. Semantic States
+The agent does not see dry percentages. The deficit percentage is translated into semantic self-perceptions (ranging from "Intellectual Satiety" to "Acute Information Deprivation") with a step of 20%.
+Sensing the growing discomfort in its system context, the agent proactively calls the `satisfy_drive` skill to reduce the deficit (for example, surfs the web for news to satisfy `Curiosity`), writing a reflection explaining how the action resolved the need.
 
-## Базовые (Fundamental) и Кастомные мотиваторы
-Система "из коробки" поставляется с тремя фундаментальными потребностями:
-- **Curiosity (Любопытство)**: Потребность в изучении новых данных и поиске информации.
-- **Social (Социализация)**: Потребность в общении и проверке каналов связи.
-- **Mastery (Мастерство/Порядок)**: Стремление решать задачи, тестировать код и наводить порядок в базах данных.
+## Fundamental and Custom Motivators
+The system is shipped with three pre-configured fundamental drives:
+- **Curiosity**: Need for data expansion and information harvesting.
+- **Social**: Need to communicate and monitor connection channels.
+- **Mastery**: Striving to complete tasks, run tests, and clean up databases.
 
-*Помимо этого, агент может создавать собственные, кастомные драйвы под специфические нужды.*
+*In addition, the agent can programmatically create custom drives for specific operational needs.*
 
-## Параметры (`system.db.sql.drives`)
-* **`enabled`**: `true` / `false`. Включение подсистемы.
-* **`pause_on_offline`**: `true` / `false`. Компенсация даунтайма. Если скрипт был остановлен, при следующем запуске система вычислит время простоя и сдвинет таймеры насыщения. Агент больше не будет просыпаться с паническим дефицитом всего на свете после долгих отключений.
-* **`dynamic_reduction`**: `true` / `false`. Нелинейная модель накопления/снижения стресса.
-* **`max_reflections_history`**: Сколько последних "рефлексий" агента хранить в промпте.
-* **`max_custom_drives`**: Лимит на количество пользовательских драйвов, которые агент может создать сам.
-* **`fundamental`**: Блок настройки базовых потребностей.
-  - Каждая потребность (`curiosity`, `social`, `mastery`) настраивается индивидуально:
-  - **`enabled`**: Включена ли конкретная потребность.
-  - **`decay.rate`**: Скорость роста дефицита (в процентах).
-  - **`decay.interval_sec`**: Как часто начисляется `rate` (в секундах).
+## Parameters (`system.db.sql.drives`)
+* **`enabled`**: `true` / `false`. Enables the drives subsystem.
+* **`pause_on_offline`**: `true` / `false`. Downtime compensation. If the system was shut down, upon startup it calculates the offline duration and shifts satisfaction timers. The agent won't wake up with a panic deficit of everything after long offline periods.
+* **`dynamic_reduction`**: `true` / `false`. Enables the non-linear stress accumulation model.
+* **`max_reflections_history`**: How many of the latest reflections are kept in the prompt.
+* **`max_custom_drives`**: Limit on the number of custom drives the agent is allowed to create.
+* **`fundamental`**: Fundamental needs configurations.
+  - Each need (`curiosity`, `social`, `mastery`) is configured individually:
+  - **`enabled`**: Enables or disables the need.
+  - **`decay.rate`**: Growth rate percentage.
+  - **`decay.interval_sec`**: Interval duration in seconds.

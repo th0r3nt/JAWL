@@ -28,7 +28,7 @@ async def test_read_webpage_truncation(mock_trafilatura, trafilatura_skill):
 
     assert res.is_success is True
     assert len(res.message) < 300
-    assert "Текст обрезан" in res.message
+    assert "Truncated" in res.message
 
 
 @pytest.mark.asyncio
@@ -40,4 +40,4 @@ async def test_read_webpage_fetch_fail(mock_trafilatura, trafilatura_skill):
     res = await trafilatura_skill.read_webpage("https://example.com")
 
     assert res.is_success is False
-    assert "не удалось прочитать" in res.message
+    assert "failed to read" in res.message

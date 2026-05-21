@@ -1,7 +1,14 @@
+"""
+L0 State for the Web Browser interface.
+
+Stores open status, current URL, page title, and the accessibility viewport snapshot.
+"""
+
+
 class WebBrowserState:
     """
-    Хранит состояние полноценного веб-браузера (Playwright).
-    Отображает текущий URL и дерево доступности (AOM) текущей страницы.
+    Stores the state of the full web browser (Playwright).
+    Displays the current URL and the accessibility tree (AOM) of the current page.
     """
 
     def __init__(self):
@@ -10,7 +17,7 @@ class WebBrowserState:
 
         self.current_url = "None"
         self.page_title = "None"
-        self.viewport = "Браузер закрыт."
+        self.viewport = "Browser is closed."
 
         self.history: list[str] = []
 

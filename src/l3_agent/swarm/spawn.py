@@ -1,6 +1,8 @@
-# ФАЙЛ: src/l3_agent/swarm/spawn.py
 """
-Навык-оркестратор (Swarm Manager).
+Swarm Orchestrator (Swarm Manager).
+
+Initializes background workers under strict asyncio Semaphore limits,
+resolves active roles, and dynamically maps authorized skills directories.
 """
 
 import asyncio
@@ -21,7 +23,7 @@ from src.l3_agent.swarm.loop import SubagentLoop
 
 
 class SwarmManager:
-    """Менеджер подсистемы роя (Субагентов). Контролирует спавн и пулы воркеров."""
+    """Manager of the swarm subsystem. Spawns and manages stateless background subagents."""
 
     def __init__(
         self,
@@ -49,12 +51,12 @@ class SwarmManager:
         base_doc = "Delegates heavy tasks to background autonomous subagent, returns report. "
 
         if self.active_roles:
-            roles_desc = ["Доступные роли в данный момент:"]
+            roles_desc = ["Currently available subagent roles:"]
             for r_id, r_obj in self.active_roles.items():
                 roles_desc.append(f"- '{r_id}' ({r_obj.name}): {r_obj.description}")
             roles_str = "\n".join(roles_desc)
         else:
-            roles_str = "Внимание: нет доступных ролей (Не хватает системных интерфейсов)."
+            roles_str = "Warning: no subagent roles are active. Ensure required interfaces are enabled."
 
         if hasattr(self.spawn_subagent, "__func__"):
             self.spawn_subagent.__func__.__doc__ = f"{base_doc}\n\n{roles_str}"
@@ -64,29 +66,20 @@ class SwarmManager:
     @skill()
     async def spawn_subagent(self, role: str, task_description: str) -> SkillResult:
         """
-        Запускает фонового субагента для выполнения задачи.
-        Докстринг динамически переопределяется в __init__ (base_doc = ...), чтобы показать агенту активные роли.
-
-        Args:
-            role: ID роли субагента (например 'coder', 'web_researcher').
-            task_description: Детальное поручение.
+        Spawns a background subagent worker for the delegated task.
         """
 
         if not self.config.enabled:
-            return SkillResult.fail(
-                "Ошибка: Подсистема Swarm отключена в настройках (settings.yaml)."
-            )
+            return SkillResult.fail("Error: Swarm subsystem is disabled in the configuration.")
 
         if self.config.subagent_model == "unknown":
-            return SkillResult.fail(
-                "Ошибка: В настройках не указана модель для субагентов (subagent_model)."
-            )
+            return SkillResult.fail("Error: No subagent model specified in the configuration.")
 
         target_role = Subagents.get_by_id(role)
         if not target_role or target_role.id not in self.active_roles:
             active_ids = list(self.active_roles.keys())
             return SkillResult.fail(
-                f"Роль '{role}' сейчас недоступна. Доступные роли: {active_ids}"
+                f"Role '{role}' is currently unavailable. Active roles: {active_ids}"
             )
 
         subagent_id = str(uuid.uuid4())[:8]
@@ -98,14 +91,14 @@ class SwarmManager:
         task.add_done_callback(self.active_tasks.discard)
 
         return SkillResult.ok(
-            f"Субагент {role}_{subagent_id} успешно запущен в фоне. Будет прислано системное уведомление, когда он закончит работу."
+            f"Subagent {role}_{subagent_id} successfully spawned in the background. You will receive a notification upon completion."
         )
 
     async def _run_subagent_task(
         self, subagent_id: str, role: SubagentRole, task_description: str
     ) -> None:
         """
-        Фоновая корутина, контролирующая выполнение цикла субагента под защитой семафора.
+        Background task thread. Runs the subagent ReAct loop under semaphore limits.
         """
 
         try:
@@ -130,5 +123,5 @@ class SwarmManager:
 
                 await loop.run()
         except Exception:
-            log = f"[Swarm] Критическая ошибка в фоновой задаче субагента {role.id}_{subagent_id}:\n{traceback.format_exc()}"
+            log = f"[Swarm] Critical exception in background subagent task {role.id}_{subagent_id}:\n{traceback.format_exc()}"
             swarm_logger.error(log)

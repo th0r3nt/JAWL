@@ -15,7 +15,7 @@ async def test_deep_think_skill_success():
     res = await skill.deep_think(task_description="Придумай как взломать пентагон")
 
     assert res.is_success is True
-    assert "успешно сгенерировано" in res.message
+    assert "successfully simulated" in res.message
 
     # Проверяем, что кэш агента обновился
     assert "Ветка..." in mock_generator.agent_state.current_thoughts_tree
@@ -36,5 +36,5 @@ async def test_deep_think_skill_fail():
     res = await skill.deep_think()
 
     assert res.is_success is False
-    assert "Не удалось сгенерировать" in res.message
+    assert "Failed to generate" in res.message
     assert mock_generator.agent_state.current_thoughts_tree == ""

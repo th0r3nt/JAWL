@@ -1,5 +1,5 @@
 """
-Плагин интерфейса Web RSS.
+Web RSS interface plugin.
 """
 
 from typing import List, Any, Dict, Optional
@@ -49,5 +49,5 @@ class WebRSSPlugin(BaseInterface):
             section=ContextSection.INTERFACES,
         )
 
-        main_logger.info("[Web RSS] Интерфейс загружен.")
+        main_logger.info("[Web RSS] Interface loaded.")
         return [events]

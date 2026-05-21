@@ -54,7 +54,7 @@ def test_recover_deploy_crashes(tmp_path):
     assert events_dir.exists()
     events = list(events_dir.glob("*.json"))
     assert len(events) == 1
-    assert "Критический сбой" in events[0].read_text(encoding="utf-8")
+    assert "Critical failure" in events[0].read_text(encoding="utf-8")
 
 
 @patch("sys.argv", ["jawl.py", "--version"])

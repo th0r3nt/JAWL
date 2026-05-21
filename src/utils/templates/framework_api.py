@@ -6,11 +6,10 @@ from pathlib import Path
 
 def send_event(message: str, payload: dict = None):
     """
-    Отправляет событие (Event) главному агенту JAWL.
+    Sends an event (Event) to the main JAWL agent.
 
-    Важно: Вызов этой функции будит агента, прерывая его сон.
-    Полезно для важных уведомлений,
-    которые требуют немедленной реакции и действий.
+    Important: Invoking this function wakes up the agent, interrupting its sleep.
+    Useful for important notifications that require immediate reaction and actions.
     """
 
     if payload is None:
@@ -20,8 +19,8 @@ def send_event(message: str, payload: dict = None):
 
 def update_dashboard(name: str, markdown_content: str):
     """
-    Создает или обновляет кастомный блок в системном контексте (L0 State) агента.
-    Эта функция пассивно обновляет контекст.
+    Creates or updates a custom block in the agent's system context (L0 State).
+    This function passively updates the context.
     """
 
     payload = {
@@ -32,10 +31,10 @@ def update_dashboard(name: str, markdown_content: str):
     _write_event({"message": f"Update dashboard {name}", "payload": payload})
 
 
-# Системная функция, не вызывать
+# System function, do not invoke
 def _write_event(data: dict):
     """
-    Внутренняя функция для атомарной записи событий в IPC-директорию.
+    Internal function for atomic event writing to the IPC directory.
     """
 
     events_dir = Path(__file__).parent / ".jawl_events"
@@ -53,43 +52,43 @@ def _write_event(data: dict):
 
 """
 =============================================================================
-ПРИМЕРЫ ИСПОЛЬЗОВАНИЯ
+EXAMPLES OF USE
 =============================================================================
 
-Пример: тихий дашборд
+Example: quiet dashboard
 -----------------------------------------------------
 import time
 from framework_api import update_dashboard
 
 def crypto_monitor():
     while True:
-        # Представим, что здесь логика запроса к API биржи...
+        # Imagine there is a request logic to the exchange API here...
         btc_price = 65000
         
         content = f"**BTC**: ${btc_price}\\n_Updated: {time.ctime()}_"
         
-        # Агент не проснется, но увидит эти цены в контексте на следующем тике
+        # The agent will not wake up, but will see these prices in the context on the next tick
         update_dashboard(name="Crypto Market", markdown_content=content)
         
-        time.sleep(300) # Ждем 5 минут
+        time.sleep(300) # Wait 5 minutes
 
-Пример: активный алерт
+Example: active alert
 -----------------------------------------------------
 import time
 from framework_api import send_event
 
 def server_watchdog():
     while True:
-        # Представим, что мы пингуем сервер...
+        # Imagine we are pinging the server...
         server_is_down = True 
         
         if server_is_down:
-            # Это событие моментально разбудит агента, чтобы он починил сервер
+            # This event will instantly wake up the agent to fix the server
             send_event(
-                message="Критическая ошибка: База данных недоступна.", 
+                message="Critical error: Database is unavailable.", 
                 payload={"server": "db_main", "error": "Timeout"}
             )
-            break # Выходим, чтобы не спамить ивентами каждую секунду
+            break # Exit so as not to spam events every second
             
         time.sleep(60)
 """

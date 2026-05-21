@@ -1,3 +1,7 @@
+"""
+Skills for managing tracked directories (Watchdog).
+"""
+
 from src.l2_interfaces.host.os.client import HostOSClient, HostOSAccessLevel
 from src.l2_interfaces.host.os.decorators import require_access
 
@@ -8,7 +12,7 @@ from src.utils.logger import main_logger
 
 
 class HostOSMonitoring:
-    """Навыки для управления отслеживаемыми директориями (Watchdog)."""
+    """Skills for managing watchdog-tracked directories."""
 
     def __init__(self, host_os_client: HostOSClient, host_os_events: HostOSEvents):
         self.host_os = host_os_client
@@ -18,19 +22,18 @@ class HostOSMonitoring:
     @require_access(HostOSAccessLevel.SANDBOX)
     async def track_directory(self, path: str) -> SkillResult:
         """
-        Starts tracking directory changes (creates/deletes/modifications). 
-        Pins file tree. 
+        Starts tracking directory changes (creates/deletes/modifications).
+        Pins file tree.
         Highly recommended for keeping structure visible.
         """
         try:
-            # Гейткипер проверит, имеет ли агент права на чтение этой папки
             safe_path = self.host_os.validate_path(path, is_write=False)
 
             success = self.events.track_path(str(safe_path))
             if not success:
                 return SkillResult.ok("True")
 
-            main_logger.info(f"[Host OS] Начато отслеживание директории: {safe_path}")
+            main_logger.info(f"[Host OS] Started tracking directory: {safe_path}")
             return SkillResult.ok("True")
 
         except ValueError as e:
@@ -40,7 +43,7 @@ class HostOSMonitoring:
             return SkillResult.fail(str(e))
 
         except Exception as e:
-            return SkillResult.fail(f"Ошибка при добавлении отслеживания: {e}")
+            return SkillResult.fail(f"Error adding tracking: {e}")
 
     @skill()
     @require_access(HostOSAccessLevel.SANDBOX)
@@ -54,11 +57,9 @@ class HostOSMonitoring:
             success = self.events.untrack_path(str(safe_path))
 
             if not success:
-                return SkillResult.fail(
-                    f"Ошибка: Директория {safe_path.name} не отслеживается."
-                )
+                return SkillResult.fail(f"Error: Directory {safe_path.name} is not tracked.")
 
-            main_logger.info(f"[Host OS] Прекращено отслеживание директории: {safe_path}")
+            main_logger.info(f"[Host OS] Stopped tracking directory: {safe_path}")
             return SkillResult.ok("True")
 
         except ValueError as e:
@@ -66,7 +67,7 @@ class HostOSMonitoring:
         except PermissionError as e:
             return SkillResult.fail(str(e))
         except Exception as e:
-            return SkillResult.fail(f"Ошибка при удалении отслеживания: {e}")
+            return SkillResult.fail(f"Error removing tracking: {e}")
 
     @skill()
     @require_access(HostOSAccessLevel.SANDBOX)
@@ -78,9 +79,9 @@ class HostOSMonitoring:
         tracked = list(self.events._watches.keys())
 
         if not tracked:
-            return SkillResult.ok("Список отслеживаемых директорий пуст.")
+            return SkillResult.ok("Tracked directories list is empty.")
 
-        lines = ["Отслеживаемые директории:"]
+        lines = ["Tracked directories:"]
         for p in tracked:
             lines.append(f"- {p}")
 

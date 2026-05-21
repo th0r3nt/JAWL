@@ -1,6 +1,7 @@
 """
-Stateful-клиент для работы с API ElevenLabs.
-Выполняет низкоуровневые HTTP-запросы и обходит защиту Cloudflare (через User-Agent).
+Stateful client for working with ElevenLabs API.
+
+Performs low-level HTTP requests and bypasses Cloudflare protection (via User-Agent).
 """
 
 import json
@@ -15,7 +16,7 @@ from src.l2_interfaces.voice.tts.cloud.elevenlabs.voices import VoiceManager
 
 
 class CloudElevenLabsTTSClient:
-    """Менеджер HTTP-соединений с ElevenLabs."""
+    """ElevenLabs HTTP connection manager."""
 
     def __init__(
         self,
@@ -29,25 +30,25 @@ class CloudElevenLabsTTSClient:
         self.api_key = api_key
         self.api_url = api_url.rstrip("/")
 
-        # Обход защиты Cloudflare (1010), на которую натыкаются дефолтные питоновские юзер-агенты
+        # Bypassing Cloudflare protection (1010) that default python user-agents run into
         self.user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
 
     async def start(self) -> None:
         """
-        Метод жизненного цикла. Валидирует токен и вытягивает квоты.
+        Lifecycle method. Validates token and pulls quotas.
         """
 
         try:
-            # 1. Проверяем квоту аккаунта
+            # 1. Verify account quota
             user_data = await self.request("GET", "/user")
             sub = user_data.get("subscription", {})
             self.state.character_count = sub.get("character_count", 0)
             self.state.character_limit = sub.get("character_limit", 0)
 
-            # 2. Кэшируем доступные голоса
+            # 2. Cache available voices
             voices_data = await self.request("GET", "/voices")
             for v in voices_data.get("voices", []):
-                # Если в конфиге жестко задан список - фильтруем, иначе берем всё
+                # If a list is strictly specified in config - filter, otherwise take everything
                 if (
                     not self.voice_manager.allowed_voices
                     or v["voice_id"] in self.voice_manager.allowed_voices
@@ -58,11 +59,11 @@ class CloudElevenLabsTTSClient:
 
             self.state.is_online = True
             main_logger.info(
-                "[ElevenLabs] Интерфейс TTS запущен. Соединение с API установлено."
+                "[ElevenLabs] TTS interface started. Connection with API established."
             )
 
         except Exception as e:
-            main_logger.error(f"[ElevenLabs] Ошибка инициализации: {e}")
+            main_logger.error(f"[ElevenLabs] Initialization error: {e}")
             self.state.is_online = False
 
     async def stop(self) -> None:
@@ -70,7 +71,7 @@ class CloudElevenLabsTTSClient:
 
     async def update_quota(self) -> None:
         """
-        Асинхронно обновляет остаток символов.
+        Asynchronously updates remaining characters.
         """
         try:
             user_data = await self.request("GET", "/user")
@@ -82,7 +83,7 @@ class CloudElevenLabsTTSClient:
     async def request(
         self, method: str, endpoint: str, body: dict = None, binary: bool = False
     ) -> Any:
-        """Низкоуровневый асинхронный HTTP запрос."""
+        """Low-level asynchronous HTTP request."""
 
         def _do_request():
             url = f"{self.api_url}/{endpoint.lstrip('/')}"
@@ -113,7 +114,7 @@ class CloudElevenLabsTTSClient:
 
     async def get_context_block(self, **kwargs: Any) -> str:
         """
-        Формирует блок состояния для системного промпта агента.
+        Formats the state block for the agent system prompt.
         """
 
         desc = "Description: Text-to-Speech generation via ElevenLabs API."
@@ -123,24 +124,24 @@ class CloudElevenLabsTTSClient:
         used = self.state.character_count
         limit = self.state.character_limit
 
-        # Пытаемся найти красивое имя для основного голоса
+        # Attempt to find name of the main voice
         main_voice_id = self.voice_manager.main_voice
-        main_voice_str = main_voice_id  # Fallback, если вдруг не найдем в кэше
+        main_voice_str = main_voice_id  # Fallback if not found in cache
 
         for v_str in self.state.available_voices_cache:
             if main_voice_id in v_str:
                 main_voice_str = v_str
                 break
 
-        # Формируем список доступных голосов
+        # Format available voices list
         voices_cache = self.state.available_voices_cache
         if not voices_cache:
-            available_str = "  Cashe is empty."
+            available_str = "  Cache is empty."
         elif len(voices_cache) > 5:
-            # Показываем 10 штук, остальное прячем под скилл
+            # Show top 5, hide the rest under a skill
             display_voices = voices_cache[:5]
             available_str = "\n".join(f"  - {v}" for v in display_voices)
-            available_str += f"\n  ...and another {len(voices_cache) - 10} votes."
+            available_str += f"\n  ...and another {len(voices_cache) - 5} voices."
         else:
             available_str = "\n".join(f"  - {v}" for v in voices_cache)
 

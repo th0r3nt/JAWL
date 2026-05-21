@@ -1,5 +1,5 @@
 """
-Навыки поиска файлов и генерации дерева директорий.
+Skills for searching files and generating directory trees.
 """
 
 import asyncio
@@ -16,7 +16,7 @@ from src.l3_agent.swarm.roles import Subagents
 
 
 class HostOSSearch:
-    """Навыки поиска и ревизии файловой структуры."""
+    """File search and directory tree mapping tools."""
 
     def __init__(self, host_os_client: HostOSClient):
         self.host_os = host_os_client
@@ -25,8 +25,8 @@ class HostOSSearch:
     @require_access(HostOSAccessLevel.SANDBOX)
     async def list_directory(self, path: str = ".", max_depth: int = 1) -> SkillResult:
         """
-        Lists directory contents. 
-        
+        Lists directory contents.
+
         max_depth: Subfolder scan depth (0 = current only).
         """
         limit = self.host_os.config.file_list_limit
@@ -35,9 +35,8 @@ class HostOSSearch:
             safe_path = self.host_os.validate_path(path, is_write=False)
 
             if not safe_path.is_dir():
-                return SkillResult.fail(f"Ошибка: Путь не является директорией ({path}).")
+                return SkillResult.fail(f"Error: Path is not a directory ({path}).")
 
-            # Вычисляем понятный агенту путь от корня проекта
             try:
                 dir_display = safe_path.relative_to(self.host_os.framework_dir).as_posix()
             except ValueError:
@@ -75,7 +74,6 @@ class HostOSSearch:
                             continue
                         items.append(p)
 
-                    # Сортировка: папки сначала, затем файлы (по алфавиту)
                     items.sort(key=lambda x: (not x.is_dir(), x.name.lower()))
                     total_items = len(items)
 
@@ -127,20 +125,20 @@ class HostOSSearch:
 
             if lines_count >= limit:
                 lines.append(
-                    f"└── ... [Лимит вывода {limit} элементов достигнут. Остальные скрыты]"
+                    f"└── ... [Output limit of {limit} elements reached. Others hidden]"
                 )
 
             if len(lines) == 1:
-                lines.append("└── (Пустая директория)")
+                lines.append("└── (Empty directory)")
 
-            main_logger.info(f"[Host OS] Просмотр директории (дерево): {safe_path.name}")
+            main_logger.info(f"[Host OS] Directory lookup (tree): {safe_path.name}")
             return SkillResult.ok("\n".join(lines))
 
         except PermissionError as e:
             return SkillResult.fail(str(e))
 
         except Exception as e:
-            return SkillResult.fail(f"Ошибка при чтении директории: {e}")
+            return SkillResult.fail(f"Error reading directory: {e}")
 
     @skill(swarm=[Subagents.CODER, Subagents.QA_ENGINEER, Subagents.SYSADMIN])
     @require_access(HostOSAccessLevel.SANDBOX)
@@ -155,19 +153,16 @@ class HostOSSearch:
             safe_path = self.host_os.validate_path(path, is_write=False)
 
             if not safe_path.is_dir():
-                return SkillResult.fail(
-                    "Ошибка: Базовый путь для поиска должен быть директорией."
-                )
+                return SkillResult.fail("Error: Base search path must be a directory.")
 
             meta = self.host_os.get_file_metadata()
 
             found = []
             for i, file_path in enumerate(safe_path.rglob(pattern)):
                 if i >= limit:
-                    found.append(f"...[Лимит поиска: найдено более {limit} совпадений] ...")
+                    found.append(f"...[Search limit: found more than {limit} matches] ...")
                     break
 
-                # ПОКАЗЫВАЕМ ПУТЬ ОТ КОРНЯ ПРОЕКТА, ЧТОБЫ АГЕНТ НЕ ПУТАЛСЯ
                 try:
                     rel_path = file_path.relative_to(self.host_os.framework_dir).as_posix()
                 except ValueError:
@@ -196,16 +191,16 @@ class HostOSSearch:
                 found.append(f"- {rel_path} ({size_str}){desc}")
 
             if not found:
-                return SkillResult.ok(f"По маске '{pattern}' ничего не найдено.")
+                return SkillResult.ok(f"No matches found for pattern '{pattern}'.")
 
-            main_logger.info(f"[Host OS] Поиск файлов '{pattern}' в {safe_path.name}")
+            main_logger.info(f"[Host OS] Searching files '{pattern}' in {safe_path.name}")
             return SkillResult.ok("\n".join(found))
 
         except PermissionError as e:
             return SkillResult.fail(str(e))
 
         except Exception as e:
-            return SkillResult.fail(f"Ошибка при поиске файлов: {e}")
+            return SkillResult.fail(f"Error searching files: {e}")
 
     @skill(swarm=[Subagents.CODER, Subagents.QA_ENGINEER, Subagents.SYSADMIN])
     @require_access(HostOSAccessLevel.SANDBOX)
@@ -217,20 +212,19 @@ class HostOSSearch:
         recursive: bool = True,
     ) -> SkillResult:
         """
-        Global search. 
+        Global search.
         Finds exact text string across all files in directory.
         """
 
         if not search_string:
-            return SkillResult.fail("Строка поиска не может быть пустой.")
+            return SkillResult.fail("Search string cannot be empty.")
 
         try:
             safe_path = self.host_os.validate_path(path, is_write=False)
 
             if not safe_path.is_dir():
-                return SkillResult.fail(f"Ошибка: Путь не является директорией ({path}).")
+                return SkillResult.fail(f"Error: Path is not a directory ({path}).")
 
-            # Лимит на количество найденных строк, чтобы не убить контекст агента огромной выдачей
             max_matches = 150
 
             def _search():
@@ -254,18 +248,15 @@ class HostOSSearch:
 
                     rel_path = item.relative_to(safe_path)
 
-                    # Пропускаем мусорные папки
                     if any(part in ignore_dirs for part in rel_path.parts):
                         continue
 
-                    # Пропускаем бинарники тихо, ловя UnicodeDecodeError
                     try:
                         with open(item, "r", encoding="utf-8") as f:
                             for line_num, line in enumerate(f, 1):
                                 check_line = line if case_sensitive else line.lower()
 
                                 if search_query in check_line:
-                                    # Форматируем путь: от корня фреймворка (для понятности) или просто имя
                                     try:
                                         display_path = item.relative_to(
                                             self.host_os.framework_dir
@@ -275,10 +266,9 @@ class HostOSSearch:
 
                                     clean_line = line.strip()
                                     limit = 300
-                                    # Ограничим длину выводимой строки (на случай сжатых/минифицированных файлов)
                                     if len(clean_line) > limit:
                                         clean_line = (
-                                            clean_line[:limit] + " ... [строка обрезана]"
+                                            clean_line[:limit] + " ... [line truncated]"
                                         )
 
                                     matches.append(
@@ -287,15 +277,15 @@ class HostOSSearch:
 
                                     if len(matches) >= max_matches:
                                         matches.append(
-                                            f"\n... [Достигнут лимит в {max_matches} совпадений. Поиск остановлен]"
+                                            f"\n... [Reached limit of {max_matches} matches. Search stopped]"
                                         )
                                         return matches
 
                     except UnicodeDecodeError:
-                        continue  # Бинарный файл - просто идем дальше
+                        continue
 
                     except Exception:
-                        continue  # Проблемы с правами доступа или лок файла
+                        continue
 
                 return matches
 
@@ -303,18 +293,18 @@ class HostOSSearch:
 
             if not results:
                 return SkillResult.ok(
-                    f"Совпадений по строке '{search_string}' в '{safe_path.name}' не найдено."
+                    f"No matches found for string '{search_string}' in '{safe_path.name}'."
                 )
 
             main_logger.info(
-                f"[Host OS] Выполнен глобальный поиск текста '{search_string}' в {safe_path.name}"
+                f"[Host OS] Executed global search for text '{search_string}' in {safe_path.name}"
             )
             return SkillResult.ok(
-                f"Результаты поиска '{search_string}':\n" + "\n".join(results)
+                f"Search results for '{search_string}':\n" + "\n".join(results)
             )
 
         except PermissionError as e:
             return SkillResult.fail(str(e))
 
         except Exception as e:
-            return SkillResult.fail(f"Ошибка при поиске текста: {e}")
+            return SkillResult.fail(f"Error searching text: {e}")

@@ -1,6 +1,6 @@
 """
-Семантический модуль для Матрицы Эйзенхауэра (Tasks).
-Отвечает за группировку и форматирование задач в системном промпте.
+Semantic module for the Eisenhower Matrix (Tasks).
+Responsible for grouping and formatting tasks in the system prompt.
 """
 
 from typing import List, Dict
@@ -39,13 +39,13 @@ ALLOWED_TAGS = [
 
 def build_eisenhower_matrix(tasks: List[TaskTable], max_tasks: int, tz_offset: int) -> str:
     """
-    Формирует Markdown-представление матрицы Эйзенхауэра.
+    Formats the Markdown representation of the Eisenhower Matrix.
     """
 
     if not tasks:
         return f"## TASKS \nEisenhower Matrix. \nMax tasks allowed: {max_tasks}\nAllowed tags: {', '.join(ALLOWED_TAGS)}\n\nThe task list is empty."
 
-    # Группируем задачи по квадрантам (по умолчанию 2, если что-то пошло не так)
+    # Group tasks by quadrants (default is 2 if something went wrong)
     matrix: Dict[int, List[TaskTable]] = {1: [], 2: [], 3: [], 4: []}
     task_statuses = {t.id: t.status for t in tasks}
 
@@ -87,7 +87,7 @@ def build_eisenhower_matrix(tasks: List[TaskTable], max_tasks: int, tz_offset: i
                 for dep_id in t.dependencies:
                     d_stat = task_statuses.get(dep_id, "unknown")
                     if d_stat not in ("done", "cancelled", "unknown"):
-                        deps_info.append(f"`{dep_id}` (Блокирует)")
+                        deps_info.append(f"`{dep_id}` (Blocks)")
                     else:
                         deps_info.append(f"`{dep_id}` (✓ {d_stat})")
                 lines.append(f"  * Dependencies: {', '.join(deps_info)}")
@@ -98,6 +98,6 @@ def build_eisenhower_matrix(tasks: List[TaskTable], max_tasks: int, tz_offset: i
                     mark = "x" if sub.get("is_done") else " "
                     lines.append(f"    [{mark}] {sub.get('title', 'unknown')}")
 
-            lines.append(f"  * Context: {t.context if t.context else 'Пусто'}")
+            lines.append(f"  * Context: {t.context if t.context else 'Empty'}")
 
     return "\n".join(lines).strip()

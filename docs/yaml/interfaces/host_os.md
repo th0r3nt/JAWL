@@ -1,26 +1,26 @@
-# Уровни доступа Host OS (`host.os.access_level`)
+# Host OS Access Levels (`host.os.access_level`)
 
-Доступ агента к файловой системе контролируется встроенным компонентом `Gatekeeper`. Он перехватывает все пути, предотвращает атаки типа Path Traversal (выход за пределы директории через `../`) и блокирует попытки чтения/изменения файлов `.env`, содержащих ключи API (если параметр `env_access` установлен в `false`).
+The agent's access to the file system is controlled by the built-in `Gatekeeper` component. It intercepts all path-related calls, prevents Path Traversal attacks (escaping directory bounds via `../` sequences), and blocks attempts to read or modify `.env` files containing API keys (if the `env_access` parameter is set to `false`).
 
-* **0 (SANDBOX):** Максимальная безопасность. Агент имеет право читать и записывать файлы строго внутри директории `sandbox/`.
-* **1 (OBSERVER):** Режим тестировщика. Агент может читать (Read) исходный код фреймворка, но запись (Write) разрешена только внутри директории `sandbox/`.
-* **2 (OPERATOR):** Режим разработчика. Агент получает право на чтение и запись файлов внутри всей директории проекта JAWL. Для изменения исходного кода системы требуется активация Deploy Session.
-* **3 (ROOT):** Полный доступ. Агент получает права на чтение, запись и удаление любых файлов на хост-машине (в пределах прав пользователя, запустившего скрипт), а также право на выполнение сырых shell-команд. **Не рекомендуется активировать данный уровень на основной рабочей машине.** 
+* **0 (SANDBOX):** Maximum safety. The agent has the right to read and write files strictly inside the `sandbox/` directory.
+* **1 (OBSERVER):** Tester mode. The agent can read (Read) the framework's source code, but write (Write) operations are allowed strictly inside the `sandbox/` directory.
+* **2 (OPERATOR):** Developer mode. The agent receives read and write privileges inside the entire JAWL project directory. Modifying the system's source code requires an active Deploy Session.
+* **3 (ROOT):** Full access. The agent receives read, write, and delete privileges on any files on the host machine (within the bounds of the user who started the script), as well as the right to execute raw shell commands. **It is highly discouraged to activate this level on your primary workstation.**
 
-### Deploy Sessions (Безопасная самомодификация)
-Если у агента есть права уровня `OPERATOR` и выше, а параметр `require_deploy_sessions` установлен в `true`, система защищает себя от фатальных ошибок. 
-Перед изменением системного кода агент обязан открыть "Деплой-сессию". Система создает бекап (Copy-on-Write) изменяемых файлов. При коммите изменений фреймворк автоматически запускает синтаксический анализатор и `pytest`. В случае провала тестов, агент получает Traceback ошибки и тратит одну попытку. Если лимит попыток (`deploy_max_retries`) исчерпан, система выполняет автоматический Rollback (откат файлов к исходному состоянию).
+### Deploy Sessions (Secure Self-Modification)
+If the agent possesses `OPERATOR` access level or higher, and the `require_deploy_sessions` parameter is set to `true`, the system protects itself from fatal syntax crashes.
+Before modifying system code, the agent must open a "Deploy Session". The system creates a Copy-on-Write backup of the modified files. Upon committing the changes, the framework automatically runs a syntax analyzer and `pytest`. If any tests fail, the agent receives the Traceback error and consumes one retry attempt. If the attempts limit (`deploy_max_retries`) is exhausted, the system automatically triggers a Rollback (restores the backed-up files to their initial state).
 
-# Лимиты Host OS (`host.os`)
+# Host OS Limits (`host.os`)
 
-Эти параметры защищают системный промпт от переполнения гигантскими деревьями директорий и длинными логами во время работы агента в операционной системе.
+These parameters protect the system prompt from being overloaded by giant directory trees and verbose logs while the agent is operating on the host machine.
 
-* **`framework_tree_depth`**: На какую глубину агент видит файловое дерево самого фреймворка (JAWL). `1` — только корень, `2` — корень и папки внутри и т.д.
-* **`monitoring_interval_sec`**: Частота (в секундах) опроса телеметрии (CPU/RAM) и изменений в файловой системе (резервный поллинг).
-* **`file_read_max_chars`**: Лимит символов при чтении файлов (навык `read_file`). Если файл больше, он будет прочитан не полностью.
-* **`file_list_limit`**: Максимальное количество файлов/папок, выводимых при сканировании директорий.
-* **`file_diff_max_chars`**: Ограничение размера `git-diff` лога, который попадает на приборную панель после модификации файла.
-* **`top_processes_limit`**: Количество отображаемых процессов (по потреблению ОЗУ) в блоке телеметрии.
-* **`workspace_max_opened_files`**: Максимальное количество "вкладок" в редакторе агента (файлы, которые он держит открытыми в контексте).
-* **`recent_file_changes_limit`**: Сколько последних Diff-ов (изменений файлов) хранится в оперативной памяти (MRU-кэш).
-* **`workspace_max_file_chars`**: Максимальный размер файла (в символах), который может висеть во "вкладке" редактора агента.
+* **`framework_tree_depth`**: The depth to which the agent can view the directory tree of the framework itself (JAWL). `1` — root folder only, `2` — root and nested folders, etc.
+* **`monitoring_interval_sec`**: Frequency (in seconds) of polling telemetry (CPU/RAM) and file system changes.
+* **`file_read_max_chars`**: Character limit when reading files (the `read_file` skill). If a file is larger, it will be truncated.
+* **`file_list_limit`**: Maximum number of files/folders displayed when scanning directories.
+* **`file_diff_max_chars`**: Character limit for the `git-diff` log injected into the dashboard after file modifications.
+* **`top_processes_limit`**: Number of active processes (sorted by memory consumption) displayed in the telemetry block.
+* **`workspace_max_opened_files`**: Maximum number of "editor tabs" (files currently held open by the agent in its context).
+* **`recent_file_changes_limit`**: How many of the latest file diffs are preserved in memory (MRU cache).
+* **`workspace_max_file_chars`**: Maximum size of a file (in characters) that can be held open in the agent's editor tabs.

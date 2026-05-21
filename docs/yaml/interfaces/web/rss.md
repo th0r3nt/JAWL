@@ -1,32 +1,32 @@
-# Настройка RSS-лент (Web RSS)
+# RSS Feed Configuration (Web RSS)
 
-Интерфейс Web RSS предназначен для автоматического отслеживания новостей, статей и релизов через форматы RSS и Atom.
+The Web RSS interface is designed for automatic tracking of news, articles, and releases via RSS and Atom feeds.
 
-## Механика работы
-Интерфейс не требует от агента тратить токены на регулярные запросы.
-1. Фоновый процесс опрашивает указанные ленты с частотой, заданной в `polling_interval_sec`.
-2. Заголовки последних публикаций выводятся на приборную панель агента (L0 State) для поддержания общего контекста.
-3. При обнаружении новой уникальной публикации система публикует системное событие `RSS_NEW_ENTRY` уровня `BACKGROUND`. 
-4. Агент видит оповещение и, если тема публикации релевантна его задачам или интересам, может использовать навык `read_rss_feed` для извлечения полного текста статьи (очищенного от HTML-мусора).
+## How It Works
+The interface does not require the agent to waste active tokens on regular requests:
+1. A background process polls the configured feeds at the frequency specified in `polling_interval_sec`.
+2. Titles of the latest entries are printed to the agent's L0 State dashboard to maintain general context.
+3. Upon detecting a new unique publication, the system publishes a `BACKGROUND` level event `RSS_NEW_ENTRY` to the event bus.
+4. The agent sees the notification, and if the topic is relevant to its current goals or interests, it can invoke the `read_rss_feed` skill to retrieve the full, HTML-stripped text of the article.
 
-## Примеры полезных лент
+## Pre-configured Feeds Examples
 
-Ниже представлен список популярных источников, которые можно добавить в блок `feeds` файла `interfaces.yaml`:
+Below is a list of popular feeds that can be added to the `feeds` block in `interfaces.yaml`:
 
-**Технологии и IT:**
-- Хабр (Все потоки): `https://habr.com/ru/rss/all/all/`
-- Хабр (Искусственный интеллект): `https://habr.com/ru/rss/hub/artificial_intelligence/`
+**Technology and IT:**
+- Habr (All streams): `https://habr.com/ru/rss/all/all/`
+- Habr (Artificial Intelligence Hub): `https://habr.com/ru/rss/hub/artificial_intelligence/`
 - TechCrunch: `https://techcrunch.com/feed/`
 
-**Научные публикации (ArXiv):**
+**Academic Publications (ArXiv):**
 - Computer Science - AI: `https://export.arxiv.org/rss/cs.AI`
 - Computer Science - Machine Learning: `https://export.arxiv.org/rss/cs.LG`
 
-**Релизы GitHub-репозиториев:**
-Для получения RSS-ленты релизов любого репозитория, добавьте `.atom` в конец URL страницы релизов:
-- Релизы Python: `https://github.com/python/cpython/releases.atom`
-- Релизы JAWL: `https://github.com/th0r3nt/JAWL/releases.atom`
+**GitHub Repository Releases:**
+To subscribe to releases of any repository, append `.atom` to the end of the releases page URL:
+- Python Releases: `https://github.com/python/cpython/releases.atom`
+- JAWL Releases: `https://github.com/th0r3nt/JAWL/releases.atom`
 
-**YouTube каналы:**
-Для отслеживания видео достаточно знать ID канала:
+**YouTube Channels:**
+You only need to know the Channel ID to track videos:
 - `https://www.youtube.com/feeds/videos.xml?channel_id=UC...`

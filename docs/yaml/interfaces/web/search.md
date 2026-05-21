@@ -1,14 +1,14 @@
-# Настройка Web Search
+# Web Search Configuration
 
-Интерфейс `search` дает агенту доступ в интернет для поиска информации. Он построен по паттерну "Стратегия" и позволяет менять движки поиска и чтения под ваши нужды.
+The `search` interface grants the agent internet access. It is designed using the Strategy pattern, allowing you to swap out search engines and parsers to fit your needs.
 
-## Параметры (`web.search`)
+## Parameters (`web.search`)
 
-* **`search_engine`**: Движок поиска ссылок.
-  * `"duckduckgo"` (DDG) — бесплатный, не требует ключей. Подвержен банам (Rate Limits) от Cloudflare при слишком частых запросах. Ограничен семафором в коде.
-  * `"tavily"` — специализированный AI-поисковик. Стабильный, быстрый. Требует прописать `TAVILY_API_KEY` в `.env` (есть бесплатный тариф). Рекомендуется.
-* **`reader_engine`**: Движок чтения веб-страниц (извлечение текста из HTML).
-  * `"jina"` — использует прокси-сервис `r.jina.ai`. Отлично конвертирует сайты в Markdown, обходит многие капчи.
-  * `"trafilatura"` — парсит HTML полностью локально на процессоре хоста. Бесплатно, быстро, приватно, но может спотыкаться о тяжелые SPA-сайты на React/Vue.
-* **`request_timeout_sec`**: Таймаут сетевых вызовов (в секундах).
-* **`max_page_chars`**: Лимит символов при чтении одной страницы. Все, что больше — будет безжалостно обрезано.
+* **`search_engine`**: The engine used to look up URLs.
+  * `"duckduckgo"` (DDG) — free, does not require API keys. Subject to Cloudflare rate limits (banned easily on intensive parallel queries). Restricted by an internal semaphore.
+  * `"tavily"` — specialized search engine optimized for AI agents. Stable, fast, and reliable. Requires `TAVILY_API_KEY` specified in `.env` (free tier available). Highly recommended.
+* **`reader_engine`**: Webpage content parser (converting raw HTML to clean text).
+  * `"jina"` — calls the remote proxy service `r.jina.ai`. Excellent at converting sites into Markdown, bypasses many captchas.
+  * `"trafilatura"` — parses raw HTML fully locally on the host machine. Free, fast, private, but might fail on heavy JS-heavy React/Vue SPA websites.
+* **`request_timeout_sec`**: Network requests timeout (in seconds).
+* **`max_page_chars`**: Maximum character length allowed when parsing a single page. Everything exceeding this limit is strictly truncated.

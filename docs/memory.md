@@ -1,40 +1,40 @@
-# 🧠 Память и Мотивация: Когнитивная архитектура
+# 🧠 Memory and Motivation: Cognitive Architecture
 
-В отличие от классических чат-ботов, которые теряют нить повествования при переполнении контекстного окна, агенты JAWL опираются на гибридную систему памяти (L1 Databases) и математически вычисляемую модель мотивации (Drives).
-
----
-
-## 🗄️ Подсистемы памяти (L1)
-
-Память агента физически и логически разделена на две парадигмы: **SQL** (структурированная) и **Vector DB** (семантическая).
-
-### 1. SQL: Структурированная память (SQLite)
-Используется для данных, требующих точного поиска, изменения статусов и удаления.
-* **Tasks (Задачи):** Модуль планирования. Агент декомпозирует сложные цели на подзадачи с отслеживанием прогресса (0-100%) и блокирующих зависимостей.
-* **Personality Traits (Черты личности):** Агент способен адаптироваться. Если он замечает, что пользователь предпочитает определенный формат общения, он добавляет себе новую черту характера, которая навсегда останется в его системном промпте.
-* **Mental States (Состояния сущностей):** Адресная книга и CRM агента. Здесь хранятся данные о людях, проектах или серверах. Агент актуализирует их статусы (например, "Сервер DB-1: Лежит, ждет ребута").
-* **Ticks (Лог действий):** Строгий аудит каждого шага агента (Мысли -> Действия -> Результат). Используется для дебага и рефлексии.
-
-### 2. Vector DB: Семантическая память (FastEmbed + Qdrant)
-Используется для неструктурированных массивов текста. Векторы генерируются локально на CPU, что экономит деньги и защищает приватность. Разделена на две коллекции:
-* **Knowledge (Знания):** Факты из внешнего мира. Документация, прочитанные статьи, куски логов.
-* **Thoughts (Мысли):** Собственные логические выводы и рефлексия агента.
-
-**Механизм Auto-RAG:** На каждом шаге мыслей агента`ContextBuilder` извлекает ключевые слова из причины пробуждения (например, текущих мыслей или текста входящего сообщения) и делает скрытый семантический поиск по Векторной БД. Найденные воспоминания автоматически инжектятся в промпт в блок `RELEVANT INFORMATION`.
+Unlike classic chat bots that lose the thread of conversation when the context window overflows, JAWL agents rely on a hybrid memory system (L1 Databases) and a mathematically calculated model of motivation (Drives).
 
 ---
 
-## 🔥 Мотиваторы (Drives)
+## 🗄️ Memory Subsystems (L1)
 
-Одной из главных проблем автономных агентов является простой без действий: если входящие команды не поступают - они банально бездействуют. В JAWL реализована концепция "Драйвов" (Мотиваторов), которая эмулирует внутренние потребности.
+The agent's memory is physically and logically divided into two paradigms: **SQL** (structured) and **Vector DB** (semantic).
 
-### Как это работает?
-У каждого драйва есть показатель **дефицита (0-100%)** и **скорость роста (decay_rate)**.
-Например, фундаментальный драйв `Curiosity` (Любопытство) может увеличивать свой дефицит на 10% каждый час.
+### 1. SQL: Structured Memory (SQLite)
+Used for data requiring precise querying, state updates, and deletion.
+* **Tasks:** Planning module. The agent decomposes complex goals into subtasks with progress tracking (0-100%) and blocking dependencies.
+* **Personality Traits:** The agent is capable of adaptation. If it notices that the user prefers a certain communication format, it adds a new character trait to itself, which will remain in its system prompt forever.
+* **Mental States:** The agent's address book and CRM. Here, data about people, projects, or servers is stored. The agent updates their statuses (for example, "Server DB-1: Down, awaiting reboot").
+* **Ticks (Actions Log):** A strict audit of each of the agent's steps (Thoughts -> Action -> Result). Used for debugging and reflection.
 
-1. Если агенту никто не пишет и ничего не происходит, дефицит Любопытства постепенно достигнет критической отметки (например, 90/100).
-2. На очередном Heartbeat-тике агент увидит на приборной панели, что потребность в информации стала критической.
-3. Это спровоцирует его на проактивные действия: агент может пойти читать новые статьи через Web Search, анализировать тренды на GitHub или рефакторить свой код, если заметил баги. Опять же, вектор изучения валидируется самой личностью и задачами агента.
-4. После полезного действия агент вызывает навык `satisfy_drive`, снижая дефицит и записывая в рефлексию то, как именно он удовлетворил эту потребность.
+### 2. Vector DB: Semantic Memory (FastEmbed + Qdrant)
+Used for unstructured blocks of text. Vectors are generated locally on the CPU, saving money and protecting privacy. Divided into two collections:
+* **Knowledge:** Facts from the external world. Documentation, read articles, log fragments.
+* **Thoughts:** The agent's own logical conclusions and reflections.
 
-Помимо базовых драйвов, система позволяет агенту (через SQL-навыки) **создавать собственные кастомные драйвы** под специфические задачи пользователя (например, "Паранойя безопасности серверов"). Это позволяет постепенно выстроить уникальную личность для вашего агента, которая будет создана на основе его взаимодействий.
+**Auto-RAG Mechanism:** On each step of the agent's reasoning, `ContextBuilder` extracts key words from the wakeup trigger (for example, active thoughts or incoming message text) and performs a hidden semantic search across the Vector DB. Retrieved memories are automatically injected into the prompt in the `RELEVANT INFORMATION` block.
+
+---
+
+## 🔥 Drives (Motivators)
+
+One of the main problems of autonomous agents is idling: if no incoming commands are received, they remain inactive. JAWL implements the concept of "Drives" (Motivators), which emulates internal needs.
+
+### How it works:
+Each drive has a **deficit metric (0-100%)** and a **decay rate (decay_rate)**.
+For example, the fundamental drive `Curiosity` can increase its deficit by 10% every hour.
+
+1. If nobody writes to the agent and nothing happens, the Curiosity deficit will gradually reach a critical threshold (for example, 90/100).
+2. On a scheduled Heartbeat tick, the agent will see on its dashboard that the need for information has become critical.
+3. This will trigger proactive actions: the agent can go and search for new articles via Web Search, analyze trends on GitHub, or refactor its code if it notices bugs. Again, the direction of study is validated by the agent's personality and active tasks.
+4. After a useful action, the agent invokes the `satisfy_drive` skill, reducing the deficit and writing a reflection on how this action resolved the need.
+
+In addition to fundamental drives, the system allows the agent (via SQL skills) to **create custom drives** for specific user tasks (for example, "Server Security Paranoia"). This allows gradually building a unique personality for your agent based on its interactions.

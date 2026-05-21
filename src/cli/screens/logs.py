@@ -1,3 +1,10 @@
+"""
+Logs Stream Viewer CLI Screen.
+
+Enables terminal streaming of system log streams (Main, Agent, Swarm, ToT, Subconscious)
+utilizing safe file reading to avoid descriptor locks on Windows platforms.
+"""
+
 import time
 from pathlib import Path
 from collections import deque
@@ -7,7 +14,6 @@ from src.cli.widgets.ui import console, print_error, print_info, clear_screen, s
 
 LOG_DIR = Path("logs")
 
-# Карта соответствия типов логов и имен файлов
 LOG_FILES = {
     "main": "main.log",
     "agent": "agent.log",
@@ -16,7 +22,6 @@ LOG_FILES = {
     "subconscious": "subconscious.log",
 }
 
-# Маппинг цветов
 PREFIX_COLORS = {
     "[Heartbeat]": "bright_magenta",
     "[ReAct]": "bright_cyan",
@@ -56,8 +61,7 @@ def _colorize_log_line(line: str) -> Text:
 
 def logs_screen(log_type: str = "main") -> None:
     """
-    Экран потокового вывода логов с защитой от FileLock на ОС Windows.
-    Умеет на лету подхватывать файлы при их ротации (RotatingFileHandler).
+    Streams target log files.
     """
 
     file_name = LOG_FILES.get(log_type, "main.log")
@@ -67,17 +71,17 @@ def logs_screen(log_type: str = "main") -> None:
 
     if not log_path.exists():
         clear_screen()
-        print_error(f"Файл логов '{file_name}' еще не создан.")
-        print_info("Возможно, эта подсистема еще не запускалась.")
-        console.print("\n[dim]Нажмите Enter для возврата.[/dim]")
+        print_error(f"Log file '{file_name}' is not created yet.")
+        print_info("This subsystem might not have been launched yet.")
+        console.print("\n[dim]Press Enter to return.[/dim]")
         input()
         return
 
     clear_screen()
     console.print(
         Panel(
-            f"[bold green]Стриминг: {file_name}[/bold green]\n"
-            f"[dim]Тип: {log_type.upper()} | Ctrl+C для выхода[/dim]",
+            f"[bold green]Streaming: {file_name}[/bold green]\n"
+            f"[dim]Type: {log_type.upper()} | Ctrl+C to exit[/dim]",
             border_style="green",
             expand=False,
         )
@@ -87,7 +91,6 @@ def logs_screen(log_type: str = "main") -> None:
     curr_inode = -1
 
     try:
-        # Первичное чтение хвоста лога для контекста
         try:
             with open(log_path, "r", encoding="utf-8", errors="replace") as f:
                 lines = list(deque(f, maxlen=150))
@@ -98,7 +101,6 @@ def logs_screen(log_type: str = "main") -> None:
         except (PermissionError, FileNotFoundError):
             pass
 
-        # Бесконечный цикл стриминга (без удержания файлового дескриптора)
         while True:
             time.sleep(0.2)
             if not log_path.exists():
@@ -109,13 +111,12 @@ def logs_screen(log_type: str = "main") -> None:
                 new_inode = stat.st_ino
                 current_size = stat.st_size
 
-                # Проверка на ротацию логером или ручную очистку юзером
                 if new_inode != curr_inode or current_size < last_pos:
                     last_pos = 0
                     curr_inode = new_inode
                     console.print(
                         Panel(
-                            "[dim yellow]Лог-файл был ротирован или очищен. Чтение нового потока.[/dim yellow]"
+                            "[dim yellow]Log file was rotated or cleared. Reading new stream.[/dim yellow]"
                         )
                     )
 
@@ -125,7 +126,6 @@ def logs_screen(log_type: str = "main") -> None:
                     last_pos = f.tell()
 
                 if new_data:
-                    # Избегаем лишних пустых строк в консоли при сплите
                     if new_data.endswith("\n"):
                         new_data = new_data[:-1]
 
@@ -133,7 +133,6 @@ def logs_screen(log_type: str = "main") -> None:
                         console.print(_colorize_log_line(line))
 
             except (PermissionError, FileNotFoundError):
-                # Файл в данный момент заблокирован ротатором для переименования, просто ждем
                 pass
 
     except KeyboardInterrupt:

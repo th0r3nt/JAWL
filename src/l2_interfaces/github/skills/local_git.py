@@ -1,7 +1,8 @@
 """
-Навыки агента для локальной работы с системой контроля версий (Git).
-Все команды выполняются в изолированных подпроцессах строго внутри директории `sandbox/`.
-Включают защиту от Argument Injection через разделитель '--'.
+Agent skills for working with the local Git version control system.
+
+All commands are executed in isolated subprocesses strictly within the `sandbox/` directory.
+Includes protection against Argument Injection via the '--' separator.
 """
 
 import asyncio
@@ -19,27 +20,27 @@ from src.l3_agent.swarm.roles import Subagents
 
 
 class GithubLocalGit:
-    """Навыки для локальной работы с Git (Клонирование, Коммиты, Пуши) внутри песочницы."""
+    """Skills for local Git operations (Cloning, Commits, Push) inside the sandbox."""
 
     def __init__(self, github_client: GithubClient) -> None:
         self.github = github_client
 
     def _mask_token(self, text: str) -> str:
-        """Скрывает токен из логов и вывода консоли."""
+        """Masks the token in log and console output."""
         if self.github.token:
             return text.replace(self.github.token, "***")
         return text
 
     async def _run_git_command(self, cwd: Path, *args: str) -> Tuple[int, str, str]:
         """
-        Безопасный запуск git команд в подпроцессе.
+        Safe execution of git commands in a subprocess.
 
         Args:
-            cwd: Рабочая директория (в песочнице).
-            args: Аргументы команды git.
+            cwd: Working directory (inside the sandbox).
+            args: Git command arguments.
 
         Returns:
-            Кортеж: (Код_возврата, STDOUT, STDERR).
+            Tuple: (Return_code, STDOUT, STDERR).
         """
         try:
             process = await asyncio.create_subprocess_exec(
@@ -57,21 +58,19 @@ class GithubLocalGit:
                 self._mask_token(stderr.decode("utf-8", errors="replace").strip()),
             )
         except FileNotFoundError:
-            raise FileNotFoundError(
-                "Утилита 'git' не найдена в системе хоста. Установите git."
-            )
+            raise FileNotFoundError("'git' utility not found on the host system. Install git.")
         except asyncio.TimeoutError:
             process.kill()
             await process.wait()
-            raise TimeoutError("Таймаут выполнения команды git (> 60 сек).")
+            raise TimeoutError("Git command execution timeout (> 60 sec).")
 
     @skill(swarm=[Subagents.CODER])
     async def git_clone_repository(
         self, owner: str, repo: str, dest_folder: str
     ) -> SkillResult:
         """
-        Clones remote repository to local sandbox preserving .git directory. 
-        
+        Clones remote repository to local sandbox preserving .git directory.
+
         dest_folder: Target folder name inside sandbox/ directory.
         """
         try:
@@ -79,7 +78,7 @@ class GithubLocalGit:
 
             if safe_path.exists() and any(safe_path.iterdir()):
                 return SkillResult.fail(
-                    f"Ошибка: Директория '{safe_path.name}' уже существует и не пуста."
+                    f"Error: Directory '{safe_path.name}' already exists and is not empty."
                 )
 
             safe_path.parent.mkdir(parents=True, exist_ok=True)
@@ -91,25 +90,23 @@ class GithubLocalGit:
             else:
                 repo_url = f"https://github.com/{owner}/{repo}.git"
 
-            # Передаем позиционные аргументы. Разделитель '--' не требуется для clone в таком виде,
-            # но мы не позволяем создавать папки с именем '-о', так как validate_sandbox_path обрубит сомнительные имена.
+            # Pass positional arguments. No '--' separator needed for clone,
+            # but we prevent folders named '-o' via validate_sandbox_path checking.
             code, out, err = await self._run_git_command(
                 safe_path.parent, "clone", "--", repo_url, safe_path.name
             )
 
             if code != 0:
-                return SkillResult.fail(f"Ошибка git clone:\n{err or out}")
+                return SkillResult.fail(f"Error during git clone:\n{err or out}")
 
             await self._run_git_command(safe_path, "config", "user.name", "JAWL Agent")
             await self._run_git_command(safe_path, "config", "user.email", "agent@jawl.local")
 
             self.github.state.add_history(f"git_clone: {owner}/{repo}")
-            main_logger.info(
-                f"[Github] Склонирован репозиторий {owner}/{repo} в {safe_path.name}"
-            )
+            main_logger.info(f"[Github] Cloned repository {owner}/{repo} to {safe_path.name}")
 
             return SkillResult.ok(
-                f"Репозиторий успешно склонирован в sandbox/{safe_path.name}"
+                f"Repository successfully cloned to sandbox/{safe_path.name}"
             )
 
         except FileNotFoundError as e:
@@ -117,26 +114,24 @@ class GithubLocalGit:
         except PermissionError as e:
             return SkillResult.fail(str(e))
         except Exception as e:
-            return SkillResult.fail(f"Ошибка при клонировании: {e}")
+            return SkillResult.fail(f"Error cloning repository: {e}")
 
     @skill(swarm=[Subagents.CODER])
     async def git_checkout_branch(
         self, repo_folder: str, branch_name: str, create_new: bool = False
     ) -> SkillResult:
         """
-        Switches local repository to another branch. 
-        
-        repo_folder: Sandbox folder with cloned repo. 
+        Switches local repository to another branch.
+
+        repo_folder: Sandbox folder with cloned repo.
         create_new: If True, creates new branch.
         """
         try:
             safe_path = validate_sandbox_path(repo_folder)
             if not (safe_path / ".git").exists():
-                return SkillResult.fail(
-                    "Ошибка: Указанная папка не является git-репозиторием."
-                )
+                return SkillResult.fail("Error: Specified folder is not a git repository.")
 
-            # Используем '--' для защиты от инъекции аргументов (-b, --orphan)
+            # Use '--' to protect against argument injection (-b, --orphan)
             if create_new:
                 args = ["checkout", "-b", "--", branch_name]
             else:
@@ -145,14 +140,14 @@ class GithubLocalGit:
             code, out, err = await self._run_git_command(safe_path, *args)
 
             if code != 0:
-                return SkillResult.fail(f"Ошибка git checkout:\n{err or out}")
+                return SkillResult.fail(f"Error during git checkout:\n{err or out}")
 
-            return SkillResult.ok(f"Успешное переключение на ветку '{branch_name}'.\n{out}")
+            return SkillResult.ok(f"Successfully switched to branch '{branch_name}'.\n{out}")
 
         except PermissionError as e:
             return SkillResult.fail(str(e))
         except Exception as e:
-            return SkillResult.fail(f"Ошибка git checkout: {e}")
+            return SkillResult.fail(f"Error during git checkout: {e}")
 
     @skill(swarm=[Subagents.CODER])
     @require_github_token()
@@ -160,58 +155,54 @@ class GithubLocalGit:
         self, repo_folder: str, commit_message: str, branch_name: str
     ) -> SkillResult:
         """
-        Stages all changes, creates commit, and pushes to origin. 
-        
+        Stages all changes, creates commit, and pushes to origin.
+
         repo_folder: Sandbox folder with repo.
         """
-        
+
         if not self.github.token:
-            return SkillResult.fail(
-                "Ошибка: Для выполнения 'git push' необходим GITHUB_TOKEN."
-            )
+            return SkillResult.fail("Error: GITHUB_TOKEN is required to execute 'git push'.")
 
         try:
             safe_path = validate_sandbox_path(repo_folder)
             if not (safe_path / ".git").exists():
-                return SkillResult.fail(
-                    "Ошибка: Указанная папка не является git-репозиторием."
-                )
+                return SkillResult.fail("Error: Specified folder is not a git repository.")
 
             code, out, err = await self._run_git_command(safe_path, "add", ".")
             if code != 0:
-                return SkillResult.fail(f"Ошибка git add:\n{err or out}")
+                return SkillResult.fail(f"Error during git add:\n{err or out}")
 
             code, status_out, _ = await self._run_git_command(
                 safe_path, "status", "--porcelain"
             )
             if not status_out.strip():
-                return SkillResult.ok("Нет изменений для коммита. Рабочее дерево чистое.")
+                return SkillResult.ok("No changes to commit. Working tree clean.")
 
-            # Сообщение не требует экранирования, т.к. мы передаем его как элемент списка,
-            # но на всякий случай явно указываем -m
+            # Message does not require escaping as we pass it as list item,
+            # but we explicitly specify -m just in case
             code, out, err = await self._run_git_command(
                 safe_path, "commit", "-m", commit_message
             )
             if code != 0:
-                return SkillResult.fail(f"Ошибка git commit:\n{err or out}")
+                return SkillResult.fail(f"Error during git commit:\n{err or out}")
 
-            # Защита branch_name от инъекции
+            # Protect branch_name against injection
             code, push_out, push_err = await self._run_git_command(
                 safe_path, "push", "-u", "origin", "--", branch_name
             )
             if code != 0:
-                return SkillResult.fail(f"Ошибка git push:\n{push_err or push_out}")
+                return SkillResult.fail(f"Error during git push:\n{push_err or push_out}")
 
             main_logger.info(
-                f"[Github] Сделан коммит и пуш в ветку {branch_name} (Папка: {safe_path.name})"
+                f"[Github] Committed and pushed to branch {branch_name} (Folder: {safe_path.name})"
             )
 
             report = truncate_text(push_err or push_out, 500)
             return SkillResult.ok(
-                f"Изменения успешно зафиксированы и отправлены в origin/{branch_name}.\n{report}"
+                f"Changes successfully committed and pushed to origin/{branch_name}.\n{report}"
             )
 
         except PermissionError as e:
             return SkillResult.fail(str(e))
         except Exception as e:
-            return SkillResult.fail(f"Ошибка git commit/push: {e}")
+            return SkillResult.fail(f"Error during git commit/push: {e}")

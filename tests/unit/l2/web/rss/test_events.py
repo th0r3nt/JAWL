@@ -6,7 +6,7 @@ from src.l2_interfaces.web.rss.events import WebRSSEvents
 
 @pytest.mark.asyncio
 async def test_rss_events_start_skips_if_empty_feeds(rss_state, mock_bus):
-    """Тест: Поллер не должен запускаться, если список фидов пуст."""
+    """Тест: Поллер не должен запускаться, если список фидов empty."""
     config_empty = MagicMock(feeds=[])
     client_empty = MagicMock(config=config_empty)
     events = WebRSSEvents(client_empty, rss_state, mock_bus)

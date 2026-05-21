@@ -56,7 +56,7 @@ async def test_desktop_take_screenshot(mock_grab, os_client):
 @pytest.mark.asyncio
 @patch("src.l2_interfaces.host.os.skills.desktop.ImageGrab.grab")
 async def test_desktop_take_screenshot_headless_fallback(mock_grab, os_client):
-    """Тест: обработка ошибки, если монитор не найден (VPS/Server)."""
+    """Тест: обработка ошибки, если монитор not found (VPS/Server)."""
     desktop = HostOSDesktop(os_client)
     mock_grab.side_effect = OSError("screen grab failed")
 
@@ -123,7 +123,7 @@ async def test_desktop_take_screenshot_with_grid(mock_grab, os_client):
 
     desktop = HostOSDesktop(os_client)
 
-    # Вместо MagicMock подсовываем реальный пустой Image,
+    # Вместо MagicMock подсовываем реальный emptyой Image,
     # чтобы код мог вызвать .size и нарисовать сетку без креша
     test_img = Image.new("RGB", (200, 200), color="white")
     mock_grab.return_value = test_img

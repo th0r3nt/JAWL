@@ -1,9 +1,9 @@
 """
-Навыки Meta уровня 0 (SAFE).
+Meta Level 0 skills (SAFE).
 
-Базовые, самые безопасные настройки системы.
-Позволяют агенту изменять свою рабочую модель LLM (переключать личности/провайдеров)
-и настраивать уровень креативности (Temperature).
+Basic, safest system settings.
+Allow the agent to modify its currently active LLM model (switch personalities/providers)
+and adjust generation creativity (Temperature).
 """
 
 from src.l2_interfaces.meta.client import MetaClient
@@ -11,7 +11,7 @@ from src.l3_agent.skills.registry import SkillResult, skill
 
 
 class MetaSafe:
-    """Уровень 0 (SAFE). Базовые настройки системы."""
+    """Level 0 (SAFE). Basic system settings."""
 
     def __init__(self, meta_client: MetaClient) -> None:
         self.client = meta_client
@@ -24,14 +24,14 @@ class MetaSafe:
 
         if self.client.available_models and model_name not in self.client.available_models:
             return SkillResult.fail(
-                f"Модель '{model_name}' недоступна. Необходимо выбрать из списка: {self.client.available_models}"
+                f"Model '{model_name}' is unavailable. Please select from the list: {self.client.available_models}"
             )
 
         success = await self.client.update_yaml(
             self.client.settings_path, ["llm", "main_model"], model_name
         )
         if not success:
-            return SkillResult.fail("Ошибка при сохранении файла конфигурации.")
+            return SkillResult.fail("Error saving configuration file.")
 
         self.client.agent_state.llm_model = model_name
         return SkillResult.ok("True")
@@ -52,7 +52,7 @@ class MetaSafe:
             self.client.settings_path, ["llm", "available_models"], new_list
         )
         if not success:
-            return SkillResult.fail("Ошибка при обновлении конфигурации.")
+            return SkillResult.fail("Error updating configuration.")
 
         self.client.available_models = new_list
         return SkillResult.ok("True")
@@ -64,12 +64,10 @@ class MetaSafe:
         """
 
         if model_name not in self.client.available_models:
-            return SkillResult.fail(f"Ошибка: Модели '{model_name}' нет в списке.")
+            return SkillResult.fail(f"Error: Model '{model_name}' is not in the list.")
 
         if model_name == self.client.agent_state.llm_model:
-            return SkillResult.fail(
-                "Ошибка: Нельзя удалить модель, которая используется в данный момент."
-            )
+            return SkillResult.fail("Error: Cannot delete the currently active model.")
 
         new_list = [m for m in self.client.available_models if m != model_name]
 
@@ -77,7 +75,7 @@ class MetaSafe:
             self.client.settings_path, ["llm", "available_models"], new_list
         )
         if not success:
-            return SkillResult.fail("Ошибка при обновлении конфигурации.")
+            return SkillResult.fail("Error updating configuration.")
 
         self.client.available_models = new_list
         return SkillResult.ok("True")
@@ -89,13 +87,13 @@ class MetaSafe:
         """
 
         if not 0.0 <= temperature <= 2.0:
-            return SkillResult.fail("Температура должна быть в пределах от 0.0 до 2.0.")
+            return SkillResult.fail("Temperature must be between 0.0 and 2.0.")
 
         success = await self.client.update_yaml(
             self.client.settings_path, ["llm", "temperature"], temperature
         )
         if not success:
-            return SkillResult.fail("Ошибка при сохранении конфигурации.")
+            return SkillResult.fail("Error saving configuration.")
 
         self.client.agent_state.temperature = temperature
         return SkillResult.ok("True")
@@ -103,11 +101,11 @@ class MetaSafe:
     @skill()
     async def set_current_goal(self, goal: str) -> SkillResult:
         """
-        Sets current focus goal. 
-        Pins goal in system prompt to maintain context over long cycles. 
+        Sets current focus goal.
+        Pins goal in system prompt to maintain context over long cycles.
         Pass empty string to clear.
         """
-        
+
         clean_goal = goal.strip()
         self.client.agent_state.current_goal = clean_goal
 

@@ -40,4 +40,4 @@ async def test_notes_limit_enforcement(notes_manager):
     # Третья должна упасть, т.к. max_notes=2
     res_fail = await notes_manager.add_note("Note 3")
     assert res_fail.is_success is False
-    assert "Достигнут лимит" in res_fail.message
+    assert "limit reached" in res_fail.message

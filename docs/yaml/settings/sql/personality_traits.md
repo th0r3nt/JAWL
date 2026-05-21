@@ -1,9 +1,9 @@
-# Приобретенные черты личности (Personality Traits)
+# Acquired Personality Traits (Personality Traits)
 
-Модуль `Personality Traits` позволяет агенту динамически адаптироваться под пользователя. 
+The `Personality Traits` module allows the agent to dynamically adapt to the user.
 
-Если основная личность задается жестко в Markdown-файлах (`prompt/personality/SOUL.md`), то этот SQL-модуль позволяет агенту "на лету" запоминать правила. Например, если пользователь несколько раз попросит агента писать код без комментариев, агент сам создаст себе черту характера "Писать код лаконично", сохранит контекст ее применения и будет следовать ей в будущем.
+While the primary, rigid personality is defined in static Markdown files (`prompt/personality/SOUL.md`), this SQL module allows the agent to learn rules "on the fly". For example, if the user repeatedly requests code without comments, the agent will autonomously write a trait "Write code concisely," save the application context, and adhere to it in future reasoning.
 
-## Параметры (`system.db.sql.personality_traits`)
-* **`enabled`**: `true` / `false`.
-* **`max_traits`**: Лимит на количество приобретенных черт характера в системном промпте.
+## Parameters (`system.db.sql.personality_traits`)
+* **`enabled`**: `true` / `false`. Enables the traits system.
+* **`max_traits`**: Limit on the number of acquired personality traits displayed in the system prompt.

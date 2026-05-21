@@ -1,5 +1,5 @@
 """
-Навыки для записи, создания, перемещения и удаления файлов и папок.
+Skills for writing, creating, moving, and deleting files and directories.
 """
 
 import ast
@@ -18,7 +18,7 @@ from src.l3_agent.swarm.roles import Subagents
 
 
 class HostOSWriter:
-    """Навыки агента для модификации и управления файловой системой."""
+    """Agent skills for file modifications and management."""
 
     def __init__(self, host_os_client: HostOSClient):
         self.host_os = host_os_client
@@ -29,8 +29,8 @@ class HostOSWriter:
         self, filepath: str, content: str, description: str = None
     ) -> SkillResult:
         """
-        Creates or fully overwrites file. 
-        
+        Creates or fully overwrites file.
+
         description: Brief content summary.
         """
 
@@ -44,7 +44,6 @@ class HostOSWriter:
 
             await asyncio.to_thread(_write)
 
-            # Сохраняем описание, если оно передано
             desc_msg = ""
             if description:
                 try:
@@ -53,19 +52,18 @@ class HostOSWriter:
                     await asyncio.to_thread(
                         self.host_os.set_file_metadata, rel_path, clean_desc
                     )
-                    desc_msg = " Описание файла успешно сохранено."
+                    desc_msg = " File description successfully saved."
                 except Exception as e:
-                    desc_msg = f" (Не удалось сохранить метаданные: {e})"
+                    desc_msg = f" (Failed to save metadata: {e})"
 
-            size_str = format_size(safe_path.stat().st_size)
-            main_logger.info(f"[Host OS] Перезаписан файл: {safe_path.name} ({size_str})")
+            main_logger.info(f"[Host OS] Overwrote file: {safe_path.name}{desc_msg}")
             return SkillResult.ok("True")
 
         except PermissionError as e:
             return SkillResult.fail(str(e))
 
         except Exception as e:
-            return SkillResult.fail(f"Ошибка при перезаписи файла: {e}")
+            return SkillResult.fail(f"Error overwriting file: {e}")
 
     @skill(swarm=[Subagents.CODER, Subagents.QA_ENGINEER, Subagents.SYSADMIN])
     @require_access(HostOSAccessLevel.SANDBOX)
@@ -95,15 +93,14 @@ class HostOSWriter:
 
             await asyncio.to_thread(_append)
 
-            size_str = format_size(safe_path.stat().st_size)
-            main_logger.info(f"[Host OS] Дополнен файл (append): {safe_path.name}")
+            main_logger.info(f"[Host OS] Appended to file (append): {safe_path.name}")
             return SkillResult.ok("True")
 
         except PermissionError as e:
             return SkillResult.fail(str(e))
 
         except Exception as e:
-            return SkillResult.fail(f"Ошибка при добавлении в файл: {e}")
+            return SkillResult.fail(f"Error appending to file: {e}")
 
     @skill()
     @require_access(HostOSAccessLevel.SANDBOX)
@@ -116,24 +113,24 @@ class HostOSWriter:
             safe_path = self.host_os.validate_path(filepath, is_write=True)
 
             if not safe_path.exists():
-                return SkillResult.fail(f"Ошибка: Файл не существует ({filepath}).")
+                return SkillResult.fail(f"Error: File does not exist ({filepath}).")
 
             if not safe_path.is_file():
                 return SkillResult.fail(
-                    "Ошибка: Это не файл, удаление директорий через этот инструмент запрещено."
+                    "Error: This is not a file, deleting directories via this tool is forbidden."
                 )
 
             size_str = format_size(safe_path.stat().st_size)
             safe_path.unlink()
 
-            main_logger.info(f"[Host OS] Удален файл: {safe_path.name} ({size_str})")
+            main_logger.info(f"[Host OS] Deleted file: {safe_path.name} ({size_str})")
             return SkillResult.ok("True")
 
         except PermissionError as e:
             return SkillResult.fail(str(e))
 
         except Exception as e:
-            return SkillResult.fail(f"Ошибка при удалении файла: {e}")
+            return SkillResult.fail(f"Error deleting file: {e}")
 
     @skill()
     @require_access(HostOSAccessLevel.SANDBOX)
@@ -146,10 +143,10 @@ class HostOSWriter:
             safe_path = self.host_os.validate_path(path, is_write=True)
 
             if not safe_path.exists():
-                return SkillResult.fail(f"Ошибка: Директория не существует ({path}).")
+                return SkillResult.fail(f"Error: Directory does not exist ({path}).")
             if not safe_path.is_dir():
                 return SkillResult.fail(
-                    "Ошибка: Это не директория. Для удаления файлов используйте delete_file."
+                    "Error: This is not a directory. To delete files, use delete_file."
                 )
 
             if (
@@ -157,18 +154,18 @@ class HostOSWriter:
                 or safe_path == self.host_os.framework_dir
             ):
                 return SkillResult.fail(
-                    "Ошибка: Отказано в доступе. Запрещено удалять корневую директорию песочницы или фреймворка."
+                    "Error: Access denied. Deleting the root sandbox or framework directory is forbidden."
                 )
 
             await asyncio.to_thread(shutil.rmtree, safe_path)
-            main_logger.info(f"[Host OS] Удалена директория: {safe_path.name}")
+            main_logger.info(f"[Host OS] Deleted directory: {safe_path.name}")
             return SkillResult.ok("True")
 
         except PermissionError as e:
             return SkillResult.fail(str(e))
 
         except Exception as e:
-            return SkillResult.fail(f"Ошибка при удалении директории: {e}")
+            return SkillResult.fail(f"Error deleting directory: {e}")
 
     @skill(swarm=[Subagents.CODER, Subagents.QA_ENGINEER, Subagents.SYSADMIN])
     @require_access(HostOSAccessLevel.SANDBOX)
@@ -188,7 +185,7 @@ class HostOSWriter:
                 paths = [paths]
 
         if not paths or not isinstance(paths, list):
-            return SkillResult.fail("Ошибка: Список путей пуст или имеет неверный формат.")
+            return SkillResult.fail("Error: Path list is empty or has invalid format.")
 
         created, errors = [], []
 
@@ -202,16 +199,16 @@ class HostOSWriter:
                 errors.append(f"{path}: {e}")
 
             except Exception as e:
-                errors.append(f"{path}: Ошибка создания ({e})")
+                errors.append(f"{path}: Creation error ({e})")
 
         if not created and errors:
-            return SkillResult.fail("Не удалось создать директории:\n" + "\n".join(errors))
+            return SkillResult.fail("Failed to create directories:\n" + "\n".join(errors))
 
-        msg = f"Успешно созданы директории: {', '.join(created)}."
+        msg = f"Successfully created directories: {', '.join(created)}."
         if errors:
-            msg += "\n\nНо возникли ошибки с этими путями:\n" + "\n".join(errors)
+            msg += "\n\nBut errors occurred with these paths:\n" + "\n".join(errors)
 
-        main_logger.info(f"[Host OS] Созданы директории: {', '.join(created)}")
+        main_logger.info(f"[Host OS] Created directories: {', '.join(created)}")
 
         return SkillResult.ok("True")
 
@@ -223,14 +220,12 @@ class HostOSWriter:
         """
 
         try:
-            # Проверяем оба пути через гейткипер ОС (и источник, и назначение)
             safe_src = self.host_os.validate_path(source_path, is_write=True)
             safe_dst = self.host_os.validate_path(destination_path, is_write=True)
 
             if not safe_src.exists():
-                return SkillResult.fail(f"Ошибка: Исходный объект не найден ({source_path}).")
+                return SkillResult.fail(f"Error: Source object not found ({source_path}).")
 
-            # Создаем родительские папки для назначения, если их нет
             safe_dst.parent.mkdir(parents=True, exist_ok=True)
 
             def _move():
@@ -239,11 +234,11 @@ class HostOSWriter:
             await asyncio.to_thread(_move)
 
             main_logger.info(
-                f"[Host OS] Перемещен/переименован объект: {safe_src.name} -> {safe_dst.name}"
+                f"[Host OS] Moved/renamed object: {safe_src.name} -> {safe_dst.name}"
             )
             return SkillResult.ok("True")
 
         except PermissionError as e:
             return SkillResult.fail(str(e))
         except Exception as e:
-            return SkillResult.fail(f"Ошибка при перемещении/переименовании: {e}")
+            return SkillResult.fail(f"Error moving/renaming: {e}")

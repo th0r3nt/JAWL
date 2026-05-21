@@ -1,8 +1,8 @@
 """
-Навыки агента для манипуляции собственным графиком (Календарем).
+Agent skills for manipulating own schedule (Calendar).
 
-Позволяют агенту устанавливать разовые будильники, интервальные проверки
-или регулярные фоновые задачи, обеспечивая механизм отложенной проактивности.
+Allows the agent to set one-time alarms, interval checks,
+or regular background tasks, providing a mechanism for deferred proactivity.
 """
 
 import uuid
@@ -17,7 +17,7 @@ from src.l3_agent.skills.registry import skill, SkillResult
 
 
 class CalendarManagement:
-    """Навыки управления локальным календарем (будильники и таймеры)."""
+    """Local calendar management skills (alarms and timers)."""
 
     def __init__(self, client: CalendarClient) -> None:
         self.client = client
@@ -26,42 +26,40 @@ class CalendarManagement:
     @skill()
     async def add_one_time_alarm(self, title: str, datetime_str: str) -> SkillResult:
         """
-        Creates one-time alarm. 
-        
+        Creates one-time alarm.
+
         datetime_str: Format 'YYYY-MM-DD HH:MM'.
         """
         try:
-            # Парсим строку с учетом часового пояса системы
+            # Parse the string considering system timezone
             dt = datetime.strptime(datetime_str, "%Y-%m-%d %H:%M").replace(tzinfo=self.tz)
             trigger_at = dt.timestamp()
 
             if trigger_at <= time.time():
-                return SkillResult.fail("Ошибка: Указанное время уже в прошлом.")
+                return SkillResult.fail("Error: Specified time is already in the past.")
 
             ev_id = str(uuid.uuid4())
             self.client.add_event(
                 {"id": ev_id, "title": title, "type": "one_time", "trigger_at": trigger_at}
             )
 
-            main_logger.info(f"[Calendar] Добавлен разовый таймер '{title}' на {datetime_str}")
+            main_logger.info(f"[Calendar] Added one-time timer '{title}' for {datetime_str}")
             return SkillResult.ok(f"True. ID: {ev_id[:8]}")
 
         except ValueError:
-            return SkillResult.fail(
-                "Ошибка: Неверный формат даты. Используйте 'YYYY-MM-DD HH:MM'."
-            )
+            return SkillResult.fail("Error: Invalid date format. Use 'YYYY-MM-DD HH:MM'.")
         except Exception as e:
-            return SkillResult.fail(f"Ошибка при создании будильника: {e}")
+            return SkillResult.fail(f"Error creating alarm: {e}")
 
     @skill()
     async def add_interval_alarm(self, title: str, interval_minutes: int) -> SkillResult:
         """
-        Creates recurring timer triggering every N minutes from now. 
-        
+        Creates recurring timer triggering every N minutes from now.
+
         interval_minutes: Interval (e.g., 2880 = 2 days).
         """
         if interval_minutes < 1:
-            return SkillResult.fail("Ошибка: Интервал должен быть не менее 1 минуты.")
+            return SkillResult.fail("Error: Interval must be at least 1 minute.")
 
         try:
             ev_id = str(uuid.uuid4())
@@ -78,35 +76,35 @@ class CalendarManagement:
             )
 
             main_logger.info(
-                f"[Calendar] Добавлен интервальный таймер '{title}' (каждые {interval_minutes} мин)"
+                f"[Calendar] Added interval timer '{title}' (every {interval_minutes} min)"
             )
             return SkillResult.ok(f"True. ID: {ev_id[:8]}")
 
         except Exception as e:
-            return SkillResult.fail(f"Ошибка при создании таймера: {e}")
+            return SkillResult.fail(f"Error creating timer: {e}")
 
     @skill()
     async def add_recurring_alarm(
         self, title: str, time_str: str, interval_days: int = 1
     ) -> SkillResult:
         """
-        Creates recurring daily/weekly alarm. 
-        
-        time_str: Format 'HH:MM'. 
+        Creates recurring daily/weekly alarm.
+
+        time_str: Format 'HH:MM'.
         interval_days: Step in days (1 = daily, 7 = weekly).
         """
 
         if interval_days < 1:
-            return SkillResult.fail("Ошибка: interval_days должен быть >= 1.")
+            return SkillResult.fail("Error: interval_days must be >= 1.")
 
         try:
             now_dt = datetime.now(self.tz)
             target_time = datetime.strptime(time_str, "%H:%M").time()
 
-            # Собираем дату срабатывания на сегодня
+            # Combine trigger date for today
             target_dt = datetime.combine(now_dt.date(), target_time, tzinfo=self.tz)
 
-            # Если это время сегодня уже прошло, переносим на первый интервал вперед
+            # If this time has already passed today, shift forward by the first interval
             if target_dt <= now_dt:
                 target_dt += timedelta(days=interval_days)
 
@@ -125,15 +123,15 @@ class CalendarManagement:
             )
 
             main_logger.info(
-                f"[Calendar] Добавлен повторяющийся таймер '{title}' (в {time_str}, каждые {interval_days} дн.)"
+                f"[Calendar] Added recurring timer '{title}' (at {time_str}, every {interval_days} days)"
             )
             return SkillResult.ok(f"True. ID: {ev_id[:8]}")
 
         except ValueError:
-            return SkillResult.fail("Ошибка: Неверный формат времени. Используйте 'HH:MM'.")
+            return SkillResult.fail("Error: Invalid time format. Use 'HH:MM'.")
 
         except Exception as e:
-            return SkillResult.fail(f"Ошибка при создании повторяющегося таймера: {e}")
+            return SkillResult.fail(f"Error creating recurring timer: {e}")
 
     @skill()
     async def get_alarms(self) -> SkillResult:
@@ -143,20 +141,20 @@ class CalendarManagement:
 
         events = self.client.get_all_events()
         if not events:
-            return SkillResult.ok("Список будильников пуст.")
+            return SkillResult.ok("Alarms list is empty.")
 
         lines = []
         for ev in events:
             dt_str = format_timestamp(ev["trigger_at"], self.client.timezone)
             if ev["type"] == "interval":
-                meta = f"Интервал: {ev.get('interval_minutes')} мин."
+                meta = f"Interval: {ev.get('interval_minutes')} min."
             elif ev["type"] == "recurring":
-                meta = f"Каждые {ev.get('interval_days')} дн. в {ev.get('time_str')}"
+                meta = f"Every {ev.get('interval_days')} days at {ev.get('time_str')}"
             else:
-                meta = "Разовый"
+                meta = "One-time"
 
             lines.append(
-                f"- [ID: `{ev['id'][:8]}`] {ev['title']} | Сработает: {dt_str} | Тип: {meta}"
+                f"- [ID: `{ev['id'][:8]}`] {ev['title']} | Trigger: {dt_str} | Type: {meta}"
             )
 
         return SkillResult.ok("\n".join(lines))
@@ -172,8 +170,8 @@ class CalendarManagement:
         filtered = [ev for ev in events if not ev["id"].startswith(alarm_id)]
 
         if len(filtered) == len(events):
-            return SkillResult.fail(f"Будильник с ID {alarm_id} не найден.")
+            return SkillResult.fail(f"Alarm with ID {alarm_id} not found.")
 
         self.client.update_events(filtered)
-        main_logger.info(f"[Calendar] Удален таймер ID: {alarm_id}")
+        main_logger.info(f"[Calendar] Deleted timer ID: {alarm_id}")
         return SkillResult.ok("True")

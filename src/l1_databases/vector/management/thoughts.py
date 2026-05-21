@@ -1,7 +1,7 @@
 """
-CRUD-контроллер для коллекции 'thoughts' (База мыслей).
+CRUD controller for the 'thoughts' collection (Thoughts Base).
 
-Хранит субъективные логические выводы, рефлексию и внутренние паттерны поведения агента.
+Stores subjective logical conclusions, reflection, and internal behavior patterns of the agent.
 """
 
 import time
@@ -23,22 +23,22 @@ if TYPE_CHECKING:
     from src.l1_databases.vector.collections import VectorCollection
 
 VectorTag = Literal[
-    # Домены мыслей
-    "domain:tech",  # Техническая инфа
-    "domain:lore",  # Инфа про субъектов
-    "domain:self",  # Инфа про себя
-    # Типы мыслей
-    "type:fact",  # Факты
-    "type:concept",  # Абстрактные мысли
-    "type:rule",  # Правила поведения
-    # Длительность мыслей
-    "retention:core",  # Фундаментально
-    "retention:ephemeral",  # Временно
+    # Thought domains
+    "domain:tech",  # Technical domain
+    "domain:lore",  # Subjects/objects lore
+    "domain:self",  # Self architecture/ideas
+    # Thought types
+    "type:fact",  # Subjective facts
+    "type:concept",  # Conceptual thoughts
+    "type:rule",  # Internal behavior rules
+    # Thought retention
+    "retention:core",  # Fundamental
+    "retention:ephemeral",  # Short-term/ephemeral
 ]
 
 
 class VectorThoughts:
-    """Интерфейс агента к базе субъективных мыслей."""
+    """Agent interface to the subjective thoughts database."""
 
     def __init__(
         self,
@@ -49,14 +49,14 @@ class VectorThoughts:
         timezone: int = 0,
     ) -> None:
         """
-        Инициализирует контроллер мыслей.
+        Initializes the thoughts controller.
 
         Args:
-            db: Подключение к Qdrant.
-            embedding_model: Синтезатор векторов FastEmbed.
-            collection: Ссылка на коллекцию.
-            similarity_threshold: Порог косинусного сходства (Cosine Distance).
-            timezone: Смещение часового пояса.
+            db: Connection to Qdrant.
+            embedding_model: FastEmbed vector synthesizer.
+            collection: Reference to the collection.
+            similarity_threshold: Cosine similarity threshold (Cosine Distance).
+            timezone: Timezone offset.
         """
         self.db = db
         self.collection = collection
@@ -71,7 +71,7 @@ class VectorThoughts:
         """
 
         if not tags:
-            return SkillResult.fail("Ошибка: Необходимо указать хотя бы один тег из списка.")
+            return SkillResult.fail("Error: You must specify at least one tag from the list.")
 
         try:
             vector = await self.embedding_model.get_embedding(str(thought_text))
@@ -85,12 +85,12 @@ class VectorThoughts:
                 wait=True,
             )
 
-            msg = f"[Vector DB] Мысль успешно сохранена в базу данных (ID: {point_id}). Теги: {tags}"
+            msg = f"[Vector DB] Thought successfully saved to the database (ID: {point_id}). Tags: {tags}"
             main_logger.info(msg)
             return SkillResult.ok(f"True. ID: {point_id}")
 
         except Exception as e:
-            msg = f"[Vector DB] Ошибка при сохранении мысли: {e}"
+            msg = f"[Vector DB] Error saving thought: {e}"
             main_logger.error(msg)
             return SkillResult.fail(msg)
 
@@ -134,13 +134,13 @@ class VectorThoughts:
             )
 
             if not points:
-                msg = "[Vector DB] Поиск мыслей не дал результатов."
+                msg = "[Vector DB] Thought search returned no results."
                 main_logger.debug(msg)
                 return SkillResult.ok("True")
 
-            short_query = truncate_text(query_str.replace("\n", " "), 50, "... [Обрезано]")
+            short_query = truncate_text(query_str.replace("\n", " "), 50, "... [Truncated]")
             main_logger.info(
-                f"[Vector DB] Мысли: найдено {len(points)} записей по запросу '{short_query}'"
+                f"[Vector DB] Thoughts: found {len(points)} records for query '{short_query}'"
             )
 
             formatted_results = []
@@ -155,25 +155,25 @@ class VectorThoughts:
                     point_tags = [str(point_tags)]
 
                 tags_str = (
-                    f"[{', '.join(str(t) for t in point_tags)}]"
-                    if point_tags
-                    else "[Без тегов]"
+                    f"[{', '.join(str(t) for t in point_tags)}]" if point_tags else "[No tags]"
                 )
                 time_str = safe_format_timestamp(
                     point.payload.get("created_at"), self.timezone
                 )
 
-                md_block = f"[ID: `{point.id}`] [Время: {time_str}] {tags_str} Релевантность: {score}/{self.similarity_threshold}\n{text}"
+                md_block = f"[ID: `{point.id}`] [Time: {time_str}] {tags_str} Relevance: {score}/{self.similarity_threshold}\n{text}"
                 formatted_results.append(md_block)
 
             return SkillResult.ok("\n\n".join(formatted_results))
 
         except Exception as e:
-            msg = f"[Vector DB] Ошибка при поиске мыслей: {e}"
+            msg = f"[Vector DB] Error searching thoughts: {e}"
             main_logger.error(msg)
             return SkillResult.fail(msg)
 
-    @skill(swarm=[Subagents.ARCHIVIST], subconscious=[Pattern.FORGETTING, Pattern.CONSOLIDATION])
+    @skill(
+        swarm=[Subagents.ARCHIVIST], subconscious=[Pattern.FORGETTING, Pattern.CONSOLIDATION]
+    )
     async def delete_thought(self, point_id: str) -> SkillResult:
         """
         Deletes thought snippet.
@@ -184,11 +184,13 @@ class VectorThoughts:
                 points_selector=models.PointIdsList(points=[str(point_id)]),
                 wait=True,
             )
-            msg = f"[Vector DB] Мысль успешно удалена в базе данных (ID: {point_id})."
+            msg = (
+                f"[Vector DB] Thought successfully deleted from the database (ID: {point_id})."
+            )
             main_logger.info(msg)
             return SkillResult.ok(msg)
         except Exception as e:
-            msg = f"[Vector DB] Ошибка при удалении мысли: {e}"
+            msg = f"[Vector DB] Error deleting thought: {e}"
             main_logger.error(msg)
             return SkillResult.fail(msg)
 
@@ -197,8 +199,8 @@ class VectorThoughts:
         self, limit: int = 50, tags_filter: Optional[List[VectorTag]] = None
     ) -> SkillResult:
         """
-        Retrieves last N thoughts from DB. 
-        
+        Retrieves last N thoughts from DB.
+
         tags_filter: Optional tag array.
         """
         try:
@@ -224,7 +226,7 @@ class VectorThoughts:
             )
 
             if not records:
-                msg = "[Vector DB] Векторная коллекция мыслей пуста (или нет записей с указанными тегами)."
+                msg = "[Vector DB] Vector thoughts collection is empty (or there are no records with specified tags)."
                 main_logger.debug(msg)
                 return SkillResult.ok(msg)
 
@@ -239,20 +241,18 @@ class VectorThoughts:
                     point_tags = [str(point_tags)]
 
                 tags_str = (
-                    f"[{', '.join(str(t) for t in point_tags)}]"
-                    if point_tags
-                    else "[Без тегов]"
+                    f"[{', '.join(str(t) for t in point_tags)}]" if point_tags else "[No tags]"
                 )
                 time_str = safe_format_timestamp(
                     point.payload.get("created_at"), self.timezone
                 )
 
-                md_block = f"[ID: `{point.id}`] [Время: {time_str}] {tags_str}\n{text}"
+                md_block = f"[ID: `{point.id}`] [Time: {time_str}] {tags_str}\n{text}"
                 formatted_results.append(md_block)
 
             return SkillResult.ok("\n\n".join(formatted_results))
 
         except Exception as e:
-            msg = f"[Vector DB] Ошибка при получении мыслей: {e}"
+            msg = f"[Vector DB] Error retrieving thoughts: {e}"
             main_logger.error(msg)
             return SkillResult.fail(msg)

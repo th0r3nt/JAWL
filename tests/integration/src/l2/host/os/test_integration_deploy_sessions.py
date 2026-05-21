@@ -38,13 +38,13 @@ async def test_integration_deploy_rollback_on_syntax_error(tmp_path: Path):
     test_file.write_text(broken_code, encoding="utf-8")
 
     # 4. Агент пытается закоммитить изменения
-    # Вызов коммита физически запустит сабпроцесс `compileall`
+    # Вызов коммита физически заemptyит сабпроцесс `compileall`
     success, commit_msg = await manager.commit_session()
 
     # 5. ПРОВЕРКА РЕЗУЛЬТАТОВ
     assert success is False
-    assert "Синтаксическая ошибка" in commit_msg
-    assert "Попытки исчерпаны" in commit_msg
+    assert "Syntax Error" in commit_msg
+    assert "Attempts exhausted" in commit_msg
 
     # Главная проверка: система должна была сама физически вернуть старый, рабочий код
     recovered_code = test_file.read_text(encoding="utf-8")

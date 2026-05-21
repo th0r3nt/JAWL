@@ -1,7 +1,12 @@
+"""
+L0 State for the Web Search interface.
+
+Stores the history of search queries and read pages.
+"""
+
+
 class WebSearchState:
-    """
-    Хранит историю веб-серфинга агента (Search / Deep Research).
-    """
+    """Stores the agent's web browsing history (Search / Deep Research)."""
 
     def __init__(self, history_limit: int = 10):
         self.is_online = False

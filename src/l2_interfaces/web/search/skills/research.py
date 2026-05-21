@@ -1,8 +1,8 @@
 """
-Модуль асинхронного OSINT-исследования (Deep Research).
+Asynchronous OSINT investigation module (Deep Research).
 
-Оркестрирует параллельную работу поисковых движков (Tavily/DDG)
-и парсеров текста (Jina/Trafilatura) для массированного сбора фактов.
+Orchestrates parallel execution of search engines (Tavily/DDG)
+and text parsers (Jina/Trafilatura) for massive fact-gathering.
 """
 
 import asyncio
@@ -18,7 +18,7 @@ from src.l3_agent.swarm.roles import Subagents
 
 
 class DeepResearch:
-    """Навыки для глубокого параллельного ресерча в интернете."""
+    """Skills for deep parallel web research."""
 
     def __init__(self, client: WebSearchClient, searcher: Any, reader: Any) -> None:
         self.client = client
@@ -28,33 +28,33 @@ class DeepResearch:
     @skill(swarm=[Subagents.WEB_RESEARCHER])
     async def deep_research(self, queries: List[str]) -> SkillResult:
         """
-        Mass parallel fact-gathering. 
+        Mass parallel fact-gathering.
         Takes search queries, googles concurrently, extracts unique links, reads pages, returns report.
         """
-        
+
         if not queries:
-            return SkillResult.fail("Ошибка: Список запросов пуст.")
+            return SkillResult.fail("Error: Query list is empty.")
 
         queries = [str(q) for q in queries]
 
-        # Берем настройки из клиента
+        # Get settings from client
         cfg = self.client.deep_research_config
 
         if len(queries) > cfg.max_queries:
-            # Ограничиваем количество параллельных запросов для стабильности API
+            # Limit the number of parallel queries for API stability
             queries = queries[: cfg.max_queries]
 
         try:
-            main_logger.info(f"[Web] Запуск deep_research для {len(queries)} запросов.")
+            main_logger.info(f"[Web] Starting deep_research for {len(queries)} queries.")
 
-            # Шаг 1: Параллельный поиск по всем запросам
+            # Step 1: Parallel search for all queries
             search_tasks = [
                 self.searcher.search_raw(q, max_results=cfg.max_results_per_query)
                 for q in queries
             ]
             search_results = await asyncio.gather(*search_tasks, return_exceptions=True)
 
-            # Шаг 2: Сбор уникальных ссылок и отсечение дублей
+            # Step 2: Gathering unique links and filtering duplicates
             unique_links = {}
             for res in search_results:
                 if isinstance(res, Exception) or not res:
@@ -63,24 +63,24 @@ class DeepResearch:
                 for item in res:
                     url = item.get("href")
                     title = item.get("title", "Unknown Title")
-                    # Защита от дублей
+                    # Protection against duplicates
                     if url and url not in unique_links:
                         unique_links[url] = title
 
             if not unique_links:
                 return SkillResult.fail(
-                    "По заданным запросам не удалось найти полезных ссылок."
+                    "Failed to find any useful links for the specified queries."
                 )
 
-            # Шаг 3: Ограничиваем количество страниц для чтения
+            # Step 3: Limit the number of pages to read
             urls_to_read = list(unique_links.keys())[: cfg.max_pages_to_read]
 
-            # Шаг 4: Параллельное чтение страниц
+            # Step 4: Parallel reading of pages
             read_tasks = [self.reader.read_raw(url) for url in urls_to_read]
             read_results = await asyncio.gather(*read_tasks, return_exceptions=True)
 
-            # Шаг 5: Форматирование результата
-            # Динамически режем каждую страницу, чтобы общий объем текста не вылетел за лимиты контекста агента.
+            # Step 5: Formatting result
+            # Dynamically truncate each page so that total text volume doesn't exceed the agent's context limits.
             chars_per_page = max(2000, cfg.total_max_chars // len(urls_to_read))
 
             final_blocks = []
@@ -88,7 +88,7 @@ class DeepResearch:
                 title = unique_links[url]
                 content = read_results[i]
 
-                # Пропускаем страницы, которые вернули ошибку
+                # Skip pages that returned an error
                 if isinstance(content, Exception) or not content:
                     continue
 
@@ -96,7 +96,7 @@ class DeepResearch:
                 truncated_content = truncate_text(
                     content_str,
                     chars_per_page,
-                    "... [Текст обрезан для экономии контекста]",
+                    "... [Text truncated to save context]",
                 )
 
                 block = f"### Title: {title}\nURL: {url}\n\n{truncated_content}\n"
@@ -104,18 +104,18 @@ class DeepResearch:
 
             if not final_blocks:
                 return SkillResult.fail(
-                    "Ссылки найдены, но не удалось извлечь текст ни с одной из страниц (возможна защита от парсинга)."
+                    "Links found, but failed to extract text from any of the pages (anti-scraping protection possible)."
                 )
 
-            # Добавляем в историю браузера агента один общий лог
+            # Add a single general log entry to the agent's browser history
             queries_str = ", ".join(queries)
             self.client.state.add_history(f"Deep Research: {queries_str}")
 
             main_logger.info(
-                f"[Web] deep_research успешно завершен (прочитано {len(final_blocks)} страниц)."
+                f"[Web] deep_research successfully completed (read {len(final_blocks)} pages)."
             )
 
             return SkillResult.ok("\n\n---\n\n".join(final_blocks))
 
         except Exception as e:
-            return SkillResult.fail(f"Критическая ошибка во время deep_research: {e}")
+            return SkillResult.fail(f"Critical error during deep_research: {e}")

@@ -1,9 +1,9 @@
 """
-Stateful-клиент электронной почты (Email).
+Stateful email client.
 
-Управляет соединениями IMAP/SMTP. Использует Context Managers для кратковременного
-поднятия сессий, защищая систему от таймаутов (socket drop) при длительном простое.
-Имеет механизм жесткой обрезки (truncate) для защиты агента от спам-рассылок.
+Manages IMAP/SMTP connections. Uses context managers to establish short-lived
+sessions, protecting the system from socket timeouts during long idling.
+Features strict text truncation to protect the agent from spam.
 """
 
 import imaplib
@@ -20,8 +20,8 @@ from src.l2_interfaces.email.utils import decode_mime_header
 
 class EmailClient:
     """
-    Менеджер соединений с почтовыми серверами.
-    Обеспечивает умный автовыбор провайдера (Gmail, Yandex, Mail.ru и др.).
+    Mail server connection manager.
+    Provides smart auto-selection of the provider (Gmail, Yandex, Mail.ru, etc.).
     """
 
     PROVIDERS = {
@@ -44,12 +44,12 @@ class EmailClient:
 
     def __init__(self, state: EmailState, account: str, password: str) -> None:
         """
-        Инициализирует клиент.
+        Initializes the client.
 
         Args:
-            state: L0 стейт (приборная панель).
-            account: Логин почты (адрес).
-            password: App Password (пароль приложения с 2FA).
+            state: L0 state (dashboard).
+            account: Mail login (address).
+            password: App Password (app password with 2FA).
         """
 
         self.state = state
@@ -62,8 +62,8 @@ class EmailClient:
 
     async def start(self) -> None:
         """
-        Определяет сервера по домену почты и выполняет тестовый коннект.
-        В случае успеха помечает интерфейс как Online.
+        Determines servers by email domain and performs a test connection.
+        On success, marks the interface as Online.
         """
 
         domain = self.account.split("@")[-1].lower() if "@" in self.account else ""
@@ -71,7 +71,7 @@ class EmailClient:
         provider = self.PROVIDERS.get(domain)
         if not provider:
             main_logger.error(
-                f"[Email] Неизвестный домен '{domain}'. Пожалуйста, используйте стандартные почтовики (Gmail, Yandex, Mail.ru)."
+                f"[Email] Unknown domain '{domain}'. Please use standard mail providers (Gmail, Yandex, Mail.ru)."
             )
             return
 
@@ -80,32 +80,32 @@ class EmailClient:
         self.smtp_tls = bool(provider.get("smtp_tls", False))
 
         try:
-            # Тестовый коннект
+            # Test connection
             with self.imap_connection():
                 pass
 
             self.state.is_online = True
             self.state.account_info = f"{self.account}"
-            main_logger.info(f"[Email] Успешная авторизация в ящике {self.account}")
+            main_logger.info(f"[Email] Successful authorization in mailbox {self.account}")
 
-            # Сразу обновляем дашборд
+            # Immediately update the dashboard
             await asyncio.to_thread(self.update_state_view)
 
         except Exception as e:
-            self.state.account_info = "Ошибка авторизации (Неверный пароль приложения?)"
-            main_logger.error(f"[Email] Ошибка авторизации {self.account}: {e}")
+            self.state.account_info = "Authorization error (Incorrect App Password?)"
+            main_logger.error(f"[Email] Authorization error for {self.account}: {e}")
 
     async def stop(self) -> None:
-        """Останавливает клиент (сессии IMAP/SMTP закрываются сами в context managers)."""
+        """Stops the client (IMAP/SMTP sessions close automatically in context managers)."""
         self.state.is_online = False
 
     @contextmanager
     def imap_connection(self) -> Iterator[imaplib.IMAP4_SSL]:
         """
-        Контекстный менеджер для безопасной работы с IMAP (открыл-сделал-закрыл).
+        Context manager for safe work with IMAP (open-do-close).
 
         Yields:
-            Подключенный и авторизованный инстанс IMAP4_SSL.
+            Connected and authorized IMAP4_SSL instance.
         """
 
         mail = imaplib.IMAP4_SSL(self.imap_server)
@@ -123,10 +123,10 @@ class EmailClient:
     @contextmanager
     def smtp_connection(self) -> Iterator[Any]:
         """
-        Контекстный менеджер для безопасной работы с SMTP.
+        Context manager for safe work with SMTP.
 
         Yields:
-            Подключенный и авторизованный инстанс SMTP или SMTP_SSL.
+            Connected and authorized SMTP or SMTP_SSL instance.
         """
 
         port = 587 if self.smtp_tls else 465
@@ -145,9 +145,9 @@ class EmailClient:
 
     def update_state_view(self) -> None:
         """
-        Легковесный метод обновления дашборда почты.
-        Скачивает исключительно заголовки (Subject, From, Date) последних N писем, игнорируя тела.
-        Гарантирует минимальный расход трафика и токенов агента.
+        Lightweight method to update the mail dashboard.
+        Downloads exclusively headers (Subject, From, Date) of the last N emails, ignoring bodies.
+        Guarantees minimum traffic and agent token consumption.
         """
 
         if not self.state.is_online:
@@ -155,54 +155,52 @@ class EmailClient:
 
         try:
             with self.imap_connection() as mail:
-                # Ищем все письма (получаем UIDs)
+                # Search all emails (retrieve UIDs)
                 status, messages = mail.uid("search", None, "ALL")
                 if status != "OK":
                     return
 
                 uids = messages[0].split()
-                total_emails = len(uids)  # Считаем общее количество писем
+                total_emails = len(uids)  # Total number of emails
 
                 if not uids:
-                    self.state.mailbox_preview = "Ящик пуст."
+                    self.state.mailbox_preview = "Inbox is empty."
                     return
 
                 recent_uids = uids[-self.state.recent_limit :]
-                recent_uids.reverse()  # Свежие сверху
+                recent_uids.reverse()  # Newest on top
 
                 lines = []
                 for uid in recent_uids:
-                    # Запрашиваем только заголовки (очень быстро)
+                    # Fetch headers only (very fast)
                     res, msg_data = mail.uid(
                         "fetch", uid, "(BODY[HEADER.FIELDS (SUBJECT FROM DATE)])"
                     )
                     if res == "OK" and msg_data[0]:
                         msg = email.message_from_bytes(msg_data[0][1])
 
-                        subject = decode_mime_header(msg.get("Subject", "Без темы"))
-                        sender = decode_mime_header(msg.get("From", "Неизвестен"))
-                        date = msg.get("Date", "Неизвестно")
+                        subject = decode_mime_header(msg.get("Subject", "No subject"))
+                        sender = decode_mime_header(msg.get("From", "Unknown"))
+                        date = msg.get("Date", "Unknown")
 
                         lines.append(
-                            f"- [UID: {uid.decode()}] От: {sender} | Тема: {subject} | {date}"
+                            f"- [UID: {uid.decode()}] From: {sender} | Subject: {subject} | {date}"
                         )
 
-                # Собираем итоговый текст
+                # Assemble final text
                 preview_text = "\n".join(lines)
 
                 if total_emails > self.state.recent_limit:
                     hidden = total_emails - self.state.recent_limit
-                    preview_text += (
-                        f"\n\n...и еще {hidden} писем скрыто для экономии контекста."
-                    )
+                    preview_text += f"\n\n...and {hidden} more emails hidden to save context."
 
                 self.state.mailbox_preview = preview_text
 
         except Exception as e:
-            main_logger.error(f"[Email] Ошибка обновления дашборда: {e}")
+            main_logger.error(f"[Email] Error updating dashboard: {e}")
 
     async def get_context_block(self, **kwargs: Any) -> str:
-        """Формирует Markdown-блок для приборной панели агента."""
+        """Context provider for the agent's system prompt."""
         desc = "Description: Connecting to the specified mailbox account (IMAP/SMTP)."
         if not self.state.is_online:
             return f"### EMAIL [OFF] \n{desc}\nThe interface is disabled."

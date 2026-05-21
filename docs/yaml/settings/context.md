@@ -1,16 +1,16 @@
-# Управление контекстом (`context_depth`)
+# Context Management (`context_depth`)
 
-Каждое выполненное действие агента логируется в базе данных как "Тик" (Мысли -> Вызов функции -> Результат). Агент видит свою историю в системном промпте, что позволяет ему сохранять нить повествования.
+Each completed action of the agent is logged in the database as a "Tick" (Thoughts -> Tool Call -> Result). The agent sees its history in the system prompt, which helps it maintain coherence.
 
-Для экстремальной экономии токенов и удержания фокуса LLM, история разделена на трехуровневую архитектуру (3-Tier Episodic Memory):
+To extremely save tokens and maintain LLM focus, the history is structured into a 3-Tier Episodic Memory architecture:
 
-1. **High Ticks (`high_ticks`)**: Самые свежие шаги. Передаются агенту с максимальной детализацией (включают полные ответы функций и JSON-параметры).
-2. **Medium Ticks (`medium_ticks`)**: Промежуточные шаги. Длинные результаты и параметры обрезаются (`_short_max_chars`), чтобы не засорять промпт, но оставить понимание, какие действия были совершены.
-3. **Low Ticks (`low_ticks`)**: Старые шаги. Физические действия и результаты **полностью скрываются**. Агент видит только свои прошлые мысли (`thoughts`), что позволяет ему помнить ход своих рассуждений без затрат сотен тысяч токенов на системные I/O логи.
+1. **High Ticks (`high_ticks`)**: The freshest reasoning steps. Transmitted to the agent with maximum details (including full tool outputs and JSON parameters).
+2. **Medium Ticks (`medium_ticks`)**: Intermediate steps. Long outputs and parameters are truncated (`_short_max_chars`) to keep the prompt clean but preserve awareness of what was executed.
+3. **Low Ticks (`low_ticks`)**: Older steps. Physical actions and results are **completely hidden**. The agent only sees its past thoughts (`thoughts`), allowing it to remember the train of thought without wasting hundreds of thousands of tokens on old system I/O logs.
 
-**Пример (`high: 3`, `medium: 7`, `low: 20`)**:
-В контекст попадут 30 последних шагов. 3 последних будут полными, следующие 7 — сжатыми, а самые старые 20 — превратятся в чистый текстовый монолог.
+**Example (`high: 3`, `medium: 7`, `low: 20`)**:
+A total of 30 past steps are injected. The last 3 are fully verbose, the preceding 7 are compressed, and the oldest 20 are represented as a clean, continuous inner monologue.
 
-### Лимиты обрезки
-- **`tick_action_max_chars` / `tick_result_max_chars`**: Лимиты символов для свежих (HIGH) шагов.
-- **`tick_thoughts_short_max_chars` / `tick_action_short_max_chars` / `tick_result_short_max_chars`**: Жесткие лимиты сжатия для старых (MEDIUM и LOW) шагов.
+### Truncation Limits
+- **`tick_action_max_chars` / `tick_result_max_chars`**: Character limit ceilings for fresh (HIGH) steps.
+- **`tick_thoughts_short_max_chars` / `tick_action_short_max_chars` / `tick_result_short_max_chars`**: Rigid character limit constraints for compressed (MEDIUM and LOW) steps.

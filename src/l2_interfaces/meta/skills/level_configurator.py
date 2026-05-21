@@ -1,8 +1,8 @@
 """
-Навыки Meta уровня 1 (CONFIGURATOR).
+Meta Level 1 skills (CONFIGURATOR).
 
-Позволяют агенту изменять настройки собственного "мозга": глубину памяти
-(лимиты контекста и БД) и ритм авто-пробуждений (Heartbeat).
+Allow the agent to modify settings of its own "brain": memory depth
+(context and DB limits) and the rate of auto-wakeups (Heartbeat).
 """
 
 from pathlib import Path
@@ -14,7 +14,7 @@ from src.utils.event.registry import Events
 
 
 class MetaConfigurator:
-    """Уровень 1 (CONFIGURATOR). Управление базами данных, контекстом и промптами."""
+    """Level 1 (CONFIGURATOR). Database, context, and prompt management."""
 
     def __init__(self, meta_client: MetaClient, root_dir: Path) -> None:
         self.client = meta_client
@@ -31,7 +31,7 @@ class MetaConfigurator:
             self.client.settings_path, ["system", "heartbeat_interval"], interval_sec
         )
         if not success:
-            return SkillResult.fail("Ошибка при сохранении конфигурации.")
+            return SkillResult.fail("Error saving configuration.")
 
         self.client.agent_state.heartbeat_interval = interval_sec
         await self.client.bus.publish(
@@ -49,7 +49,7 @@ class MetaConfigurator:
             self.client.settings_path, ["llm", "max_react_steps"], steps
         )
         if not success:
-            return SkillResult.fail("Ошибка при сохранении конфигурации.")
+            return SkillResult.fail("Error saving configuration.")
 
         self.client.agent_state.max_react_steps = steps
         return SkillResult.ok("True")
@@ -73,32 +73,32 @@ class MetaConfigurator:
 
         path_keys = db_keys_map.get(database)
         if not path_keys:
-            return SkillResult.fail("Неверное имя базы данных.")
+            return SkillResult.fail("Invalid database name.")
 
         success = await self.client.update_yaml(
             self.client.settings_path, path_keys, new_limit
         )
 
         if success:
-            # Моментальное обновление в памяти
+            # Instant memory update
             await self.client.bus.publish(
                 Events.SYSTEM_CONFIG_UPDATED, key="db_limit", module=database, value=new_limit
             )
             return SkillResult.ok("True")
-        return SkillResult.fail("Ошибка обновления конфигурации.")
+        return SkillResult.fail("Error updating configuration.")
 
     @skill()
     async def change_context_depth(
         self, high_ticks: int, medium_ticks: int, low_ticks: int
     ) -> SkillResult:
         """
-        Dynamically alters context window depth. 
-        
-        high_ticks: Uncut recent ticks. 
-        medium_ticks: Ticks with truncated I/O. 
+        Dynamically alters context window depth.
+
+        high_ticks: Uncut recent ticks.
+        medium_ticks: Ticks with truncated I/O.
         low_ticks: Thoughts only.
         """
-        
+
         s1 = await self.client.update_yaml(
             self.client.settings_path, ["system", "context_depth", "high_ticks"], high_ticks
         )
@@ -124,4 +124,4 @@ class MetaConfigurator:
                 low_ticks=low_ticks,
             )
             return SkillResult.ok("True")
-        return SkillResult.fail("Ошибка сохранения настроек.")
+        return SkillResult.fail("Error saving settings.")

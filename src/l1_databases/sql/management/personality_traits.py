@@ -1,8 +1,8 @@
 """
-CRUD-контроллер таблицы Personality Traits (Черты личности).
+CRUD controller of the Personality Traits table.
 
-Позволяет агенту динамически адаптироваться под пользователя: сохранять
-паттерны поведения, предпочитаемые форматы ответов и индивидуальные правила.
+Allows the agent to dynamically adapt to the user: store
+behavioral patterns, preferred response formats, and individual rules.
 """
 
 import uuid
@@ -21,15 +21,15 @@ if TYPE_CHECKING:
 
 
 class SQLPersonalityTraits:
-    """CRUD для управления приобретенными чертами характера агента."""
+    """CRUD for managing acquired personality traits of the agent."""
 
     def __init__(self, db: "SQLDB", max_traits: int = 10) -> None:
         """
-        Инициализирует контроллер черт личности.
+        Initializes the personality traits controller.
 
         Args:
-            db: Подключение к SQLite.
-            max_traits: Максимальное количество хранимых черт в памяти.
+            db: Connection to SQLite.
+            max_traits: Maximum number of stored traits in memory.
         """
         self.db = db
         self.max_traits = max_traits
@@ -43,21 +43,22 @@ class SQLPersonalityTraits:
         context: Optional[str] = None,
     ) -> SkillResult:
         """
-        Adds new acquired personality trait. 
-        
+        Adds new acquired personality trait.
+
         reason: Triggering event for this trait.
         context: Situations where this trait applies.
         """
 
+        # Truncate IDs to fit typical short schemas
         trait_id = str(uuid.uuid4())[:8]
 
         async with self.db.session_factory() as session:
-            # Проверка лимита
+            # Check limits
             count_res = await session.execute(select(func.count(PersonalityTraitTable.id)))
             if count_res.scalar_one() >= self.max_traits:
                 return SkillResult.fail(
-                    f"Достигнут лимит макс. количества приобретенных черт личности ({self.max_traits}). "
-                    "Рекомендуется удалить неактуальные."
+                    f"Maximum limit of acquired personality traits reached ({self.max_traits}). "
+                    "It is recommended to delete obsolete ones."
                 )
 
             new_trait = PersonalityTraitTable(
@@ -66,7 +67,6 @@ class SQLPersonalityTraits:
             session.add(new_trait)
             await session.commit()
 
-        msg = f"Черта личности '{name}' успешно добавлена. ID: {trait_id}"
         return SkillResult.ok(f"True. ID: {trait_id}")
 
     @skill(subconscious=[Pattern.REFLECTION])
@@ -80,17 +80,17 @@ class SQLPersonalityTraits:
             traits = result.scalars().all()
 
         if not traits:
-            return SkillResult.ok("Список приобретенных черт личности пуст.")
+            return SkillResult.ok("Acquired personality traits list is empty.")
 
         lines = []
         for t in traits:
             lines.append(f"['{t.name}'] (ID: `{t.id}`)")
-            lines.append(f"* Описание: {t.description}")
+            lines.append(f"* Description: {t.description}")
             if t.reason:
-                lines.append(f"* Причина: {t.reason}")
+                lines.append(f"* Reason: {t.reason}")
             if t.context:
-                lines.append(f"* Контекст: {t.context}")
-            lines.append("")  # Пустая строка-разделитель между чертами
+                lines.append(f"* Context: {t.context}")
+            lines.append("")  # Empty line separator
 
         return SkillResult.ok("\n".join(lines).strip())
 
@@ -106,16 +106,16 @@ class SQLPersonalityTraits:
             await session.commit()
 
             if result.rowcount == 0:
-                return SkillResult.fail(f"Черта личности с ID {trait_id} не найдена.")
+                return SkillResult.fail(f"Personality trait with ID {trait_id} not found.")
 
-        msg = f"Черта личности {trait_id} удалена."
+        msg = f"Personality trait {trait_id} deleted."
         main_logger.info(f"[SQL DB] {msg}")
         return SkillResult.ok("True")
 
     async def get_context_block(self, **kwargs: Any) -> str:
         """
-        Провайдер контекста для ContextRegistry.
-        Отдает отформатированный блок для контекста агента.
+        Context provider for ContextRegistry.
+        Returns a formatted block for the agent's context.
         """
 
         res = await self.get_traits()

@@ -1,83 +1,83 @@
-# 🐝 Swarm: Система Субагентов (Мульти-агентность)
+# 🐝 Swarm: Subagents System (Multi-Agent Subsystem)
 
-В JAWL v0.10.0 была внедрена подсистема **Swarm**. Она позволяет главному агенту (Оркестратору) делегировать объемные, ресурсоемкие или рутинные задачи фоновым субагентам (Воркерам).
+In JAWL v0.10.0, the **Swarm** subsystem was introduced. It allows the main agent (Orchestrator) to delegate voluminous, resource-heavy, or routine tasks to background subagents (Workers).
 
-Главная концепция: **Субагенты - это изолированные, слепые работяги.** Они не имеют доступа к вашей переписке, долгосрочной памяти (SQL/Vector) или общему контексту. Они получают только конкретную задачу, набор разрешенных инструментов, выполняют работу и возвращают главному агенту строгий Markdown-отчет.
+Main concept: **Subagents are isolated, blind workers.** They do not have access to your chat history, long-term memory (SQL/Vector), or general context. They only receive a specific task and a set of authorized tools, perform the work, and return a strict Markdown report to the main agent.
 
 ---
 
-## 🛠 Часть 1. Для пользователей (Как включить и использовать)
+## 🛠 Part 1. For Users (How to Enable and Use)
 
-Делегирование решает две главные проблемы: **экономия дорогих токенов** и **параллелизм**. Вместо того чтобы заставлять дорогой `Claude Opus` скроллить 20 сайтов, он поручает это быстрому и дешевому `Gemini Flash Lite`, который сделает всю грязную работу в фоне и принесет готовую выжимку.
+Delegating solves two major problems: **saving expensive tokens** and **parallelism**. Instead of forcing an expensive model like `Claude Opus` to scroll through 20 websites, it delegates this task to a background `CODER` or `WEB_RESEARCHER` subagent (running on the cheap and fast `Gemini Flash Lite`), which will do all the dirty work in the background and return a finalized summary.
 
-### 1. Включение и настройка
-Откройте файл `config/settings.yaml` и найдите блок `swarm`:
+### 1. Enabling and Configuration
+Open `config/settings.yaml` and locate the `swarm` block:
 
 ```yaml
   swarm:
     enabled: true
-    subagent_model: gemini-3.1-flash-lite-preview # Хорошая модель для воркеров
+    subagent_model: gemini-3.5-flash # Great model for workers
     max_concurrent_workers: 3 
 ```
 
-* **subagent_model**: Крайне рекомендуется использовать дешевые, быстрые модели с большим контекстным окном. 
-* **max_concurrent_workers**: Защита от Rate Limits. Если агент решит запустить сразу 10 субагентов для парсинга, ваш API-провайдер выдаст бан (HTTP 429). Семафор ограничит параллельный запуск (остальные встанут в очередь).
+* **subagent_model**: It is highly recommended to use cheap, fast models with large context windows.
+* **max_concurrent_workers**: Protection against Rate Limits. If the agent decides to launch 10 subagents at once for parsing, your API provider will ban you (HTTP 429). The semaphore limits parallel execution (others will queue).
 
-### 2. Доступные роли
-По умолчанию "из коробки" доступны следующие специалисты:
-* 💻 **CODER (Software Engineer)**: Имеет доступ к песочнице `sandbox/`. Умеет читать файлы, писать скрипты, запускать их и работать с локальным Git (clone, commit, push). Идеален для рефакторинга и дебага.
-* 🕵️ **WEB RESEARCHER (OSINT Analyst)**: Имеет доступ к поисковикам и читалке веб-страниц. Владеет мощным навыком `DeepResearch` (умеет параллельно гуглить и читать до 20 уникальных сайтов за раз). Идеален для фактчекинга и сбора лора.
-* 🗄️ **ARCHIVIST**: Доступ к долгосрочной памяти (Vector DB + Graph). Отвечает за фоновую ревизию, поиск дубликатов, сжатие фактов и удаление информационного шума для идеальной работы RAG.
-* 🛡️ **QA ENGINEER**: Доступ к файловой системе, выполнению кода и сети. Не пишет фичи, а пишет суровые `pytest` тесты, прогоняет их в несколько итераций и ищет краевые случаи.
+### 2. Available Roles
+By default, the following specialists are available out of the box:
+* 💻 **CODER (Software Engineer)**: Has access to the isolated `sandbox/` folder. Can read files, write scripts, execute them, and work with local Git (clone, commit, push). Great for refactoring and debugging.
+* 🕵️ **WEB RESEARCHER (OSINT Analyst)**: Has access to search engines and web page readers. Owns a powerful `DeepResearch` skill (can search and read up to 20 unique websites concurrently in a single call). Great for fact-checking and gathering lore.
+* 🗄️ **ARCHIVIST**: Has access to long-term memory (Vector DB). Responsible for background database revision, locating duplicates, compressing facts, and removing informational noise for perfect RAG performance.
+* 🛡️ **QA ENGINEER**: Has access to the file system, code execution, and network. Writes rigorous `pytest` test suites instead of features, runs them through multiple iterations, and hunts for edge cases.
 
-### 3. Как использовать?
-Вам не нужно вызывать их вручную. Просто напишите главному агенту:
-> *"Делегируй сбор информации о выходе новой модели Claude Mythos веб-ресерчеру. А сам пока проверь мою почту."*
+### 3. How to Use
+You don't need to invoke them manually. Simply write to the main agent:
+> *"Delegate gathering info about the release of the new Claude model to the web researcher. And you, check my mail in the meantime."*
 
-Главный агент сам сформулирует промпт для субагента, запустит его в фоне и пойдет заниматься своими делами или уснет. Когда субагент закончит - система мгновенно разбудит Оркестратора ивентом `SUBAGENT_TASK_COMPLETED`, передав ему готовый отчет.
+The main agent will formulate the prompt for the subagent, launch it in the background, and go to sleep or perform other tasks. When the subagent finishes, the system will instantly wake up the Orchestrator with a `SUBAGENT_TASK_COMPLETED` event, passing the finalized report.
 
 ---
 
-## 🏗 Часть 2. Для разработчиков (Как добавить своего субагента)
+## 🏗 Part 2. For Developers (How to Add Your Subagent)
 
-Подсистема спроектирована по принципу **SOLID (Open/Closed Principle)**. Чтобы добавить нового субагента, вам не нужно менять `ReactLoop` или `SubagentLoop`. Роли и доступы (RBAC) добавляются в 3 простых шага.
+The subsystem is designed according to the **SOLID (Open/Closed Principle)**. To add a new subagent, you do not need to modify `ReactLoop` or `SubagentLoop`. Roles and accesses (RBAC) are added in 3 simple steps.
 
-### Архитектурная справка
-Субагенты крутятся в `SubagentLoop`. Это облегченный ReAct-цикл без сохранения стейта в SQLite. 
-У них есть **жесткий Guard**: субагент физически не может завершить свою работу (вернуть пустой массив действий), пока не вызовет специальный системный навык `SubagentReport.submit_final_report`. Если он попытается сбежать - цикл перехватит ошибку и заставит его написать отчет.
+### Architectural Reference
+Subagents run in a `SubagentLoop`. This is a lightweight ReAct loop without SQL state persistence.
+They have a **strict Guard**: a subagent physically cannot complete its execution (return an empty actions list) until it successfully invokes the system skill `SubagentReport.submit_final_report`. If it attempts to escape, the loop catches the error and forces it to write a report.
 
-### Шаг 1. Создание промпта роли
-Создайте Markdown-файл в `src/l3_agent/swarm/prompt/roles/`, например `DATA_ANALYST.md`.
-Здесь описывается специализация субагента и его принципы работы.
+### Step 1. Creating the Role Prompt
+Create a Markdown file in `src/l3_agent/swarm/prompt/roles/`, for example `DATA_ANALYST.md`.
+Describe the subagent's specialization and operational principles here.
 
 ```markdown
 ## ROLE: DATA ANALYST
-Вы - Аналитик данных. Ваша задача - анализировать сырые массивы информации (CSV, JSON, логи), находить в них аномалии и строить сводные отчеты.
+You are a Data Analyst. Your task is to analyze raw datasets (CSV, JSON, logs), identify anomalies, and build summary reports.
 
-### Принципы работы:
-- Вы всегда проверяете структуру файла перед его полным чтением.
-- Ваш итоговый отчет должен содержать четкие выводы и списки найденных аномалий.
+### Operational Principles:
+- Always verify file structure before reading the entire file.
+- Your final report must contain clear conclusions and lists of identified anomalies.
 ```
 
-### Шаг 2. Регистрация роли в системе
-Откройте `src/l3_agent/swarm/roles.py` и добавьте вашу роль в класс `Subagents`:
+### Step 2. Registering the Role in the System
+Open `src/l3_agent/swarm/roles.py` and add your role to the `Subagents` class:
 
 ```python
 class Subagents:
-    # ... старые роли ...
+    # ... older roles ...
 
     DATA_ANALYST = SubagentRole(
         id="data_analyst",
         name="Data Analyst",
-        description="Вызывать для глубокого анализа логов, поиска аномалий в данных и работы с большими текстовыми массивами.",
+        description="Invoke for deep log analysis, locating dataset anomalies, and processing large text files.",
         prompt_file="DATA_ANALYST.md",
     )
 ```
-*`description` - это то, что увидит главный агент (Оркестратор) в своем системном промпте. Именно по этому описанию он будет решать, стоит ли вызывать вашего субагента.*
+*`description` is what the main agent (Orchestrator) sees in its system prompt. Based on this description, it decides whether to invoke your subagent.*
 
-### Шаг 3. Выдача доступов (RBAC)
-Субагенты не видят все навыки фреймворка. Они живут по принципу наименьших привилегий.
-Чтобы дать Дата Аналитику возможность читать файлы из песочницы, найдите нужный навык в L2 интерфейсах (например, в `src/l2_interfaces/host/os/skills/files.py`) и добавьте вашу роль в список разрешенных:
+### Step 3. Granting Accesses (RBAC)
+Subagents do not see all framework skills. They live by the principle of least privilege.
+To allow the Data Analyst to read files from the sandbox, locate the target skill in the L2 interfaces (for example, in `src/l2_interfaces/host/os/skills/files/reader.py`) and add your role to the authorized list:
 
 ```python
 from src.l3_agent.swarm.roles import Subagents
@@ -85,8 +85,8 @@ from src.l3_agent.swarm.roles import Subagents
 @skill(swarm=[Subagents.CODER, Subagents.DATA_ANALYST])
 @require_access(HostOSAccessLevel.SANDBOX)
 async def read_file(self, filepath: str, read_from: Literal["head", "tail"] = "head") -> SkillResult:
-    # ... логика навыка ...
+    # ... skill logic ...
 ```
 
-**Всё!** 
-При следующем запуске система динамически соберет вашего субагента, выдаст ему доступ к методу `read_file` и встроит его описание в промпт главного Оркестратора. Никакого хардкода.
+**That's it!**
+On the next startup, the system will dynamically compile your subagent, grant it access to the `read_file` method, and embed its description in the main Orchestrator's prompt. No hardcoding required.

@@ -1,7 +1,7 @@
 """
-Навыки для выполнения вычислительных операций: запуск скриптов, демонов и сырых shell-команд.
-Наиболее критичный модуль с точки зрения безопасности. Содержит логику "очистки" переменных
-окружения от токенов перед спавном подпроцессов и инъекцию Sandbox Guard.
+Skills for executing computational operations: launching scripts, daemons, and raw shell commands.
+This is the most critical module from a security standpoint. Contains environment cleaning
+logic to scrub secrets prior to spawning subprocesses, and Sandbox Guard injection.
 """
 
 import asyncio
@@ -26,8 +26,8 @@ from src.l3_agent.skills.registry import SkillResult, skill
 
 class HostOSExecution:
     """
-    Навыки агента для запуска кода и управления процессами.
-    Самый опасный модуль: строго контролируется через Access Level.
+    Agent skills for executing code and process orchestration.
+    Highly sensitive module controlled by the operating system Gatekeeper.
     """
 
     def __init__(self, host_os_client: HostOSClient):
@@ -35,9 +35,9 @@ class HostOSExecution:
 
     def _kill_process_tree(self, pid: int) -> None:
         """
-        Рекурсивно убивает всё дерево процессов (родителя и всех потомков).
-        Необходимо для предотвращения зависания communicate(), если дочерние
-        процессы (например node) удерживают открытые пайпы (stdout/stderr) после смерти родителя.
+        Recursively terminates the entire process tree (parent and all descendants).
+        Prevents communicate() from hanging if child processes (such as Node)
+        hold open file descriptors after parent death.
         """
 
         try:
@@ -56,13 +56,13 @@ class HostOSExecution:
 
     def _build_isolated_env(self) -> dict:
         """
-        Собирает изолированное окружение (env) для запуска скриптов.
-        Очищает окружение от системных секретов (чтобы хитрые агенты не достали их через os.environ).
+        Constructs an isolated environment dict for sandbox child processes.
+        Scrubs system sensitive API keys and secrets.
         """
 
         env = os.environ.copy()
 
-        # ЖЕСТКИЙ скраббинг секретов фреймворка из дочернего процесса
+        # Rigid scrubbing of framework secrets from child process
         forbidden_substrings = [
             "TOKEN",
             "KEY",
@@ -80,17 +80,16 @@ class HostOSExecution:
                 del env[k]
 
         env["PYTHONUNBUFFERED"] = "1"
+        env["PYTHONUNBUFFERED"] = "1"
         env["PYTHONIOENCODING"] = "utf-8"
 
         fw_dir = str(self.host_os.framework_dir.resolve())
         sb_dir = str(self.host_os.sandbox_dir.resolve())
         sys_dir = str(self.host_os.system_dir.resolve())
 
-        # Переменные для нашего Sandbox Runner (Гарда)
         env["JAWL_FRAMEWORK_DIR"] = fw_dir
         env["JAWL_SANDBOX_DIR"] = sb_dir
 
-        # Добавляем все директории, чтобы 'import framework_api' работало как и раньше
         paths_to_add = [fw_dir, sb_dir, sys_dir]
 
         current_pythonpath = env.get("PYTHONPATH", "")
@@ -106,8 +105,8 @@ class HostOSExecution:
     @require_access(HostOSAccessLevel.OBSERVER)
     async def execute_script(self, filepath: str) -> SkillResult:
         """
-        Runs script in isolated environment. Captures STDOUT/STDERR. 
-        
+        Runs script in isolated environment. Captures STDOUT/STDERR.
+
         filepath: Rel/abs path.
         """
 
@@ -121,25 +120,23 @@ class HostOSExecution:
                 and not safe_path.is_relative_to(self.host_os.sandbox_dir)
             ):
                 return SkillResult.fail(
-                    "Отказано в доступе: при текущем уровне прав скрипты можно запускать строго из папки sandbox/."
+                    "Access denied: with the current privilege level, scripts must be executed strictly from the sandbox/ folder."
                 )
 
             if not safe_path.is_file():
-                return SkillResult.fail(f"Ошибка: Файл скрипта не найден ({safe_path.name}).")
+                return SkillResult.fail(f"Error: Script file not found ({safe_path.name}).")
 
             ext = safe_path.suffix.lower()
             if self.host_os.access_level < HostOSAccessLevel.OPERATOR and ext != ".py":
                 return SkillResult.fail(
-                    "Отказано в доступе: при текущем уровне прав разрешен запуск только Python-скриптов "
-                    "через sandbox guard. Shell/JS/native scripts требуют Access Level >= 2 (OPERATOR)."
+                    "Access denied: with the current privilege level, only Python scripts can be executed "
+                    "via sandbox guard. Shell/JS/native scripts require Access Level >= 2 (OPERATOR)."
                 )
 
-            # Формируем изолированное окружение
             env = self._build_isolated_env()
             env["JAWL_TARGET_SCRIPT"] = str(safe_path)
 
             if ext == ".py":
-                # Внедряем безопасную обертку (Guard)
                 runner_path = (
                     self.host_os.framework_dir
                     / "src"
@@ -148,7 +145,6 @@ class HostOSExecution:
                     / "sandbox_runner.py"
                 )
 
-                # Если обертка существует - используем ее, иначе fallback на стандартный запуск
                 if runner_path.exists():
                     cmd = [sys.executable, str(runner_path)]
                 else:
@@ -183,7 +179,7 @@ class HostOSExecution:
                 self._kill_process_tree(process.pid)
                 await process.wait()
                 return SkillResult.fail(
-                    f"Скрипт работал дольше {timeout} секунд и всё его дерево процессов было принудительно убито (Таймаут)."
+                    f"The script ran longer than {timeout} seconds, and its entire process tree was forcibly killed (Timeout)."
                 )
 
             stdout_str = truncate_text(
@@ -194,9 +190,9 @@ class HostOSExecution:
             )
 
             exit_code = process.returncode
-            main_logger.info(f"[Host OS] Выполнен скрипт {safe_path.name} (Код: {exit_code})")
+            main_logger.info(f"[Host OS] Executed script {safe_path.name} (Code: {exit_code})")
 
-            report = f"Скрипт завершился с кодом {exit_code}."
+            report = f"Script exited with code {exit_code}."
             if stdout_str:
                 report += f"\n\nSTDOUT:\n```\n{stdout_str}\n```"
 
@@ -209,7 +205,9 @@ class HostOSExecution:
             return SkillResult.fail(str(e))
 
         except Exception as e:
-            err_msg = f"Критическая ошибка при запуске скрипта: {e}\n\nTraceback:\n{traceback.format_exc()}"
+            err_msg = (
+                f"Critical error running script: {e}\n\nTraceback:\n{traceback.format_exc()}"
+            )
             main_logger.error(f"[Host OS] {err_msg}")
             return SkillResult.fail(err_msg)
 
@@ -220,12 +218,11 @@ class HostOSExecution:
         Executes raw bash/cmd command in host OS terminal.
         """
 
-        # Защита от самоубийства
         cmd_lower = command.lower()
         if "taskkill" in cmd_lower or "kill" in cmd_lower or "pkill" in cmd_lower:
             if "python" in cmd_lower or "jawl" in cmd_lower:
                 return SkillResult.fail(
-                    "SYSTEM DENIED: Попытка завершить системный процесс python. Данная команда может прекратить работу основной системы фреймворка. Действие заблокировано в целях безопасности."
+                    "SYSTEM DENIED: Attempt to terminate the system python process. This command may stop the main framework system. This action is blocked for security reasons."
                 )
 
         timeout = self.host_os.config.execution_timeout_sec
@@ -245,7 +242,7 @@ class HostOSExecution:
                 self._kill_process_tree(process.pid)
                 await process.wait()
                 return SkillResult.fail(
-                    f"Команда работала дольше {timeout} секунд и всё её дерево процессов было убито (Таймаут)."
+                    f"The command ran longer than {timeout} seconds, and its entire process tree was killed (Timeout)."
                 )
 
             stdout_str = truncate_text(
@@ -256,9 +253,9 @@ class HostOSExecution:
             )
 
             exit_code = process.returncode
-            main_logger.info(f"[Host OS] Выполнена shell-команда (Код: {exit_code})")
+            main_logger.info(f"[Host OS] Executed shell command (Code: {exit_code})")
 
-            report = f"Команда завершилась с кодом {exit_code}."
+            report = f"Command exited with code {exit_code}."
             if stdout_str:
                 report += f"\n\nSTDOUT:\n{stdout_str}"
             if stderr_str:
@@ -267,21 +264,21 @@ class HostOSExecution:
             return SkillResult.ok(report)
 
         except Exception as e:
-            return SkillResult.fail(f"Ошибка выполнения shell-команды: {e}")
+            return SkillResult.fail(f"Error executing shell command: {e}")
 
     @skill(swarm=[Subagents.CODER, Subagents.QA_ENGINEER])
     @require_access(HostOSAccessLevel.OBSERVER)
     async def run_pytest(self, target_path: str = "tests/") -> SkillResult:
         """
-        Runs pytest. 
-        
+        Runs pytest.
+
         target_path: File/dir path (default 'tests/').
         """
         try:
             safe_path = self.host_os.validate_path(target_path, is_write=False)
 
             if not safe_path.exists():
-                return SkillResult.fail(f"Путь не найден: {safe_path.name}")
+                return SkillResult.fail(f"Path not found: {safe_path.name}")
 
             cmd = [sys.executable, "-m", "pytest", str(safe_path), "-v", "--disable-warnings"]
 
@@ -297,35 +294,33 @@ class HostOSExecution:
             except asyncio.TimeoutError:
                 self._kill_process_tree(process.pid)
                 return SkillResult.fail(
-                    "Тесты выполнялись дольше 120 секунд и были прерваны (Таймаут)."
+                    "Tests ran longer than 120 seconds and were aborted (Timeout)."
                 )
 
-            # Pytest часто пишет полезный вывод и в stdout, и в stderr. Собираем всё
             out_str = stdout.decode("utf-8", errors="replace").strip()
             err_str = stderr.decode("utf-8", errors="replace").strip()
 
             full_log = f"{out_str}\n{err_str}".strip()
-            # Берем хвост лога, так как там самая важная сводка (Traceback)
             clean_log = full_log[-4000:] if len(full_log) > 4000 else full_log
 
             exit_code = process.returncode
             main_logger.info(
-                f"[Host OS] Выполнен run_pytest для {safe_path.name} (Код: {exit_code})"
+                f"[Host OS] Executed run_pytest for {safe_path.name} (Code: {exit_code})"
             )
 
             if exit_code == 0:
                 return SkillResult.ok(
-                    f"Тесты успешно пройдены.\n\nЛог:\n```\n{clean_log}\n```"
+                    f"Tests passed successfully.\n\nLog:\n```\n{clean_log}\n```"
                 )
             else:
                 return SkillResult.fail(
-                    f"Тесты провалены (Код {exit_code}).\n\nЛог (последние строки):\n```\n{clean_log}\n```"
+                    f"Tests failed (Code {exit_code}).\n\nLog (last lines):\n```\n{clean_log}\n```"
                 )
 
         except PermissionError as e:
             return SkillResult.fail(str(e))
         except Exception as e:
-            return SkillResult.fail(f"Критическая ошибка при запуске pytest: {e}")
+            return SkillResult.fail(f"Critical error running pytest: {e}")
 
     @skill(swarm=[Subagents.SYSADMIN])
     @require_access(HostOSAccessLevel.ROOT)
@@ -341,25 +336,25 @@ class HostOSExecution:
             process.terminate()
             process.wait(timeout=3)
 
-            main_logger.info(f"[Host OS] Убит процесс {pid} ({process_name})")
-            return SkillResult.ok(f"Процесс {pid} ({process_name}) успешно завершен.")
+            main_logger.info(f"[Host OS] Terminated process {pid} ({process_name})")
+            return SkillResult.ok(f"Process {pid} ({process_name}) successfully terminated.")
 
         except psutil.NoSuchProcess:
-            return SkillResult.fail(f"Ошибка: Процесс с PID {pid} не найден.")
+            return SkillResult.fail(f"Error: Process with PID {pid} not found.")
 
         except psutil.AccessDenied:
             return SkillResult.fail(
-                f"Отказано в доступе (ОС не позволила убить процесс {pid})."
+                f"Access denied (OS did not allow terminating process {pid})."
             )
 
         except psutil.TimeoutExpired:
             self._kill_process_tree(int(pid))
             return SkillResult.ok(
-                f"Процесс {pid} завис и всё его дерево было убито принудительно (kill)."
+                f"Process {pid} hung and its entire tree was killed forcibly (kill)."
             )
 
         except Exception as e:
-            return SkillResult.fail(f"Ошибка при попытке завершить процесс: {e}")
+            return SkillResult.fail(f"Error attempting to terminate process: {e}")
 
     @skill(swarm=[Subagents.SYSADMIN])
     @require_access(HostOSAccessLevel.OBSERVER)
@@ -372,12 +367,10 @@ class HostOSExecution:
             safe_path = self.host_os.validate_path(filepath, is_write=False)
 
             if not safe_path.is_file():
-                return SkillResult.fail(f"Ошибка: Скрипт не найден ({safe_path.name}).")
+                return SkillResult.fail(f"Error: Script not found ({safe_path.name}).")
 
             if safe_path.suffix.lower() != ".py":
-                return SkillResult.fail(
-                    "Ошибка: В качестве демонов поддерживается запуск только .py скриптов."
-                )
+                return SkillResult.fail("Error: Only .py scripts are supported as daemons.")
 
             safe_name = "".join(c if c.isalnum() else "_" for c in name)
             logs_dir = self.host_os.system_dir / "logs"
@@ -386,7 +379,6 @@ class HostOSExecution:
             log_path = logs_dir / f"{safe_name}.log"
             log_file = open(log_path, "a", encoding="utf-8")
 
-            # Формируем изолированное окружение
             env = self._build_isolated_env()
             env["JAWL_TARGET_SCRIPT"] = str(safe_path)
 
@@ -396,7 +388,6 @@ class HostOSExecution:
             else:
                 kwargs["start_new_session"] = True
 
-            # Запускаем через Guard
             runner_path = (
                 self.host_os.framework_dir
                 / "src"
@@ -429,18 +420,18 @@ class HostOSExecution:
             }
             self.host_os.set_daemons_registry(registry)
 
-            main_logger.info(f"[Host OS] Запущен фоновый демон '{name}' (PID: {pid})")
+            main_logger.info(f"[Host OS] Background daemon '{name}' started (PID: {pid})")
 
             return SkillResult.ok(
-                f"Демон '{name}' успешно запущен (PID: {pid}).\n"
-                f"Логи перенаправлены в файл: sandbox/_system/logs/{log_path.name}\n"
-                f"Теперь можно отслеживать его статус в контексте Host OS."
+                f"Daemon '{name}' successfully started (PID: {pid}).\n"
+                f"Logs redirected to: sandbox/_system/logs/{log_path.name}\n"
+                f"You can now track its status in the Host OS context."
             )
 
         except PermissionError as e:
             return SkillResult.fail(str(e))
         except Exception as e:
-            return SkillResult.fail(f"Ошибка при запуске демона: {e}")
+            return SkillResult.fail(f"Error starting daemon: {e}")
 
     @skill(swarm=[Subagents.SYSADMIN])
     @require_access(HostOSAccessLevel.OBSERVER)
@@ -453,7 +444,7 @@ class HostOSExecution:
             pid_str = str(pid)
 
             if pid_str not in registry:
-                return SkillResult.fail(f"Ошибка: Демон с PID {pid} не найден в реестре.")
+                return SkillResult.fail(f"Error: Daemon with PID {pid} not found in registry.")
 
             name = registry[pid_str]["name"]
 
@@ -469,16 +460,18 @@ class HostOSExecution:
                 self._kill_process_tree(int(pid))
 
             except Exception as e:
-                return SkillResult.fail(f"Не удалось завершить процесс: {e}")
+                return SkillResult.fail(f"Failed to terminate process: {e}")
 
             del registry[pid_str]
             self.host_os.set_daemons_registry(registry)
 
-            main_logger.info(f"[Host OS] Остановлен фоновый демон '{name}' (PID: {pid})")
-            return SkillResult.ok(f"Демон '{name}' (PID: {pid}) успешно остановлен вручную.")
+            main_logger.info(f"[Host OS] Background daemon '{name}' stopped (PID: {pid})")
+            return SkillResult.ok(
+                f"Daemon '{name}' (PID: {pid}) successfully stopped manually."
+            )
 
         except Exception as e:
-            return SkillResult.fail(f"Ошибка при остановке демона: {e}")
+            return SkillResult.fail(f"Error stopping daemon: {e}")
 
     @skill()
     @require_access(HostOSAccessLevel.OBSERVER)
@@ -486,10 +479,10 @@ class HostOSExecution:
         self, filepath: str, func_name: str, kwargs: dict = None
     ) -> SkillResult:
         """
-        Isolated RPC call. Dynamically executes specific function in sandbox Python script. 
-        
-        filepath: .py path. 
-        func_name: Target function. 
+        Isolated RPC call. Dynamically executes specific function in sandbox Python script.
+
+        filepath: .py path.
+        func_name: Target function.
         kwargs: Named arguments dict.
         """
 
@@ -503,7 +496,7 @@ class HostOSExecution:
 
             if not safe_path.is_file() or safe_path.suffix.lower() != ".py":
                 return SkillResult.fail(
-                    f"Ошибка: Файл не найден или это не .py скрипт ({safe_path.name})."
+                    f"Error: File not found or is not a .py script ({safe_path.name})."
                 )
 
             tmp_dir = self.host_os.system_dir / ".tmp"
@@ -517,13 +510,12 @@ class HostOSExecution:
             )
             if not template_path.exists():
                 return SkillResult.fail(
-                    "Системная ошибка: Шаблон RPC-обертки не найден (src/utils/templates/rpc_wrapper.py)."
+                    "System error: RPC wrapper template not found (src/utils/templates/rpc_wrapper.py)."
                 )
 
             wrapper_code = template_path.read_text(encoding="utf-8")
             wrapper_path.write_text(wrapper_code, encoding="utf-8")
 
-            # Формируем изолированное окружение
             env = self._build_isolated_env()
 
             process = await asyncio.create_subprocess_exec(
@@ -531,9 +523,7 @@ class HostOSExecution:
                 str(wrapper_path),
                 str(safe_path),
                 func_name,
-                str(
-                    self.host_os.sandbox_dir.resolve()
-                ),  # Передаем корень песочницы для резолва путей
+                str(self.host_os.sandbox_dir.resolve()),
                 stdin=asyncio.subprocess.PIPE,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
@@ -553,7 +543,7 @@ class HostOSExecution:
                 await process.wait()
                 wrapper_path.unlink(missing_ok=True)
                 return SkillResult.fail(
-                    f"Функция работала дольше {timeout} секунд и всё дерево процессов было убито (Таймаут)."
+                    f"The function ran longer than {timeout} seconds, and its entire process tree was killed (Timeout)."
                 )
 
             wrapper_path.unlink(missing_ok=True)
@@ -571,24 +561,24 @@ class HostOSExecution:
                     rpc_result = json.loads(rpc_json_str)
                 except json.JSONDecodeError:
                     return SkillResult.fail(
-                        f"Скрипт отработал, но результат невалиден.\nSTDOUT:\n{out_str}\nSTDERR:\n{err_str}"
+                        f"Script executed but result is invalid.\nSTDOUT:\n{out_str}\nSTDERR:\n{err_str}"
                     )
 
                 report = []
                 if script_stdout:
                     report.append(
-                        f"STDOUT скрипта:\n```\n{truncate_text(script_stdout, 2000)}\n```"
+                        f"Script STDOUT:\n```\n{truncate_text(script_stdout, 2000)}\n```"
                     )
                 if err_str:
-                    report.append(f"STDERR скрипта:\n```\n{truncate_text(err_str, 2000)}\n```")
+                    report.append(f"Script STDERR:\n```\n{truncate_text(err_str, 2000)}\n```")
 
                 if rpc_result.get("status") == "ok":
                     result_data = rpc_result.get("result")
                     report.append(
-                        f"Возвращенный результат (Return):\n```json\n{json.dumps(result_data, ensure_ascii=False, indent=2)}\n```"
+                        f"Returned result (Return):\n```json\n{json.dumps(result_data, ensure_ascii=False, indent=2)}\n```"
                     )
                     main_logger.info(
-                        f"[Host OS] RPC-шлюз успешно выполнил функцию '{func_name}' из {safe_path.name}"
+                        f"[Host OS] RPC-gateway successfully executed function '{func_name}' from {safe_path.name}"
                     )
                     return SkillResult.ok("\n\n".join(report))
 
@@ -596,12 +586,12 @@ class HostOSExecution:
                     err_msg = rpc_result.get("error")
                     tb = rpc_result.get("traceback")
                     report.append(
-                        f"Ошибка выполнения '{func_name}': {err_msg}\n\nTraceback:\n```python\n{tb}\n```"
+                        f"Error executing '{func_name}': {err_msg}\n\nTraceback:\n```python\n{tb}\n```"
                     )
                     return SkillResult.fail("\n\n".join(report))
             else:
                 return SkillResult.fail(
-                    f"Скрипт завершился с ошибкой (код {process.returncode}).\n"
+                    f"Script ended with error (code {process.returncode}).\n"
                     f"STDOUT:\n{truncate_text(out_str, 2000)}\n"
                     f"STDERR:\n{truncate_text(err_str, 2000)}"
                 )
@@ -610,6 +600,6 @@ class HostOSExecution:
             return SkillResult.fail(str(e))
 
         except Exception as e:
-            err_msg = f"Внутренняя ошибка RPC: {e}\n\nTraceback:\n{traceback.format_exc()}"
+            err_msg = f"Internal RPC error: {e}\n\nTraceback:\n{traceback.format_exc()}"
             main_logger.error(f"[Host OS] {err_msg}")
             return SkillResult.fail(err_msg)

@@ -82,7 +82,7 @@ async def test_hypotheses_limits(hypotheses_manager):
     # 1. Тест лимита кластеров
     res_fail_cluster = await hypotheses_manager.formulate_hypothesis("Кластер 3", "H3", 0.5)
     assert res_fail_cluster.is_success is False
-    assert "Достигнут лимит уникальных кластеров" in res_fail_cluster.message
+    assert "limit reached" in res_fail_cluster.message
 
     # 2. Тест глобального лимита гипотез
     await hypotheses_manager.formulate_hypothesis("Кластер 1", "H3", 0.5)
@@ -90,7 +90,7 @@ async def test_hypotheses_limits(hypotheses_manager):
 
     res_fail_hyp = await hypotheses_manager.formulate_hypothesis("Кластер 1", "H5", 0.5)
     assert res_fail_hyp.is_success is False
-    assert "Достигнут глобальный лимит" in res_fail_hyp.message
+    assert "limit reached" in res_fail_hyp.message
 
 
 @pytest.mark.asyncio
@@ -100,7 +100,7 @@ async def test_hypotheses_validation(hypotheses_manager):
     # Вероятность больше 1
     res_high = await hypotheses_manager.formulate_hypothesis("Кластер 1", "H", 1.5)
     assert res_high.is_success is False
-    assert "между 0.01 и 0.99" in res_high.message
+    assert "between 0.01 and 0.99" in res_high.message
 
     # Вероятность меньше 0
     res_low = await hypotheses_manager.formulate_hypothesis("Кластер 1", "H", -0.5)

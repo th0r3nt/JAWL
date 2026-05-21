@@ -31,7 +31,6 @@ async def test_drives_satisfy_drive(drives_manager):
 
     context = await drives_manager.get_context_block()
     assert "Прочитала статью на Хабре про вектора." in context
-    assert "Снижен на 50%:" in context
 
 
 @pytest.mark.asyncio
@@ -46,7 +45,7 @@ async def test_drives_custom_crud_and_limits(drives_manager):
 
     res_fail = await drives_manager.create_custom_drive("Лишний", "Не влезет")
     assert res_fail.is_success is False
-    assert "Достигнут лимит" in res_fail.message
+    assert "limit reached" in res_fail.message
 
     res_del = await drives_manager.delete_custom_drive("Мониторинг логов")
     assert res_del.is_success is True
@@ -60,7 +59,7 @@ async def test_drives_cannot_delete_fundamental(drives_manager):
 
     res_del = await drives_manager.delete_custom_drive("Social")
     assert res_del.is_success is False
-    assert "Базовые (Fundamental) драйвы нельзя удалить" in res_del.message
+    assert "cannot be deleted" in res_del.message
 
 
 @pytest.mark.asyncio

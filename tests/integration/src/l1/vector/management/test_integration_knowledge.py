@@ -49,4 +49,4 @@ async def test_knowledge_get_all(knowledge_manager):
 async def test_knowledge_search_not_found(knowledge_manager):
     await knowledge_manager.save_knowledge("Яблоко", tags=["type:fact"], source="Test")
     search_result = await knowledge_manager.search_knowledge("Неизвестный космос")
-    assert "не дал результатов" in search_result.message
+    assert "returned no results" in search_result.message

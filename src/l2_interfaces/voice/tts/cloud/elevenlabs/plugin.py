@@ -1,3 +1,7 @@
+"""
+ElevenLabs plugin for Telegram User API.
+"""
+
 from typing import List, Any, Dict, Optional
 from src.utils.logger import main_logger
 from src.l2_interfaces.base import BaseInterface
@@ -30,10 +34,10 @@ class ElevenLabsPlugin(BaseInterface):
     def setup(
         self, container: SystemContainer, env_vars: Dict[str, Optional[str]]
     ) -> List[Any]:
-        
+
         api_key = env_vars.get("ELEVENLABS_API_KEY")
         if not api_key:
-            main_logger.error("[ElevenLabs] API ключ не задан. Отключен.")
+            main_logger.error("[ElevenLabs] API key not specified. Disabled.")
             self.register_off_provider(container.context_registry)
             return []
 
@@ -62,6 +66,6 @@ class ElevenLabsPlugin(BaseInterface):
         container.context_registry.register_provider(
             "elevenlabs_tts", client.get_context_block, ContextSection.INTERFACES
         )
-        
-        main_logger.info("[ElevenLabs] Загружен (Plugin).")
+
+        main_logger.info("[ElevenLabs] Loaded (Plugin).")
         return [client]

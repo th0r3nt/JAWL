@@ -1,21 +1,21 @@
-# Конфигурация LLM (`llm`)
+# LLM Configuration (`llm`)
 
-Блок `llm` в `settings.yaml` отвечает за настройку взаимодействия с языковыми моделями.
+The `llm` block in `settings.yaml` manages the interaction with language models.
 
-* **`main_model`**: Идентификатор модели (например, `gpt-4o`, `claude-3-5-sonnet`), которая используется Оркестратором (главным агентом).
-* **`available_models`**: Список моделей, о которых знает агент. Если включен интерфейс Meta (уровень SAFE и выше), агент сможет "на лету" переключать свою основную модель, выбирая её из этого списка под конкретную задачу.
-* **`is_multimodal`**: `true` / `false`. Укажите `true`, только если ваша модель физически поддерживает обработку изображений. Это активирует передачу скриншотов в промпт.
-* **`temperature`**: От 0.0 (максимально детерминированные ответы) до 1.0+ (креативность). 
-* **`max_react_steps`**: Жесткий лимит количества итераций "Мысль -> Действие" в рамках одного пробуждения. Если агент зациклится или столкнется с нерешаемой проблемой, система принудительно усыпит его после достижения этого лимита, чтобы не сжечь ваш баланс API.
+* **`main_model`**: Model identifier (e.g., `gpt-4o`, `claude-3-5-sonnet`) used by the main Orchestrator agent.
+* **`available_models`**: A list of models available to the agent. If the Meta interface is enabled (SAFE level or higher), the agent can switch its active model on the fly, selecting from this list for specific tasks.
+* **`is_multimodal`**: `true` / `false`. Set to `true` only if your model physically supports image processing. This enables passing screenshots into the prompt.
+* **`temperature`**: Creativity factor from 0.0 (highly deterministic) to 1.0+ (highly creative).
+* **`max_react_steps`**: Hard limit on the number of "Thought -> Tool Call -> Result" iterations per single wakeup step. If the agent gets stuck in a loop or encounters an unresolvable error, the system will forcibly put it to sleep after reaching this limit to protect your API balance.
 
-## Подключение локальных моделей (Ollama, vLLM, LM Studio)
+## Connecting Local Models (Ollama, vLLM, LM Studio)
 
-JAWL полностью поддерживает работу с локальными моделями, если они предоставляют OpenAI-совместимый API (а его предоставляют почти все популярные решения).
+JAWL fully supports local models out of the box, provided they expose an OpenAI-compatible REST API (which almost all popular solutions do).
 
-**Как настроить:**
-1. Запустите вашу модель локально (`ollama run model_name`).
-2. В файле `.env` укажите локальный хост в параметре `LLM_API_URL` (например, `http://127.0.0.1:11434/v1/` для Ollama или `http://127.0.0.1:1234/v1/` для LM Studio).
-3. Поле `LLM_API_KEY_1` в `.env` **оставьте пустым**. Система автоматически подставит заглушку и не будет требовать авторизации.
-4. В файле `settings.yaml` в блоке `llm` -> `main_model` укажите точное название вашей локальной модели.
+**How to configure:**
+1. Start your local model (e.g., `ollama run model_name`).
+2. In your `.env` file, specify the local host address in the `LLM_API_URL` parameter (for example, `http://127.0.0.1:11434/v1/` for Ollama or `http://127.0.0.1:1234/v1/` for LM Studio).
+3. Leave the `LLM_API_KEY_1` field in `.env` **completely empty**. The system will automatically use a placeholder and won't require authorization.
+4. In `settings.yaml`, specify the exact name of your local model in the `llm` -> `main_model` parameter.
 
-*Примечание: Вы также можете использовать облачную модель для главного агента-Оркестратора, а локальную бесплатную модель повесить на субагентов для выполнения рутины. Для этого укажите локальный эндпоинт в переменных `SUB_LLM_API_URL` в файле `.env`.*
+*Note: You can use an expensive cloud model for the main Orchestrator agent while delegating routine subagent tasks to a cheap or free local model. To do so, specify the local endpoint in the `SUB_LLM_API_URL` environment variables in your `.env` file.*

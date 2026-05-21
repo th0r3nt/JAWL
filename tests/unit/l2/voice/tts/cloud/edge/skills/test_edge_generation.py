@@ -61,7 +61,7 @@ async def test_edge_generate_speech_permission_error(edge_skills):
     assert res.is_success is False
     assert "SANDBOX: Доступ запрещен" in res.message
 
-    # Убеждаемся, что генерация даже не пыталась запуститься
+    # Убеждаемся, что генерация даже не пыталась заemptyиться
     edge_skills.client.generate_audio.assert_not_called()
 
 
@@ -71,4 +71,4 @@ async def test_edge_generate_speech_empty_text(edge_skills):
     res = await edge_skills.generate_speech(text="   \n  ")
 
     assert res.is_success is False
-    assert "не может быть пустым" in res.message
+    assert "cannot be empty" in res.message

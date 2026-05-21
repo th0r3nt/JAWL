@@ -1,7 +1,8 @@
 """
-Контейнер зависимостей системы JAWL.
-Глупый дата-класс без бизнес-логики. Служит единым хранилищем для всех
-инициализированных компонентов, сгруппированных по слоям (L0-L3).
+JAWL System Dependency Container.
+
+Anemic DTO container. Serves as a single registry for all initialized
+subsystems grouped across L0-L3 layers.
 """
 
 from pathlib import Path
@@ -22,7 +23,7 @@ from src.l3_agent.context.registry import ContextRegistry
 
 
 class SystemContainer:
-    """Хранилище собранных деталей системы."""
+    """Assembled system dependencies container."""
 
     def __init__(
         self,
@@ -30,7 +31,7 @@ class SystemContainer:
         interfaces_config: InterfacesConfig,
         event_bus: EventBus,
     ) -> None:
-        # Глобальные зависимости
+        # Global dependencies
         self.settings = settings
         self.interfaces_config = interfaces_config
         self.event_bus = event_bus
@@ -41,7 +42,7 @@ class SystemContainer:
 
         # L0 State
         self.agent_state: Optional[AgentState] = None
-        self.l0_states: Dict[str, Any] = {}  # Из файлов state.py в папках l2_interfaces
+        self.l0_states: Dict[str, Any] = {}  # Extracted from l2_interfaces state.py files
 
         # L1 Databases
         self.sql: Optional[SQLManager] = None

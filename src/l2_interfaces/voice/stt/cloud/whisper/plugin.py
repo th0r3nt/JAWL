@@ -1,3 +1,7 @@
+"""
+STT transcription via OpenAI Whisper interface plugin.
+"""
+
 from typing import List, Any, Dict, Optional
 from src.utils.logger import main_logger
 from src.l2_interfaces.base import BaseInterface
@@ -32,7 +36,7 @@ class WhisperPlugin(BaseInterface):
 
         api_key = env_vars.get("CLOUD_WHISPER_API_KEY")
         if not api_key:
-            main_logger.error("[Whisper STT] API ключ не задан. Отключен.")
+            main_logger.error("[Whisper STT] API key not specified. Disabled.")
             self.register_off_provider(container.context_registry)
             return []
 
@@ -61,5 +65,5 @@ class WhisperPlugin(BaseInterface):
             "cloud_whisper_stt", client.get_context_block, ContextSection.INTERFACES
         )
 
-        main_logger.info("[Whisper STT] Интерфейс загружен.")
+        main_logger.info("[Whisper STT] Interface loaded.")
         return [client]

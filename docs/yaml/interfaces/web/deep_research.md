@@ -1,8 +1,8 @@
-# Настройки Deep Research (`web.search.deep_research`)
+# Deep Research Configuration (`web.search.deep_research`)
 
-Навык `DeepResearch` позволяет главному агенту и субагентам проводить массированный параллельный сбор данных в интернете. Эти настройки защищают вас от rate-лимитов и переполнения контекста.
+The `DeepResearch` skill allows the main agent and subagents to conduct mass parallel search and data harvesting on the web. These settings protect you from API rate limits and context window overflows.
 
-* **`max_queries`**: Сколько поисковых запросов можно запустить параллельно (защищает от бана в DuckDuckGo/Tavily).
-* **`max_results_per_query`**: Сколько ссылок брать из каждого поискового запроса.
-* **`max_pages_to_read`**: Суммарный лимит уникальных веб-страниц, которые будут прочитаны и скачаны (защита от скачивания всего интернета).
-* **`total_max_chars`**: **Критический параметр.** Максимальный объем текста (в символах), который суммарно вернется в результате исследования. Модуль динамически разделит это число на количество прочитанных страниц и обрежет каждую из них, гарантируя, что контекст LLM не переполнится.
+* **`max_queries`**: Maximum number of search queries executed in parallel (prevents IP/API bans in DuckDuckGo/Tavily).
+* **`max_results_per_query`**: Maximum number of link results extracted per single search query.
+* **`max_pages_to_read`**: Overall limit of unique web pages to download and parse (prevents downloading half of the Internet).
+* **`total_max_chars`**: **Critical parameter.** Maximum character length of text returned by the research. The module dynamically splits this budget across all parsed pages, truncating each page to ensure the LLM's context window does not overflow.

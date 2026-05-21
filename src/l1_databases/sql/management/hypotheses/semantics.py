@@ -1,6 +1,6 @@
 """
-Семантический модуль для Байесовских гипотез.
-Форматирует список активных гипотез и лог улик для системного промпта.
+Semantic module for Bayesian hypotheses.
+Formats the list of active hypotheses and the evidence log for the system prompt.
 """
 
 from typing import List
@@ -15,15 +15,16 @@ def build_hypotheses(
     tz_offset: int,
 ) -> str:
     """
-    Формирует Markdown ASCII-дерево кластеров активных гипотез.
+    Formats the Markdown ASCII tree of active hypotheses clusters.
     """
+    
     if not hypotheses:
         return ""
 
-    # Группируем гипотезы по кластерам
+    # Group hypotheses by clusters
     clusters = {}
     for h in hypotheses:
-        c_name = h.cluster_name or "Общее расследование"
+        c_name = h.cluster_name or "General investigation"
         clusters.setdefault(c_name, []).append(h)
 
     lines = [

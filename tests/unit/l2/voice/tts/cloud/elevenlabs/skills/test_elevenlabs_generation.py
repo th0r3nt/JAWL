@@ -27,7 +27,7 @@ async def test_get_available_voices(gen_skills):
 async def test_generate_speech_success(gen_skills, mock_os_client):
     """Тест: Успешная генерация и физическое сохранение аудиофайла через гейткипер."""
 
-    # Мокаем запрос к API, пусть вернет фейковые байты
+    # Мокаем запрос к API, emptyь вернет фейковые байты
     gen_skills.client.request = AsyncMock(return_value=b"fake_mp3_data")
 
     # Мокаем фоновое обновление квоты, чтобы не лезло в сеть
@@ -72,4 +72,4 @@ async def test_generate_speech_empty_text(gen_skills):
     res = await gen_skills.generate_speech(text="   \n  ")
 
     assert res.is_success is False
-    assert "не может быть пустым" in res.message
+    assert "cannot be empty" in res.message

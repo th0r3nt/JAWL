@@ -1,8 +1,8 @@
 """
-Клиент управления системным временем и расписанием (Календарь).
+Client for managing system time and schedules (Calendar).
 
-Управляет сериализацией таймеров (будильников) в JSON и предоставляет агенту
-в L0 State отсортированный список ближайших событий/пробуждений.
+Manages serialization of timers (alarms) to JSON and provides the agent
+in L0 State with a sorted list of upcoming events/wakeups.
 """
 
 import json
@@ -15,8 +15,8 @@ from src.utils.dtime import format_timestamp
 
 class CalendarClient:
     """
-    Клиент интерфейса Календаря.
-    Управляет сохранением/загрузкой JSON-файла событий и провайдером контекста.
+    Calendar interface client.
+    Manages saving/loading of the JSON events file and the context provider.
     """
 
     def __init__(
@@ -27,13 +27,13 @@ class CalendarClient:
         upcoming_events_limit: int = 10,
     ) -> None:
         """
-        Инициализирует клиент календаря.
+        Initializes the calendar client.
 
         Args:
-            state: L0 стейт (приборная панель календаря).
-            data_dir: Корневая директория локальных данных.
-            timezone: Смещение часового пояса.
-            upcoming_events_limit: Максимальное кол-во событий для отображения в системном промпте.
+            state: L0 state (calendar dashboard).
+            data_dir: Local data root directory.
+            timezone: Timezone offset.
+            upcoming_events_limit: Maximum number of events to display in the system prompt.
         """
         self.state = state
         self.timezone = timezone
@@ -46,10 +46,10 @@ class CalendarClient:
         if not self.filepath.exists():
             self._save([])
         else:
-            self.update_state_view()  # Обновляем стейт при старте из существующего файла
+            self.update_state_view()  # Update state on startup from existing file
 
     def _load(self) -> List[Dict[str, Any]]:
-        """Загружает данные из JSON-календаря."""
+        """Loads data from JSON calendar."""
         try:
             with open(self.filepath, "r", encoding="utf-8") as f:
                 return json.load(f)
@@ -58,34 +58,34 @@ class CalendarClient:
 
     def _save(self, events: List[Dict[str, Any]]) -> None:
         """
-        Сохраняет данные в JSON-календарь и МГНОВЕННО обновляет стейт агента.
+        Saves data to the JSON calendar and IMMEDIATELY updates the agent's state.
 
         Args:
-            events: Список словарей с таймерами.
+            events: List of dicts with timers.
         """
         with open(self.filepath, "w", encoding="utf-8") as f:
             json.dump(events, f, indent=4, ensure_ascii=False)
 
-        # Мгновенная синхронизация кэша после любого изменения файла!
+        # Instant cache synchronization after any file change!
         self.update_state_view()
 
     def update_state_view(self) -> None:
         """
-        Агрегирует и сортирует текущие таймеры, вычисляя ближайшие срабатывания.
-        Обновляет MRU-кэш (L0 State) агента, жестко обрезая список до `upcoming_events_limit`,
-        чтобы не переполнять системный промпт при тысячах запланированных задач.
+        Aggregates and sorts current timers, calculating upcoming triggers.
+        Updates the agent's MRU-cache (L0 State), strictly truncating the list to `upcoming_events_limit`
+        to avoid overflowing the system prompt with thousands of scheduled tasks.
         """
         events = self._load()
         if not events:
             self.state.upcoming_events = "There are no scheduled events."
             return
 
-        # Сортируем по ближайшему времени срабатывания и применяем лимит из конфига
+        # Sort by nearest trigger time and apply limit from config
         sorted_events = sorted(events, key=lambda x: x["trigger_at"])[
             : self.upcoming_events_limit
         ]
 
-        lines = ["Ближайшие события:"]
+        lines = ["Upcoming events:"]
         for ev in sorted_events:
             dt_str = format_timestamp(ev["trigger_at"], self.timezone, "%m-%d %H:%M")
             ev_type = ev["type"].upper()
@@ -94,26 +94,26 @@ class CalendarClient:
         self.state.upcoming_events = "\n".join(lines)
 
     def get_all_events(self) -> List[Dict[str, Any]]:
-        """Возвращает все события в календаре."""
+        """Returns all events in the calendar."""
         return self._load()
 
     def add_event(self, event_data: Dict[str, Any]) -> None:
         """
-        Добавляет новое событие в календарь.
+        Adds a new event to the calendar.
 
         Args:
-            event_data: Словарь с данными таймера (id, type, title, trigger_at).
+            event_data: Dict with timer data (id, type, title, trigger_at).
         """
         events = self._load()
         events.append(event_data)
         self._save(events)
 
     def update_events(self, events: List[Dict[str, Any]]) -> None:
-        """Полная перезапись списка (используется при удалении или изменении времени)."""
+        """Full list rewrite (used when deleting or changing time)."""
         self._save(events)
 
     async def get_context_block(self, **kwargs: Any) -> str:
-        """Провайдер контекста для ContextRegistry."""
+        """Context provider for ContextRegistry."""
         desc = "Description: Time management and scheduled alarms/timers."
         if not self.state.is_online:
             return f"### CALENDAR [OFF] \n{desc}\nThe interface is disabled."

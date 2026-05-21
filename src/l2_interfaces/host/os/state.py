@@ -1,29 +1,36 @@
+"""
+Stores the state of the Host OS.
+
+Telemetry, time, uptime.
+Updated by listeners (os/events.py) in the background.
+"""
+
 
 class HostOSState:
     """
-    Хранит состояние Host OS.
-    Телеметрия, время, аптайм.
-    Обновляется слушателями (os/events.py) в фоне.
+    Stores the state of the Host OS.
+    Telemetry, time, uptime.
+    Updated by listeners (os/events.py) in the background.
     """
 
     def __init__(self) -> None:
         self.is_online = False
 
-        # Статические данные (определяются 1 раз при старте)
-        self.os_info = "Неизвестно."  # Окно/Linux/Mac
+        # Static data (determined once upon start)
+        self.os_info = "Unknown."  # Windows/Linux/Mac
         self.cpu_name = "unknown CPU"
         self.total_ram_gb = 0.0
 
-        # Динамические данные
-        self.datetime = "Неизвестно."  # Время
-        self.uptime = "Неизвестно."  # Аптайм хост-пк
-        self.telemetry = "Нет доступной телеметрии."  # CPU, ОЗУ, процессы
-        self.sandbox_files = "Неизвестно."  # Текущие файлы в Sandbox
-        self.framework_files = "Неизвестно."  # Дерево директории JAWL
-        self.tracked_dirs_trees = "Нет отслеживаемых директорий."
-        self.active_daemons = "Нет запущенных демонов."
+        # Dynamic data
+        self.datetime = "Unknown."  # Time
+        self.uptime = "Unknown."  # Host PC uptime
+        self.telemetry = "No available telemetry."  # CPU, RAM, processes
+        self.sandbox_files = "Unknown."  # Current files in Sandbox
+        self.framework_files = "Unknown."  # JAWL directory tree
+        self.tracked_dirs_trees = "No tracked directories."
+        self.active_daemons = "No running daemons."
 
-        self.polling_interval = "Неизвестно."
+        self.polling_interval = "Unknown."
 
-        self.opened_workspace_files: set[str] = set()  # Файлы, открытые в "редакторе" агента
-        self.recent_file_changes: list[str] = []  # Кэш последних diff-ов
+        self.opened_workspace_files: set[str] = set()  # Files opened in the agent "editor"
+        self.recent_file_changes: list[str] = []  # Cache of the latest diffs

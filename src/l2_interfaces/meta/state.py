@@ -1,5 +1,5 @@
 """
-L0 State для кастомных компонентов (Meta).
+L0 State for custom components (Meta).
 """
 
 from typing import Optional
@@ -7,8 +7,8 @@ from typing import Optional
 
 class CustomDashboardState:
     """
-    Хранит кастомные блоки контекста (Markdown) для агента.
-    Обновляется по событиям из песочницы или через навыки.
+    Stores custom context blocks (Markdown) for the agent.
+    Updated by sandbox events or through skills.
     """
 
     def __init__(self):
@@ -16,7 +16,7 @@ class CustomDashboardState:
 
     def update_block(self, name: str, content: Optional[str]) -> None:
         """
-        Обновляет или удаляет Markdown-блок на приборной панели.
+        Updates or deletes a Markdown block on the dashboard.
         """
 
         if content:
@@ -26,9 +26,9 @@ class CustomDashboardState:
 
     async def get_context_block(self, **kwargs) -> str:
         """
-        Провайдер контекста для сборщика промптов.
+        Context provider for the prompt builder.
         """
-        
+
         if not self.blocks:
             return ""
 

@@ -28,5 +28,5 @@ async def test_jina_read_http_error(mock_urlopen, jina_skill):
     res = await jina_skill.read_webpage("https://example.com")
 
     assert res.is_success is False
-    assert "Ошибка HTTP" in res.message
+    assert "HTTP Error" in res.message
     assert "404 Not Found" in res.message

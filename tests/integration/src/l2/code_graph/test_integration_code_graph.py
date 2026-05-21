@@ -121,7 +121,7 @@ def start_server():
     res_index = await indexer.index_codebase("sandbox/test_project", "test_proj")
 
     assert res_index.is_success is True
-    assert "2 файлов" in res_index.message
+    assert "2 files" in res_index.message
     assert "test_proj" in indexer.client.state.active_indexes
 
     # ======================================================
@@ -143,7 +143,7 @@ def start_server():
 
     assert res_deps.is_success is True
     # Проверяем входящие связи (usages)
-    assert "Его импортирует: main.py (FILE)" in res_deps.message
+    assert "Imported by: main.py (FILE)" in res_deps.message
 
     # ======================================================
     # 5. СЕМАНТИЧЕСКИЙ ПОИСК (search_code_semantic)
@@ -166,6 +166,6 @@ def start_server():
     assert res_del.is_success is True
     assert "test_proj" not in indexer.client.state.active_indexes
 
-    # Убеждаемся, что база пуста (запрос структуры должен вернуть ошибку/пустоту)
+    # Убеждаемся, что база empty (запрос структуры должен вернуть ошибку/emptyоту)
     res_struct_after = await navigator.get_file_structure("test_proj", "utils.py")
     assert res_struct_after.is_success is False

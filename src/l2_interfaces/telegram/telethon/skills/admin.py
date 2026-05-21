@@ -1,9 +1,8 @@
 """
-Навыки администратора (Telethon).
+Telethon Admin Skills.
 
-Позволяют агенту создавать новые каналы, переименовывать чаты, привязывать
-группы обсуждений к каналам, управлять топиками (Форумы) и выдавать/забирать
-права администратора у других участников.
+Provides group and channel administration capabilities: creating channels, modifying titles,
+descriptions, managing Forums (Topics), exporting invite links, and modifying permissions/promotions.
 """
 
 from typing import Union
@@ -32,7 +31,7 @@ except ImportError:
 
 
 class TelethonAdmin:
-    """Группа навыков для администрирования групп и каналов."""
+    """Group and channel administration tools."""
 
     def __init__(self, tg_client: TelethonClient) -> None:
         self.tg_client = tg_client
@@ -51,21 +50,21 @@ class TelethonAdmin:
             )
 
             chat_id = f"-100{result.chats[0].id}"
-            chat_type = "Супергруппа" if is_megagroup else "Канал"
+            chat_type = "Supergroup" if is_megagroup else "Channel"
 
-            msg = f"{chat_type} '{title}' успешно создан. ID: {chat_id}"
+            msg = f"{chat_type} '{title}' successfully created. ID: {chat_id}"
             main_logger.info(f"[Telegram Telethon] {msg}")
             return SkillResult.ok(f"True. ID: {chat_id}")
 
         except Exception as e:
-            return SkillResult.fail(f"Ошибка при создании чата: {e}")
+            return SkillResult.fail(f"Error creating chat: {e}")
 
     @skill()
     async def set_channel_username(
         self, chat_id: Union[int, str], username: str
     ) -> SkillResult:
         """
-        Sets public username for channel/group. 
+        Sets public username for channel/group.
         Pass empty string to make private.
         """
 
@@ -79,24 +78,24 @@ class TelethonAdmin:
 
             if clean_username:
                 main_logger.info(
-                    f"[Telegram Telethon] Канал {chat_id} стал публичным (@{clean_username})"
+                    f"[Telegram Telethon] Channel {chat_id} is now public (@{clean_username})"
                 )
                 return SkillResult.ok(f"True. URL: t.me/{clean_username}")
             else:
-                main_logger.info(f"[Telegram Telethon] Канал {chat_id} стал приватным")
+                main_logger.info(f"[Telegram Telethon] Channel {chat_id} is now private")
                 return SkillResult.ok("True")
 
         except ValueError:
-            return SkillResult.fail("Ошибка: Некорректный ID чата.")
+            return SkillResult.fail("Error: Invalid chat ID.")
         except Exception as e:
-            return SkillResult.fail(f"Ошибка при изменении статуса канала: {e}")
+            return SkillResult.fail(f"Error setting public link username: {e}")
 
     @skill()
     async def set_discussion_group(
         self, channel_id: Union[int, str], group_id: Union[int, str]
     ) -> SkillResult:
         """
-        Links supergroup to channel as discussion group. 
+        Links supergroup to channel as discussion group.
         Pass empty group_id to unlink.
         """
 
@@ -105,7 +104,6 @@ class TelethonAdmin:
             channel_entity = await client.get_input_entity(parse_int_or_str(channel_id))
 
             if not group_id or str(group_id).strip() == "":
-                # Отвязываем группу (передаем пустой InputChannel)
                 from telethon.tl.types import InputChannelEmpty
 
                 group_entity = InputChannelEmpty()
@@ -116,16 +114,16 @@ class TelethonAdmin:
                 SetDiscussionGroupRequest(broadcast=channel_entity, group=group_entity)
             )
 
-            action_str = "привязана к каналу" if group_id else "отвязана от канала"
-            msg = f"Супергруппа успешно {action_str} {channel_id}."
+            action_str = "linked to channel" if group_id else "unlinked from channel"
+            msg = f"Supergroup successfully {action_str} {channel_id}."
             main_logger.info(f"[Telegram Telethon] {msg}")
 
             return SkillResult.ok("True")
 
         except ValueError:
-            return SkillResult.fail("Ошибка: Некорректный ID канала или группы.")
+            return SkillResult.fail("Error: Invalid channel or group ID.")
         except Exception as e:
-            return SkillResult.fail(f"Ошибка при привязке группы обсуждений: {e}")
+            return SkillResult.fail(f"Error binding discussion group: {e}")
 
     @skill()
     async def edit_chat_title(self, chat_id: Union[int, str], new_title: str) -> SkillResult:
@@ -143,14 +141,14 @@ class TelethonAdmin:
                 await client(EditChatTitleRequest(chat_id=entity.id, title=new_title))
 
             main_logger.info(
-                f"[Telegram Telethon] Название чата {chat_id} изменено на '{new_title}'"
+                f"[Telegram Telethon] Chat {chat_id} title changed to '{new_title}'"
             )
             return SkillResult.ok("True")
 
         except ValueError:
-            return SkillResult.fail("Ошибка: Некорректный ID чата.")
+            return SkillResult.fail("Error: Invalid chat ID.")
         except Exception as e:
-            return SkillResult.fail(f"Ошибка при изменении названия чата: {e}")
+            return SkillResult.fail(f"Error changing chat title: {e}")
 
     @skill()
     async def edit_chat_description(
@@ -166,12 +164,12 @@ class TelethonAdmin:
 
             await client(EditChatAboutRequest(peer=entity, about=new_description))
 
-            main_logger.info(f"[Telegram Telethon] Описание чата {chat_id} успешно изменено.")
+            main_logger.info(f"[Telegram Telethon] Chat {chat_id} description updated.")
             return SkillResult.ok("True")
         except ValueError:
-            return SkillResult.fail("Ошибка: Некорректный ID чата.")
+            return SkillResult.fail("Error: Invalid chat ID.")
         except Exception as e:
-            return SkillResult.fail(f"Ошибка при изменении описания чата: {e}")
+            return SkillResult.fail(f"Error updating chat description: {e}")
 
     @skill()
     async def edit_chat_avatar(self, chat_id: Union[int, str], filepath: str) -> SkillResult:
@@ -182,7 +180,7 @@ class TelethonAdmin:
         try:
             safe_path = validate_sandbox_path(filepath)
             if not safe_path.is_file():
-                return SkillResult.fail(f"Ошибка: Файл {safe_path.name} не найден.")
+                return SkillResult.fail(f"Error: Avatar file {safe_path.name} not found.")
 
             client = self.tg_client.client()
             entity = await client.get_input_entity(parse_int_or_str(chat_id))
@@ -195,19 +193,21 @@ class TelethonAdmin:
             elif isinstance(entity, InputPeerChat):
                 await client(EditChatPhotoRequest(chat_id=entity.chat_id, photo=photo))
             else:
-                return SkillResult.fail("Ошибка: Этот тип чата не поддерживает смену аватара.")
+                return SkillResult.fail(
+                    "Error: This chat type does not support avatar updates."
+                )
 
             main_logger.info(
-                f"[Telegram Telethon] Аватар чата {chat_id} изменен на {safe_path.name}"
+                f"[Telegram Telethon] Chat {chat_id} avatar updated to {safe_path.name}"
             )
             return SkillResult.ok("True")
 
         except PermissionError as e:
             return SkillResult.fail(str(e))
         except ValueError:
-            return SkillResult.fail("Ошибка: Некорректный ID чата.")
+            return SkillResult.fail("Error: Invalid chat ID.")
         except Exception as e:
-            return SkillResult.fail(f"Ошибка при изменении аватара чата: {e}")
+            return SkillResult.fail(f"Error updating chat avatar: {e}")
 
     @skill()
     async def create_invite_link(self, chat_id: Union[int, str]) -> SkillResult:
@@ -221,17 +221,17 @@ class TelethonAdmin:
 
             result = await client(ExportChatInviteRequest(peer=entity))
 
-            return SkillResult.ok(f"Пригласительная ссылка сгенерирована: {result.link}")
+            return SkillResult.ok(f"Invite link generated: {result.link}")
 
         except Exception as e:
-            return SkillResult.fail(f"Ошибка при генерации ссылки: {e}")
+            return SkillResult.fail(f"Error exporting invite link: {e}")
 
     @skill()
     async def get_participants(
         self, chat_id: Union[int, str], limit: int = 100
     ) -> SkillResult:
         """
-        Fetches participant list of group/channel. 
+        Fetches participant list of group/channel.
         Requires admin rights.
         """
 
@@ -243,24 +243,26 @@ class TelethonAdmin:
             async for user in client.iter_participants(entity, limit=limit):
                 name = utils.get_display_name(user) or "Unknown"
                 bot_tag = " [Bot]" if user.bot else ""
-                participants.append(f"- ID: `{user.id}` | Имя: {name}{bot_tag}")
+                participants.append(f"- ID: `{user.id}` | Name: {name}{bot_tag}")
 
             if not participants:
-                return SkillResult.ok("Список участников пуст (или нет прав на его просмотр).")
+                return SkillResult.ok(
+                    "Participants list is empty (or permissions are insufficient)."
+                )
 
             return SkillResult.ok(
-                f"Участники (последние {limit} чел.):\n" + "\n".join(participants)
+                f"Participants (Recent {limit}):\n" + "\n".join(participants)
             )
 
         except Exception as e:
-            return SkillResult.fail(f"Ошибка при получении участников: {e}")
+            return SkillResult.fail(f"Error fetching participants: {e}")
 
     @skill()
     async def promote_user(
         self, chat_id: Union[int, str], user_id: Union[int, str], add_admins: bool = False
     ) -> SkillResult:
         """
-        Promotes user to administrator. 
+        Promotes user to administrator.
         add_admins: if True, grants add-admin rights.
         """
 
@@ -284,7 +286,7 @@ class TelethonAdmin:
             return SkillResult.ok("True")
 
         except Exception as e:
-            return SkillResult.fail(f"Ошибка при выдаче прав администратора: {e}")
+            return SkillResult.fail(f"Error promoting user to admin: {e}")
 
     @skill()
     async def demote_user(
@@ -306,7 +308,7 @@ class TelethonAdmin:
             return SkillResult.ok("True")
 
         except Exception as e:
-            return SkillResult.fail(f"Ошибка при снятии прав администратора: {e}")
+            return SkillResult.fail(f"Error demoting administrator: {e}")
 
     @skill()
     async def pin_message(
@@ -322,13 +324,11 @@ class TelethonAdmin:
                 entity=parse_int_or_str(chat_id), message=int(message_id), notify=notify
             )
 
-            main_logger.info(
-                f"[Telegram Telethon] Сообщение {message_id} закреплено в {chat_id}"
-            )
+            main_logger.info(f"[Telegram Telethon] Message {message_id} pinned in {chat_id}")
             return SkillResult.ok("True")
 
         except Exception as e:
-            return SkillResult.fail(f"Ошибка при закреплении сообщения: {e}")
+            return SkillResult.fail(f"Error pinning message: {e}")
 
     @skill()
     async def unpin_message(self, chat_id: Union[int, str], message_id: int) -> SkillResult:
@@ -342,13 +342,11 @@ class TelethonAdmin:
                 entity=parse_int_or_str(chat_id), message=int(message_id)
             )
 
-            main_logger.info(
-                f"[Telegram Telethon] Сообщение {message_id} откреплено в {chat_id}"
-            )
+            main_logger.info(f"[Telegram Telethon] Message {message_id} unpinned in {chat_id}")
             return SkillResult.ok("True")
 
         except Exception as e:
-            return SkillResult.fail(f"Ошибка при откреплении сообщения: {e}")
+            return SkillResult.fail(f"Error unpinning message: {e}")
 
     @skill()
     async def create_topic(self, chat_id: Union[int, str], title: str) -> SkillResult:
@@ -358,7 +356,7 @@ class TelethonAdmin:
 
         if not CreateForumTopicRequest:
             return SkillResult.fail(
-                "Ошибка: Версия библиотеки Telethon не поддерживает работу с темами."
+                "Error: Telethon library version does not support Forum Topics."
             )
 
         try:
@@ -375,19 +373,19 @@ class TelethonAdmin:
 
             if not topic_id:
                 return SkillResult.fail(
-                    "Топик создан, но не удалось извлечь его ID из ответа."
+                    "Topic created, but failed to extract topic ID from response updates."
                 )
 
-            msg = f"Топик '{title}' успешно создан. ID топика: {topic_id}"
-            main_logger.info(f"[Telegram Telethon] {msg} (чат {chat_id})")
+            msg = f"Topic '{title}' created successfully. Topic ID: {topic_id}"
+            main_logger.info(f"[Telegram Telethon] {msg} (chat {chat_id})")
             return SkillResult.ok(f"True. ID: {topic_id}")
 
         except ValueError:
-            return SkillResult.fail("Ошибка: Некорректный ID чата.")
+            return SkillResult.fail("Error: Invalid chat ID.")
 
         except Exception as e:
             if "CHAT_NOT_MODIFIED" in str(e) or "not a forum" in str(e).lower():
                 return SkillResult.fail(
-                    "Ошибка: Этот чат не является форумом (темы не включены)."
+                    "Error: Target group is not a forum (topics are not enabled)."
                 )
-            return SkillResult.fail(f"Ошибка при создании топика: {e}")
+            return SkillResult.fail(f"Error creating forum topic: {e}")

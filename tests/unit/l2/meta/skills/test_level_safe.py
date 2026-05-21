@@ -14,7 +14,7 @@ async def test_meta_safe_change_model(meta_client):
     # Нельзя поставить модель, которой нет в списке
     res_fail = await skills.change_model("llama-3")
     assert res_fail.is_success is False
-    assert "недоступна" in res_fail.message
+    assert "unavailable" in res_fail.message
 
 
 @pytest.mark.asyncio
@@ -34,7 +34,7 @@ async def test_meta_safe_add_remove_models(meta_client):
     # Нельзя удалить текущую рабочую модель
     res_fail = await skills.remove_available_model(meta_client.agent_state.llm_model)
     assert res_fail.is_success is False
-    assert "используется в данный момент" in res_fail.message
+    assert "currently active model" in res_fail.message
 
 
 @pytest.mark.asyncio

@@ -1,9 +1,9 @@
 """
-Асинхронный клиент для взаимодействия с LLM (OpenAI API совместимый).
+Asynchronous LLM Client Wrapper.
 
-Модуль инкапсулирует логику управления HTTP-сессиями и отвечает за бесшовную
-интеграцию с любыми провайдерами, поддерживающими стандарт OpenAI
-(OpenRouter, Gemini, Anthropic, локальные VLLM и т.д.).
+Encapsulates HTTP session management and provides seamless integration with any
+OpenAI-compatible API providers (OpenRouter, Gemini, Anthropic, local vLLM, etc.).
+Includes proxy support and key rotation integration.
 """
 
 import httpx
@@ -15,20 +15,20 @@ from src.l3_agent.llm.api_keys.rotator import APIKeyRotator
 
 class LLMClient:
     """
-    Интерфейс для общения мозга агента с языковой моделью.
-    Включает автоматическую ротацию ключей и кэширование HTTP-сессий.
+    Interface for communication between the agent's brain and the language model.
+    Includes automatic key rotation and HTTP sessions caching.
     """
 
     def __init__(
         self, api_url: str, api_keys_rotator: APIKeyRotator, proxy_url: str = None
     ) -> None:
         """
-        Инициализирует клиент.
+        Initializes the client.
 
         Args:
-            api_url: Базовый URL для OpenAI API.
-            api_keys_rotator: Менеджер API ключей (ротатор).
-            proxy_url: URL прокси-сервера.
+            api_url: Base URL for the OpenAI-compatible API.
+            api_keys_rotator: API key manager (rotator).
+            proxy_url: Optional proxy server URL.
         """
 
         self.api_url = api_url
@@ -44,28 +44,28 @@ class LLMClient:
                 self.api_url = f"https://{self.api_url}"
 
         if self.api_url:
-            main_logger.info(f"[LLM] Клиент инициализирован (URL: {self.api_url}).")
+            main_logger.info(f"[LLM] Client initialized (URL: {self.api_url}).")
         else:
-            main_logger.info("[LLM] Клиент инициализирован (Default OpenAI URL).")
+            main_logger.info("[LLM] Client initialized (Default OpenAI URL).")
 
     def get_session(self) -> AsyncOpenAI:
         """
-        Возвращает закэшированную сессию OpenAI с актуальным "живым" ключом.
+        Returns a cached OpenAI session with an active "live" key.
 
         Returns:
-            Экземпляр AsyncOpenAI, готовый к вызову.
+            AsyncOpenAI: An initialized and authenticated client session.
 
         Raises:
-            RuntimeError: Если все API ключи исчерпаны или забанены.
+            RuntimeError: If all API keys are exhausted or banned.
         """
 
         api_key = self.rotator.get_next_key()
 
         if not api_key:
-            raise RuntimeError("[LLM] Нет доступных API ключей. Лимиты исчерпаны.")
+            raise RuntimeError("[LLM] No API keys available. Limits exhausted.")
 
         if api_key not in self._sessions:
-            # Настраиваем кастомный HTTP-клиент с поддержкой прокси (в т.ч. SOCKS5)
+            # Configure custom HTTP client with proxy support (including SOCKS5)
             http_client = httpx.AsyncClient(proxy=self.proxy_url) if self.proxy_url else None
 
             self._sessions[api_key] = AsyncOpenAI(
@@ -78,10 +78,10 @@ class LLMClient:
 
     async def close(self) -> None:
         """
-        Корректно закрывает все активные пулы HTTP-соединений.
-        Вызывается при остановке системы (Graceful Shutdown).
+        Correctly closes all active HTTP connection pools.
+        Called during system shutdown (Graceful Shutdown).
         """
         for session in self._sessions.values():
             await session.close()
         self._sessions.clear()
-        main_logger.info("[LLM] Все HTTP-сессии закрыты.")
+        main_logger.info("[LLM] All HTTP sessions closed.")

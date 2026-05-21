@@ -1,9 +1,9 @@
 """
-Фасад для системы гибридного поиска (Vector-Graph RAG).
+Facade for the Hybrid Search System (Vector-Graph RAG).
 
-Анализирует входящие сообщения, системные триггеры и текущие мысли агента,
-передает их Оркестратору, который на лету делает кросс-поиск по Векторной
-и Графовой БД. Найденные факты и связи инжектятся прямо в системный промпт.
+Intercepts current events, system triggers, and active thoughts of the agent,
+passing them to the GraphRAGOrchestrator. Gathers retrieved facts and maps them
+into a unified Markdown block for the context builder.
 """
 
 from typing import Dict, Any, List, TYPE_CHECKING
@@ -25,7 +25,7 @@ if TYPE_CHECKING:
 
 class RAGMemories:
     """
-    Провайдер контекста, отвечающий за автоматический гибридный поиск (Vector-Graph RAG).
+    Context provider responsible for automated hybrid search (Vector-Graph RAG).
     """
 
     def __init__(
@@ -53,7 +53,6 @@ class RAGMemories:
 
         self.graph_search = GraphSearchWrapper(graph_manager=graph_manager, max_neighbors=10)
 
-        # Инициализация самого Оркестратора
         self.orchestrator = GraphRAGOrchestrator(
             vector_search=self.vector_search,
             graph_search=self.graph_search,
@@ -69,14 +68,14 @@ class RAGMemories:
         **kwargs: Any,
     ) -> str:
         """
-        Собирает сырые тексты из текущего контекста и запускает цикл Vector-Graph RAG.
+        Gathers raw text streams from the current wakeup context and initiates the RAG cycle.
 
         Args:
-            payload: Данные текущего события (сообщения).
-            missed_events: Лог фоновых событий.
+            payload: Current event payload.
+            missed_events: Background events logs.
 
         Returns:
-            Отформатированный блок 'RELEVANT INFORMATION' или пустая строка.
+            str: Formatted 'RELEVANT INFORMATION' Markdown block or empty string.
         """
 
         if not self.config.enabled:
@@ -84,9 +83,9 @@ class RAGMemories:
 
         input_texts = set()
 
-        # ==================================================================
-        # Сбор текстов для первого шага ReAct-цикла
-        # ==================================================================
+        # ---------------------------------------------------------------------
+        # Step 1 context collection
+        # ---------------------------------------------------------------------
 
         if self.agent_state.current_step == 1:
             sender = payload.get("sender_name")
@@ -101,16 +100,15 @@ class RAGMemories:
             if len(msg) > 10 or len(msg.split()) > 2:
                 input_texts.add(msg.strip())
 
-            # Берем ПОСЛЕДНИЙ пропущенный ивент
             if missed_events:
                 last_evt = missed_events[-1].get("payload", {})
                 match_msg = last_evt.get("raw_text") or last_evt.get("message", "")
                 if len(match_msg) > 15 or len(match_msg.split()) > 3:
                     input_texts.add(match_msg.strip())
 
-        # ==================================================================
-        # Сбор текстов между шагами ReAct цикла
-        # ==================================================================
+        # ---------------------------------------------------------------------
+        # Mid-cycle step context collection
+        # ---------------------------------------------------------------------
 
         else:
             if self.agent_state.last_thoughts:
@@ -123,5 +121,4 @@ class RAGMemories:
         if not input_texts:
             return ""
 
-        # Делегируем всю магию Оркестратору
         return await self.orchestrator.run(list(input_texts))

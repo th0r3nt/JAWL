@@ -1,3 +1,10 @@
+"""
+Terminal Chat CLI Screen.
+
+Acts as the interactive operator terminal. Initiates safe handshake TCP client
+connections to talk directly with the awake JAWL agent core.
+"""
+
 import asyncio
 import json
 import io
@@ -29,18 +36,13 @@ ROOT_DIR = Path(__file__).resolve().parent.parent.parent.parent
 
 
 def _print_markdown_safe(text: str) -> None:
-    """
-    Рендерит Markdown в буфер, сохраняя цвета (ANSI), и безопасно выводит
-    через prompt_toolkit. Решает проблему конфликта спецсимволов.
-    """
+    """Renders Rich markdown output safely."""
     formatted_text = text.replace("\n", "  \n")
 
-    # Рендерим rich в виртуальный буфер
     str_console = Console(file=io.StringIO(), force_terminal=True, color_system="standard")
     str_console.print(Markdown(formatted_text))
     ansi_str = str_console.file.getvalue()
 
-    # Обрезаем лишний перенос строки от rich, чтобы не ломать верстку
     if ansi_str.endswith("\n"):
         ansi_str = ansi_str[:-1]
 
@@ -48,7 +50,7 @@ def _print_markdown_safe(text: str) -> None:
 
 
 async def _chat_loop(port: int, history_file: Path, agent_name: str) -> None:
-    set_window_title(f"JAWL - Чат с агентом {agent_name}")
+    set_window_title(f"JAWL - Chat with agent {agent_name}")
 
     try:
         reader, writer = await asyncio.open_connection("127.0.0.1", port)
@@ -56,20 +58,19 @@ async def _chat_loop(port: int, history_file: Path, agent_name: str) -> None:
         await writer.drain()
 
     except ConnectionRefusedError:
-        print_error("Не удалось подключиться к чату.")
-        print_info("Проверьте, что агент запущен и интерфейс 'Host Terminal' включен.")
-        print("\nНажмите Enter для возврата...")
+        print_error("Failed to connect to chat.")
+        print_info("Ensure the agent is running and the 'Host Terminal' interface is enabled.")
+        print("\nPress Enter to return...")
         input()
         return
 
     clear_screen()
 
-    # Здесь используем обычный Console, так как мы еще не вошли в цикл ввода
     Console().print(
         Panel(
-            f"[bold cyan]Интерактивный чат с агентом {agent_name}[/bold cyan]\n"
-            "[dim]Отправка: Enter[/dim]\n"
-            "[dim]Выход: /exit или Ctrl+C[/dim]",
+            f"[bold cyan]Interactive chat with agent {agent_name}[/bold cyan]\n"
+            "[dim]Send: Enter[/dim]\n"
+            "[dim]Exit: /exit or Ctrl+C[/dim]",
             border_style="cyan",
             expand=False,
         )
@@ -88,7 +89,7 @@ async def _chat_loop(port: int, history_file: Path, agent_name: str) -> None:
 
                 if sender == "User":
                     print_formatted_text(
-                        HTML(f"{time_prefix}<ansigreen><b>Вы:</b></ansigreen> {text}")
+                        HTML(f"{time_prefix}<ansigreen><b>You:</b></ansigreen> {text}")
                     )
                 else:
                     print_formatted_text(
@@ -96,7 +97,7 @@ async def _chat_loop(port: int, history_file: Path, agent_name: str) -> None:
                     )
                     _print_markdown_safe(text)
 
-            print_formatted_text(HTML("\n<style fg='gray'>--- Конец истории ---</style>\n"))
+            print_formatted_text(HTML("\n<style fg='gray'>--- End of History ---</style>\n"))
         except Exception:
             pass
 
@@ -106,18 +107,15 @@ async def _chat_loop(port: int, history_file: Path, agent_name: str) -> None:
 
     @bindings.add("enter")
     def handle_enter(event):
-        """Отправка сообщения по Enter."""
         event.current_buffer.validate_and_handle()
 
-    @bindings.add("escape", "enter")  # Alt + Enter (Shift+Enter вызывает краш на Windows)
+    @bindings.add("escape", "enter")
     def handle_newline(event):
-        """Перенос строки."""
         event.current_buffer.insert_text("\n")
 
     def prompt_continuation(width, line_number, is_soft_wrap):
-        """Отрисовка многоточия на новых строках для красоты."""
         return "... ".rjust(width)
-    
+
     async def receive_messages():
         try:
             while True:
@@ -152,12 +150,10 @@ async def _chat_loop(port: int, history_file: Path, agent_name: str) -> None:
         except Exception as e:
             with patch_stdout():
                 print_formatted_text(
-                    HTML(f"\n<ansired><b>✗ Связь разорвана:</b> {e}</ansired>")
+                    HTML(f"\n<ansired><b>✗ Connection lost:</b> {e}</ansired>")
                 )
                 print_formatted_text(
-                    HTML(
-                        "<style fg='gray'>Введите /exit или нажмите Ctrl+C для выхода.</style>\n"
-                    )
+                    HTML("<style fg='gray'>Type /exit or press Ctrl+C to exit.</style>\n")
                 )
 
     receive_task = asyncio.create_task(receive_messages())
@@ -166,10 +162,10 @@ async def _chat_loop(port: int, history_file: Path, agent_name: str) -> None:
         while True:
             with patch_stdout():
                 user_input = await session.prompt_async(
-                    HTML("<ansigreen><b>Вы:</b></ansigreen> "),
-                    multiline=True,                           # Многострочность
-                    key_bindings=bindings,                    # Биндинги
-                    prompt_continuation=prompt_continuation,  # Отрисовка переносов
+                    HTML("<ansigreen><b>You:</b></ansigreen> "),
+                    multiline=True,
+                    key_bindings=bindings,
+                    prompt_continuation=prompt_continuation,
                 )
 
             text = user_input.strip()
@@ -185,13 +181,17 @@ async def _chat_loop(port: int, history_file: Path, agent_name: str) -> None:
                 break
 
             payload = json.dumps({"text": text}, ensure_ascii=False)
-            
+
             try:
                 writer.write((payload + "\n").encode("utf-8"))
                 await writer.drain()
             except (ConnectionError, OSError):
                 with patch_stdout():
-                    print_formatted_text(HTML("\n<ansired><b>✗ Соединение разорвано (Агент перезагружается или выключен).</b></ansired>"))
+                    print_formatted_text(
+                        HTML(
+                            "\n<ansired><b>✗ Connection lost (Agent is rebooting or stopped).</b></ansired>"
+                        )
+                    )
                 break
 
     except (KeyboardInterrupt, EOFError):
@@ -203,26 +203,26 @@ async def _chat_loop(port: int, history_file: Path, agent_name: str) -> None:
             writer.close()
             await writer.wait_closed()
         except (ConnectionError, OSError):
-            pass # Игнорируем ошибки закрытия мертвого сокета
+            pass
 
 
 def terminal_chat_screen() -> None:
-    set_window_title("JAWL - Терминал (Настройки)")
+    set_window_title("JAWL - Terminal (Settings)")
     style = get_custom_style()
 
     while True:
         draw_header()
         choice = questionary.select(
-            "Чат с агентом:",
+            "Agent Chat:",
             choices=[
-                questionary.Choice("[@] Открыть чат", "open"),
-                questionary.Choice("[-] Очистить историю чата", "clear_history"),
+                questionary.Choice("[@] Open Chat", "open"),
+                questionary.Choice("[-] Clear Chat History", "clear_history"),
                 questionary.Separator(" "),
-                questionary.Choice("↩ Назад", "back"),
+                questionary.Choice("↩ Back", "back"),
             ],
             style=style,
             qmark="",
-            instruction="\n (Стрелочки ↑/↓ для навигации)\n",
+            instruction="\n (Arrows ↑/↓ for navigation)\n",
         ).ask()
 
         if choice == "back" or choice is None:
@@ -235,17 +235,17 @@ def terminal_chat_screen() -> None:
 
 def _open_terminal_chat() -> None:
     if not _is_agent_running():
-        print_error(
-            "Ошибка: Агент не запущен. Для общения с ним необходимо запустить основной код."
-        )
-        print("\nНажмите Enter для возврата.")
+        print_error("Error: Agent is not running. Launch the main code first to communicate.")
+        print("\nPress Enter to return.")
         input()
         return
 
     settings, interfaces = load_config()
     if not hasattr(interfaces.host, "terminal") or not interfaces.host.terminal.enabled:
-        print_error("Интерфейс 'Host Terminal' отключен в настройках (interfaces.yaml).")
-        print("\nНажмите Enter для возврата.")
+        print_error(
+            "The 'Host Terminal' interface is disabled in the settings (interfaces.yaml)."
+        )
+        print("\nPress Enter to return.")
         input()
         return
 
@@ -257,15 +257,15 @@ def _open_terminal_chat() -> None:
     agent_name = settings.identity.agent_name
 
     if not port_file.exists():
-        print_error("Сервер терминала еще не запущен/произошла ошибка.")
-        print("\nНажмите Enter для возврата.")
+        print_error("Terminal server is not running or an error occurred.")
+        print("\nPress Enter to return.")
         input()
         return
 
     try:
         active_port = int(port_file.read_text().strip())
     except ValueError:
-        print_error("Файл порта поврежден.")
+        print_error("Port file is corrupted.")
         input()
         return
 
@@ -281,11 +281,11 @@ def _clear_terminal_history() -> None:
         try:
             with open(history_file, "w", encoding="utf-8") as f:
                 json.dump([], f, ensure_ascii=False)
-            print_success("История терминала успешно очищена.")
+            print_success("Terminal history successfully cleared.")
 
         except Exception as e:
-            print_error(f"Не удалось очистить историю: {e}")
+            print_error(f"Failed to clear history: {e}")
     else:
-        print_info(" История уже пуста (файл не найден).")
-    print("\nНажмите Enter для возврата.")
+        print_info(" History is already empty (file not found).")
+    print("\nPress Enter to return.")
     input()

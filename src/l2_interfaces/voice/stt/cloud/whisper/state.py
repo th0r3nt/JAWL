@@ -1,27 +1,27 @@
 """
-L0 State для интерфейса Cloud Whisper STT.
+L0 State for the Cloud Whisper STT interface.
 
-Хранит статус подключения и MRU-кэш (историю) последних транскрибированных аудиофайлов,
-чтобы агент не терял контекст своих действий.
+Stores connection status and the MRU-cache (history) of the last transcribed audio files
+to ensure the agent does not lose context of its actions.
 """
 
 
 class CloudWhisperSTTState:
     """
-    Приборная панель клиента Cloud Whisper STT.
+    Cloud Whisper STT client dashboard.
     """
 
     def __init__(self, history_limit: int = 5) -> None:
         self.is_online: bool = False
         self.history_limit: int = history_limit
 
-        # MRU-кэш истории транскрибаций
+        # MRU cache of the latest transcriptions
         self.history: list[str] = []
 
     def add_history(self, entry: str) -> None:
         """
-        Добавляет запись об успешной транскрибации в начало списка.
-        Обрезает список при превышении лимита.
+        Adds a record of successful transcription to the beginning of the list.
+        Truncates the list when the limit is exceeded.
         """
         self.history.insert(0, entry)
         if len(self.history) > self.history_limit:
@@ -29,7 +29,7 @@ class CloudWhisperSTTState:
 
     @property
     def recent_history(self) -> str:
-        """Форматирует историю для вставки в Markdown-контекст агента."""
+        """Formats the history for injection into the agent's Markdown context."""
         if not self.history:
-            return "Аудиофайлы не транскрибировались."
+            return "Audio files were not transcribed."
         return "\n".join(f"- {item}" for item in self.history)

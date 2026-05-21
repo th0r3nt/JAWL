@@ -1,3 +1,7 @@
+"""
+Skills for working with repositories and code.
+"""
+
 import base64
 import asyncio
 from datetime import datetime, timedelta, timezone
@@ -14,7 +18,7 @@ from src.l3_agent.swarm.roles import Subagents
 
 
 class GithubRepositories:
-    """Навыки для работы с репозиториями и кодом."""
+    """Skills for working with repositories and code."""
 
     def __init__(self, client: GithubClient):
         self.client = client
@@ -40,30 +44,30 @@ class GithubRepositories:
 
             items = data.get("items", [])
             if not items:
-                return SkillResult.ok(f"По запросу '{query}' репозитории не найдены.")
+                return SkillResult.ok(f"No repositories found for query '{query}'.")
 
             lines = [
-                f"Найдено репозиториев: {data.get('total_count')} (показаны топ {len(items)}):"
+                f"Repositories found: {data.get('total_count')} (showing top {len(items)}):"
             ]
             for item in items:
                 repo_name = item.get("full_name")
                 stars = item.get("stargazers_count")
                 lang = item.get("language") or "N/A"
-                desc = item.get("description") or "Без описания"
+                desc = item.get("description") or "No description"
                 url = item.get("html_url")
 
-                # Защищаем контекст от огромных описаний
+                # Protect context against giant descriptions
                 clean_desc = truncate_text(desc.replace("\n", " "), 150, "...")
 
                 lines.append(
                     f"- [{repo_name}] ({stars}⭐ | {lang}) - {clean_desc}\n  URL: {url}"
                 )
 
-            main_logger.info(f"[Github] Выполнен поиск репозиториев: '{query}'")
+            main_logger.info(f"[Github] Executed repository search: '{query}'")
             return SkillResult.ok("\n".join(lines))
 
         except Exception as e:
-            return SkillResult.fail(f"Ошибка при поиске репозиториев: {e}")
+            return SkillResult.fail(f"Error during repository search: {e}")
 
     @skill(swarm=[Subagents.CODER])
     async def get_trending_repositories(
@@ -73,8 +77,8 @@ class GithubRepositories:
         limit: int = 10,
     ) -> SkillResult:
         """
-        Gets trending repositories. 
-        
+        Gets trending repositories.
+
         language: Optional language filter.
         """
 
@@ -91,10 +95,10 @@ class GithubRepositories:
 
             else:
                 return SkillResult.fail(
-                    "Ошибка: period должен быть 'daily', 'weekly' или 'monthly'."
+                    "Error: period must be 'daily', 'weekly', or 'monthly'."
                 )
 
-            # Формируем Dork-запрос (репозитории, созданные за указанный период, отсортированные по звездам)
+            # Form dork query (repos created during period, sorted by stars)
             target_date = (now - delta).strftime("%Y-%m-%d")
             query = f"created:>{target_date}"
             if language:
@@ -108,17 +112,17 @@ class GithubRepositories:
             items = data.get("items", [])
             if not items:
                 return SkillResult.ok(
-                    "Не удалось найти трендовые репозитории по заданным критериям."
+                    "Failed to find trending repositories matching the criteria."
                 )
 
-            lang_str = f" для '{language}'" if language else ""
-            lines = [f"Тренды GitHub ({period}){lang_str}:"]
+            lang_str = f" for '{language}'" if language else ""
+            lines = [f"GitHub Trends ({period}){lang_str}:"]
 
             for item in items:
                 repo_name = item.get("full_name")
                 stars = item.get("stargazers_count")
                 lang_val = item.get("language") or "N/A"
-                desc = item.get("description") or "Без описания"
+                desc = item.get("description") or "No description"
                 url = item.get("html_url")
 
                 clean_desc = truncate_text(desc.replace("\n", " "), 150, "...")
@@ -127,11 +131,11 @@ class GithubRepositories:
                     f"- [{repo_name}] (+{stars}⭐ | {lang_val}) - {clean_desc}\n  URL: {url}"
                 )
 
-            main_logger.info(f"[Github] Запрошены тренды: {period}, lang: {language or 'all'}")
+            main_logger.info(f"[Github] Trends requested: {period}, lang: {language or 'all'}")
             return SkillResult.ok("\n".join(lines))
 
         except Exception as e:
-            return SkillResult.fail(f"Ошибка при получении трендов: {e}")
+            return SkillResult.fail(f"Error retrieving trends: {e}")
 
     @skill(swarm=[Subagents.CODER])
     async def get_repo_info(self, owner: str, repo: str) -> SkillResult:
@@ -144,15 +148,15 @@ class GithubRepositories:
             self.client.state.add_history(f"get_repo: {owner}/{repo}")
 
             lines = [
-                f"Репозиторий: {data.get('full_name')}",
-                f"Описание: {data.get('description', 'Нет')}",
-                f"Звезды: {data.get('stargazers_count')} | Форки: {data.get('forks_count')}",
-                f"Язык: {data.get('language')} | Ветка: {data.get('default_branch')}",
-                f"Открытых issues: {data.get('open_issues_count')}",
+                f"Repository: {data.get('full_name')}",
+                f"Description: {data.get('description', 'None')}",
+                f"Stars: {data.get('stargazers_count')} | Forks: {data.get('forks_count')}",
+                f"Language: {data.get('language')} | Branch: {data.get('default_branch')}",
+                f"Open issues: {data.get('open_issues_count')}",
             ]
             return SkillResult.ok("\n".join(lines))
         except Exception as e:
-            return SkillResult.fail(f"Ошибка при получении репозитория: {e}")
+            return SkillResult.fail(f"Error retrieving repository: {e}")
 
     @skill()
     @require_github_token()
@@ -162,7 +166,7 @@ class GithubRepositories:
         """
 
         if not self.client.token:
-            return SkillResult.fail("Ошибка: Поиск кода требует наличия GITHUB_TOKEN.")
+            return SkillResult.fail("Error: Code search requires GITHUB_TOKEN.")
 
         try:
             params = {"q": query, "per_page": per_page}
@@ -171,19 +175,19 @@ class GithubRepositories:
 
             items = data.get("items", [])
             if not items:
-                return SkillResult.ok(f"Код по запросу '{query}' не найден.")
+                return SkillResult.ok(f"No code found for query '{query}'.")
 
-            lines = [f"Найдено: {data.get('total_count')} (показаны топ {len(items)}):"]
+            lines = [f"Found: {data.get('total_count')} (showing top {len(items)}):"]
             for item in items:
                 repo_name = (item.get("repository") or {}).get("full_name")
                 lines.append(
                     f"- [{repo_name}] {item.get('path')} (URL: {item.get('html_url')})"
                 )
 
-            main_logger.info(f"[Github] Выполнен поиск кода: '{query}'")
+            main_logger.info(f"[Github] Executed code search: '{query}'")
             return SkillResult.ok("\n".join(lines))
         except Exception as e:
-            return SkillResult.fail(f"Ошибка при поиске кода: {e}")
+            return SkillResult.fail(f"Error during code search: {e}")
 
     @skill(swarm=[Subagents.CODER])
     async def read_file_content(
@@ -200,21 +204,19 @@ class GithubRepositories:
             )
 
             if isinstance(data, list):
-                return SkillResult.fail("Ошибка: Указан путь к директории, а не к файлу.")
+                return SkillResult.fail("Error: Directory path specified instead of file.")
 
             content_b64 = data.get("content", "")
             content = base64.b64decode(content_b64).decode("utf-8", errors="replace")
 
-            content = truncate_text(
-                content, 10000, "... [Файл обрезан для экономии контекста]"
-            )
+            content = truncate_text(content, 10000, "... [File truncated to save context]")
 
             self.client.state.add_history(f"read_file: {owner}/{repo}:{path}")
-            main_logger.info(f"[Github] Прочитан файл {path} из {owner}/{repo}")
+            main_logger.info(f"[Github] Read file {path} from {owner}/{repo}")
 
-            return SkillResult.ok(f"Содержимое {path}:\n```\n{content}\n```")
+            return SkillResult.ok(f"Content of {path}:\n```\n{content}\n```")
         except Exception as e:
-            return SkillResult.fail(f"Ошибка при чтении файла: {e}")
+            return SkillResult.fail(f"Error reading file: {e}")
 
     @skill(swarm=[Subagents.CODER])
     async def list_recent_commits(
@@ -232,9 +234,9 @@ class GithubRepositories:
             self.client.state.add_history(f"list_commits: {owner}/{repo}")
 
             if not data:
-                return SkillResult.ok("Коммитов не найдено.")
+                return SkillResult.ok("No commits found.")
 
-            lines = [f"Последние коммиты {owner}/{repo}:"]
+            lines = [f"Latest commits of {owner}/{repo}:"]
             for c in data:
                 sha = (c.get("sha") or "")[:7]
                 commit_data = c.get("commit", {})
@@ -244,15 +246,15 @@ class GithubRepositories:
 
             return SkillResult.ok("\n".join(lines))
         except Exception as e:
-            return SkillResult.fail(f"Ошибка при получении коммитов: {e}")
+            return SkillResult.fail(f"Error retrieving commits: {e}")
 
     @skill(swarm=[Subagents.CODER])
     async def download_repository(
         self, owner: str, repo: str, dest_filename: str, ref: Optional[str] = None
     ) -> SkillResult:
         """
-        Downloads repository as ZIP archive to sandbox/download/. 
-        
+        Downloads repository as ZIP archive to sandbox/download/.
+
         ref: Optional branch name, tag, or commit.
         """
 
@@ -270,7 +272,9 @@ class GithubRepositories:
             binary_data = await self.client.request("GET", endpoint, response_format="binary")
 
             if not binary_data:
-                return SkillResult.fail("Не удалось скачать архив (пустой ответ от сервера).")
+                return SkillResult.fail(
+                    "Failed to download archive (empty response from server)."
+                )
 
             def _save():
                 with open(safe_path, "wb") as f:
@@ -281,17 +285,17 @@ class GithubRepositories:
             size_str = format_size(safe_path.stat().st_size)
             self.client.state.add_history(f"download_repo: {owner}/{repo}")
             main_logger.info(
-                f"[Github] Репозиторий {owner}/{repo} скачан в {safe_path.name} ({size_str})"
+                f"[Github] Repository {owner}/{repo} downloaded to {safe_path.name} ({size_str})"
             )
 
             return SkillResult.ok(
-                f"Репозиторий успешно скачан в архив: sandbox/{safe_path.name} ({size_str})"
+                f"Repository successfully downloaded to archive: sandbox/{safe_path.name} ({size_str})"
             )
         except PermissionError as e:
             return SkillResult.fail(str(e))
 
         except Exception as e:
-            return SkillResult.fail(f"Ошибка при скачивании репозитория: {e}")
+            return SkillResult.fail(f"Error downloading repository: {e}")
 
     @skill(swarm=[Subagents.CODER])
     async def get_commit_details(self, owner: str, repo: str, commit_sha: str) -> SkillResult:
@@ -305,21 +309,21 @@ class GithubRepositories:
             )
             self.client.state.add_history(f"get_commit: {owner}/{repo}@{commit_sha[:7]}")
 
-            commit_msg = data.get("commit", {}).get("message", "Без описания")
+            commit_msg = data.get("commit", {}).get("message", "No description")
             author = data.get("author", {}).get("login", "Unknown")
             stats = data.get("stats", {})
             files = data.get("files", [])
 
             lines = [
-                f"Коммит: {commit_sha}",
-                f"Автор: @{author}",
-                f"Сообщение: {commit_msg}",
-                f"Статистика: {stats.get('total')} изменений (+{stats.get('additions')} / -{stats.get('deletions')})",
-                "\nИзмененные файлы:",
+                f"Commit: {commit_sha}",
+                f"Author: @{author}",
+                f"Message: {commit_msg}",
+                f"Stats: {stats.get('total')} changes (+{stats.get('additions')} / -{stats.get('deletions')})",
+                "\nModified files:",
             ]
 
             if not files:
-                lines.append("Нет измененных файлов.")
+                lines.append("No modified files.")
             else:
                 for f in files:
                     status = f.get("status", "unknown")  # added, modified, removed, renamed
@@ -329,27 +333,27 @@ class GithubRepositories:
                     lines.append(f"- [{status.upper()}] {filename} (+{adds} / -{dels})")
 
             main_logger.info(
-                f"[Github] Прочитаны детали коммита {commit_sha[:7]} в {owner}/{repo}"
+                f"[Github] Read details of commit {commit_sha[:7]} in {owner}/{repo}"
             )
             return SkillResult.ok("\n".join(lines))
 
         except Exception as e:
-            return SkillResult.fail(f"Ошибка при получении деталей коммита: {e}")
+            return SkillResult.fail(f"Error retrieving commit details: {e}")
 
     @skill(swarm=[Subagents.CODER])
     async def list_repo_directory(
         self, owner: str, repo: str, path: str = "", ref: Optional[str] = None
     ) -> SkillResult:
         """
-        Lists directory contents in repository. 
-        
-        path: Directory path (empty for root). 
+        Lists directory contents in repository.
+
+        path: Directory path (empty for root).
         ref: Optional branch, tag, or commit.
         """
 
         try:
             params = {"ref": ref} if ref else None
-            # Если path пустой, запрашиваем корень репозитория
+            # If path is empty, query the root of the repository
             endpoint = (
                 f"/repos/{owner}/{repo}/contents/{path.strip('/')}"
                 if path
@@ -359,13 +363,13 @@ class GithubRepositories:
             data = await self.client.request("GET", endpoint, params=params)
             self.client.state.add_history(f"list_repo_dir: {owner}/{repo}/{path}")
 
-            # Если по указанному пути лежит файл, API возвращает dict, а не list
+            # If the path points to a file, the API returns a dict instead of a list
             if not isinstance(data, list):
                 return SkillResult.fail(
-                    "Ошибка: Указанный путь является файлом, а не директорией. Используйте навык 'read_file_content'."
+                    "Error: Specified path is a file, not a directory. Use 'read_file_content' skill."
                 )
 
-            lines = [f"Содержимое /{path} в {owner}/{repo}:"]
+            lines = [f"Contents of /{path} in {owner}/{repo}:"]
             for item in data:
                 i_type = "📁 DIR " if item.get("type") == "dir" else "📄 FILE"
                 name = item.get("name")
@@ -373,11 +377,11 @@ class GithubRepositories:
                 size_str = f" ({format_size(size)})" if item.get("type") == "file" else ""
                 lines.append(f"- {i_type}: {name}{size_str}")
 
-            main_logger.info(f"[Github] Прочитана директория /{path} в {owner}/{repo}")
+            main_logger.info(f"[Github] Read directory /{path} in {owner}/{repo}")
             return SkillResult.ok("\n".join(lines))
 
         except Exception as e:
-            return SkillResult.fail(f"Ошибка при просмотре директории репозитория: {e}")
+            return SkillResult.fail(f"Error viewing repository directory: {e}")
 
     @skill()
     @require_agent_account()
@@ -387,15 +391,15 @@ class GithubRepositories:
         """
 
         if not self.client.config.agent_account:
-            return SkillResult.fail("Ошибка: Для этого действия нужен Agent Account.")
+            return SkillResult.fail("Error: This action requires Agent Account.")
 
         try:
             await self.client.request("PUT", f"/user/starred/{owner}/{repo}")
             self.client.state.add_history(f"star: {owner}/{repo}")
-            main_logger.info(f"[Github] Поставлена звезда репозиторию {owner}/{repo}")
+            main_logger.info(f"[Github] Starred repository {owner}/{repo}")
             return SkillResult.ok("True")
         except Exception as e:
-            return SkillResult.fail(f"Ошибка при постановке звезды: {e}")
+            return SkillResult.fail(f"Error during starring: {e}")
 
     @skill()
     @require_agent_account()
@@ -405,15 +409,15 @@ class GithubRepositories:
         """
 
         if not self.client.config.agent_account:
-            return SkillResult.fail("Ошибка: Для этого действия нужен Agent Account.")
+            return SkillResult.fail("Error: This action requires Agent Account.")
 
         try:
             await self.client.request("DELETE", f"/user/starred/{owner}/{repo}")
             self.client.state.add_history(f"unstar: {owner}/{repo}")
-            main_logger.info(f"[Github] Убрана звезда с репозитория {owner}/{repo}")
+            main_logger.info(f"[Github] Unstarred repository {owner}/{repo}")
             return SkillResult.ok("True")
         except Exception as e:
-            return SkillResult.fail(f"Ошибка при удалении звезды: {e}")
+            return SkillResult.fail(f"Error during unstarring: {e}")
 
     @skill(swarm=[Subagents.CODER])
     async def list_branches(self, owner: str, repo: str, per_page: int = 30) -> SkillResult:
@@ -429,16 +433,16 @@ class GithubRepositories:
             self.client.state.add_history(f"list_branches: {owner}/{repo}")
 
             if not data:
-                return SkillResult.ok("Ветки не найдены.")
+                return SkillResult.ok("No branches found.")
 
-            lines = [f"Ветки репозитория {owner}/{repo}:"]
+            lines = [f"Branches of repository {owner}/{repo}:"]
             for branch in data:
-                protected = " (Защищена)" if branch.get("protected") else ""
+                protected = " (Protected)" if branch.get("protected") else ""
                 lines.append(f"- {branch.get('name')}{protected}")
 
             return SkillResult.ok("\n".join(lines))
         except Exception as e:
-            return SkillResult.fail(f"Ошибка при получении списка веток: {e}")
+            return SkillResult.fail(f"Error retrieving branch list: {e}")
 
     @skill()
     @require_agent_account()
@@ -450,14 +454,14 @@ class GithubRepositories:
         """
 
         if not self.client.config.agent_account:
-            return SkillResult.fail("Ошибка: Для создания репозитория нужен Agent Account.")
+            return SkillResult.fail("Error: Creating a repository requires Agent Account.")
 
         try:
             payload = {
                 "name": name,
                 "description": description,
                 "private": private,
-                "auto_init": True,  # Инициализируем пустым README
+                "auto_init": True,  # Initialize with empty README
             }
 
             data = await self.client.request("POST", "/user/repos", body=payload)
@@ -466,11 +470,11 @@ class GithubRepositories:
             repo_full_name = data.get("full_name")
             url = data.get("html_url")
 
-            main_logger.info(f"[Github] Создан репозиторий {repo_full_name}")
+            main_logger.info(f"[Github] Created repository {repo_full_name}")
             return SkillResult.ok(f"True. URL: {url}")
 
         except Exception as e:
-            return SkillResult.fail(f"Ошибка при создании репозитория: {e}")
+            return SkillResult.fail(f"Error creating repository: {e}")
 
     @skill()
     @require_agent_account()
@@ -480,21 +484,20 @@ class GithubRepositories:
         """
 
         if not self.client.config.agent_account:
-            return SkillResult.fail("Ошибка: Для создания форка нужен Agent Account.")
+            return SkillResult.fail("Error: Creating a fork requires Agent Account.")
 
         try:
-            # POST /repos/{owner}/{repo}/forks
             data = await self.client.request("POST", f"/repos/{owner}/{repo}/forks")
             self.client.state.add_history(f"fork_repo: {owner}/{repo}")
 
             fork_name = data.get("full_name")
             url = data.get("html_url")
 
-            main_logger.info(f"[Github] Сделан форк {owner}/{repo} -> {fork_name}")
+            main_logger.info(f"[Github] Fork made {owner}/{repo} -> {fork_name}")
             return SkillResult.ok(f"True. URL: {url}")
 
         except Exception as e:
-            return SkillResult.fail(f"Ошибка при форке репозитория: {e}")
+            return SkillResult.fail(f"Error forking repository: {e}")
 
     @skill()
     @require_agent_account()
@@ -504,9 +507,9 @@ class GithubRepositories:
         """
         Creates public or private Gist snippet.
         """
-        
+
         if not self.client.config.agent_account:
-            return SkillResult.fail("Ошибка: Для создания Gist нужен Agent Account.")
+            return SkillResult.fail("Error: Creating a Gist requires Agent Account.")
 
         try:
             payload = {
@@ -519,9 +522,9 @@ class GithubRepositories:
             self.client.state.add_history("create_gist")
 
             url = data.get("html_url")
-            main_logger.info(f"[Github] Создан Gist: {filename}")
+            main_logger.info(f"[Github] Gist created: {filename}")
 
-            return SkillResult.ok(f"Gist успешно создан.\nURL: {url}")
+            return SkillResult.ok(f"Gist successfully created.\nURL: {url}")
 
         except Exception as e:
-            return SkillResult.fail(f"Ошибка при создании Gist: {e}")
+            return SkillResult.fail(f"Error creating Gist: {e}")

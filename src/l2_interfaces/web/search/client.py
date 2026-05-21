@@ -1,8 +1,7 @@
 """
-Клиент Web Search интерфейса.
+L2 client for Web Search interface.
 
-Хранит общие константы, таймауты и лимиты для веб-поиска и парсинга страниц.
-Служит провайдером истории веб-серфинга агента.
+Configures search timeout, page limits, and handles search history context.
 """
 
 from typing import Any
@@ -12,7 +11,7 @@ from src.utils.settings import DeepResearchConfig
 
 
 class WebSearchClient:
-    """Базовый клиент веб-интерфейса."""
+    """Base client for the web search interface."""
 
     def __init__(
         self,
@@ -22,25 +21,27 @@ class WebSearchClient:
         deep_research_config: DeepResearchConfig = None,
     ) -> None:
         """
-        Инициализирует настройки веб-клиента.
+        Initializes web client settings.
 
         Args:
-            state: L0 стейт (приборная панель агента).
-            request_timeout: Таймаут на загрузку страниц.
-            max_page_chars: Жесткий лимит символов при чтении одной страницы.
-            deep_research_config: Конфигурация для навыка параллельного сбора информации.
+            state: L0 state (agent dashboard).
+            request_timeout: Timeout for loading pages.
+            max_page_chars: Strict character limit when reading a single page.
+            deep_research_config: Configuration for the parallel fact-gathering skill.
         """
+
         self.state = state
         self.timeout = request_timeout
         self.max_page_chars = max_page_chars
         self.deep_research_config = deep_research_config
-        self.state.is_online = True  # Если инициализирован, считаем включенным
+        self.state.is_online = True  # If initialized, consider enabled
 
     async def get_context_block(self, **kwargs: Any) -> str:
         """
-        Провайдер контекста для ContextRegistry.
-        Отдает отформатированный блок контекста для агента (история серфинга).
+        Context provider for ContextRegistry.
+        Returns formatted context block for the agent (browsing history).
         """
+
         desc = "Description: Search engines (DuckDuckGo/Tavily) and web page parsers."
         if not self.state.is_online:
             return f"### WEB SEARCH [OFF] \n{desc}\nThe interface is disabled."

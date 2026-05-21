@@ -1,9 +1,9 @@
 """
-Фоновый HTTP-сервер на базе aiohttp (Webhook Receiver).
+Background HTTP server based on aiohttp (Webhook Receiver).
 
-Слушает выделенный локальный порт и перехватывает POST/GET запросы от внешних интеграций
-(GitHub Actions, Stripe, Smart Home), пробрасывая их полезную нагрузку (JSON) в EventBus
-агента. Защищен механизмом валидации токена.
+Listens to a dedicated local port and intercepts POST/GET requests from external integrations
+(GitHub Actions, Stripe, Smart Home), forwarding their payload (JSON) to the agent's EventBus.
+Protected by a token validation mechanism.
 """
 
 import hmac
@@ -22,9 +22,7 @@ from src.l2_interfaces.web.hooks.client import WebHooksClient
 
 
 class WebHooksEvents:
-    """
-    Фоновый воркер: запускает aiohttp сервер для приема вебхуков.
-    """
+    """Background worker: launches aiohttp server to receive webhooks."""
 
     def __init__(
         self, client: WebHooksClient, state: WebHooksState, event_bus: EventBus, timezone: int
@@ -36,84 +34,82 @@ class WebHooksEvents:
 
         self.app = web.Application()
 
-        # Универсальный эндпоинт-воронка
+        # Universal funnel endpoint
         self.app.router.add_post("/webhook/{source}", self.handle_webhook)
-        self.app.router.add_get("/webhook/{source}", self.handle_webhook)  # На всякий случай
+        self.app.router.add_get("/webhook/{source}", self.handle_webhook)  # Just in case
 
         self.runner: Optional[web.AppRunner] = None
 
     async def start(self) -> None:
-        """
-        Запускает вебхук сервер.
-        """
+        """Starts the webhook server."""
         if self.state.is_online:
             return
 
         if not self.client.secret_token:
-            main_logger.error("[Web Hooks] WEBHOOK_SECRET не задан в .env. Сервер не запущен.")
+            main_logger.error(
+                "[Web Hooks] WEBHOOK_SECRET is not set in .env. Server not started."
+            )
             return
 
         try:
             self.runner = web.AppRunner(self.app, access_log=None)
             await self.runner.setup()
-            site = web.TCPSite(self.runner, self.client.config.host, self.client.config.port)
-            await site.start()
+            size = web.TCPSite(self.runner, self.client.config.host, self.client.config.port)
+            await size.start()
 
             self.state.is_online = True
             main_logger.info(
-                f"[Web Hooks] Сервер запущен на http://{self.client.config.host}:{self.client.config.port}"
+                f"[Web Hooks] Server started at http://{self.client.config.host}:{self.client.config.port}"
             )
 
         except Exception as e:
-            main_logger.error(f"[Web Hooks] Ошибка запуска сервера: {e}")
+            main_logger.error(f"[Web Hooks] Server startup error: {e}")
 
-            # Убираем за собой мусор, если бинд порта упал
+            # Clean up if port binding failed
             if self.runner:
                 await self.runner.cleanup()
                 self.runner = None
 
     async def stop(self) -> None:
-        """
-        Останавливает вебхук сервер.
-        """
+        """Stops the webhook server."""
         self.state.is_online = False
         if self.runner:
             await self.runner.cleanup()
-            main_logger.info("[Web Hooks] Сервер остановлен.")
+            main_logger.info("[Web Hooks] Server stopped.")
 
     async def handle_webhook(self, request: web.Request) -> web.Response:
         """
-        Универсальный эндпоинт-воронка.
-        Валидирует токен (Query или Bearer), парсит тело (JSON или Text) и генерирует
-        событие WEBHOOK_MESSAGE_INCOMING для экстренного пробуждения Heartbeat'а.
+        Universal funnel endpoint.
+        Validates token (Query or Bearer), parses body (JSON or Text), and generates
+        a WEBHOOK_MESSAGE_INCOMING event to urgently wake up the Heartbeat.
 
         Args:
-            request: Входящий HTTP-запрос (aiohttp).
+            request: Incoming HTTP request (aiohttp).
 
         Returns:
-            web.Response: 200 OK или 401 Unauthorized.
+            web.Response: 200 OK or 401 Unauthorized.
         """
-        # Валидация токена
+        # Token validation
         token = request.query.get("token")
         if not token:
             auth_header = request.headers.get("Authorization", "")
             if auth_header.startswith("Bearer "):
                 token = auth_header.replace("Bearer ", "").strip()
 
-        # hmac.compare_digest — защита от timing attack. Обычное != прекращает сравнение на
-        # первом несовпадающем символе, и разница во времени ответа позволяет атакующему
-        # подбирать секрет посимвольно. compare_digest всегда сравнивает за одинаковое время.
+        # hmac.compare_digest — protection against timing attacks. Normal != stops comparison
+        # at the first mismatched character, and the response time difference allows the attacker
+        # to guess the secret character by character. compare_digest always compares in constant time.
         if not self.client.secret_token or not hmac.compare_digest(
             token or "", self.client.secret_token
         ):
             main_logger.warning(
-                f"[Web Hooks] Несанкционированная попытка доступа с IP {request.remote} (входящий токен невалиден)"
+                f"[Web Hooks] Unauthorized access attempt from IP {request.remote} (incoming token is invalid)"
             )
             return web.json_response(
                 {"status": "error", "message": "Unauthorized"}, status=401
             )
 
-        # Получение данных
+        # Getting data
         source = request.match_info.get("source", "unknown")
 
         try:
@@ -123,27 +119,27 @@ class WebHooksEvents:
             payload = await request.text()
             is_json = False
 
-        # Обновление стейта L0
+        # Updating L0 state
         hook_id = str(uuid.uuid4())[:8]
         time_str = get_now_formatted(self.timezone, "%H:%M:%S")
 
-        # Делаем короткое превью для промпта
+        # Create short preview for the prompt
         raw_str = json.dumps(payload, ensure_ascii=False) if is_json else str(payload)
         preview = raw_str.replace("\n", " ").strip()
 
         limit = self.client.config.preview_max_chars
         if len(preview) > limit:
-            preview = preview[:limit] + "... [Обрезано]"
+            preview = preview[:limit] + "... [Truncated]"
 
         self.state.add_hook(hook_id, source, time_str, payload, preview)
-        main_logger.info(f"[Web Hooks] Принят вебхук от '{source}' (ID: {hook_id})")
+        main_logger.info(f"[Web Hooks] Webhook received from '{source}' (ID: {hook_id})")
 
-        # Проброс события в ядро агента
+        # Forward event to the agent core
         await self.bus.publish(
             Events.WEBHOOK_MESSAGE_INCOMING,
             source=source,
             hook_id=hook_id,
-            message=f"Новый вебхук от {source}",
+            message=f"New webhook from {source}",
             preview=preview,
         )
 

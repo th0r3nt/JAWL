@@ -1,15 +1,15 @@
-# Настройка GitHub
+# GitHub Configuration
 
-Интерфейс GitHub предоставляет агенту доступ к REST API (управление репозиториями, чтение кода, Issues, Pull Requests). В связке с навыками локального Git (клонирование в песочницу и коммиты) это позволяет агенту быть полноценным Software Engineer'ом.
+The GitHub interface provides the agent with access to the REST API (managing repositories, reading code, Issues, Pull Requests). In conjunction with local Git skills (cloning into the sandbox and making commits), this allows the agent to act as a full-fledged Software Engineer.
 
-## Авторизация и режимы работы
-В `.env` необходимо указать `GITHUB_TOKEN` (используйте классический Personal Access Token с правами `repo` и `read:user`).
+## Authorization and Operating Modes
+In `.env`, specify `GITHUB_TOKEN` (use a classic Personal Access Token with `repo` and `read:user` scopes).
 
-* **`agent_account: true`**: Полноценный режим. Агент будет использовать токен для авторизации. Он сможет читать приватные репозитории, создавать Issues, комментить код, делать форки и пушить коммиты. Лимит API — 5000 запросов в час.
-* **`agent_account: false`**: Read-Only режим. Токен не используется. Агент может только читать публичные репозитории. Лимит API крайне жесток — 60 запросов в час (хватит только на базовый поиск трендов).
+* **`agent_account: true`**: Full-access mode. The agent uses the token for authorization. It can read private repositories, create Issues, comment on code, make forks, and push commits. API limit is 5000 requests per hour.
+* **`agent_account: false`**: Read-Only mode. No token is used. The agent can only read public repositories. The API limit is extremely strict - 60 requests per hour (only enough for basic trends lookup).
 
-## Параметры (`github`)
+## Parameters (`github`)
 
-* **`request_timeout_sec`**: Таймаут ожидания ответа от серверов GitHub.
-* **`history_limit`**: Лимит MRU-кэша. Сколько последних действий (запросов) хранить в истории на приборной панели.
-* **`polling_interval_sec`**: Частота (в секундах) фонового опроса. Как часто агент будет проверять новые уведомления (меншны) и события в отслеживаемых репозиториях (Watchers).
+* **`request_timeout_sec`**: Timeout for waiting responses from GitHub servers.
+* **`history_limit`**: MRU cache limit. How many of the latest actions (requests) are stored in the history on the dashboard.
+* **`polling_interval_sec`**: Frequency (in seconds) of background polling. How often the agent will check for new notifications (mentions) and events in watched repositories (Watchers).

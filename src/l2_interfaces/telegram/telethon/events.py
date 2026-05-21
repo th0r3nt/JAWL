@@ -1,10 +1,10 @@
 """
-Слушатель событий (Events Poller) для Telethon.
+Event listener (Events Poller) for Telethon.
 
-Мощный оркестратор входящих данных (MTProto Updates).
-Перехватывает ЛС, упоминания, системные ивенты и реакции.
-Управляет MRU-кэшем диалогов, вычисляет статусы "UNREAD" и динамически подтягивает
-предысторию чатов (до 50 сообщений) для создания глубокого контекста в EventBus.
+Powerful orchestrator of incoming data (MTProto Updates).
+Intercepts DMs, mentions, system events, and reactions.
+Manages dialogue MRU-cache, calculates "UNREAD" statuses, and dynamically pulls
+chat history (up to 50 messages) to create deep context in EventBus.
 """
 
 import time
@@ -17,7 +17,7 @@ from telethon.tl.functions.messages import GetFullChatRequest, GetPeerDialogsReq
 from telethon.errors import FloodWaitError
 
 from src.utils._tools import truncate_text
-from src.utils.logger import main_logger
+from src.utils.logger import main_logger, agent_logger
 from src.utils.event.bus import EventBus
 from src.utils.event.registry import Events
 
@@ -31,7 +31,7 @@ from src.l2_interfaces.telegram.telethon.utils._message_parser import TelethonMe
 
 class TelethonEvents:
     """
-    Фоновый воркер-слушатель событий Telethon.
+    Background worker-listener of Telethon events.
     """
 
     def __init__(
@@ -42,13 +42,13 @@ class TelethonEvents:
         config: "TelethonConfig",
     ) -> None:
         """
-        Инициализирует менеджер событий.
+        Initializes the event manager.
 
         Args:
-            tg_client (TelethonClient): Инстанс клиента.
-            state (TelethonState): L0 стейт.
-            event_bus (EventBus): Шина событий JAWL.
-            config (TelethonConfig): Конфиг с лимитами.
+            tg_client (TelethonClient): Client instance.
+            state (TelethonState): L0 state.
+            event_bus (EventBus): JAWL event bus.
+            config (TelethonConfig): Config with limits.
         """
 
         self.tg_client = tg_client
@@ -56,14 +56,14 @@ class TelethonEvents:
         self.bus = event_bus
         self.config = config
 
-        # Защита от спама (rate limiter для обновления стейта)
+        # Spam protection (rate limiter for state updates)
         self._last_state_update = 0.0
 
-        # Кэш описаний чатов. Спасает от FloodWaitError, не делая FullChatRequest на каждый чих.
+        # Chat descriptions cache. Saves from FloodWaitError by not making FullChatRequest on every breath.
         self._chat_desc_cache: Dict[int, str] = {}
 
     async def start(self) -> None:
-        """Регистрирует хендлеры на сокете Telethon и делает первичный сбор стейта."""
+        """Registers handlers on the Telethon socket and performs initial state gathering."""
         client = self.tg_client.client()
         await self._update_state(force=True)
 
@@ -83,11 +83,11 @@ class TelethonEvents:
         client.add_event_handler(self._on_reaction, events.Raw())
         client.add_event_handler(self._on_outgoing_message, events.NewMessage(outgoing=True))
 
-        main_logger.info("[Telegram Telethon] Слушатели событий успешно запущены.")
+        main_logger.info("[Telegram Telethon] Event listeners successfully started.")
 
     async def stop(self) -> None:
-        """Останавливает обработку событий."""
-        main_logger.info("[Telegram Telethon] Слушатели событий успешно остановлены.")
+        """Stops event processing."""
+        main_logger.info("[Telegram Telethon] Event listeners successfully stopped.")
 
     # ==========================================================
     # STATE DASHBOARD BUILDERS (L0 State)
@@ -95,11 +95,11 @@ class TelethonEvents:
 
     async def _update_state(self, force: bool = False) -> None:
         """
-        Оркестратор обновления дашборда активных чатов.
-        Опрашивает список диалогов и делегирует их парсинг специализированным методам.
+        Orchestrator of the active chats dashboard update.
+        Queries the list of dialogues and delegates their parsing to specialized methods.
 
         Args:
-            force (bool): Игнорировать rate limiter (3 сек) и обновить немедленно.
+            force (bool): Ignore rate limiter (3 sec) and update immediately.
         """
         now = time.time()
         if not force and now - self._last_state_update < 3:
@@ -125,7 +125,7 @@ class TelethonEvents:
                 is_public = bool(getattr(entity, "username", None))
                 status_str = "Public" if is_public else "Private"
                 participants = getattr(entity, "participants_count", None)
-                part_str = f" | {participants} чел." if participants else ""
+                part_str = f" | {participants} people" if participants else ""
                 unread_str = (
                     f" [UNREAD: {dialog.unread_count}]" if dialog.unread_count > 0 else ""
                 )
@@ -150,10 +150,10 @@ class TelethonEvents:
             )
 
         except Exception as e:
-            main_logger.error(f"[Telethon] Ошибка обновления стейта: {e}")
+            main_logger.error(f"[Telethon] Error updating state: {e}")
 
     async def _get_entity_description(self, client: Any, entity: Any) -> str:
-        """Извлекает и кэширует описание группы/канала."""
+        """Extracts and caches group/channel description."""
         if entity.id not in self._chat_desc_cache:
             try:
                 about = ""
@@ -172,13 +172,13 @@ class TelethonEvents:
         desc = self._chat_desc_cache.get(entity.id, "")
         if desc:
             clean_desc = desc.replace("\n", " ")
-            return f" | Описание: {truncate_text(clean_desc, 100, '... [Обрезано]')}"
+            return f" | Description: {truncate_text(clean_desc, 100, '... [Truncated]')}"
         return ""
 
     async def _process_user_dialog(
         self, client: Any, dialog: Any, entity: Any, unread_str: str
     ) -> Tuple[str, str]:
-        """Обрабатывает ЛС, при необходимости выкачивая историю непрочитанных сообщений."""
+        """Processes DMs, fetching unread messages history if necessary."""
 
         bot_tag = " [Bot]" if getattr(entity, "bot", False) else ""
         overview_line = f"- [User] {dialog.name}{bot_tag} (ID: `{dialog.id}`){unread_str}"
@@ -205,7 +205,7 @@ class TelethonEvents:
                         msg_lines.append(indented)
                     unread_block = block + "\n\n" + "\n\n".join(msg_lines)
             except Exception as e:
-                main_logger.debug(f"[Telethon] Ошибка загрузки истории для {dialog.id}: {e}")
+                main_logger.debug(f"[Telethon] Error loading history for {dialog.id}: {e}")
 
         return overview_line, unread_block
 
@@ -219,7 +219,7 @@ class TelethonEvents:
         part_str: str,
         desc_str: str,
     ) -> str:
-        """Обрабатывает группы и каналы, включая логику парсинга Форумов (топиков)."""
+        """Processes groups and channels, including Forum (topic) parsing logic."""
         chat_type = "Group" if dialog.is_group else "Channel"
         forum_str = ""
 
@@ -235,14 +235,14 @@ class TelethonEvents:
                         else ""
                     )
                     topics_list.append(
-                        f"      ↳ Топик '{getattr(topic, 'title', 'Unknown')}' (ID: {topic.id}){t_unread}"
+                        f"      ↳ Topic '{getattr(topic, 'title', 'Unknown')}' (ID: {topic.id}){t_unread}"
                     )
             except Exception:
                 pass
 
             if not topics_list and dialog.unread_count > 0:
                 topics_list.append(
-                    f"      ↳ General / Общий топик (UNREAD: {dialog.unread_count})"
+                    f"      ↳ General / Main Topic (UNREAD: {dialog.unread_count})"
                 )
             if topics_list:
                 forum_str = "\n" + "\n".join(topics_list)
@@ -252,34 +252,36 @@ class TelethonEvents:
     def _build_markdown_dashboard(
         self, unread_blocks: List[str], overview_lines: List[str], total_dialogs: int
     ) -> str:
-        """Склеивает блоки в итоговый Markdown для системного промпта агента."""
+        """Formats the Markdown representation of active dialogues."""
         res_str = ""
         if unread_blocks:
-            res_str += "ТРЕБУЮТ ВНИМАНИЯ (Непрочитанные личные сообщения):\n"
+            res_str += "REQUIRED ATTENTION (Unread private messages):\n"
             res_str += "\n\n".join(unread_blocks)
             res_str += "\n\n---\n\n"
 
         if overview_lines:
-            res_str += "ПОСЛЕДНИЕ ДИАЛОГИ (Общий список):\n"
+            res_str += "RECENT DIALOGUES (General list):\n"
             res_str += "\n".join(overview_lines)
             if total_dialogs > len(overview_lines):
                 hidden = total_dialogs - len(overview_lines)
-                res_str += f"\n\n...и еще {hidden} чатов скрыто для экономии контекста. Для просмотра - соответствующая функция."
+                res_str += (
+                    f"\n\n...and {hidden} more chats hidden. Increase limit to load more."
+                )
         else:
-            res_str += "Список диалогов пуст."
+            res_str += "Dialogues list is empty."
 
         return res_str
 
     # ==========================================================
-    # ОБРАБОТЧИКИ
+    # HANDLERS
     # ==========================================================
 
     async def _on_outgoing_message(self, event: events.NewMessage.Event) -> None:
-        """Триггер на исходящие (наши) сообщения: форсируем обновление стейта."""
+        """Trigger on outgoing (our) messages: force state update."""
         await self._update_state(force=True)
 
     async def _on_private_message(self, event: events.NewMessage.Event) -> None:
-        """Перехват ЛС. Динамически подтягивает контекст (историю) чата."""
+        """Intercepts DMs. Dynamically pulls chat context (history)."""
         await self._update_state(force=True)
 
         client = self.tg_client.client()
@@ -299,7 +301,7 @@ class TelethonEvents:
 
         enriched_message = f"{base_text}{fwd_info}{reply_info}".strip()
 
-        # Динамический расчет истории сообщений
+        # Dynamic calculation of messages history
         unread_count = await self._get_unread_count(chat)
         limit = min(50, max(self.config.incoming_history_limit, unread_count))
         history = await self._fetch_recent_history(chat, limit=limit)
@@ -318,7 +320,7 @@ class TelethonEvents:
         await self.bus.publish(Events.TELETHON_MESSAGE_INCOMING, **payload)
 
     async def _on_group_message(self, event: events.NewMessage.Event) -> None:
-        """Перехват сообщений в группах. Резолвит ветки (Topics) на форумах."""
+        """Intercepts group messages. Resolves threads (Topics) on forums."""
         if event.mentioned:
             event_type = Events.TELETHON_GROUP_MENTION
         else:
@@ -386,7 +388,7 @@ class TelethonEvents:
         await self.bus.publish(event_type, **payload)
 
     async def _on_reaction(self, event: Any) -> None:
-        """Перехватывает реакции (эмодзи) на сообщения."""
+        """Intercepts message emoji reactions."""
         if not isinstance(event, UpdateMessageReactions):
             return
 
@@ -397,7 +399,7 @@ class TelethonEvents:
         except Exception:
             chat_id = "Unknown"
 
-        reactions_str = "Реакции удалены"
+        reactions_str = "Reactions removed"
         if getattr(event, "reactions", None) and getattr(event.reactions, "results", None):
             r_list = [
                 f"{getattr(r.reaction, 'emoticon', '[CustomEmoji]')} x{r.count}"
@@ -414,7 +416,7 @@ class TelethonEvents:
         )
 
     async def _on_channel_message(self, event: events.NewMessage.Event) -> None:
-        """Перехватывает посты в каналах."""
+        """Intercepts channel posts."""
         await self._update_state()
 
         client = self.tg_client.client()
@@ -446,37 +448,33 @@ class TelethonEvents:
         await self.bus.publish(Events.TELETHON_CHANNEL_MESSAGE, **payload)
 
     async def _on_chat_action(self, event: events.ChatAction.Event) -> None:
-        """Перехват системных действий в чате (юзер вступил, закреп, смена фото)."""
+        """Intercepts system actions in chat (user joined, pin, photo change)."""
         await self._update_state()
 
         chat = await event.get_chat()
         chat_name = utils.get_display_name(chat) if chat else "Unknown"
 
-        action_text = "[Системное действие] Произошло системное событие в чате."
+        action_text = "[System Action] A system event occurred in the chat."
 
         users = [utils.get_display_name(u) for u in event.users] if event.users else []
-        users_str = ", ".join(users) if users else "Кто-то"
+        users_str = ", ".join(users) if users else "Someone"
 
         if event.user_joined:
-            action_text = f"[Системное действие] {users_str} присоединился к чату."
+            action_text = f"[System Action] {users_str} joined the chat."
         elif event.user_added:
-            action_text = f"[Системное действие] {users_str} был добавлен в чат."
+            action_text = f"[System Action] {users_str} was added to the chat."
         elif event.user_left:
-            action_text = f"[Системное действие] {users_str} покинул чат."
+            action_text = f"[System Action] {users_str} left the chat."
         elif event.user_kicked:
-            action_text = f"[Системное действие] {users_str} был исключен."
+            action_text = f"[System Action] {users_str} was kicked."
         elif event.created:
-            action_text = (
-                f"[Системное действие] Чат '{event.new_title or chat_name}' был создан."
-            )
+            action_text = f"[System Action] Chat '{event.new_title or chat_name}' was created."
         elif event.new_title:
-            action_text = (
-                f"[Системное действие] Название чата изменено на '{event.new_title}'."
-            )
+            action_text = f"[System Action] Chat title was changed to '{event.new_title}'."
         elif event.new_photo or event.photo_deleted:
-            action_text = "[Системное действие] В чате обновлено или удалено фото."
+            action_text = "[System Action] Chat photo was updated or deleted."
         elif event.new_pin:
-            action_text = "[Системное действие] В чате закреплено новое сообщение."
+            action_text = "[System Action] New message pinned in the chat."
 
         payload = {
             "message": action_text,
@@ -488,12 +486,12 @@ class TelethonEvents:
         await self.bus.publish(Events.TELETHON_CHAT_ACTION, **payload)
 
     # ==========================================================
-    # СЛУЖЕБНЫЕ МЕТОДЫ (HELPERS)
+    # HELPERS
     # ==========================================================
 
     async def _fetch_recent_history(self, target_entity: Any, limit: int = 5) -> str:
         """
-        Вытаскивает N последних сообщений чата (предысторию) для инъекции в событие.
+        Pulls N last messages of the chat (history) for injection into the event.
         """
         if not target_entity:
             return ""
@@ -519,26 +517,26 @@ class TelethonEvents:
             return "\n" + "\n\n".join(lines)
 
         except Exception as e:
-            main_logger.error(f"[Telegram Telethon] Не удалось подтянуть предысторию: {e}")
+            main_logger.error(f"[Telegram Telethon] Failed to fetch history: {e}")
             return ""
 
     async def _get_unread_count(self, peer: Any) -> int:
-        """Определяет количество непрочитанных сообщений в чате."""
+        """Determines the unread messages count in the chat."""
         try:
             client = self.tg_client.client()
             peer_dialogs = await client(GetPeerDialogsRequest(peers=[peer]))
             if peer_dialogs and peer_dialogs.dialogs:
                 return peer_dialogs.dialogs[0].unread_count
         except Exception as e:
-            main_logger.debug(f"[TelethonEvents] Ошибка получения unread_count: {e}")
+            main_logger.debug(f"[TelethonEvents] Error obtaining unread_count: {e}")
         return 0
 
     async def _get_topics(self, client: Any, entity: Any, limit: int = 100) -> list:
-        """Получает список топиков форума через Raw API Telethon."""
+        """Gets forum topics list via Raw API Telethon."""
         try:
             from telethon.tl.functions.channels import GetForumTopicsRequest
         except ImportError:
-            main_logger.debug("[TelethonChats] GetForumTopicsRequest недоступен.")
+            main_logger.debug("[TelethonChats] GetForumTopicsRequest unavailable.")
             return []
 
         try:
@@ -554,5 +552,5 @@ class TelethonEvents:
             )
             return getattr(result, "topics", [])
         except Exception as e:
-            main_logger.error(f"[TelethonChats] Ошибка _get_topics: {e}")
+            main_logger.error(f"[TelethonChats] Error _get_topics: {e}")
             return []

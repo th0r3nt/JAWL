@@ -52,12 +52,12 @@ def test_prompt_builder_happy_path(fake_prompt_dir):
 def test_prompt_builder_missing_folders(tmp_path):
     builder = PromptBuilder(tmp_path)
     result = builder.build()
-    assert result == ""  # Папок нет, промпт пустой
+    assert result == ""  # Папок нет, промпт emptyой
 
 
 def test_prompt_builder_read_error(fake_prompt_dir):
     builder = PromptBuilder(fake_prompt_dir)
-    with patch("pathlib.Path.read_text", side_effect=PermissionError("Отказано в доступе")):
+    with patch("pathlib.Path.read_text", side_effect=PermissionError("Access denied")):
         with pytest.raises(RuntimeError) as exc:
             builder.build()
-        assert "Ошибка чтения файла промпта" in str(exc.value)
+        assert "Error reading prompt file" in str(exc.value)

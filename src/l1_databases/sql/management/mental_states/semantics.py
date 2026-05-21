@@ -1,6 +1,6 @@
 """
-Семантический модуль для Mental States.
-Отвечает за красивую группировку сущностей, их отношений (Attitude) и связей.
+Semantic module for Mental States.
+Responsible for clean grouping of entities, their attitudes, and relations.
 """
 
 from typing import List
@@ -29,7 +29,7 @@ def build_mental_states(states: List[MentalStateTable], max_entities: int) -> st
         time_ago = f"{hours}h {minutes}m ago"
 
         tier_str = s.tier.upper()
-        # Иконки для понимания "одушевленности"
+        # Icons for understanding "animacy"
 
         lines.append(
             f"[{s.category.capitalize()}: {s.name}] (ID: `{s.id}` | Tier: {tier_str} | Updated: {time_ago})"
@@ -57,6 +57,6 @@ def build_mental_states(states: List[MentalStateTable], max_entities: int) -> st
             for rel_id, rel_desc in s.relations.items():
                 lines.append(f"    -> [ID: {rel_id}]: {rel_desc}")
 
-        lines.append("")  # Отступ между карточками
+        lines.append("")  # Spacing between cards
 
     return "\n".join(lines).strip()

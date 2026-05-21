@@ -1,5 +1,5 @@
 """
-Плагин интерфейса Code Graph.
+Code Graph (Playwright) interface plugin.
 """
 
 from typing import List, Any, Dict, Optional
@@ -29,7 +29,6 @@ class CodeGraphPlugin(BaseInterface):
         return "Parsing Python directory AST-trees and constructing dependency/relationship graphs for semantic search."
 
     def is_enabled(self, config: InterfacesConfig) -> bool:
-        # Для обратной совместимости проверяем наличие code_graph в конфиге
         return getattr(config, "code_graph", None) and getattr(
             config.code_graph, "enabled", False
         )
@@ -39,7 +38,6 @@ class CodeGraphPlugin(BaseInterface):
     ) -> List[Any]:
         os_state = container.l0_states.get("os") or HostOSState()
 
-        # Создаем легковесного гейткипера ОС для безопасного чтения файлов при парсинге
         host_os_client = HostOSClient(
             base_dir=container.root_dir,
             config=container.interfaces_config.host.os,
@@ -66,5 +64,5 @@ class CodeGraphPlugin(BaseInterface):
             section=ContextSection.INTERFACES,
         )
 
-        main_logger.info("[Code Graph] Интерфейс загружен..")
+        main_logger.info("[Code Graph] Interface loaded.")
         return []

@@ -1,14 +1,14 @@
-# Настройка Telegram (Aiogram)
+# Telegram Configuration (Aiogram)
 
-Интерфейс `aiogram` предназначен для классического Bot API. Идеально подходит, если агент должен выступать в роли классического бота-помощника, техподдержки или модератора чата.
+The `aiogram` interface is designed for the classic Bot API. It is ideal if the agent needs to act as a classic support assistant, bot manager, or chat moderator.
 
-## Авторизация
-Создайте бота у [@BotFather](https://t.me/BotFather), скопируйте полученный токен и добавьте его в файл `.env`:
+## Authorization
+Create a bot with [@BotFather](https://t.me/BotFather), copy the token, and add it to the `.env` file:
 * `AIOGRAM_BOT_TOKEN="123456789:ABCDefgh..."`
 
-В отличие от Telethon, ботам недоступна полная история переписок. Агент будет "видеть" только те сообщения, которые пришли после его запуска.
+Unlike Telethon, bots do not have access to full chat histories. The agent will only "see" messages that arrived after its startup.
 
-## Параметры (`telegram.aiogram`)
+## Parameters (`telegram.aiogram`)
 
-* **`enabled`**: `true` / `false`. Включение интерфейса.
-* **`recent_chats_limit`**: Лимит чатов, отображаемых на приборной панели (L0 State). Если бот добавлен в 500 групп, этот лимит не позволит списку сжечь весь лимит токенов LLM.
+* **`enabled`**: `true` / `false`.
+* **`recent_chats_limit`**: Maximum number of active chats displayed on the dashboard (L0 State). If the bot is added to 500 groups, this limit prevents the list from burning your entire LLM token quota.

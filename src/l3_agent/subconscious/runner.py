@@ -1,3 +1,10 @@
+"""
+Subconscious Runner.
+
+Implements a lightweight, stateless ReAct loop for background database
+maintenance tasks (Consolidation, Reflection, Forgetting).
+"""
+
 import asyncio
 from pathlib import Path
 from typing import List, Tuple, Optional
@@ -10,7 +17,6 @@ from src.l3_agent.skills.schema import AgentResponse, ActionCall, ACTION_SCHEMA,
 from src.l3_agent.skills.registry import _REGISTRY, call_skill
 from src.l3_agent.subconscious.schema import Pattern
 
-# Импортируем менеджеры
 from src.l1_databases.sql.manager import SQLManager
 from src.l1_databases.vector.manager import VectorManager
 from src.l1_databases.graph.manager import GraphManager
@@ -18,7 +24,7 @@ from src.l1_databases.graph.schema import GRAPH_NODE_TABLE
 
 
 class SubconsciousRunner:
-    """Облегченный цикл ReAct для фоновой работы с базами данных."""
+    """Lightweight ReAct loop for background database tasks."""
 
     def __init__(
         self,
@@ -30,6 +36,9 @@ class SubconsciousRunner:
         root_dir: Path,
         max_steps: int = 4,
     ) -> None:
+        """
+        Initializes the background runner.
+        """
         self.executor = executor
 
         self.model_name = model_name
@@ -40,30 +49,26 @@ class SubconsciousRunner:
         self.max_steps = max_steps
 
     # ========================================================
-    # ОСНОВНОЙ ЦИКЛ RUN
+    # MAIN RUN LOOP
     # ========================================================
 
     async def run(self, pattern: Pattern, ticks_to_analyze: int) -> None:
-        """Запускает мини-цикл раздумий подсознания."""
-        log = (
-            f"[Subconscious] Запуск паттерна {pattern.value.upper()} (LLM: {self.model_name})."
-        )
+        """Launches a miniature subconscious reasoning cycle."""
+        log = f"[Subconscious] Starting pattern {pattern.value.upper()} (LLM: {self.model_name})."
         subc_logger.info(log)
 
         prompt = self._get_prompt(pattern)
         allowed_skills_doc = self._get_allowed_skills(pattern)
 
-        # Динамически собираем контекст
         context = await self._build_dynamic_context(pattern, ticks_to_analyze)
 
-        full_user_msg = f"{context}\n\n## AVAILABLE SKILLS\nВам разрешено использовать исключительно следующие инструменты:\n{allowed_skills_doc}"
+        full_user_msg = f"{context}\n\n## AVAILABLE SKILLS\nYou are allowed to use strictly the following tools:\n{allowed_skills_doc}"
 
         messages = [
             {"role": "system", "content": prompt},
             {"role": "user", "content": full_user_msg},
         ]
 
-        # Мини-ReAct Loop
         for step in range(self.max_steps):
             await asyncio.to_thread(self._dump_context_to_file, messages, pattern)
 
@@ -86,7 +91,7 @@ class SubconsciousRunner:
                 continue
 
             if not parsed.actions:
-                log = f"[Subconscious] Паттерн {pattern.value.upper()} штатно завершил работу."
+                log = f"[Subconscious] Pattern {pattern.value.upper()} successfully completed operations."
                 subc_logger.info(log)
                 break
 
@@ -94,33 +99,31 @@ class SubconsciousRunner:
             messages.append({"role": "assistant", "content": raw_answer})
             messages.append({"role": "user", "content": results})
 
-        log = f"[Subconscious] Цикл паттерна {pattern.value.upper()} окончен."
+        log = f"[Subconscious] Cycle of pattern {pattern.value.upper()} concluded."
         subc_logger.debug(log)
 
     # ========================================================
-    # СТРАТЕГИИ СБОРКИ КОНТЕКСТА ДЛЯ РАЗНЫХ ПАТТЕРНОВ
+    # CONTEXT BUILDER STRATEGIES
     # ========================================================
 
     async def _build_ticks_context(self, limit: int) -> str:
-        """Собирает недавние тики. (Используется Консолидацией)."""
+        """Gathers recent ticks (used by Consolidation)."""
         return await self.sql.ticks.get_full_context_block(limit=limit)
 
     async def _build_reflection_context(self, limit: int) -> str:
-        """Собирает тики + текущее состояние CRM и Черт характера."""
+        """Gathers ticks + active CRM state and personality traits (used by Reflection)."""
         ticks_ctx = await self._build_ticks_context(limit)
 
-        # Получаем сырые данные напрямую через методы скиллов, которые возвращают SkillResult
         ms_res = await self.sql.mental_states.get_mental_states()
         tr_res = await self.sql.personality_traits.get_traits()
 
         return f"{ticks_ctx}\n\n{ms_res.message}\n\n{tr_res.message}"
 
     async def _build_forgetting_context(self, limit: int) -> str:
-        """Собирает дампы баз данных для чистки мусора."""
+        """Gathers database dumps for garbage collection (used by Forgetting)."""
         k_res = await self.vector.knowledge.get_all_knowledge(limit=limit)
         t_res = await self.vector.thoughts.get_all_thoughts(limit=limit)
 
-        # Для графа у нас нет прямого скилла "получить всё", поэтому делаем безопасный запрос
         def _get_graph_nodes():
             try:
                 res = self.graph.db.conn.execute(
@@ -130,9 +133,9 @@ class SubconsciousRunner:
                 while res.has_next():
                     row = res.get_next()
                     nodes.append(f"- [{row[1]}] {row[0]}: {row[2]}")
-                return "\n".join(nodes) if nodes else "Граф пуст."
+                return "\n".join(nodes) if nodes else "Graph is empty."
             except Exception:
-                return "Граф пуст или недоступен."
+                return "Graph is empty or unavailable."
 
         graph_str = await asyncio.to_thread(_get_graph_nodes)
 
@@ -143,7 +146,7 @@ class SubconsciousRunner:
         )
 
     async def _build_dynamic_context(self, pattern: Pattern, limit: int) -> str:
-        """Маршрутизатор контекста."""
+        """Context router."""
         if pattern == Pattern.CONSOLIDATION:
             return await self._build_ticks_context(limit)
 
@@ -152,10 +155,10 @@ class SubconsciousRunner:
         elif pattern == Pattern.FORGETTING:
             return await self._build_forgetting_context(limit)
 
-        return "Нет данных."
+        return "No data."
 
     # ========================================================
-    # Служебные методы
+    # Private Helpers
     # ========================================================
 
     def _parse_response(
@@ -166,11 +169,10 @@ class SubconsciousRunner:
     async def _execute_actions(self, actions: List[ActionCall], pattern: Pattern) -> str:
         results = []
         for act in actions:
-            # Двойная проверка RBAC (разрешен ли скилл этому паттерну)
             item = _REGISTRY.get(act.tool_name)
             if not item or pattern not in item.get("subconscious", []):
                 results.append(
-                    f"* {act.tool_name}: Отказано в доступе. Инструмент не разрешен для паттерна {pattern.value.upper()}."
+                    f"* {act.tool_name}: Access denied. Tool is not allowed for the {pattern.value.upper()} pattern."
                 )
                 continue
 
@@ -178,7 +180,7 @@ class SubconsciousRunner:
                 res = await call_skill(act.tool_name, act.parameters, logger=subc_logger)
                 results.append(f"* {act.tool_name}: {res.message}")
             except Exception as e:
-                results.append(f"* {act.tool_name}: Внутренняя ошибка - {e}")
+                results.append(f"* {act.tool_name}: Internal error - {e}")
 
         return "\n".join(results)
 
@@ -187,7 +189,7 @@ class SubconsciousRunner:
         for name, data in _REGISTRY.items():
             if pattern in data.get("subconscious", []):
                 allowed_docs.append(data["doc_string"])
-        return "\n".join(allowed_docs) if allowed_docs else "Нет доступных инструментов."
+        return "\n".join(allowed_docs) if allowed_docs else "No tools available."
 
     def _get_prompt(self, pattern: Pattern) -> str:
         prompt_path = (
@@ -200,10 +202,10 @@ class SubconsciousRunner:
         )
         if prompt_path.exists():
             return prompt_path.read_text(encoding="utf-8").strip()
-        return f"Вы — фоновый процесс подсознания ({pattern.value.upper()})."
+        return f"You are a background subconscious process ({pattern.value.upper()})."
 
     def _dump_context_to_file(self, messages: list, pattern: Pattern) -> None:
-        """Сохраняет промпт подсознания (Consolidation/Reflection/Forgetting) для отладки."""
+        """Dumps subconscious prompt to a Markdown file for debugging."""
         from src.utils._tools import dump_prompt_to_file
 
         meta = f"# SUBCONSCIOUS DUMP: {pattern.value.upper()}"

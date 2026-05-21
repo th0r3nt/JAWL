@@ -1,32 +1,31 @@
-# Настройка Подсознания (Subconscious)
+# Subconscious Configuration (Subconscious)
 
-Модуль `subconscious` позволяет Главному Агенту (Оркестратору) переложить рутинную работу по обслуживанию баз данных на фоновые микро-процессы.
+The `subconscious` module allows the Main Agent (Orchestrator) to delegate routine database maintenance tasks to background micro-processes.
 
-Если Оркестратор "осознает" информацию в реальном времени, то Подсознание работает в фоне: оно просыпается через определенное количество тактов, анализирует сырые дампы памяти и наводит порядок, не блокируя работу системы. 
+While the Orchestrator "reasons" in real-time, the Subconscious operates in the background: it wakes up on a schedule based on tick counts, analyzes raw database dumps, and tidies up, without blocking the main reasoning loop.
 
-Для этой задачи рекомендуется использовать **дешевые и быстрые модели**.
+It is highly recommended to use **cheap and fast models** for these background tasks.
 
-## Паттерны поведения
+## Behavior Patterns
 
-Подсознание разделено на 3 независимых паттерна, каждый из которых имеет свой счетчик тактов (тиков) и строгий системный промпт.
+The Subconscious is divided into 3 independent patterns, each having its own tick threshold counter and system prompt instructions.
 
-### 1. Consolidation (Консолидация)
-- **Цель:** Перенос фактов из кратковременной памяти (логов действий агента) в долгосрочную (Векторную базу).
-- **Как работает:** Читает последние N действий агента. Если агент узнал что-то важное (например, пароль, факт о сервере или новую технологию), Подсознание тихо вызывает навык `save_knowledge` и сохраняет это.
+### 1. Consolidation
+- **Goal:** Transfer of facts from temporary episodic memory (agent's actions history logs) to long-term memory (Vector DB).
+- **How it works:** Reads the agent's last N actions. If the agent learned something important (for example, a credential, a server fact, or a new technology), the Subconscious silently calls the `save_knowledge` skill to preserve it.
 
-### 2. Reflection (Рефлексия)
-- **Цель:** Анализ отношений и корректировка поведения.
-- **Как работает:** Если агент регулярно злится на определенного пользователя или сталкивается со сбоем одной и той же программы, Подсознание обновит карточку этой сущности в базе данных Mental States или добавит новую черту характера (Personality Trait).
+### 2. Reflection
+- **Goal:** Relationship audit and behavioral adaptation.
+- **How it works:** If the agent regularly interacts with a specific user or encounters crashes on a particular system, the Subconscious updates the entity's card in the Mental States database or adds a new acquired Personality Trait.
 
-### 3. Forgetting (Информационная гигиена)
-- **Цель:** Очистка баз данных от мусора и дубликатов.
-- **Как работает:** Читает дампы Векторной и Графовой БД. Если находит ошибки парсинга, устаревшие временные данные или полностью идентичные записи — удаляет их, освобождая место и улучшая будущий поиск (RAG).
+### 3. Forgetting (Information Hygiene)
+- **Goal:** Purging databases of redundant or corrupted data.
+- **How it works:** Scans Vector and Graph DB dumps. If it finds parsing errors, obsolete temporary records, or duplicate entries, it purges them to maintain high semantic density for future RAG lookups.
 
+## Parameters (`system.subconscious`)
 
-## Параметры (`system.subconscious`)
-
-* **`enabled`**: `true` / `false`. Глобальный рубильник модуля.
-* **`llm_model`**: Идентификатор модели для фоновых процессов (укажите самую дешевую из доступных).
-* **`patterns`**: Настройка каждого паттерна в отдельности.
-  * **`enabled`**: `true` / `false`. Включен ли конкретный паттерн.
-  * **`activation_limit_ticks`**: Частота пробуждения. Например, `30` означает, что этот паттерн будет запускаться каждые 30 тактов (тиков) Главного Агента. Рекомендуется ставить для Консолидации `30`, а для Забывания `90` или выше.
+* **`enabled`**: `true` / `false`. Global switch for the subconscious module.
+* **`llm_model`**: Model identifier for background processes (specify the cheapest available model).
+* **`patterns`**: Individual configurations for each pattern.
+  * **`enabled`**: `true` / `false`. Enables or disables the specific pattern.
+  * **`activation_limit_ticks`**: Execution frequency. For example, `30` means this pattern will run once every 30 main agent ticks. It is recommended to use `30` for Consolidation and `90` or higher for Forgetting.

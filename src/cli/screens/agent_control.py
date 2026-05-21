@@ -1,3 +1,11 @@
+"""
+Agent Control CLI Screen.
+
+Manages background agent processes (start, stop, status).
+Validates configurations and credentials (e.g., Telethon session verification)
+before launching the main execution orchestrator.
+"""
+
 import sys
 import os
 import shutil
@@ -25,12 +33,12 @@ PROMPTS_DIR = ROOT_DIR / "src" / "l3_agent" / "prompt" / "personality"
 
 
 def _is_agent_running() -> bool:
-    """Проверяет, работает ли агент на самом деле."""
+    """Checks if the agent process is actually running."""
     return is_agent_running()
 
 
 def _check_and_setup_prompts() -> None:
-    """Проверяет наличие файлов промпта личности. Если их нет, создает из .example.md."""
+    """Verifies personality prompts presence. Recreates from .example.md if missing."""
     if not PROMPTS_DIR.exists():
         PROMPTS_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -40,33 +48,33 @@ def _check_and_setup_prompts() -> None:
 
         if not target_file.exists():
             shutil.copy(example_file, target_file)
-            print_info(f" Создан базовый файл личности: {target_name}")
+            print_info(f" Created base personality file: {target_name}")
 
 
 def _validate_configs() -> bool:
-    """Предполетная проверка конфигураций."""
+    """Pre-flight configuration validation."""
     try:
         load_config()
         return True
 
     except ValidationError as e:
-        print_error("Ошибка структуры конфигурации (yaml не совпадает со схемой):")
+        print_error("Configuration structure error (yaml does not match the schema):")
         for err in e.errors():
             loc = " -> ".join(map(str, err.get("loc", [])))
             print_info(f"[{loc}]: {err.get('msg')}")
 
         print_info(
-            "\n 💡 Подсказка: если вы обновили JAWL, удалите старые файлы settings.yaml и interfaces.yaml в папке config/, чтобы система пересоздала их из актуальных шаблонов."
+            "\n 💡 Tip: if you updated JAWL, delete old settings.yaml and interfaces.yaml files in the config/ folder so the system can recreate them from the latest templates."
         )
         return False
 
     except Exception as e:
-        print_error(f"Критическая ошибка при чтении настроек: {e}")
+        print_error(f"Critical error reading settings: {e}")
         return False
 
 
 def _telethon_auth_flow() -> bool:
-    """Предполетная авторизация сессии Telethon, если она включена в конфиге."""
+    """Pre-flight Telethon session authorization if enabled."""
     settings, interfaces = load_config()
 
     if not interfaces.telegram.telethon.enabled:
@@ -77,17 +85,15 @@ def _telethon_auth_flow() -> bool:
     api_hash = env_dict.get("TELETHON_API_HASH")
 
     if not api_id or not api_hash:
-        print_info(
-            " Для работы Telethon требуются API_ID и API_HASH (можно получить на my.telegram.org)."
-        )
-        api_id_input = questionary.text("Введите TELETHON_API_ID:").ask()
+        print_info(" Telethon requires API_ID and API_HASH (obtainable at my.telegram.org).")
+        api_id_input = questionary.text("Enter TELETHON_API_ID:").ask()
         if not api_id_input:
-            print_error("Запуск отменен: TELETHON_API_ID обязателен.")
+            print_error("Startup cancelled: TELETHON_API_ID is required.")
             return False
 
-        api_hash_input = questionary.text("Введите TELETHON_API_HASH:").ask()
+        api_hash_input = questionary.text("Enter TELETHON_API_HASH:").ask()
         if not api_hash_input:
-            print_error("Запуск отменен: TELETHON_API_HASH обязателен.")
+            print_error("Startup cancelled: TELETHON_API_HASH is required.")
             return False
 
         with open(ENV_FILE, "a", encoding="utf-8") as f:
@@ -111,7 +117,7 @@ def _telethon_auth_flow() -> bool:
 
             await client.connect()
             if not await client.is_user_authorized():
-                print_info(" Сессия Telegram не найдена. Потребуется авторизация.")
+                print_info(" Telegram session not found. Authorization required.")
                 await client.start()
 
             me = await client.get_me()
@@ -119,45 +125,41 @@ def _telethon_auth_flow() -> bool:
             if getattr(me, "last_name", None):
                 name += f" {me.last_name}"
 
-            print_success(f"Telegram сессия активна (Пользователь: {name}).")
+            print_success(f"Telegram session active (User: {name}).")
             await client.disconnect()
             return True
 
         except Exception as e:
-            print_error(f"Ошибка при авторизации Telethon: {e}")
+            print_error(f"Error authorizing Telethon: {e}")
             return False
 
-    print_info(" Проверка сессии Telegram (Telethon)...")
+    print_info(" Verifying Telegram (Telethon) session...")
     return asyncio.run(_auth())
 
 
 def start_agent_screen() -> None:
-    """Экран запуска агента."""
+    """Agent startup screen."""
     if _is_agent_running():
-        print_error("Агент уже запущен. Если он завис, сначала остановите его.")
+        print_error("Agent is already running. If it's frozen, stop it first.")
         wait_for_enter()
         return
 
-    # 1. Запуск онбординга, если .env или ключей еще нет
     if not run_onboarding_if_needed():
         wait_for_enter()
         return
 
-    # 2. Тихая генерация промптов личности (если их удалили)
     _check_and_setup_prompts()
 
-    # 3. Валидация всех Pydantic-схем перед запуском основного кода
     if not _validate_configs():
         wait_for_enter()
         return
 
-    # 4. Проверка телеграм-сессии
     if not _telethon_auth_flow():
         wait_for_enter()
         return
 
     print("\n")
-    print_info(" Инициализация систем агента.")
+    print_info(" Initializing agent systems.")
     PID_FILE.parent.mkdir(parents=True, exist_ok=True)
 
     env = os.environ.copy()
@@ -192,34 +194,33 @@ def start_agent_screen() -> None:
         time.sleep(5)
 
         if process.poll() is not None:
-            print_error("Агент завершился с ошибкой сразу после старта.")
+            print_error("Agent terminated with an error immediately after startup.")
 
             error_output = crash_log_path.read_text(encoding="utf-8", errors="replace").strip()
 
             if error_output:
-                print_info("Детали критической ошибки (Traceback):")
+                print_info("Critical error details (Traceback):")
                 print(f"\n{error_output}\n")
             else:
-                print_info("Проверьте основной лог (logs/system.log) для получения деталей.")
+                print_info("Check the main log (logs/system.log) for details.")
 
             wait_for_enter()
             return
 
-        print_success("Агент успешно запущен в фоновом режиме.")
+        print_success("Agent successfully started in the background.")
         time.sleep(1)
-        print_info(" Для просмотра логов выберите 'Логи' в главном меню.")
+        print_info(" To view logs, select 'Logs' from the main menu.")
 
     except Exception as e:
-        print_error(f"Не удалось запустить агента: {e}")
+        print_error(f"Failed to start agent: {e}")
 
     wait_for_enter()
 
 
 def stop_agent_screen() -> None:
-    """Экран остановки агента."""
+    """Agent stop screen."""
     if not _is_agent_running():
-        print_info(" Агент в данный момент не запущен.")
-        # Для надежности сносим файлы-маркеры, если они остались
+        print_info(" Agent is not currently running.")
         try:
             if PID_FILE.exists():
                 PID_FILE.unlink()
@@ -229,11 +230,10 @@ def stop_agent_screen() -> None:
         return
 
     try:
-        # Читаем PID из незаблокированного файла agent.pid
         pid = int(PID_FILE.read_text().strip())
         process = psutil.Process(pid)
 
-        print_info(" Отправка сигнала на плавное завершение (Graceful Shutdown).")
+        print_info(" Sending signal for graceful shutdown.")
         STOP_FILE.touch(exist_ok=True)
 
         timeout = 15
@@ -246,18 +246,17 @@ def stop_agent_screen() -> None:
             time.sleep(1)
 
         if is_dead:
-            print_success("Агент успешно остановлен.")
+            print_success("Agent successfully stopped.")
         else:
             print_error(
-                f"Агент не ответил за {timeout} секунд. Принудительное убийство (SIGKILL)."
+                f"Agent did not respond within {timeout} seconds. Forcing termination (SIGKILL)."
             )
             process.kill()
-            print_success("Процесс агента выслежен и убит.")
+            print_success("Agent process tracked and killed.")
 
     except Exception as e:
-        print_error(f"Ошибка при попытке остановить агента: {e}")
+        print_error(f"Error attempting to stop agent: {e}")
 
-    # Подчищаем мусор, игнорируя ошибки
     try:
         if PID_FILE.exists():
             PID_FILE.unlink()

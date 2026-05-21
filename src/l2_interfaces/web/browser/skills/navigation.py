@@ -1,3 +1,9 @@
+"""
+Browser navigation skills.
+
+Handles page loading, scrolling, and browser shutdown.
+"""
+
 from src.utils.logger import main_logger
 from src.l3_agent.skills.registry import skill, SkillResult
 from src.l2_interfaces.web.browser.client import WebBrowserClient
@@ -5,7 +11,7 @@ from src.l2_interfaces.web.browser.client import WebBrowserClient
 
 class BrowserNavigation:
     """
-    Навыки для управления вкладками и перемещения в браузере.
+    Skills for tab management and browsing navigation.
     """
 
     def __init__(self, client: WebBrowserClient):
@@ -27,13 +33,13 @@ class BrowserNavigation:
             await self.client.page.goto(url, wait_until="networkidle")
             await self.client.update_state_view()
 
-            self.client.state.add_history(f"Переход на: {url}")
-            main_logger.info(f"[Web Browser] Переход по ссылке: {url}")
+            self.client.state.add_history(f"Navigated to: {url}")
+            main_logger.info(f"[Web Browser] Navigation to URL: {url}")
 
             return SkillResult.ok("True")
 
         except Exception as e:
-            return SkillResult.fail(f"Ошибка загрузки страницы: {e}")
+            return SkillResult.fail(f"Error loading page: {e}")
 
     @skill()
     async def scroll(self, direction: str = "down") -> SkillResult:
@@ -46,18 +52,18 @@ class BrowserNavigation:
             self.client.touch()
 
             sign = "" if direction == "down" else "-"
-            # JS-инъекция для прокрутки на высоту окна (viewport)
+            # JS-injection to scroll by viewport height
             await self.client.page.evaluate(f"window.scrollBy(0, {sign}window.innerHeight)")
 
-            # Даем время на подгрузку ленивых изображений/DOM (Lazy Load)
+            # Give time for lazy-loaded images/DOM to load
             await self.client.page.wait_for_timeout(1000)
             await self.client.update_state_view()
 
-            self.client.state.add_history(f"Скролл: {direction}")
+            self.client.state.add_history(f"Scroll: {direction}")
             return SkillResult.ok("True")
 
         except Exception as e:
-            return SkillResult.fail(f"Ошибка скролла: {e}")
+            return SkillResult.fail(f"Scroll error: {e}")
 
     @skill()
     async def close(self) -> SkillResult:
@@ -67,8 +73,8 @@ class BrowserNavigation:
 
         try:
             await self.client.close_browser()
-            self.client.state.add_history("Браузер закрыт.")
+            self.client.state.add_history("Browser closed.")
             return SkillResult.ok("True")
-        
+
         except Exception as e:
-            return SkillResult.fail(f"Ошибка при закрытии браузера: {e}")
+            return SkillResult.fail(f"Error closing browser: {e}")

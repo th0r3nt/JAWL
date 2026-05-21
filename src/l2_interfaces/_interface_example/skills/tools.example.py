@@ -1,73 +1,73 @@
 """
-Навыки (Skills) для агента.
+Skills for the agent.
 
-Это "руки" агента. Классы здесь содержат функции, задекорированные `@skill()`.
-Pydantic Guard Layer динамически читает type-hints ваших функций, конвертирует их
-в JSON Schema и отдает LLM модели.
+These are the "hands" of the agent. Classes here contain functions decorated with `@skill()`.
+Pydantic Guard Layer dynamically reads type-hints of your functions, converts them
+into JSON Schema, and feeds them to the LLM model.
 
-Небольшой совет:
-Не плодите God Objects.
+Quick Tip:
+Do not create God Objects.
 
-Если этот файл разрастается (больше 200-300 строк или объединяет разный функционал),
-Обязательно дробите его на логические подфайлы в директории `skills/`.
-Например:
+If this file grows too large (more than 200-300 lines or combines different functionality),
+split it into logical subfiles in the `skills/` directory.
+For example:
 
-- `skills/messages.py` (отправка/чтение сообщений)
-- `skills/moderation.py` (бан/мут)
+- `skills/messages.py` (send/read messages)
+- `skills/moderation.py` (ban/mute)
 - `skills/files.py` -> `skills/files/reader.py`, `skills/files/writer.py`
 
-Смотрите пример в `src/l2_interfaces/host/os/skills/files/`.
+See the example in `src/l2_interfaces/host/os/skills/files/`.
 
-Если в этом фреймворке появятся файлы по 1000 строк - оригинальный разработчик подаст на вас жалобу в Гаагский трибунал (шутка).
+If 1000-line files appear in this framework, the original developer will file a complaint to the Hague Tribunal (just kidding).
 """
 
 from typing import Optional, Any
 
-# Импорты для регистрации навыков:
+# Imports to register skills:
 from src.l3_agent.skills.registry import skill, SkillResult
 
-# Если необходимо ограничить доступ субагентам (RBAC):
+# If you need to restrict subagent access (RBAC):
 # from src.l3_agent.swarm.roles import Subagents
 
 
 class ExampleSkills:
-    """Инструменты агента для работы с пользовательским API."""
+    """Agent tools for working with custom API."""
 
     def __init__(self, client: Any) -> None:
-        """Инжектим клиент, через который мы будем делать реальные запросы к API."""
+        """Inject client used to make real API requests."""
         self.client = client
 
-    # Аргумент swarm=[...] разрешает вызывать этот навык только определенным субагентам.
-    # Если swarm не передан, субагенты не увидят этот навык вообще. Главный оркестратор видит всё всегда (если не поставить hidden=True).
+    # The swarm=[...] argument allows only specific subagents to call this skill.
+    # If swarm is not passed, subagents will not see this skill at all. The main orchestrator always sees everything (unless hidden=True is set).
 
     # @skill(swarm=[Subagents.CODER, Subagents.WEB_RESEARCHER])
     @skill()
     async def my_custom_tool(self, text_param: str, count: Optional[int] = 1) -> SkillResult:
         """
-        Идеальный, подробный докстринг. Именно этот текст LLM увидит в своем System Prompt.
-        Объясняйте здесь, для чего нужна функция и что делают её аргументы.
+        Perfect, detailed docstring. This exact text is what the LLM will see in its System Prompt.
+        Explain here what the function is for and what its arguments do.
 
         Args:
-            text_param: Текст, который нужно обработать.
-            count: Количество итераций (по умолчанию 1).
+            text_param: Text to process.
+            count: Number of iterations (default is 1).
         """
 
-        # Pydantic Guard Layer автоматически проверит, чтобы `count` был `int` (даже если LLM пришлет "5" как строку),
-        # а если LLM пришлет сюда массив, функция даже не запустится - Guard Layer сам вернет ошибку агенту.
+        # Pydantic Guard Layer will automatically check that `count` is an `int` (even if the LLM sends "5" as a string),
+        # and if the LLM sends an array here, the function won't even launch - Guard Layer itself will return an error to the agent.
 
         try:
-            # 1. Вызываем клиент для взаимодействия с внешним миром
+            # 1. Call the client to interact with the external world
             # response = await self.client.do_something(text_param, count)
 
-            # 2. Логируем успешное действие в истории стейта (если нужно)
-            # self.client.state.add_history(f"Вызван my_custom_tool с параметром {text_param}")
+            # 2. Log the successful action in the state history (if needed)
+            # self.client.state.add_history(f"my_custom_tool called with parameter {text_param}")
 
-            # 3. Обязательно возвращаем SkillResult.ok() в случае успеха
+            # 3. Be sure to return SkillResult.ok() on success
             return SkillResult.ok(
-                f"Инструмент успешно отработал. Текст: {text_param}, раз: {count}"
+                f"Tool successfully executed. Text: {text_param}, count: {count}"
             )
 
         except Exception as e:
-            # Возвращаем SkillResult.fail() с подробной ошибкой, чтобы агент мог проанализировать
-            # проблему в `thoughts` на следующем шаге ReAct-цикла.
-            return SkillResult.fail(f"Ошибка при вызове внешнего API: {e}")
+            # Return SkillResult.fail() with a detailed error so the agent can analyze
+            # the problem in `thoughts` on the next ReAct loop step.
+            return SkillResult.fail(f"Error calling external API: {e}")

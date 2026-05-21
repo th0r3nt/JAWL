@@ -1,3 +1,7 @@
+"""
+Aiogram plugin for Telegram Bot API.
+"""
+
 from typing import List, Any, Dict, Optional
 from src.utils.logger import main_logger
 from src.l2_interfaces.base import BaseInterface
@@ -30,7 +34,7 @@ class AiogramPlugin(BaseInterface):
     ) -> List[Any]:
         bot_token = env_vars.get("AIOGRAM_BOT_TOKEN")
         if not bot_token:
-            main_logger.error("[Aiogram] BOT_TOKEN не найден. Интерфейс отключен.")
+            main_logger.error("[Aiogram] BOT_TOKEN not found. Interface disabled.")
             self.register_off_provider(container.context_registry)
             return []
 
@@ -53,5 +57,5 @@ class AiogramPlugin(BaseInterface):
         container.context_registry.register_provider(
             "aiogram", client.get_context_block, ContextSection.INTERFACES
         )
-        main_logger.info("[Aiogram] Интерфейс загружен (Plugin).")
+        main_logger.info("[Aiogram] Interface loaded (Plugin).")
         return [client, events]

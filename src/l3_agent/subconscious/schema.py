@@ -1,12 +1,14 @@
 """
-Схемы и структуры данных для подсознательных моделей (Subconscious Patterns).
+Schemas and Data Structures for Subconscious Models.
+
+Defines internal enumeration types for different background processes.
 """
 
 from enum import Enum
 
 
 class Pattern(str, Enum):
-    """Доступные паттерны поведения подсознания."""
+    """Available subconscious behavior patterns."""
 
     CONSOLIDATION = "consolidation"
     REFLECTION = "reflection"

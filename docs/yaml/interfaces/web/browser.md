@@ -1,15 +1,15 @@
-# Настройка Web Browser
+# Web Browser Configuration
 
-Интерфейс `browser` поднимает полноценный асинхронный Chromium на базе Playwright. В отличие от `search`, браузер умеет исполнять JavaScript, работать с Cookie и взаимодействовать со сложными интерактивными сайтами. 
+The `browser` interface spins up a full asynchronous Chromium instance on the host machine via Playwright. Unlike `search`, the browser can execute JavaScript, manage cookies, and interact with complex SPA websites.
 
-Если бинарники браузера не установлены в системе, клиент скачает их автоматически при первом запуске (это займет пару минут).
+If Chromium binaries are missing on the system, the client will automatically download them on the first launch (this might take a few minutes).
 
-## Особенности (Ленивая загрузка)
-Браузер не висит в памяти постоянно. Он стартует только в момент, когда агент вызывает навык (например, навигацию). Дерево элементов сайта (AOM) конвертируется в плоский Markdown-вид и инжектится в приборную панель агента.
+## Features (Lazy Loading)
+The browser does not stay in memory permanently. It is launched only when the agent invokes a navigation or interaction skill. The page element tree (AOM) is converted into a flat Markdown structure and injected into the agent's dashboard.
 
-## Параметры (`web.browser`)
+## Parameters (`web.browser`)
 
 * **`enabled`**: `true` / `false`.
-* **`headless`**: `true` / `false`. Если `true` (рекомендуется), браузер работает в фоне без отрисовки окон. Если `false`, вы увидите, как агент водит мышкой и кликает по сайту (полезно для дебага антифрод-защит на сложных сайтах).
-* **`timeout_sec`**: Максимальное время ожидания загрузки элементов страницы.
-* **`idle_timeout_sec`**: Время простоя (в секундах). Если агент ничего не делает с браузером N секунд, Watchdog-демон автоматически закроет Chromium для освобождения оперативной памяти.
+* **`headless`**: `true` / `false`. If `true` (recommended), the browser runs in the background without drawing windows. If `false`, you will physically see how the agent moves the cursor and clicks on the page (useful for debugging anti-fraud bypasses on complex sites).
+* **`timeout_sec`**: Maximum wait timeout for loading page elements.
+* **`idle_timeout_sec`**: Idle timeout (in seconds). If the browser remains unused for N seconds, a background daemon automatically closes Chromium to free up RAM.

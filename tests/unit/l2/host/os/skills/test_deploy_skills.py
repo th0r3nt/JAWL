@@ -35,7 +35,7 @@ async def test_start_deploy_session_disabled_in_config(deploy_skills):
     res = await deploy_skills.start_deploy_session(reason="I want to")
 
     assert res.is_success is True
-    assert "Деплой-сессии отключены в конфигурации" in res.message
+    assert "Deploy sessions are disabled" in res.message
     # Менеджер не должен был вызываться
     deploy_skills.host_os.deploy_manager.start_session.assert_not_called()
 

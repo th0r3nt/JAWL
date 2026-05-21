@@ -67,7 +67,7 @@ async def test_integration_swarm_full_cycle(tmp_path: Path):
         )
     ]
 
-    # На втором шаге LLM возвращает пустой массив действий для завершения цикла
+    # На втором шаге LLM возвращает empty actions list действий для завершения цикла
     mock_msg_exit = MagicMock()
     mock_msg_exit.content = '{"reflection": "Завершаю работу.", "actions":[]}'
     mock_msg_exit.tool_calls = None

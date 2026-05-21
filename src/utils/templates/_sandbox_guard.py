@@ -1,18 +1,18 @@
 """
 Shared Sandbox Guard.
 
-ВАЖНО: это НЕ настоящая изоляция. Pure-Python in-process guard предназначен
-для защиты от случайных/тривиальных эскейпов. Любой мотивированный атакующий
-может его обойти (на уровне ctypes/Cython/C extension/mmap/прямого syscall).
+IMPORTANT: this is NOT real isolation. Pure-Python in-process guard is intended
+for protection against trivial/casual escapes. Any motivated attacker
+can bypass it (on the level of ctypes/Cython/C extension/mmap/direct syscall).
 
-Для серьёзной изоляции используйте:
-  - отдельный процесс в namespace + seccomp (Linux)
-  - Docker / Podman контейнер
+For serious isolation use:
+  - a separate process in a namespace + seccomp (Linux)
+  - Docker / Podman container
   - WASM (Pyodide)
-  - полноценный VM sandbox
+  - a full VM sandbox
 
-Этот модуль объединяет общую логику для `sandbox_runner.py` и `rpc_wrapper.py`,
-чтобы защита не расходилась между двумя путями исполнения кода в песочнице.
+This module unifies the common logic for `sandbox_runner.py` and `rpc_wrapper.py`
+so that protection does not diverge between the two code execution paths in the sandbox.
 """
 
 from __future__ import annotations
@@ -21,18 +21,15 @@ import builtins
 import ctypes
 import importlib
 import io
-import mmap
 import os
-import signal
 import subprocess
 import sys
 import _io
 from pathlib import Path
 from typing import Any, Callable
 
-
 # ----------------------------------------------------------------------
-# Скрабинг секретов из os.environ
+# Secret scrubbing from os.environ
 # ----------------------------------------------------------------------
 _ALLOWED_ENV_PREFIXES: tuple[str, ...] = ("JAWL_",)
 _ALLOWED_ENV_NAMES: frozenset[str] = frozenset(
@@ -60,8 +57,7 @@ _ALLOWED_ENV_NAMES: frozenset[str] = frozenset(
         "TMP",
     }
 )
-# Подстроки, указывающие на секрет. Широкий фильтр — лучше удалить лишнее,
-# чем пропустить.
+# Substrings indicating a secret. Wide filter — better to remove too much than to miss.
 _SECRET_HINTS: tuple[str, ...] = (
     "KEY",
     "TOKEN",
@@ -89,7 +85,7 @@ _SECRET_HINTS: tuple[str, ...] = (
 
 
 def scrub_environ() -> None:
-    """Удаляет из ``os.environ`` все переменные, похожие на секрет."""
+    """Removes all variables that look like a secret from os.environ."""
 
     for name in list(os.environ.keys()):
         up = name.upper()
@@ -102,10 +98,10 @@ def scrub_environ() -> None:
 
 
 # ----------------------------------------------------------------------
-# Резолвинг пути и проверка на выход из песочницы
+# Path resolving and checks for escaping the sandbox
 # ----------------------------------------------------------------------
 def _is_system_python_path(p: Path) -> bool:
-    """Пути Python stdlib / site-packages разрешены на чтение."""
+    """Python stdlib / site-packages paths are allowed for reading."""
 
     s = str(p).lower()
     if "site-packages" in s:
@@ -114,7 +110,7 @@ def _is_system_python_path(p: Path) -> bool:
         return True
     if "/lib-dynload" in s or "\\lib-dynload" in s:
         return True
-    # Путь префиксов Python-дистрибутива (для venv/conda/embedded).
+    # Python distribution prefix paths (for venv/conda/embedded).
     for prefix in (sys.base_prefix, sys.prefix, sys.exec_prefix):
         if prefix and s.startswith(prefix.lower()):
             return True
@@ -122,17 +118,17 @@ def _is_system_python_path(p: Path) -> bool:
 
 
 class PathChecker:
-    """Проверяет что файловый путь остаётся в ``sandbox_dir``."""
+    """Checks that the file path remains in sandbox_dir."""
 
     def __init__(self, framework_dir: Path, sandbox_dir: Path) -> None:
         self.framework_dir = framework_dir.resolve()
         self.sandbox_dir = sandbox_dir.resolve()
 
     def check(self, file: Any) -> None:
-        """Бросает ``PermissionError`` если путь вне песочницы.
+        """Throws PermissionError if the path is outside the sandbox.
 
-        Целочисленные ``fd`` не проверяются — предполагается, что
-        дескриптор уже прошёл через патченный ``os.open``.
+        Integer fd is not checked — it is assumed that the descriptor
+        has already passed through the patched os.open.
         """
 
         if isinstance(file, int):
@@ -143,7 +139,7 @@ class PathChecker:
                 file = file.decode(errors="ignore")
             p = Path(file).resolve()
         except Exception:  # noqa: BLE001
-            # Если путь нерезолвится, real open упадёт сам с FileNotFoundError.
+            # If the path does not resolve, real open will fail itself with FileNotFoundError.
             return
 
         if p.is_relative_to(self.sandbox_dir):
@@ -153,18 +149,18 @@ class PathChecker:
             return
 
         raise PermissionError(
-            f"[Sandbox Guard] Access Denied: Path Traversal попытка заблокирована. Доступ к '{file}' запрещен."
+            f"[Sandbox Guard] Access Denied: Path Traversal attempt blocked. Access to '{file}' is forbidden."
         )
 
 
 # ----------------------------------------------------------------------
-# Блокировка API
+# API Blocking
 # ----------------------------------------------------------------------
 def _blocked_func(*args: Any, **kwargs: Any) -> None:  # noqa: D401, ARG001
-    """Универсальный блокиратор — просто бросает ``PermissionError``."""
+    """Universal blocker — simply throws PermissionError."""
 
     raise PermissionError(
-        "[Sandbox Guard] Access Denied: Использование shell/subprocess заблокировано в целях безопасности."
+        "[Sandbox Guard] Access Denied: Usage of shell/subprocess is blocked for security reasons."
     )
 
 
@@ -179,13 +175,13 @@ def _make_guarded_open(
 
 
 def _install_file_guards(checker: PathChecker) -> None:
-    """Патчит все известные высоко- и низкоуровневые I/O точки."""
+    """Patches all known high- and low-level I/O points."""
 
     # 1. builtins.open + io.open
     builtins.open = _make_guarded_open(builtins.open, checker)
     io.open = _make_guarded_open(io.open, checker)
 
-    # 2. os.open (низкоуровневый)
+    # 2. os.open (low-level)
     orig_os_open = os.open
 
     def _safe_os_open(path, flags, mode=0o777, *, dir_fd=None):  # type: ignore[no-untyped-def]
@@ -194,7 +190,7 @@ def _install_file_guards(checker: PathChecker) -> None:
 
     os.open = _safe_os_open  # type: ignore[assignment]
 
-    # 3. _io.FileIO (обход через внутренний модуль CPython)
+    # 3. _io.FileIO (bypass via CPython internal module)
     orig_FileIO = _io.FileIO
 
     class _SafeFileIO(orig_FileIO):  # type: ignore[misc,valid-type]
@@ -204,27 +200,28 @@ def _install_file_guards(checker: PathChecker) -> None:
 
     _io.FileIO = _SafeFileIO  # type: ignore[assignment]
 
-    # 4. pathlib перехват
-    # В Python 3.10 Path.open() вызывает ``self._accessor.open(...)``, где
-    # ``_accessor.open`` биндится к оригинальному ``os.open`` во время
-    # импорта модуля - до нашего патча. В Python 3.11+ этот слой
-    # удалён и ``Path.open`` зовет ``io.open`` напрямую, но для
-    # обратной совместимости переприсываем Path.open целиком.
+    # 4. pathlib interception
+    # In Python 3.10 Path.open() invokes ``self._accessor.open(...)``, where
+    # ``_accessor.open`` binds to the original ``os.open`` during
+    # module import - before our patch. In Python 3.11+ this layer
+    # is removed and ``Path.open`` calls ``io.open`` directly, but for
+    # backward compatibility we reassign Path.open entirely.
     import pathlib
 
     _orig_path_open = pathlib.Path.open
 
-    def _safe_path_open(self, mode="r", buffering=-1, encoding=None,
-                         errors=None, newline=None):  # type: ignore[no-untyped-def]
+    def _safe_path_open(
+        self, mode="r", buffering=-1, encoding=None, errors=None, newline=None
+    ):  # type: ignore[no-untyped-def]
         checker.check(str(self))
-        # Делегируем io.open явно, чтобы пройти через наш патч.
+        # Delegate io.open explicitly to go through our patch.
         return io.open(str(self), mode, buffering, encoding, errors, newline)
 
     pathlib.Path.open = _safe_path_open  # type: ignore[assignment,method-assign]
 
 
 def _install_process_guards() -> None:
-    """Блокирует subprocess / shell / fork / exec / posix_spawn."""
+    """Blocks subprocess / shell / fork / exec / posix_spawn."""
 
     # subprocess.*
     for name in (
@@ -269,7 +266,7 @@ def _install_process_guards() -> None:
         if hasattr(os, name):
             setattr(os, name, _blocked_func)
 
-    # os.kill — запретить сигналы родителю/группе (суицид агента).
+    # os.kill — forbid signals to parent/group (agent suicide).
     orig_os_kill = os.kill
 
     def _safe_os_kill(pid, sig):  # type: ignore[no-untyped-def]
@@ -283,7 +280,7 @@ def _install_process_guards() -> None:
 
 
 def _install_ctypes_guard() -> None:
-    """Блокирует ctypes loader API (прямой syscall / native-library escape)."""
+    """Blocks ctypes loader API (direct syscall / native-library escape)."""
 
     class _BlockedLibraryLoader:
         def __getattr__(self, name):  # type: ignore[no-untyped-def]
@@ -309,7 +306,7 @@ def _install_ctypes_guard() -> None:
 
 
 def _install_reload_guard() -> None:
-    """Не даёт ``importlib.reload`` перезагрузить защищённые модули."""
+    """Does not allow importlib.reload to reload protected modules."""
 
     orig_reload = importlib.reload
     protected = {"os", "subprocess", "io", "_io", "mmap", "ctypes", "builtins"}
@@ -326,13 +323,12 @@ def _install_reload_guard() -> None:
 
 
 # ----------------------------------------------------------------------
-# Публичный API
+# Public API
 # ----------------------------------------------------------------------
 def install(framework_dir: Path, sandbox_dir: Path) -> None:
-    """Включает все защиты. Должно быть вызвано ДО exec пользовательского кода."""
+    """Enables all protections. Must be called BEFORE exec of user code."""
 
-    # Скрабим env в первую очередь — на случай если пользовательский код
-    # форкнется и инхерит переменные.
+    # Scrub env first — in case user code forks and inherits variables.
     scrub_environ()
 
     checker = PathChecker(framework_dir, sandbox_dir)

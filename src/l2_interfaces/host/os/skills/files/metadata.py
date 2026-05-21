@@ -1,5 +1,5 @@
 """
-Навыки для привязки описаний и метаданных к локальным файлам.
+File metadata management (descriptions).
 """
 
 import asyncio
@@ -13,7 +13,7 @@ from src.l3_agent.skills.registry import SkillResult, skill
 
 
 class HostOSMetadata:
-    """Управление метаданными файлов (описания)."""
+    """File metadata management (descriptions)."""
 
     def __init__(self, host_os_client: HostOSClient):
         self.host_os = host_os_client
@@ -22,24 +22,24 @@ class HostOSMetadata:
     @require_access(HostOSAccessLevel.SANDBOX)
     async def set_file_description(self, filepath: str, description: str) -> SkillResult:
         """
-        Binds text description to local file. 
+        Binds text description to local file.
         Useful for persisting context of images/media/archives/logs to prevent re-reading.
         """
 
         try:
             safe_path = self.host_os.validate_path(filepath, is_write=False)
             if not safe_path.exists():
-                return SkillResult.fail(f"Ошибка: Файл не найден ({filepath}).")
+                return SkillResult.fail(f"Error: File not found ({filepath}).")
 
             rel_path = safe_path.relative_to(self.host_os.sandbox_dir).as_posix()
             clean_desc = description.replace("\n", " ").strip()
 
             await asyncio.to_thread(self.host_os.set_file_metadata, rel_path, clean_desc)
 
-            main_logger.info(f"[Host OS] Добавлено описание для файла: {safe_path.name}")
+            main_logger.info(f"[Host OS] Added description for file: {safe_path.name}")
             return SkillResult.ok("True")
 
         except PermissionError as e:
             return SkillResult.fail(str(e))
         except Exception as e:
-            return SkillResult.fail(f"Ошибка при сохранении описания: {e}")
+            return SkillResult.fail(f"Error saving description: {e}")

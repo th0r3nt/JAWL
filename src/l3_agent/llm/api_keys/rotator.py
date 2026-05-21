@@ -1,9 +1,9 @@
 """
-Модуль управления API ключами для языковых моделей.
+API Key Rotator Module.
 
-Отвечает за бесперебойную работу агента (High Availability) путем
-автоматической ротации ключей при исчерпании Rate Limits (429 HTTP)
-или блокировке невалидных ключей (401 HTTP).
+Provides high availability for LLM API calls by automatically rotating
+API keys when encountering rate limits (HTTP 429) or invalid keys (HTTP 401).
+Uses a Round-Robin strategy to balance the load across available keys.
 """
 
 import math
@@ -11,60 +11,57 @@ import time
 from typing import List, Dict
 
 from src.utils.logger import main_logger
-
 from src.l3_agent.llm.exceptions import AllKeysExhaustedError
 
 
 class APIKeyRotator:
     """
-    Ротатор API ключей для LLM.
-    Отслеживает мертвые ключи и временные кулдауны (Rate Limits).
+    API key rotator for LLM.
+    Tracks dead keys and temporary cooldowns (Rate Limits).
     """
 
     def __init__(self, keys: List[str]) -> None:
         """
-        Инициализирует ротатор с пулом ключей.
+        Initializes the rotator with a pool of keys.
 
         Args:
-            keys: Список сырых API ключей из .env.
+            keys: List of raw API keys from .env.
 
         Raises:
-            ValueError: Если список ключей пуст.
+            ValueError: If the key list is empty.
         """
 
         if not keys:
-            main_logger.error("[System] Передан пустой список ключей для LLM.")
+            main_logger.error("[System] Empty key list passed for LLM.")
             raise ValueError("LLM API keys not found. Check your .env file.")
 
         self.keys = keys
-        # Хранит timestamp, до которого ключ недоступен из-за Rate Limit
+        # Stores the timestamp until which a key is unavailable due to Rate Limit
         self._cooldowns: Dict[str, float] = {k: 0.0 for k in self.keys}
         self._current_index: int = 0
 
-        main_logger.info(
-            f"[LLM] APIKeyRotator инициализирован. Ключей в пуле: {len(self.keys)}."
-        )
+        main_logger.info(f"[LLM] APIKeyRotator initialized. Keys in pool: {len(self.keys)}.")
 
     def get_next_key(self) -> str:
         """
-        Извлекает следующий доступный ключ (Round-Robin), обходя те,
-        что находятся в состоянии кулдауна (Rate Limit).
+        Retrieves the next available key (Round-Robin), bypassing those
+        in a cooldown state (Rate Limit).
 
         Returns:
-            Строка с API ключом.
+            str: A valid API key.
 
         Raises:
-            ValueError: Если список ключей абсолютно пуст (все забанены).
-            RuntimeError: Если все ключи находятся во временном кулдауне.
+            ValueError: If the key list is empty (all keys banned).
+            AllKeysExhaustedError: If all keys are currently cooling down.
         """
 
         if not self.keys:
-            raise ValueError("Список API ключей пуст (или все были забанены).")
+            raise ValueError("API key list is empty (or all keys have been banned).")
 
         now = time.time()
         attempts = len(self.keys)
 
-        # Ищем первый доступный ключ не в кулдауне
+        # Look for the first available key not in cooldown
         for _ in range(attempts):
             key = self.keys[self._current_index]
             self._current_index = (self._current_index + 1) % len(self.keys)
@@ -72,18 +69,18 @@ class APIKeyRotator:
             if self._cooldowns.get(key, 0.0) <= now:
                 return key
 
-        # Если дошли сюда - все ключи в кулдауне
-        # Находим тот, который освободится раньше всех
+        # If we reached here, all keys are cooling down
+        # Find the one that will become available first
         soonest_key = min(self.keys, key=lambda k: self._cooldowns.get(k, 0.0))
         wait_time = max(1, math.ceil(self._cooldowns[soonest_key] - now))
         raise AllKeysExhaustedError(wait_time=wait_time)
 
     def ban_key(self, key: str) -> None:
         """
-        Удаляет ключ из ротации навсегда (например, при HTTP 401).
+        Removes a key from rotation permanently (e.g., on HTTP 401).
 
         Args:
-            key: Невалидный API ключ.
+            key: The invalid API key.
         """
 
         if key in self.keys:
@@ -91,20 +88,20 @@ class APIKeyRotator:
             if key in self._cooldowns:
                 del self._cooldowns[key]
 
-            # Маскируем для логов
+            # Mask for logs
             masked = key[:6] + "***" if len(key) > 6 else "***"
-            main_logger.warning(f"[LLM] Ключ {masked} удален из пула (Dead, помянем).")
+            main_logger.warning(f"[LLM] Key {masked} removed from pool (Dead).")
 
             if self.keys:
                 self._current_index = self._current_index % len(self.keys)
 
     def cooldown_key(self, key: str, seconds: int = 60) -> None:
         """
-        Временно блокирует ключ для использования (HTTP 429).
+        Temporarily blocks a key from use (HTTP 429).
 
         Args:
-            key: API ключ, поймавший лимит.
-            seconds: На сколько секунд заморозить использование ключа.
+            key: The API key that hit a rate limit.
+            seconds: Duration in seconds to freeze the key.
         """
 
         if key in self.keys:
@@ -113,11 +110,11 @@ class APIKeyRotator:
 
             reason = "Quota Exceeded" if seconds > 3600 else "Rate Limit"
             main_logger.warning(
-                f"[LLM] Ключ {masked} ушел в кулдаун на {seconds} сек ({reason})."
+                f"[LLM] Key {masked} cooled down for {seconds} sec ({reason})."
             )
 
     def total_keys(self) -> int:
         """
-        Возвращает общее количество валидных ключей в пуле.
+        Returns the total number of valid keys in the pool.
         """
         return len(self.keys)

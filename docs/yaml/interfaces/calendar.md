@@ -1,14 +1,14 @@
-# Настройка Календаря
+# Calendar Configuration
 
-Интерфейс `calendar` управляет временем и расписанием агента. Он отвечает за разовые, интервальные и повторяющиеся таймеры/будильники.
+The `calendar` interface manages the agent's time and schedule. It handles one-time, interval, and recurring timers/alarms.
 
-Календарь хранит данные локально в `sandbox/local/data/interfaces/calendar/events.json`.
+The calendar stores data locally in `sandbox/_system/interfaces/calendar/events.json`.
 
-## Механика пробуждения
-Агент не проверяет время самостоятельно (это тратило бы токены). Этим занимается фоновый легковесный демон. Когда наступает время, демон публикует в шину событий ивент `SYSTEM_CALENDAR_ALARM`. `Heartbeat` ловит его, мгновенно прерывает сон агента и передает ему информацию о том, какой именно будильник сработал.
+## Wakeup Mechanism
+The agent does not check the time itself (that would waste API tokens). Instead, a lightweight background daemon handles this. When the time comes, the daemon publishes a `SYSTEM_CALENDAR_ALARM` event to the event bus. `Heartbeat` catches it, immediately interrupts the agent's sleep, and passes information about which alarm triggered.
 
-## Параметры (`calendar`)
+## Parameters (`calendar`)
 
 * **`enabled`**: `true` / `false`.
-* **`polling_interval_sec`**: Как часто (в секундах) фоновый демон сверяет текущее время с таймерами в JSON-файле. По умолчанию — раз в минуту (60).
-* **`upcoming_events_limit`**: Сколько ближайших событий отображать на приборной панели (L0 State) агента, чтобы он мог видеть свои планы на день.
+* **`polling_interval_sec`**: How often (in seconds) the background daemon checks current time against the timers in the JSON file. Default is once per minute (60).
+* **`upcoming_events_limit`**: How many upcoming events to display on the agent's dashboard (L0 State) so it can see its daily plans.

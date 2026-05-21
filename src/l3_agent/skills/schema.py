@@ -1,9 +1,9 @@
 """
-Универсальная Pydantic схема для вызова инструментов агентом.
+Universal Pydantic schema for agent tool calls.
 
-Определяет JSON Schema, которую ожидает OpenAI API (или совместимые).
-Включает эвристический парсер (Dirty JSON Repair) для извлечения данных,
-если LLM нарушает форматирование или экранирование.
+Defines the JSON Schema expected by the OpenAI API (or compatible).
+Includes an heuristic parser (Dirty JSON Repair) to extract data
+if the LLM violates formatting or escaping.
 """
 
 import re
@@ -19,8 +19,8 @@ class ActionCall(BaseModel):
 
 class AgentResponse(BaseModel):
     """
-    Типизированная схема полного ответа LLM.
-    Содержит структурированный внутренний монолог и массив действий.
+    Typed schema of the complete LLM response.
+    Contains structured internal monologue (CoT) and an array of actions.
     """
 
     observation: str = ""
@@ -31,7 +31,7 @@ class AgentResponse(BaseModel):
     @property
     def thoughts(self) -> str:
         """
-        Склеивает структурированный CoT в единую строку для базы данных и логов.
+        Concatenates the structured CoT into a single string for logs and databases.
         """
 
         parts = []
@@ -43,8 +43,6 @@ class AgentResponse(BaseModel):
             parts.append(f"\n[Reflection]: {self.reflection.strip()}")
         return "\n".join(parts)
 
-
-# Константа, которая отправляется в параметр 'tools' API языковой модели
 
 ACTION_SCHEMA = [
     {
@@ -98,10 +96,9 @@ ACTION_SCHEMA = [
 
 def _extract_json_array(text: str) -> Optional[str]:
     """
-    Умный поиск массива `actions` с учетом вложенности скобок и строковых литералов.
-    Способен извлечь массив, даже если модель засунула его внутрь строки 'thoughts'.
+    Smart search for the 'actions' array taking into account bracket nesting and string literals.
+    Capable of extracting the array even if the model puts it inside the 'thoughts' string.
     """
-    # Ищем начало массива, внутри которого есть tool_name
     match = re.search(r'\[\s*\{\s*["\']tool_name["\']', text)
     if not match:
         return None
@@ -140,12 +137,12 @@ def parse_llm_json(
     clean_answer = raw_answer.strip()
     json_str = ""
 
-    # Попытка 1: Строгий парсинг (Ищем Markdown-блок)
+    # Attempt 1: Strict parsing (looking for Markdown block)
     json_match = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", clean_answer, re.DOTALL)
     if json_match:
         json_str = json_match.group(1)
     else:
-        # Попытка 2: Ищем внешние границы JSON объекта
+        # Attempt 2: Looking for outer boundaries of JSON object
         start_idx = clean_answer.find('{"observation"')
         if start_idx == -1:
             start_idx = clean_answer.find("{")
@@ -164,7 +161,7 @@ def parse_llm_json(
         except Exception as e:
             error_msg = str(e)
 
-    # Попытка 3: Эвристический Fallback
+    # Attempt 3: Heuristic Fallback (JSON repair)
     if parsed_response is None or (
         not parsed_response.actions and '"tool_name"' in raw_answer
     ):
@@ -179,14 +176,13 @@ def parse_llm_json(
                 parsed_response = AgentResponse(
                     observation="[Heuristic parse]",
                     reasoning="",
-                    reflection=clean_answer,  # Сохраняем весь сломанный ответ как рефлексию
+                    reflection=clean_answer,
                     actions=actions_list,
                 )
                 error_msg = None
         except Exception as e:
             error_msg = f"Heuristic parse failed: {e}"
 
-    # Если вообще не найдено следов JSON
     if (
         parsed_response is None
         and "System Error" in (error_msg or "")
@@ -203,13 +199,12 @@ def parse_llm_json(
         )
 
     # =========================================================================
-    # ANTI-INCEPTION (Защита от JSON внутри CoT)
+    # ANTI-INCEPTION (JSON inside CoT)
     # =========================================================================
 
     if parsed_response is not None:
         thoughts_str = parsed_response.thoughts.strip()
 
-        # Если внутри строки лежат ключи действий и наблюдений (LLM обернула JSON в текст)
         if (
             _depth < 3
             and ('"actions"' in thoughts_str or "'actions'" in thoughts_str)

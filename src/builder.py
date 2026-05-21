@@ -1,8 +1,8 @@
 """
 System Builder.
 
-Паттерн Строитель (Fluent Interface) для сборки DI-контейнера.
-Заполняет переданный SystemContainer готовыми подсистемами.
+Builder pattern (Fluent Interface) for assembling the DI container.
+Populates the passed SystemContainer with ready-made subsystems.
 """
 
 from typing import Dict, Optional
@@ -41,7 +41,7 @@ from src.l3_agent.subconscious.orchestrator import SubconsciousOrchestrator
 
 class SystemBuilder:
     """
-    Сборщик архитектуры агента. Заполняет SystemContainer.
+    Agent architecture builder. Populates SystemContainer.
     """
 
     def __init__(self, container: SystemContainer) -> None:
@@ -50,10 +50,10 @@ class SystemBuilder:
 
     def with_l0_states(self) -> "SystemBuilder":
         """
-        Создает стейты интерфейсов.
+        Creates interface states.
         """
 
-        main_logger.info("[System] Инициализация L0 State.")
+        main_logger.info("[System] Initializing L0 State.")
 
         self.container.agent_state = AgentState(
             llm_model=self.container.settings.llm.main_model,
@@ -72,8 +72,8 @@ class SystemBuilder:
         return self
 
     async def with_l1_databases(self) -> "SystemBuilder":
-        """Поднимает базы данных и регистрирует их CRUD-скиллы."""
-        main_logger.info("[System] Инициализация L1 Databases.")
+        """Starts databases and registers their CRUD skills."""
+        main_logger.info("[System] Initializing L1 Databases.")
 
         # SQL
         self.container.sql = SQLManager(
@@ -185,17 +185,17 @@ class SystemBuilder:
         return self
 
     def with_l2_interfaces(self, env_vars: Dict[str, Optional[str]]) -> "SystemBuilder":
-        """Читает конфиг, поднимает нужные интерфейсы и регистрирует их скиллы."""
-        main_logger.info("[System] Инициализация L2 Interfaces.")
+        """Reads config, initializes required interfaces and registers their skills."""
+        main_logger.info("[System] Initializing L2 Interfaces.")
 
-        # Эти компоненты потом запустит SystemOrchestrator
+        # These components will later be started by SystemOrchestrator
         components = initialize_l2_interfaces(self.container, env_vars)
         self.container.lifecycle_components.extend(components)
         return self
 
     def with_l3_agent(self, env_vars: Dict[str, Optional[str]]) -> "SystemBuilder":
-        """Сборка мозга агента."""
-        main_logger.info("[System] Инициализация L3 Agent.")
+        """Assembles the agent brain."""
+        main_logger.info("[System] Initializing L3 Agent.")
 
         llm_api_keys = env_vars.get("LLM_API_KEYS", [])
         llm_api_url = env_vars.get("LLM_API_URL", "")
@@ -209,7 +209,7 @@ class SystemBuilder:
         )
 
         if sub_llm_api_keys:
-            main_logger.info("[System] Обнаружены выделенные ключи для субагентов (Swarm).")
+            main_logger.info("[System] Found dedicated keys for subagents (Swarm).")
             sub_rotator = APIKeyRotator(keys=sub_llm_api_keys)
             self.container.sub_llm_client = LLMClient(
                 api_url=sub_llm_api_url or "",
@@ -331,5 +331,5 @@ class SystemBuilder:
         return self
 
     def build(self) -> SystemContainer:
-        """Возвращает полностью укомплектованный контейнер."""
+        """Returns fully assembled container."""
         return self.container

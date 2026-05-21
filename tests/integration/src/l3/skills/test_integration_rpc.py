@@ -63,7 +63,7 @@ def calculate_metrics(cpu_load: int, user: str) -> dict:
     assert "critical" in rpc_res.message
     assert "Admin" in rpc_res.message
     assert "190" in rpc_res.message  # 95 * 2
-    assert "Возвращенный результат (Return)" in rpc_res.message
+    assert "Returned result (Return)" in rpc_res.message
 
 
 @pytest.mark.asyncio
@@ -103,5 +103,5 @@ async def test_integration_rpc_error_handling(tmp_path: Path):
     # Обертка должна перехватить AttributeError, а execute_sandbox_func должна вернуть Fail
     assert rpc_res.is_success is False
     assert "AttributeError" in rpc_res.message
-    assert "нет функции 'multiply'" in rpc_res.message
+    assert "has no function 'multiply'" in rpc_res.message
     assert "Traceback" in rpc_res.message

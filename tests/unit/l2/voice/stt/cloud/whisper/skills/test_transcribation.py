@@ -50,7 +50,7 @@ async def test_transcribe_audio_unsupported_extension(
     res = await whisper_skills.transcribe_audio("document.txt")
 
     assert res.is_success is False
-    assert "не поддерживается" in res.message
+    assert "is not supported" in res.message
 
 
 @pytest.mark.asyncio
@@ -64,7 +64,7 @@ async def test_transcribe_audio_empty_file(
     res = await whisper_skills.transcribe_audio("empty.mp3")
 
     assert res.is_success is False
-    assert "Файл пуст" in res.message
+    assert "File is empty" in res.message
 
 
 @pytest.mark.asyncio
@@ -100,4 +100,4 @@ async def test_transcribe_audio_size_limit(
     res = await whisper_skills.transcribe_audio("huge.mp3")
 
     assert res.is_success is False
-    assert "превышает лимит API" in res.message
+    assert "exceeds API limit" in res.message

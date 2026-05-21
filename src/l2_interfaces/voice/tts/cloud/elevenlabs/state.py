@@ -1,23 +1,24 @@
 """
-L0 State для интерфейса ElevenLabs TTS.
-Хранит информацию о лимитах и кэш последних сгенерированных аудио.
+L0 State for the ElevenLabs TTS interface.
+
+Stores quota limits and the cache of recently generated audio files.
 """
 
 
 class CloudElevenLabsTTSState:
     """
-    Приборная панель TTS-клиента.
+    TTS client dashboard.
     """
 
     def __init__(self, history_limit: int = 5):
         self.is_online = False
         self.history_limit = history_limit
 
-        # Квоты (символы)
+        # Quotas (characters)
         self.character_count = 0
         self.character_limit = 0
 
-        # Кэшированные имена голосов
+        # Cached voice names
         self.available_voices_cache: list[str] = []
 
         self.history: list[str] = []
@@ -30,5 +31,5 @@ class CloudElevenLabsTTSState:
     @property
     def recent_history(self) -> str:
         if not self.history:
-            return "Файлы не генерировались."
+            return "No files were generated."
         return "\n".join(f"- {item}" for item in self.history)

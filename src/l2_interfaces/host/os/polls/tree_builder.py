@@ -1,3 +1,7 @@
+"""
+ASCII directory tree generator for the agent's context.
+"""
+
 from pathlib import Path
 from src.l2_interfaces.host.os.client import HostOSClient
 from src.l2_interfaces.host.os.polls.utils import is_ignored
@@ -5,7 +9,7 @@ from src.utils._tools import get_python_module_docstring
 
 
 class TreeBuilder:
-    """Генератор ASCII-дерева директорий для контекста агента."""
+    """ASCII directory tree generator for the agent's context."""
 
     def __init__(self, client: HostOSClient):
         self.client = client
@@ -36,20 +40,22 @@ class TreeBuilder:
                 desc = ""
                 if item.is_file():
                     try:
+                        # Calculate path relative to sandbox to fetch description from metadata
                         rel_path = item.relative_to(self.client.sandbox_dir).as_posix()
                         if rel_path in meta:
                             desc = f" — [{meta[rel_path]}]"
                     except ValueError:
-                        pass  # Файл вне песочницы, метаданных нет
+                        # File is outside the sandbox, no metadata
+                        pass
 
                     desc += get_python_module_docstring(item)
 
-                # Папка sandbox/ выводится отдельным блоком - проверяем, чтобы не дублировать
+                # The sandbox/ folder is output as a separate block - verify to avoid duplication
                 is_sandbox = item == self.client.sandbox_dir
                 is_truncated_dir = item.is_dir() and current_depth >= max_depth
 
                 if is_sandbox:
-                    display_name = f"{item.name}/ [См. блок Sandbox Directory ниже]"
+                    display_name = f"{item.name}/ [See Sandbox Directory block below]"
                     should_traverse = False
                 elif is_truncated_dir:
                     display_name = f"{item.name}/..."

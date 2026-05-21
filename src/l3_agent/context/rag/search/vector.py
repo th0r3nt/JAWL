@@ -1,3 +1,10 @@
+"""
+Semantic Database Search Wrapper (Vector Search).
+
+Provides unified semantic query interface. Queries 'knowledge' and 'thoughts'
+collections concurrently, handling deduping and score prioritization.
+"""
+
 import asyncio
 from typing import List, Dict, Any
 
@@ -6,7 +13,7 @@ from src.l1_databases.vector.management.thoughts import VectorThoughts
 
 
 class VectorSearchWrapper:
-    """Утилита для стандартизированного поиска текстов в семантической БД."""
+    """Wrapper over vector databases."""
 
     def __init__(
         self,
@@ -16,9 +23,9 @@ class VectorSearchWrapper:
     ) -> None:
         """
         Args:
-            vector_knowledge: Контроллер базы знаний.
-            vector_thoughts: Контроллер базы мыслей.
-            top_k: Количество возвращаемых результатов на ОДИН поисковый вектор.
+            vector_knowledge: Knowledge base controller.
+            vector_thoughts: Thoughts controller.
+            top_k: Max returned records count per single search vector.
         """
         self.vector_knowledge = vector_knowledge
         self.vector_thoughts = vector_thoughts
@@ -26,32 +33,21 @@ class VectorSearchWrapper:
 
     async def search_batch(self, query_vectors: List[List[float]]) -> List[Dict[str, Any]]:
         """
-        Выполняет параллельный семантический поиск по массиву векторов.
-        Ищет одновременно в 'knowledge' и 'thoughts', объединяя и дедуплицируя результаты.
+        Executes parallel semantic search over an embedding array.
+        Queries both collections concurrently, merges, and dedupes outputs.
 
         Args:
-            query_vectors: Массив сгенерированных эмбеддингов (тензоров).
+            query_vectors: List of vectorized embeddings.
 
         Returns:
-            Список словарей вида:
-            [
-                {
-                    "id": "uuid",
-                    "text": "Полный текст воспоминания...",
-                    "score": 0.89,
-                    "collection": "knowledge",
-                    "tags": ["domain:tech"]
-                }, ...
-            ]
+            List[Dict[str, Any]]: List of unique matched records.
         """
 
         if not query_vectors:
             return []
 
-        # Формируем задачи (для каждого вектора ищем и в знаниях, и в мыслях)
         tasks = []
         for vector in query_vectors:
-            # Ищем в базе знаний
             if self.vector_knowledge.db.client:
                 tasks.append(
                     self.vector_knowledge.db.client.query_points(
@@ -63,7 +59,6 @@ class VectorSearchWrapper:
                     )
                 )
 
-            # Ищем в базе мыслей
             if self.vector_thoughts.db.client:
                 tasks.append(
                     self.vector_thoughts.db.client.query_points(
@@ -75,21 +70,16 @@ class VectorSearchWrapper:
                     )
                 )
 
-        # Ждем выполнения всех запросов к Qdrant
         results_matrix = await asyncio.gather(*tasks, return_exceptions=True)
 
-        # Сборка, дедупликация и форматирование результатов
         unique_points: Dict[str, Dict[str, Any]] = {}
 
         for i, search_result in enumerate(results_matrix):
-            # Пропускаем ошибки или пустые результаты
             if isinstance(search_result, Exception) or not search_result:
                 continue
 
-            # Определяем, из какой коллекции пришел результат (задачи чередуются: 0-knowledge, 1-thoughts, 2-knowledge...)
             collection_name = "knowledge" if i % 2 == 0 else "thoughts"
 
-            # query_points возвращает QueryResponse, извлекаем ScoredPoint
             points = (
                 search_result.points if hasattr(search_result, "points") else search_result
             )
@@ -99,7 +89,6 @@ class VectorSearchWrapper:
                 score = float(point.score)
                 text = point.payload.get("text", "")
 
-                # Если такой ID уже находили - оставляем тот вариант, где Score выше
                 if point_id in unique_points:
                     if score > unique_points[point_id]["score"]:
                         unique_points[point_id]["score"] = score
@@ -107,7 +96,7 @@ class VectorSearchWrapper:
                         unique_points[point_id]["text"] = text
                         unique_points[point_id]["tags"] = point.payload.get("tags", [])
                         unique_points[point_id]["source"] = point.payload.get(
-                            "source", "Внутренний монолог"
+                            "source", "Internal monologue"
                         )
                         unique_points[point_id]["reliability"] = point.payload.get(
                             "reliability", "assumption"
@@ -119,9 +108,8 @@ class VectorSearchWrapper:
                         "score": score,
                         "collection": collection_name,
                         "tags": point.payload.get("tags", []),
-                        "source": point.payload.get("source", "Внутренний монолог"),
+                        "source": point.payload.get("source", "Internal monologue"),
                         "reliability": point.payload.get("reliability", "assumption"),
                     }
 
-        # Возвращаем плоский список всех найденных уникальных точек
         return list(unique_points.values())

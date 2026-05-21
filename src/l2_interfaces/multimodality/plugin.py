@@ -1,3 +1,7 @@
+"""
+Multimodality (Vision) interface plugin.
+"""
+
 from typing import List, Any, Dict, Optional
 from src.utils.logger import main_logger
 from src.l2_interfaces.base import BaseInterface
@@ -28,7 +32,7 @@ class MultimodalityPlugin(BaseInterface):
     ) -> List[Any]:
         if not getattr(container.settings.llm, "is_multimodal", False):
             main_logger.warning(
-                "[Multimodality] Включен, но llm.is_multimodal = False. Отключен."
+                "[Multimodality] Enabled, but llm.is_multimodal = False. Disabled."
             )
             self.register_off_provider(container.context_registry)
             return []
@@ -46,10 +50,10 @@ class MultimodalityPlugin(BaseInterface):
         client.is_online = True
 
         register_instance(VisionSkills(client))
-        
+
         container.context_registry.register_provider(
             "multimodality", client.get_context_block, ContextSection.INTERFACES
         )
 
-        main_logger.info("[Multimodality] Агент прозрел (Plugin).")
+        main_logger.info("[Multimodality] Agent gained vision (Plugin).")
         return []

@@ -36,7 +36,7 @@ async def test_email_client_start_unknown_domain() -> None:
 
     await client.start()
 
-    # Клиент инициализирует эти поля пустой строкой `""`, а не `None`
+    # Клиент инициализирует эти поля emptyой строкой `""`, а не `None`
     assert client.imap_server == ""
     assert client.smtp_server == ""
     assert client.state.is_online is False

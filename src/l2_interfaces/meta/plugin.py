@@ -1,6 +1,7 @@
 """
-Плагин интерфейса самомодификации (Meta).
-Управление конфигурацией агента в рантайме и кастомные навыки.
+Self-modification interface plugin (Meta).
+
+Managing agent configuration at runtime and custom skills.
 """
 
 from typing import List, Any, Dict, Optional
@@ -39,7 +40,7 @@ class MetaPlugin(BaseInterface):
     ) -> List[Any]:
         meta_config = container.interfaces_config.meta
 
-        # Инициализируем стейт дашборда
+        # Initialize dashboard state
         state = CustomDashboardState()
         container.l0_states["dashboard"] = state
 
@@ -74,7 +75,7 @@ class MetaPlugin(BaseInterface):
                 register_instance(MetaCreator(client, custom_registry))
             else:
                 main_logger.info(
-                    "[Meta] Access Level 3 (CREATOR) активен, но кастомные навыки отключены."
+                    "[Meta] Access Level 3 (CREATOR) is active, but custom skills are disabled."
                 )
 
         container.context_registry.register_provider(
@@ -84,6 +85,6 @@ class MetaPlugin(BaseInterface):
         )
 
         main_logger.info(
-            f"[Meta] Интерфейс загружен (Access Level: {meta_config.access_level})."
+            f"[Meta] Interface loaded (Access Level: {meta_config.access_level})."
         )
         return []

@@ -1,15 +1,15 @@
 """
-Фасад для слоя реляционной памяти (SQL).
+Facade for the relational memory layer (SQL).
 
-Инкапсулирует инициализацию БД и маршрутизирует вызовы к соответствующим
-CRUD-контроллерам таблиц, передавая им лимиты из конфигурации (YAML).
+Encapsulates DB initialization and routes calls to the corresponding
+table CRUD controllers, passing them limits from the configuration (YAML).
 """
 
 from pathlib import Path
 
 from src.l1_databases.sql.db import SQLDB
 
-# Таблицы
+# Tables
 from src.l1_databases.sql.management.tasks.crud import SQLTasks
 from src.l1_databases.sql.management.mental_states.crud import SQLMentalStates
 from src.l1_databases.sql.management.ticks import SQLTicks
@@ -21,8 +21,8 @@ from src.l1_databases.sql.management.hypotheses.crud import SQLHypotheses
 
 class SQLManager:
     """
-    Фасад для SQL слоя.
-    Инкапсулирует подключение к SQLite и сборку CRUD-обработчиков.
+    Facade for the SQL layer.
+    Encapsulates connection to SQLite and assembly of CRUD handlers.
     """
 
     def __init__(
@@ -35,7 +35,7 @@ class SQLManager:
         max_tasks: int = 15,
         # Notes
         notes_max_notes: int = 5,
-        # Ticks (Эпизодическая память)
+        # Ticks (Episodic Memory)
         high_ticks: int = 3,
         medium_ticks: int = 7,
         low_ticks: int = 20,
@@ -50,21 +50,21 @@ class SQLManager:
         drives_enabled: bool = True,
         dynamic_reduction: bool = True,
         pause_on_offline: bool = True,
-        max_history_drives: int = 3,
+        max_history_drives: int = 4,
         max_custom_drives: int = 5,
         fundamental_config: dict = None,
         # Hypotheses
         hypotheses_enabled: bool = True,
         max_clusters_hypotheses: int = 3,
         max_hypotheses: int = 10,
-        # Время
+        # Time
         timezone: int = 0,
     ) -> None:
         """
-        Сборка всех компонентов SQL-памяти и передача лимитов из конфигурации.
+        Assembly of all SQL memory components and passing limits from the configuration.
 
-        Все аргументы напрямую проксируются из `settings.yaml` для управления
-        глубиной контекста и защитой от переполнения токенов LLM.
+        All arguments are directly proxied from `settings.yaml` to manage
+        context depth and protect against LLM token overflow.
         """
 
         self.db = SQLDB(db_path=str(db_path))
@@ -119,6 +119,7 @@ class SQLManager:
         )
 
     async def connect(self) -> None:
+        """Opens connections, runs migrations, and initializes drives."""
         await self.db.connect()
         await self.tasks.bootstrap_migrations()
         await self.mental_states.bootstrap_migrations()
@@ -130,15 +131,16 @@ class SQLManager:
             await self.drives.adjust_downtime()
 
     async def disconnect(self) -> None:
+        """Safely closes connection."""
         await self.db.disconnect()
 
     # =================================================================================
-    # ИНКАПСУЛЯЦИЯ ДЛЯ HOT-RELOAD ИЗ МЕТА ИНТЕРФЕЙСА
+    # ENCAPSULATION FOR HOT-RELOAD FROM META INTERFACE
     # =================================================================================
 
     def update_limits(self, module_name: str, new_limit: int) -> None:
         """
-        Динамически обновляет лимит записей для конкретного CRUD-контроллера.
+        Dynamically updates row limits for a specific CRUD controller.
         """
 
         if module_name == "tasks":
@@ -155,7 +157,7 @@ class SQLManager:
 
     def update_context_depth(self, high: int, medium: int, low: int) -> None:
         """
-        Динамически обновляет глубину эпизодической памяти (Ticks).
+        Dynamically updates episodic memory depth (Ticks).
         """
 
         self.ticks.high_ticks = high

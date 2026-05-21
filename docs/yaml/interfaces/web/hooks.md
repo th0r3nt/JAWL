@@ -1,32 +1,32 @@
-# Настройка Webhooks (Входящие HTTP-запросы)
+# Webhooks Configuration (Incoming HTTP Requests)
 
-Интерфейс Web Hooks поднимает локальный асинхронный сервер (на базе `aiohttp`) для приема POST/GET запросов от внешних сервисов. Это позволяет интегрировать JAWL с автоматизациями (GitHub Actions, Stripe, Smart Home, IFTTT) без написания специализированных коннекторов.
+The Web Hooks interface spins up a local asynchronous HTTP server (using `aiohttp`) to receive incoming POST/GET requests from external automation services (such as GitHub Actions, Stripe, Smart Home, or IFTTT) without needing custom API integrations.
 
-## Безопасность и Авторизация
-Каждый входящий запрос должен сопровождаться параметром авторизации, совпадающим с ключом `WEBHOOK_SECRET` из файла `.env`.
-Поддерживается два способа передачи токена:
-1. В параметрах запроса (Query URL): `?token=СЕКРЕТ`
-2. В заголовках HTTP (Header): `Authorization: Bearer СЕКРЕТ`
+## Security and Authorization
+Each incoming request must contain an authorization token matching the `WEBHOOK_SECRET` key specified in the `.env` file.
+The token can be passed in two ways:
+1. In the query parameters: `?token=SECRET`
+2. In the HTTP headers: `Authorization: Bearer SECRET`
 
-Запросы без валидного токена отбрасываются (HTTP 401 Unauthorized), а в логи системы фиксируется попытка несанкционированного доступа.
+Requests without a valid token are rejected with a `401 Unauthorized` HTTP status, and unauthorized access attempts are logged.
 
-## Сетевая доступность (Reverse Proxy)
-По умолчанию сервер прослушивает локальный интерфейс (`host: "127.0.0.1"`). Это означает, что он принимает запросы только от скриптов, запущенных на этой же машине.
+## Network Accessibility (Reverse Proxy)
+By default, the server listens to the local loopback interface (`host: "127.0.0.1"`). This means it only accepts requests initiated from the same host machine.
 
-Чтобы принимать вебхуки из интернета, **не рекомендуется** менять `host` на `0.0.0.0`. Следует использовать Reverse Proxy для безопасного проброса трафика.
+To accept webhooks from the public Internet, **it is highly discouraged** to modify `host` to `0.0.0.0`. Instead, a secure Reverse Proxy should be used.
 
-### Способ 1: Использование ngrok (Для тестирования и локальных ПК)
-Утилита `ngrok` генерирует публичную HTTPS-ссылку и пробрасывает трафик на ваш локальный порт.
+### Method 1: Using ngrok (For testing and local PCs)
+The `ngrok` utility generates a public HTTPS URL and tunnels traffic directly to your local port:
 ```bash
 ngrok http 8080
 ```
-Внешним сервисам предоставляется ссылка вида:
-`https://<случайный_ид>.ngrok-free.app/webhook/github_action?token=СЕКРЕТ`
+External services can then call the generated URL:
+`https://<random_id>.ngrok-free.app/webhook/github_action?token=SECRET`
 
-### Способ 2: Использование Nginx (Для VPS-серверов)
-Рекомендуемый способ для Production-окружения. Nginx принимает входящий трафик по HTTPS, берет на себя SSL-шифрование и перенаправляет запросы в JAWL.
+### Method 2: Using Nginx (For VPS servers)
+The recommended production setup. Nginx terminates SSL encryption and forwards traffic to the local JAWL port.
 
-Пример конфигурации `nginx.conf`:
+Example `nginx.conf` block:
 ```nginx
 server {
     listen 443 ssl;

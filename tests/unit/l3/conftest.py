@@ -9,7 +9,7 @@ from src.l3_agent.llm.executor import LLMExecutor
 def mock_executor():
     executor = AsyncMock(spec=LLMExecutor)
     executor.tracker = MagicMock()
-    # По дефолту возвращаем пустой массив действий для штатного завершения циклов
+    # По дефолту возвращаем empty actions list действий для штатного завершения циклов
     executor.execute.return_value = '{"reflection": "ok", "actions": []}'
     return executor
 

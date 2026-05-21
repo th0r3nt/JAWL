@@ -47,7 +47,7 @@ async def test_stop_daemon_success(mock_process_cls, os_client):
     res = await executor.stop_daemon(8888)
     
     assert res.is_success is True
-    assert "успешно остановлен" in res.message
+    assert "successfully stopped" in res.message
     
     mock_proc.terminate.assert_called_once()
     

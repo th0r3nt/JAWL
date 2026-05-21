@@ -1,9 +1,9 @@
 """
-Фоновый хронометрист (Watchdog времени).
+Background timekeeper (Time Watchdog).
 
-Сравнивает текущий UNIX-timestamp с запланированными задачами. При совпадении —
-генерирует системное событие в EventBus, экстренно прерывая сон агента
-и передавая ему суть сработавшего будильника.
+Compares the current UNIX-timestamp with scheduled tasks. Upon match —
+generates a system event in EventBus, urgently waking the agent
+and passing the details of the triggered alarm.
 """
 
 import time
@@ -20,8 +20,8 @@ from src.l2_interfaces.calendar.client import CalendarClient
 
 class CalendarEvents:
     """
-    Фоновый поллинг событий календаря.
-    Сравнивает текущее время с trigger_at. Если сработало — будит агента.
+    Background polling of calendar events.
+    Compares current time with trigger_at. If triggered — wakes the agent.
     """
 
     def __init__(
@@ -32,13 +32,13 @@ class CalendarEvents:
         polling_interval: int,
     ) -> None:
         """
-        Инициализирует хронометриста.
+        Initializes the timekeeper.
 
         Args:
-            client: Экземпляр CalendarClient.
-            state: L0 стейт (приборная панель).
-            event_bus: Глобальная шина событий.
-            polling_interval: Как часто проверять таймеры (в секундах).
+            client: CalendarClient instance.
+            state: L0 state (dashboard).
+            event_bus: Global event bus.
+            polling_interval: How often to check timers (in seconds).
         """
         self.client = client
         self.state = state
@@ -49,29 +49,29 @@ class CalendarEvents:
         self._polling_task: Optional[asyncio.Task] = None
 
     async def start(self) -> None:
-        """Запускает фоновый поллинг событий календаря."""
+        """Starts background polling of calendar events."""
         if self._is_running:
             return
 
         self._is_running = True
         self.client.state.is_online = True
-        self.client.update_state_view()  # Дергаем обновленный метод из клиента
+        self.client.update_state_view()  # Trigger updated method from client
 
         self._polling_task = asyncio.create_task(self._loop())
-        main_logger.info("[Calendar] Фоновый мониторинг времени запущен.")
+        main_logger.info("[Calendar] Background time monitoring started.")
 
     async def stop(self) -> None:
-        """Останавливает фоновый поллинг событий календаря."""
+        """Stops background polling of calendar events."""
         self._is_running = False
         if self._polling_task:
             self._polling_task.cancel()
             self._polling_task = None
 
         self.client.state.is_online = False
-        main_logger.info("[Calendar] Фоновый мониторинг времени остановлен.")
+        main_logger.info("[Calendar] Background time monitoring stopped.")
 
     async def _loop(self) -> None:
-        """Бесконечный цикл проверки таймеров."""
+        """Infinite loop checking timers."""
         while self._is_running:
             try:
                 now = time.time()
@@ -81,7 +81,7 @@ class CalendarEvents:
 
                 for ev in events:
                     if now >= ev["trigger_at"]:
-                        # Кидаем ивент агенту, будим
+                        # Publish event to the agent, wake them up
                         await self.bus.publish(
                             Events.SYSTEM_CALENDAR_ALARM,
                             alarm_id=ev["id"],
@@ -90,29 +90,29 @@ class CalendarEvents:
                         )
                         modified = True
 
-                        # Обновляем таймер или удаляем
+                        # Update timer or delete
                         if ev["type"] == "one_time":
-                            continue  # Пропускаем добавление в active_events (удаляем)
+                            continue  # Skip adding to active_events (delete)
 
                         elif ev["type"] == "interval":
                             ev["trigger_at"] += ev["interval_minutes"] * 60
                             active_events.append(ev)
 
                         elif ev["type"] == "recurring":
-                            # Добавляем нужное кол-во дней
+                            # Add needed number of days
                             ev["trigger_at"] += ev["interval_days"] * 86400
                             active_events.append(ev)
                     else:
                         active_events.append(ev)
 
-                # Если хотя бы один таймер сработал, перезаписываем JSON
-                # Метод _save() клиента внутри update_events автоматически обновит стейт
+                # If at least one timer triggered, overwrite JSON
+                # Client's _save() method inside update_events will automatically update the state
                 if modified:
                     self.client.update_events(active_events)
 
             except asyncio.CancelledError:
                 break
             except Exception as e:
-                main_logger.error(f"[Calendar] Ошибка в цикле мониторинга: {e}")
+                main_logger.error(f"[Calendar] Error in monitoring loop: {e}")
 
             await asyncio.sleep(self.polling_interval)

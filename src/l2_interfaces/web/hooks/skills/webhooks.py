@@ -6,7 +6,7 @@ from src.l2_interfaces.web.hooks.client import WebHooksClient
 
 
 class WebHooksSkills:
-    """Навыки для работы с входящими HTTP-вебхуками."""
+    """Skills for working with incoming HTTP webhooks."""
 
     def __init__(self, client: WebHooksClient):
         self.client = client
@@ -23,17 +23,17 @@ class WebHooksSkills:
 
                 if isinstance(payload, dict):
                     formatted_payload = json.dumps(payload, ensure_ascii=False, indent=2)
-                    result_text = f"Полные данные вебхука `{hook_id}`:\n```json\n{formatted_payload}\n```"
+                    result_text = f"Full payload of webhook `{hook_id}`:\n```json\n{formatted_payload}\n```"
                 else:
                     result_text = (
-                        f"Полные данные вебхука `{hook_id}`:\n```text\n{payload}\n```"
+                        f"Full payload of webhook `{hook_id}`:\n```text\n{payload}\n```"
                     )
 
-                main_logger.info(f"[Web Hooks] Прочитаны полные данные вебхука: {hook_id}")
+                main_logger.info(f"[Web Hooks] Full payload read for webhook: {hook_id}")
                 return SkillResult.ok(result_text)
 
         return SkillResult.fail(
-            f"Вебхук с ID '{hook_id}' не найден. Возможно, он устарел и был удален из истории."
+            f"Webhook with ID '{hook_id}' not found. It might have expired and been removed from history."
         )
 
     @skill()
@@ -46,7 +46,7 @@ class WebHooksSkills:
         self.client.state.recent_hooks.clear()
         self.client.state.preview_lines.clear()
 
-        main_logger.info(f"[Web Hooks] История очищена ({count} записей удалено).")
+        main_logger.info(f"[Web Hooks] History cleared ({count} records deleted).")
         return SkillResult.ok("True")
 
     @skill()
@@ -60,14 +60,14 @@ class WebHooksSkills:
         ]
 
         if not filtered:
-            return SkillResult.ok(f"Вебхуков от источника '{source}' не обнаружено.")
+            return SkillResult.ok(f"No webhooks from source '{source}' found.")
 
-        lines = [f"Найдено {len(filtered)} записей от '{source}':"]
+        lines = [f"Found {len(filtered)} records from '{source}':"]
         for h in filtered:
-            # Ищем превью для этой записи в preview_lines (по ID)
+            # Search preview for this record in preview_lines (by ID)
             preview = next(
                 (p for p in self.client.state.preview_lines if f"`{h['id']}`" in p),
-                "Нет превью",
+                "No preview available",
             )
             lines.append(preview)
 

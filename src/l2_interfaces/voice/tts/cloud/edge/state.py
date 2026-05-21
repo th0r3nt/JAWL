@@ -1,29 +1,29 @@
 """
-L0 State для интерфейса Edge TTS.
+L0 State for the Edge TTS interface.
 
-Хранит информацию об истории генерации и кэш доступных голосов Microsoft Edge.
+Stores generation history and the cache of available Microsoft Edge voices.
 """
 
 
 class CloudEdgeTTSState:
     """
-    Приборная панель TTS-клиента Microsoft Edge.
+    Microsoft Edge TTS client dashboard.
     """
 
     def __init__(self, history_limit: int = 5) -> None:
         self.is_online: bool = False
         self.history_limit: int = history_limit
 
-        # Кэшированные имена голосов (для отображения в промпте и защиты от частых API-вызовов)
+        # Cached voice names (to display in the prompt and prevent frequent API calls)
         self.available_voices_cache: list[str] = []
 
-        # MRU-кэш истории генераций
+        # MRU cache of generation history
         self.history: list[str] = []
 
     def add_history(self, entry: str) -> None:
         """
-        Добавляет запись об успешной генерации в начало списка.
-        Обрезает список при превышении лимита.
+        Adds a record of successful generation to the beginning of the list.
+        Truncates the list when the limit is exceeded.
         """
         self.history.insert(0, entry)
         if len(self.history) > self.history_limit:
@@ -31,7 +31,7 @@ class CloudEdgeTTSState:
 
     @property
     def recent_history(self) -> str:
-        """Форматирует историю для вставки в Markdown-контекст агента."""
+        """Formats the history for injection into the agent's Markdown context."""
         if not self.history:
-            return "Файлы не генерировались."
+            return "No files were generated."
         return "\n".join(f"- {item}" for item in self.history)

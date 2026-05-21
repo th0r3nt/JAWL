@@ -1,7 +1,7 @@
-# Жизненный цикл и Проактивность (`system`)
+# Lifecycle and Proactivity (`system`)
 
-Управляет ритмом работы агента (Heartbeat) и его автономностью.
+Manages the agent's operating rhythm (Heartbeat) and its proactivity.
 
-* **`heartbeat_interval`**: Базовое время сна (в секундах) при отсутствии входящих событий. Например, `600` означает, что агент гарантированно проснется раз в 10 минут, чтобы проверить свои мотиваторы (Drives) и фоновые процессы.
-* **`continuous_cycle`**: `true` / `false`. Если `true`, агент вообще не уходит в сон. Как только он заканчивает один цикл ReAct, он моментально начинает следующий. **Осторожно:** сжигает токены с астрономической скоростью.
-* **`proactive_guidance`**: `true` / `false`. Инъекция дополнительного промпта в плановые Heartbeat-пробуждения, которая настойчиво рекомендует агенту найти себе работу (сделать рефакторинг, поискать информацию, вычистить память), если нет прямых указаний от пользователя.
+* **`heartbeat_interval`**: Base sleep interval (in seconds) in the absence of external incoming events. For example, `600` means that the agent is guaranteed to wake up once every 10 minutes to verify its motivators (Drives) and run background routines.
+* **`continuous_cycle`**: `true` / `false`. If `true`, the agent does not sleep at all. As soon as it concludes one ReAct reasoning loop, it instantly starts the next one. **Warning:** burns API tokens at an astronomical rate.
+* **`proactive_guidance`**: `true` / `false`. Injects an insistent prompt instruction into scheduled Heartbeat wakeups, urging the agent to find productive tasks (refactoring, information harvesting, database maintenance) in the absence of direct user commands.

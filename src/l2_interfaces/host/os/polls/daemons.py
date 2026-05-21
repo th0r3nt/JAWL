@@ -1,7 +1,8 @@
 """
-Фоновый мониторинг долгоживущих процессов (демонов) агента в песочнице.
-Отслеживает их статус (жив/умер/зомби) и асинхронно собирает IPC-вебхуки (через файл-маркеры),
-пробрасывая их в глобальную шину событий.
+Background monitoring of long-running agent processes (daemons) in the sandbox.
+
+Tracks their status (alive/dead/zombie) and asynchronously gathers IPC webhooks (via file markers),
+dispatching them to the global event bus.
 """
 
 import asyncio
@@ -18,7 +19,7 @@ from src.l2_interfaces.host.os.client import HostOSClient
 
 
 class DaemonsPoller:
-    """Мониторинг фоновых скриптов (демонов) и сбор вебхуков из песочницы."""
+    """Monitoring of background scripts (daemons) and gathering of webhooks from the sandbox."""
 
     def __init__(self, client: HostOSClient, state: HostOSState, bus: EventBus):
         self.client = client
@@ -40,7 +41,7 @@ class DaemonsPoller:
 
     async def _fast_loop(self):
         """
-        Быстрый цикл (каждую секунду) для моментальной реакции.
+        Fast loop (every second) for immediate reaction.
         """
 
         while self._is_running:
@@ -52,7 +53,7 @@ class DaemonsPoller:
                 break
 
             except Exception as e:
-                main_logger.error(f"[Host OS] Ошибка в поллере демонов: {e}")
+                main_logger.error(f"[Host OS] Error in daemons poller: {e}")
 
             await asyncio.sleep(1)
 
@@ -66,11 +67,11 @@ class DaemonsPoller:
                 with open(file_path, "r", encoding="utf-8") as f:
                     data = json.load(f)
 
-                msg = data.get("message", "Событие из песочницы.")
+                msg = data.get("message", "Sandbox event.")
                 payload = data.get("payload", {})
 
-                # Проверяем, не является ли это скрытым системным обновлением дашборда
-                # При обновлении дашборда в пейлоаде всегда идет это маркер
+                # Check if this is a hidden system dashboard update
+                # When updating the dashboard, this marker is always present in the payload
                 if payload.get("_jawl_internal_type") == "dashboard_update":
                     await self.bus.publish(
                         Events.SYSTEM_DASHBOARD_UPDATE,
@@ -83,7 +84,7 @@ class DaemonsPoller:
                     )
 
             except Exception as e:
-                main_logger.error(f"[Host OS] Ошибка чтения события из песочницы: {e}")
+                main_logger.error(f"[Host OS] Error reading event from sandbox: {e}")
 
             finally:
                 try:
@@ -94,7 +95,7 @@ class DaemonsPoller:
     async def _update_daemons_status(self):
         daemons = self.client.get_daemons_registry()
         if not daemons:
-            self.state.active_daemons = "Нет запущенных демонов."
+            self.state.active_daemons = "No running daemons."
             return
 
         lines = []
@@ -104,7 +105,7 @@ class DaemonsPoller:
         for pid_str, info in list(daemons.items()):
             pid = int(pid_str)
             name = info.get("name", "Unknown")
-            desc = info.get("description", "Без описания")
+            desc = info.get("description", "No description")
             start_time = info.get("start_time", time.time())
 
             is_alive = False
@@ -118,7 +119,9 @@ class DaemonsPoller:
 
             if is_alive:
                 uptime = seconds_to_duration_str(time.time() - start_time)
-                lines.append(f"- [PID: {pid}] {name} (Uptime: {uptime})\n  Описание: {desc}")
+                lines.append(
+                    f"- [PID: {pid}] {name} (Uptime: {uptime})\n  Description: {desc}"
+                )
             else:
                 dead_daemons.append(name)
                 del daemons[pid_str]
@@ -129,8 +132,8 @@ class DaemonsPoller:
             for d_name in dead_daemons:
                 await self.bus.publish(
                     Events.HOST_OS_SANDBOX_EVENT,
-                    message=f"Фоновый скрипт '{d_name}' завершил работу.",
-                    log_hint="Рекомендуется проверить его лог-файл (sandbox/logs/*.log), чтобы узнать причину.",
+                    message=f"Background script '{d_name}' finished execution.",
+                    log_hint="It is recommended to check its log file (sandbox/logs/*.log) to find the cause.",
                 )
 
-        self.state.active_daemons = "\n".join(lines) if lines else "Нет запущенных демонов."
+        self.state.active_daemons = "\n".join(lines) if lines else "No running daemons."

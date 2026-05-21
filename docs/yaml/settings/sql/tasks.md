@@ -1,15 +1,15 @@
-# Задачи и Планирование (Tasks)
+# Tasks and Planning (Tasks)
 
-Модуль `Tasks` отвечает за долгосрочное планирование. В версии 0.14.2-beta модуль был переработан на базе **матрицы Эйзенхауэра**.
+The `Tasks` module handles long-term planning. In version `0.14.2-beta`, the module was refactored to use the **Eisenhower Matrix**.
 
-Агент не просто хранит плоский список дел, а распределяет их по 4 квадрантам:
-1. **Quadrant 1 (Срочно и Важно / DO FIRST)**: Критические баги, падающие серверы. Ядро агента бросает всё и решает эти задачи.
-2. **Quadrant 2 (Важно, Не срочно / PLAN)**: Стратегическое развитие, написание документации. Квадрант по умолчанию.
-3. **Quadrant 3 (Срочно, Не важно / DELEGATE)**: Рутина, парсинг сайтов, базовые тесты. Агент обучен проактивно сбрасывать эти задачи на фоновых субагентов (Swarm), освобождая себе время.
-4. **Quadrant 4 (Не срочно, Не важно / BACKLOG)**: Идеи на будущее. Могут быть удалены при нехватке памяти.
+Instead of a flat list, the agent organizes goals across 4 quadrants:
+1. **Quadrant 1 (Urgent and Important / DO FIRST)**: Critical bugs, down servers. The agent drops everything to solve these.
+2. **Quadrant 2 (Important, Not Urgent / PLAN)**: Strategic development, writing docs. The default quadrant.
+3. **Quadrant 3 (Urgent, Not Important / DELEGATE)**: Routine, web scraping, basic tests. The agent is trained to proactively delegate these to background subagents (Swarm), freeing up its own time.
+4. **Quadrant 4 (Not Urgent, Not Important / BACKLOG)**: Ideas for the future. Primary deletion candidates during memory limits.
 
-Агент способен самостоятельно перемещать задачи между квадрантами (реприоритизация) и устанавливать жесткие зависимости (блокировки).
+The agent can autonomously shift tasks between quadrants (reprioritization) and set strict blocking dependencies.
 
-## Параметры (`system.db.sql.tasks`)
-* **`enabled`**: `true` / `false`. Включение подсистемы задач.
-* **`max_tasks`**: Максимальное количество одновременно существующих задач. Если лимит превышен, агенту придется удалить завершенные задачи перед созданием новых.
+## Parameters (`system.db.sql.tasks`)
+* **`enabled`**: `true` / `false`. Enables the task subsystem.
+* **`max_tasks`**: Maximum number of concurrent tasks. If exceeded, the agent must delete completed tasks before creating new ones.

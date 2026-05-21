@@ -1,9 +1,9 @@
 """
-Навыки модерации для бота (Aiogram).
+Moderation skills for the bot (Aiogram).
 
-Внимание: боты могут банить пользователей ТОЛЬКО в группах/супергруппах/каналах.
-Глобального ЧС (Черного Списка) для ботов не существует — в ЛС бот может
-просто игнорировать заблокированного пользователя в логике самого кода.
+Note: bots can ban users ONLY in groups/supergroups/channels.
+Global Blacklist for bots does not exist — in DMs, the bot can
+simply ignore the blocked user in the code logic itself.
 """
 
 from src.l2_interfaces.telegram.aiogram.client import AiogramClient
@@ -12,7 +12,7 @@ from src.utils.logger import main_logger
 
 
 class AiogramModeration:
-    """Группа навыков административного контроля (баны и разбаны)."""
+    """Administrative control skills group (bans and unbans)."""
 
     def __init__(self, aiogram_client: AiogramClient) -> None:
         self.client = aiogram_client
@@ -20,24 +20,24 @@ class AiogramModeration:
     @skill()
     async def ban_user(self, chat_id: int, user_id: int) -> SkillResult:
         """
-        Bans user from group or supergroup. 
+        Bans user from group or supergroup.
         Requires admin privileges.
         """
-        
+
         try:
             bot = self.client.bot()
 
-            # В aiogram ban_chat_member навсегда исключает пользователя из чата
+            # In aiogram, ban_chat_member excludes the user from the chat permanently
             await bot.ban_chat_member(chat_id=int(chat_id), user_id=int(user_id))
 
-            msg = f"Пользователь {user_id} забанен в чате {chat_id} (Aiogram)."
+            msg = f"User {user_id} banned in chat {chat_id} (Aiogram)."
             main_logger.info(f"[Telegram Aiogram] {msg}")
             return SkillResult.ok("True")
 
         except ValueError:
-            return SkillResult.fail("Ошибка: ID пользователя и чата должны быть числами.")
+            return SkillResult.fail("Error: User and chat IDs must be numbers.")
         except Exception as e:
-            return SkillResult.fail(f"Ошибка при блокировке пользователя (Aiogram): {e}")
+            return SkillResult.fail(f"Error blocking user (Aiogram): {e}")
 
     @skill()
     async def unban_user(self, chat_id: int, user_id: int) -> SkillResult:
@@ -48,12 +48,12 @@ class AiogramModeration:
         try:
             bot = self.client.bot()
 
-            # unban_chat_member снимает бан
+            # unban_chat_member lifts the ban
             await bot.unban_chat_member(chat_id=int(chat_id), user_id=int(user_id))
 
-            msg = f"Пользователь {user_id} разбанен в чате {chat_id} (Aiogram)."
+            msg = f"User {user_id} unbanned in chat {chat_id} (Aiogram)."
             main_logger.info(f"[Telegram Aiogram] {msg}")
             return SkillResult.ok("True")
 
         except Exception as e:
-            return SkillResult.fail(f"Ошибка при разблокировке пользователя (Aiogram): {e}")
+            return SkillResult.fail(f"Error unblocking user (Aiogram): {e}")

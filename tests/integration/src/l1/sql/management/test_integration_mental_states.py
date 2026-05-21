@@ -39,7 +39,7 @@ async def test_mental_states_crud(mental_states_manager):
 async def test_update_mental_state_allows_clearing_description_and_status(
     mental_states_manager,
 ):
-    """Раньше update использовал `if description:` вместо `is not None`, и пустая
+    """Раньше update использовал `if description:` вместо `is not None`, и emptyя
     строка молча игнорировалась. Агент не мог очистить поле, получая в ответ
     'обновлен'. Это silent update failure.
     """
@@ -53,7 +53,7 @@ async def test_update_mental_state_allows_clearing_description_and_status(
     assert res_create.is_success is True
     ms_id = res_create.message.split("ID: ")[1].strip()
 
-    # Пробуем очистить поля пустой строкой
+    # Пробуем очистить поля emptyой строкой
     res_update = await mental_states_manager.update_mental_state(
         ms_id, description="", status=""
     )

@@ -21,7 +21,7 @@ async def test_list_rss_feeds_empty(rss_client):
 
     res = await skill.list_feeds()
     assert res.is_success is True
-    assert "пуст" in res.message
+    assert "empty" in res.message
 
 
 @pytest.mark.asyncio
@@ -50,7 +50,7 @@ async def test_read_rss_feed_success(rss_client):
 
 @pytest.mark.asyncio
 async def test_read_rss_feed_empty(rss_client):
-    """Тест: обработка пустой или битой ленты."""
+    """Тест: обработка emptyой или битой ленты."""
     skill = WebRSSSkills(rss_client)
 
     mock_feed = MagicMock()
@@ -61,4 +61,4 @@ async def test_read_rss_feed_empty(rss_client):
     res = await skill.read_feed("http://bad-url.com")
 
     assert res.is_success is True
-    assert "пуста, недоступна или не содержит записей" in res.message
+    assert "empty, unavailable, or contains no entries" in res.message

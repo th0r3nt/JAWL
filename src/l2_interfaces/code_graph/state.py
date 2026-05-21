@@ -1,8 +1,8 @@
 """
-L0 State для интерфейса Кодового графа (Code Graph).
+L0 State for the Code Graph interface.
 
-Кодовые графы хранят зависимости, описания и помогают разбираться в сложных кодовых базах,
-благодаря векторному поиску по связям в детерминированном графе.
+Code graphs store dependencies, descriptions, and help understand complex codebases,
+thanks to semantic vector search over relations in a deterministic graph.
 """
 
 import json
@@ -11,14 +11,14 @@ from typing import Dict
 
 
 class CodeGraphState:
-    """Хранит список проиндексированных проектов (кодовых баз)."""
+    """Stores the list of indexed projects (codebases)."""
 
     def __init__(self, data_dir: Path):
         self.is_online = False
         self.persist_file = data_dir / "interfaces" / "code_graph" / "indexes.json"
         self.persist_file.parent.mkdir(parents=True, exist_ok=True)
 
-        # Кэш: {"project_id": "path/to/folder"}
+        # Cache: {"project_id": "path/to/folder"}
         self.active_indexes: Dict[str, str] = self._load()
 
     def _load(self) -> Dict[str, str]:

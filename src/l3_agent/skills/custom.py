@@ -1,9 +1,9 @@
 """
-Реестр кастомных навыков (Meta Access Level 3: CREATOR).
+Custom Skills Registry (Meta Access Level 3: CREATOR).
 
-Модуль отвечает за метапрограммирование: он читает JSON-манифест, на лету создает
-Proxy-функции для скриптов из песочницы и внедряет их в глобальный реестр (registry.py)
-как нативные инструменты, доступные для вызова языковой модели.
+The module is responsible for metaprogramming: it reads the JSON manifest,
+creates proxy functions for sandbox scripts on the fly, and registers them into
+the global registry (registry.py) as native tools available for LLM calls.
 """
 
 import json
@@ -18,15 +18,15 @@ from src.l3_agent.skills.registry import register_custom_callable, unregister_sk
 
 class CustomSkillsRegistry:
     """
-    Управляет сохранением и динамической генерацией прокси для кастомных скиллов агента.
+    Manages saving and dynamic generation of proxies for custom agent skills.
     """
 
     def __init__(self, data_dir: Path) -> None:
         """
-        Инициализирует менеджер кастомных скриптов.
+        Initializes custom skills manager.
 
         Args:
-            data_dir: Путь к директории хранения локальных данных (Local Data Dir).
+            data_dir: Path to the local data storage directory (Local Data Dir).
         """
 
         self.json_path = data_dir / "interfaces" / "meta" / "custom_skills.json"
@@ -37,7 +37,7 @@ class CustomSkillsRegistry:
 
     def load_and_register_all(self) -> None:
         """
-        Читает манифест (JSON) и регистрирует прокси-функции в ядро агента при старте.
+        Reads the manifest (JSON) and registers proxy functions in the agent core upon startup.
         """
 
         try:
@@ -48,15 +48,15 @@ class CustomSkillsRegistry:
                 self._create_and_register_proxy(skill_name, info)
 
         except Exception as e:
-            main_logger.error(f"[System] Ошибка загрузки кастомных скиллов: {e}")
+            main_logger.error(f"[System] Error loading custom skills: {e}")
 
     def _create_and_register_proxy(self, skill_name: str, info: Dict[str, Any]) -> None:
         """
-        Создает асинхронную функцию-заглушку (Proxy) с фейковой сигнатурой типов.
+        Creates an asynchronous placeholder function (Proxy) with a fake type signature.
 
         Args:
-            skill_name: Имя функции.
-            info: Словарь с метаданными (путь, параметры, докстринг).
+            skill_name: Function identifier name.
+            info: Metadata dict containing filepath, parameters, and docstring.
         """
 
         filepath = info["filepath"]
@@ -73,13 +73,13 @@ class CustomSkillsRegistry:
             "dict": dict,
         }
 
-        # Метапрограммирование: создаем фейковые параметры для inspect.signature
+        # Metaprogramming: create fake parameters for inspect.signature
         parameters = []
         for p_name, p_desc in params_dict.items():
             p_str = str(p_desc).lower()
             is_optional = "optional" in p_str or "=" in p_str
 
-            # Извлекаем реальное дефолтное значение из строки (если оно есть)
+            # Extract the real default value from the string (if any)
             default_val = None
             if "=" in p_str:
                 try:
@@ -90,7 +90,7 @@ class CustomSkillsRegistry:
 
             default = default_val if is_optional else inspect.Parameter.empty
 
-            # Достаем базовый тип, например "float = 13.0" -> "float"
+            # Extract the base type, e.g. "float = 13.0" -> "float"
             base_type_str = str(p_desc).split("=")[0].strip().lower()
             base_type_str = base_type_str.replace("optional", "").strip()
             real_type = type_mapping.get(base_type_str, Any)
@@ -104,7 +104,7 @@ class CustomSkillsRegistry:
                 )
             )
 
-        # Функция-заглушка (Proxy), которая дергает нативный скилл HostOSExecution
+        # Placeholder function (Proxy) that invokes the native HostOSExecution skill
         async def dynamic_proxy(**kwargs: Any) -> Any:
             from src.l3_agent.skills.registry import call_skill
 
@@ -113,7 +113,7 @@ class CustomSkillsRegistry:
                 {"filepath": filepath, "func_name": func_name, "kwargs": kwargs},
             )
 
-        # Приклеиваем сигнатуру
+        # Attach signature
         dynamic_proxy.__signature__ = inspect.Signature(parameters=parameters)
         dynamic_proxy.__name__ = skill_name
 
@@ -129,10 +129,10 @@ class CustomSkillsRegistry:
         params: Dict[str, str],
     ) -> Tuple[bool, str]:
         """
-        Сохраняет навык в JSON манифест и регистрирует в рантайме.
+        Saves the skill to the JSON manifest and registers it at runtime.
 
         Returns:
-            Tuple[Успех_операции, Новое_имя_навыка_или_текст_ошибки]
+            Tuple[bool, str]: Tuple of (operation_success, new_skill_name_or_error_text)
         """
 
         try:
@@ -162,10 +162,10 @@ class CustomSkillsRegistry:
 
     def unregister_skill(self, skill_name: str) -> Tuple[bool, str]:
         """
-        Удаляет навык из манифеста и исключает его из системного промпта.
+        Removes the skill from the manifest and excludes it from the system prompt.
 
         Returns:
-            Tuple[Успех_операции, Текст_ошибки]
+            Tuple[bool, str]: Tuple of (operation_success, error_text)
         """
 
         try:
@@ -184,7 +184,7 @@ class CustomSkillsRegistry:
             return False, str(e)
 
     def get_all_skills(self) -> Dict[str, Any]:
-        """Возвращает словарь всех сохраненных кастомных навыков."""
+        """Returns a dictionary of all saved custom skills."""
         try:
             with open(self.json_path, "r", encoding="utf-8") as f:
                 return json.load(f)

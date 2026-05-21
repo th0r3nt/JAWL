@@ -1,3 +1,7 @@
+"""
+Skills for tracking events in remote or own repositories.
+"""
+
 from src.l2_interfaces.github.client import GithubClient
 from src.l2_interfaces.github.events import GithubEvents
 from src.l3_agent.skills.registry import SkillResult, skill
@@ -5,7 +9,7 @@ from src.utils.logger import main_logger
 
 
 class GithubWatchers:
-    """Навыки для отслеживания событий в чужих или своих репозиториях."""
+    """Skills for tracking events in remote or own repositories."""
 
     def __init__(self, client: GithubClient, events: GithubEvents):
         self.client = client
@@ -23,10 +27,10 @@ class GithubWatchers:
             return SkillResult.ok("True")
 
         try:
-            # Делаем тестовый запрос
+            # Make a test request
             await self.client.request("GET", f"/repos/{owner}/{repo}")
 
-            # Подписка на Гитхабе (чтобы появиться в списке Watchers на сайте)
+            # Remote subscription (to appear in the Watchers list on the site)
             if self.client.config.agent_account and self.client.token:
                 try:
                     await self.client.request(
@@ -34,19 +38,17 @@ class GithubWatchers:
                     )
                 except Exception as sub_err:
                     main_logger.debug(
-                        f"[Github] Не удалось физически подписаться на {repo_name}: {sub_err}"
+                        f"[Github] Failed to physically subscribe to {repo_name}: {sub_err}"
                     )
 
             self.client.state.tracked_repos[repo_name] = ""
             self.events.save_persisted_repos()
 
-            main_logger.info(f"[Github] Начато отслеживание репозитория: {repo_name}")
+            main_logger.info(f"[Github] Started tracking repository: {repo_name}")
             return SkillResult.ok("True")
 
         except Exception as e:
-            return SkillResult.fail(
-                f"Ошибка при добавлении в отслеживаемые (репозиторий не найден?): {e}"
-            )
+            return SkillResult.fail(f"Error adding to tracked (repository not found?): {e}")
 
     @skill()
     async def untrack_repository(self, owner: str, repo: str) -> SkillResult:
@@ -57,19 +59,19 @@ class GithubWatchers:
         repo_name = f"{owner}/{repo}"
 
         if repo_name not in self.client.state.tracked_repos:
-            return SkillResult.fail(f"Ошибка: Репозиторий {repo_name} не отслеживался.")
+            return SkillResult.fail(f"Error: Repository {repo_name} was not tracked.")
 
         del self.client.state.tracked_repos[repo_name]
         self.events.save_persisted_repos()
 
-        # Отписываемся на самом сайте
+        # Unsubscribe on the remote site
         if self.client.config.agent_account and self.client.token:
             try:
                 await self.client.request("DELETE", f"/repos/{owner}/{repo}/subscription")
             except Exception:
                 pass
 
-        main_logger.info(f"[Github] Прекращено отслеживание репозитория: {repo_name}")
+        main_logger.info(f"[Github] Stopped tracking repository: {repo_name}")
         return SkillResult.ok("True")
 
     @skill()
@@ -81,6 +83,6 @@ class GithubWatchers:
         tracked = list(self.client.state.tracked_repos.keys())
 
         if not tracked:
-            return SkillResult.ok("Список отслеживаемых репозиториев пуст.")
+            return SkillResult.ok("List of tracked repositories is empty.")
 
-        return SkillResult.ok("Отслеживаемые репозитории:\n- " + "\n- ".join(tracked))
+        return SkillResult.ok("Tracked repositories:\n- " + "\n- ".join(tracked))

@@ -1,6 +1,6 @@
 """
-Навыки для чтения файлов.
-Включает механизмы массового чтения и защиты контекста от переполнения.
+Skills for reading files.
+Includes mechanisms for mass reading and context window protection.
 """
 
 import asyncio
@@ -17,7 +17,7 @@ from src.l3_agent.swarm.roles import Subagents
 
 
 class HostOSReader:
-    """Навыки агента для безопасного чтения файлов."""
+    """Agent skills for secure file reading."""
 
     def __init__(self, host_os_client: HostOSClient):
         self.host_os = host_os_client
@@ -39,7 +39,7 @@ class HostOSReader:
 
             if not safe_path.is_file():
                 return SkillResult.fail(
-                    f"Ошибка: Путь не является файлом или не существует ({filepath})."
+                    f"Error: Path is not a file or does not exist ({filepath})."
                 )
 
             def _read_fast():
@@ -73,16 +73,16 @@ class HostOSReader:
             content, is_truncated, file_size = await asyncio.to_thread(_read_fast)
 
             size_str = format_size(file_size)
-            header = f"[Файл: {safe_path.name} | Прочитано: {len(content)} симв. | Исходный размер: {size_str}]\n{'='*40}\n"
+            header = f"[File: {safe_path.name} | Read: {len(content)} chars | Original size: {size_str}]\n{'='*40}\n"
 
             if is_truncated:
                 if read_from == "tail":
-                    content = f"...[Файл обрезан с начала. Показаны последние {max_chars} байт]...\n{content}"
+                    content = f"...[File truncated from the beginning. Showing the last {max_chars} bytes]...\n{content}"
                 else:
-                    content = f"{content}\n...[Файл обрезан с конца. Показаны первые {max_chars} байт]..."
+                    content = f"{content}\n...[File truncated from the end. Showing the first {max_chars} bytes]..."
 
             main_logger.info(
-                f"[Host OS] Прочитан файл ({read_from}): {safe_path.name} ({size_str})"
+                f"[Host OS] Read file ({read_from}): {safe_path.name} ({size_str})"
             )
             return SkillResult.ok(header + content)
 
@@ -90,7 +90,7 @@ class HostOSReader:
             return SkillResult.fail(str(e))
 
         except Exception as e:
-            return SkillResult.fail(f"Ошибка при чтении файла: {e}")
+            return SkillResult.fail(f"Error reading file: {e}")
 
     @skill(swarm=[Subagents.CODER, Subagents.QA_ENGINEER, Subagents.SYSADMIN])
     @require_access(HostOSAccessLevel.SANDBOX)
@@ -108,10 +108,8 @@ class HostOSReader:
             safe_path = self.host_os.validate_path(path, is_write=False)
 
             if not safe_path.is_dir():
-                return SkillResult.fail(f"Ошибка: Путь не является директорией ({path}).")
+                return SkillResult.fail(f"Error: Path is not a directory ({path}).")
 
-            # Берем лимит из конфига и умножаем на 2, так как файлов много,
-            # но в пределах разумного, чтобы не убить контекст агента
             total_max_chars = self.host_os.config.file_read_max_chars * 2
 
             def _read_all():
@@ -119,7 +117,6 @@ class HostOSReader:
                 total_chars = 0
                 files_read = 0
 
-                # Защита: чтобы при recursive=True не сжечь лимит файлов на мусор
                 ignore_dirs = {
                     ".git",
                     "venv",
@@ -136,13 +133,12 @@ class HostOSReader:
                 for item in items:
                     rel_path = item.relative_to(safe_path)
 
-                    # Пропускаем мусорные папки
                     if recursive and any(part in ignore_dirs for part in rel_path.parts):
                         continue
 
                     if files_read >= max_files:
                         results.append(
-                            f"\n... [Достигнут лимит на чтение {max_files} файлов. Остальные скрыты]"
+                            f"\n... [Reached the limit of reading {max_files} files. Others hidden]"
                         )
                         break
 
@@ -153,32 +149,29 @@ class HostOSReader:
                         if not content.strip():
                             continue
 
-                        # Считаем остаток квоты
                         chars_left = total_max_chars - total_chars
                         if chars_left <= 0:
                             results.append(
-                                "\n... [Достигнут глобальный лимит символов для чтения. Операция прервана]"
+                                "\n... [Reached global character reading limit. Operation aborted]"
                             )
                             break
 
                         if len(content) > chars_left:
                             content = (
                                 content[:chars_left]
-                                + "\n... [Файл обрезан из-за системных лимитов]"
+                                + "\n... [File truncated due to system limits]"
                             )
 
                         total_chars += len(content)
 
-                        # Выводим относительный путь для понимания структуры вложенности
-                        results.append(f"--- Файл: {rel_path.as_posix()} ---\n{content}\n")
+                        results.append(f"--- File: {rel_path.as_posix()} ---\n{content}\n")
                         files_read += 1
 
                     except UnicodeDecodeError:
-                        # Пропускаем бинарники тихо
                         continue
                     except Exception as e:
                         results.append(
-                            f"--- Файл: {rel_path.as_posix()} ---\n[Ошибка чтения: {e}]\n"
+                            f"--- File: {rel_path.as_posix()} ---\n[Read error: {e}]\n"
                         )
                         files_read += 1
 
@@ -188,18 +181,18 @@ class HostOSReader:
 
             if not results:
                 return SkillResult.ok(
-                    f"Директория '{path}' пуста или содержит только бинарные файлы."
+                    f"Directory '{path}' is empty or contains only binary files."
                 )
 
             size_str = format_size(total_chars)
-            header = f"[Прочитано файлов: {files_read} из директории {safe_path.name} | Общий объем: {size_str}]\n{'='*60}\n\n"
+            header = f"[Files read: {files_read} from directory {safe_path.name} | Total size: {size_str}]\n{'='*60}\n\n"
 
             main_logger.info(
-                f"[Host OS] Массовое чтение {files_read} файлов из директории: {safe_path.name}"
+                f"[Host OS] Mass reading of {files_read} files from directory: {safe_path.name}"
             )
             return SkillResult.ok(header + "\n".join(results))
 
         except PermissionError as e:
             return SkillResult.fail(str(e))
         except Exception as e:
-            return SkillResult.fail(f"Ошибка при массовом чтении файлов: {e}")
+            return SkillResult.fail(f"Error during mass file reading: {e}")

@@ -1,36 +1,36 @@
-# Векторные базы данных и Embedding-модели
+# Vector Databases and Embedding Models
 
-Модуль семантической памяти (Vector DB) использует комбинацию Qdrant и FastEmbed. Поиск, сохранение и генерация векторов производятся исключительно локально на процессоре, что гарантирует приватность данных.
+The semantic memory module (Vector DB) utilizes a combination of Qdrant and FastEmbed. Indexing, storage, and vector generation are performed completely locally on the host CPU, guaranteeing absolute privacy.
 
-## Выбор модели генерации векторов (Embedding Model)
+## Selecting the Embedding Model
 
-Модель задается параметром `embedding_model`. Выбор модели влияет на точность ассоциативного поиска, скорость работы и потребление оперативной памяти.
+The model is defined by the `embedding_model` parameter. Changing the model affects search accuracy, generation speed, and RAM consumption.
 
-### Рекомендуемые модели:
+### Recommended Models:
 
-1. **`intfloat/multilingual-e5-large`** (Самая мощная)
-   - Поддержка языков: 100+
-   - Размер вектора (`vector_size`): 1024
-   - Потребление ОЗУ: ~2.2 ГБ
-   - Косинусное расстояние (`similarity_threshold`): рекомендуется `0.85`
-   - *Характеристика:* Обеспечивает наивысшее качество поиска смысловых связей, но требует больше ресурсов и времени на генерацию эмбеддингов.
+1. **`intfloat/multilingual-e5-large`** (Most Powerful)
+   - Languages: 100+
+   - Vector Size (`vector_size`): 1024
+   - RAM consumption: ~2.2 GB
+   - Cosine threshold (`similarity_threshold`): recommended `0.85`
+   - *Characteristics:* High-fidelity semantic matching, but requires more CPU resources and time for generating embeddings.
 
-2. **`sentence-transformers/paraphrase-multilingual-mpnet-base-v2`** (Баланс)
-   - Размер вектора (`vector_size`): 768
-   - Потребление ОЗУ: ~1.0 ГБ
-   - Косинусное расстояние (`similarity_threshold`): рекомендуется `0.75`
+2. **`sentence-transformers/paraphrase-multilingual-mpnet-base-v2`** (Balanced)
+   - Vector Size (`vector_size`): 768
+   - RAM consumption: ~1.0 GB
+   - Cosine threshold (`similarity_threshold`): recommended `0.75`
 
-3. **`sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2`** (Легковесная)
-   - Размер вектора (`vector_size`): 384
-   - Потребление ОЗУ: ~300 МБ
-   - Косинусное расстояние (`similarity_threshold`): рекомендуется `0.65`
-   - *Характеристика:* Оптимальна для слабых VPS. Работает быстро, но может упускать сложные ассоциации.
+3. **`sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2`** (Lightweight)
+   - Vector Size (`vector_size`): 384
+   - RAM consumption: ~300 MB
+   - Cosine threshold (`similarity_threshold`): recommended `0.65`
+   - *Characteristics:* Optimal for low-resource VPS servers. Fast, but might miss complex associations.
 
-## ⚠️ Критическое предупреждение при смене модели
+## ⚠️ Critical Warning When Changing Models
 
-Архитектура векторной базы данных **не допускает смешивания векторов разной размерности**. 
-Если вы решили изменить модель (например, переключиться с `MiniLM` на `e5-large`), вам необходимо:
-1. Изменить параметр `embedding_model` в конфигурации.
-2. Изменить параметр `vector_size` на соответствующий новой модели (например, с 384 на 1024).
-3. **Обязательно удалить директорию базы данных:** `src/utils/local/data/vector/db`.
-При следующем запуске система автоматически создаст новые коллекции с правильными размерностями тензоров. Старые данные будут утеряны.
+The vector database architecture **does not allow mixing vectors of different dimensions**.
+If you decide to change the model (for example, switching from `MiniLM` to `e5-large`), you must:
+1. Change the `embedding_model` parameter in the configuration.
+2. Change the `vector_size` parameter to match the new model's dimensions (for example, from 384 to 1024).
+3. **Absolutely delete the database directory:** `src/utils/local/data/vector/db`.
+Upon the next launch, the system will automatically recreate clean collections with correct tensor dimensions. Old data will be lost.

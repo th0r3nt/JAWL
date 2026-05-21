@@ -11,7 +11,7 @@ def test_is_onboarding_needed_no_env(tmp_path: Path):
 
 
 def test_is_onboarding_needed_empty_key(tmp_path: Path):
-    """Если ключ LLM пуст - онбординг нужен."""
+    """Если ключ LLM empty - онбординг нужен."""
     env_file = tmp_path / ".env"
     env_file.write_text('LLM_API_KEY_1=""\nLLM_API_URL=""\n', encoding="utf-8")
     
@@ -20,7 +20,7 @@ def test_is_onboarding_needed_empty_key(tmp_path: Path):
 
 
 def test_is_onboarding_needed_local_url(tmp_path: Path):
-    """Если указан локальный URL (Ollama), ключ может быть пуст - онбординг НЕ нужен."""
+    """Если указан локальный URL (Ollama), ключ может быть empty - онбординг НЕ нужен."""
     env_file = tmp_path / ".env"
     env_file.write_text('LLM_API_KEY_1=""\nLLM_API_URL="http://127.0.0.1:11434"\n', encoding="utf-8")
     

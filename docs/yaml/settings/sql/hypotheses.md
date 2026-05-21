@@ -1,9 +1,9 @@
-# Вероятностное мышление (Bayesian Hypotheses)
+# Probabilistic Reasoning (Bayesian Hypotheses)
 
-Модуль `Hypotheses` наделяет агента способностью к дедуктивному расследованию на основе теоремы Байеса.
+The `Hypotheses` module equips the agent with the ability to conduct deductive investigations based on Bayes' Theorem.
 
-Вместо того чтобы слепо гадать или паниковать при возникновении неочевидной проблемы (например, падение сервера или непонятный баг в коде), агент формирует гипотезу, оценивает ее начальную вероятность, а затем целенаправленно ищет улики. Каждая найденная улика (сделан `ping`, прочитан лог) математически смещает уверенность агента вверх или вниз.
+Instead of blind guessing or panicking when faced with a system failure (for example, a database crash or a weird code bug), the agent formulates a hypothesis, estimates its prior probability, and actively gathers clues. Each gathered clue (a ping command, a read log file) mathematically shifts the agent's confidence up or down.
 
-## Параметры (`system.db.sql.hypotheses`)
-* **`enabled`**: `true` / `false`. Включение подсистемы вероятностного мышления.
-* **`max_hypotheses`**: Жесткий лимит на количество одновременно активных гипотез. Оперативная память (контекст агента) должна быть чистой, поэтому агент обязан удалять подтвержденные/опровергнутые гипотезы перед созданием новых.
+## Parameters (`system.db.sql.hypotheses`)
+* **`enabled`**: `true` / `false`. Enables the probabilistic reasoning module.
+* **`max_hypotheses`**: Limit on the number of concurrent active hypotheses. The agent's operative context must remain clean, so it is forced to delete confirmed or refuted hypotheses before creating new ones.

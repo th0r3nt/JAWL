@@ -1,6 +1,6 @@
 """
-CRUD-контроллер долгосрочных задач (Tasks).
-Использует Матрицу Эйзенхауэра для распределения приоритетов.
+CRUD controller for long-term tasks (Tasks).
+Uses the Eisenhower Matrix for priority distribution.
 """
 
 import uuid
@@ -26,7 +26,7 @@ from src.l3_agent.skills.registry import skill, SkillResult
 
 
 class SQLTasks:
-    """CRUD для управления долгосрочными задачами агента (Eisenhower Matrix)."""
+    """CRUD for managing agent's long-term tasks (Eisenhower Matrix)."""
 
     def __init__(self, db: "SQLDB", max_tasks: int = 15, tz_offset: int = 0) -> None:
         self.db = db
@@ -35,7 +35,7 @@ class SQLTasks:
 
     async def bootstrap_migrations(self) -> None:
         """
-        Мягкая миграция для добавления колонки quadrant в старые базы данных.
+        Soft migration to add quadrant column to older databases.
         """
 
         async with self.db.engine.begin() as conn:
@@ -44,16 +44,16 @@ class SQLTasks:
                     text("ALTER TABLE tasks ADD COLUMN quadrant INTEGER DEFAULT 2")
                 )
                 main_logger.info(
-                    "[SQL DB] Выполнена успешная миграция таблицы Tasks (добавлен quadrant)."
+                    "[SQL DB] Successful migration of the Tasks table (added quadrant)."
                 )
             except Exception as e:
                 main_logger.debug(
-                    f"[SQL DB] Миграция таблицы Tasks пропущена (возможно, колонка уже существует): {e}"
+                    f"[SQL DB] Migration of the Tasks table skipped (column probably already exists): {e}"
                 )
 
     def _validate_tags(self, tags: Any) -> tuple[bool, str, list[str]]:
         """
-        Защитный парсер тегов от галлюцинаций LLM.
+        Protective tag parser against LLM hallucinations.
         """
 
         if not tags:
@@ -70,14 +70,14 @@ class SQLTasks:
                 tags = [tags]
 
         if not isinstance(tags, list):
-            return False, "Ошибка: Теги должны быть массивом (списком) строк.", []
+            return False, "Error: Tags must be an array (list) of strings.", []
 
         clean_tags = [str(t).strip() for t in tags if str(t).strip()]
         for tag in clean_tags:
             if tag not in ALLOWED_TAGS:
                 return (
                     False,
-                    f"Тег '{tag}' недопустим. Разрешенные теги: {', '.join(ALLOWED_TAGS)}",
+                    f"Tag '{tag}' is invalid. Allowed tags: {', '.join(ALLOWED_TAGS)}",
                     [],
                 )
         return True, "", clean_tags
@@ -94,15 +94,15 @@ class SQLTasks:
         due_date_str: Optional[str] = None,
     ) -> SkillResult:
         """
-        Creates long-term Eisenhower matrix task. 
-        
-        dependencies: Blocking task IDs. 
-        subtasks: Progress tracking checklist. 
+        Creates long-term Eisenhower matrix task.
+
+        dependencies: Blocking task IDs.
+        subtasks: Progress tracking checklist.
         due_date_str: 'YYYY-MM-DD HH:MM' deadline.
         """
 
         if quadrant not in [1, 2, 3, 4]:
-            return SkillResult.fail("Ошибка: quadrant должен быть числом от 1 до 4.")
+            return SkillResult.fail("Error: quadrant must be a number from 1 to 4.")
 
         task_id = str(uuid.uuid4())[:8]
         if tags is None:
@@ -120,14 +120,14 @@ class SQLTasks:
                 due_date_ts = dt.timestamp()
             except ValueError:
                 return SkillResult.fail(
-                    "Ошибка: Неверный формат due_date_str. Необходимо использовать 'YYYY-MM-DD HH:MM'."
+                    "Error: Invalid due_date_str format. Must use 'YYYY-MM-DD HH:MM'."
                 )
 
         async with self.db.session_factory() as session:
             count_res = await session.execute(select(func.count(TaskTable.id)))
             if count_res.scalar_one() >= self.max_tasks:
                 return SkillResult.fail(
-                    f"Достигнут лимит задач ({self.max_tasks}). Необходимо завершить или удалить старые задачи."
+                    f"Tasks limit reached ({self.max_tasks}). It is necessary to complete or delete old tasks."
                 )
 
             new_task = TaskTable(
@@ -146,7 +146,7 @@ class SQLTasks:
             session.add(new_task)
             await session.commit()
 
-        msg = f"Задача '{title}' создана (Квадрант {quadrant}). ID: {task_id}"
+        msg = f"Task '{title}' created (Quadrant {quadrant}). ID: {task_id}"
         main_logger.debug(f"[SQL DB] {msg}")
         return SkillResult.ok(f"True. ID: {task_id}")
 
@@ -159,20 +159,20 @@ class SQLTasks:
         """
 
         if new_quadrant not in [1, 2, 3, 4]:
-            return SkillResult.fail("Ошибка: quadrant должен быть числом от 1 до 4.")
+            return SkillResult.fail("Error: quadrant must be a number from 1 to 4.")
 
         async with self.db.session_factory() as session:
             result = await session.execute(select(TaskTable).where(TaskTable.id == task_id))
             task = result.scalar_one_or_none()
 
             if not task:
-                return SkillResult.fail(f"Задача с ID {task_id} не найдена.")
+                return SkillResult.fail(f"Task with ID {task_id} not found.")
 
             old_quadrant = task.quadrant
             task.quadrant = new_quadrant
             await session.commit()
 
-        msg = f"Задача {task_id} перемещена из Квадранта {old_quadrant} в Квадрант {new_quadrant}."
+        msg = f"Task {task_id} moved from Quadrant {old_quadrant} to Quadrant {new_quadrant}."
         main_logger.debug(f"[SQL DB] {msg}")
         return SkillResult.ok("True")
 
@@ -197,7 +197,7 @@ class SQLTasks:
 
         if status and status not in STATUS_EMOJIS.keys():
             return SkillResult.fail(
-                f"Недопустимый статус. Варианты: {', '.join(STATUS_EMOJIS.keys())}"
+                f"Invalid status. Allowed: {', '.join(STATUS_EMOJIS.keys())}"
             )
 
         clean_tags = None
@@ -211,7 +211,7 @@ class SQLTasks:
             task = result.scalar_one_or_none()
 
             if not task:
-                return SkillResult.fail(f"Задача с ID {task_id} не найдена.")
+                return SkillResult.fail(f"Task with ID {task_id} not found.")
 
             if title is not None:
                 task.title = title
@@ -236,7 +236,7 @@ class SQLTasks:
 
             await session.commit()
 
-        msg = f"Задача {task_id} успешно обновлена."
+        msg = f"Task {task_id} successfully updated."
         main_logger.debug(f"[SQL DB] {msg}")
         return SkillResult.ok("True")
 
@@ -250,15 +250,15 @@ class SQLTasks:
             result = await session.execute(delete(TaskTable).where(TaskTable.id == task_id))
             await session.commit()
             if result.rowcount == 0:
-                return SkillResult.fail(f"Задача с ID {task_id} не найдена.")
+                return SkillResult.fail(f"Task with ID {task_id} not found.")
 
-        msg = f"Задача {task_id} удалена."
+        msg = f"Task {task_id} deleted."
         main_logger.debug(f"[SQL DB] {msg}")
         return SkillResult.ok("True")
 
     async def get_context_block(self, **kwargs: Any) -> str:
         """
-        Формирует блок активных задач для системного промпта через матрицу Эйзенхауэра.
+        Formats the active tasks block for the system prompt using the Eisenhower Matrix.
         """
 
         async with self.db.session_factory() as session:

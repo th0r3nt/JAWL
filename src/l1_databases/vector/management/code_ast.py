@@ -1,7 +1,7 @@
 """
-CRUD-контроллер для коллекции 'code_ast'.
+CRUD controller for the 'code_ast' collection.
 
-Хранит докстринги и описания функций, классов и файлов для Code Graph.
+Stores docstrings and descriptions of functions, classes, and files for the Code Graph.
 """
 
 import uuid
@@ -18,7 +18,7 @@ if TYPE_CHECKING:
 
 class VectorCodeAST:
     """
-    Контроллер векторной памяти для хранения докстрингов и кусков кода.
+    Vector memory controller for storing docstrings and code snippets.
     """
 
     def __init__(
@@ -35,7 +35,7 @@ class VectorCodeAST:
 
     async def save_doc(self, node_id: str, text: str, project_id: str, node_type: str) -> None:
         """
-        Векторизует докстринг класса/функции.
+        Vectorizes the class/function docstring.
         """
 
         if not text.strip() or not self.db.client:
@@ -43,7 +43,7 @@ class VectorCodeAST:
 
         vector = await self.embedding_model.get_embedding(text)
 
-        # Используем предсказуемый ID, чтобы не плодить дубликаты при переиндексации
+        # Use a predictable ID to prevent duplicate generation during re-indexing
         point_id = str(uuid.uuid5(uuid.NAMESPACE_URL, node_id))
 
         payload = {
@@ -62,7 +62,7 @@ class VectorCodeAST:
         self, query: str, project_id: str, limit: int = 5
     ) -> List[Dict[str, Any]]:
         """
-        Семантический поиск по докстрингам внутри указанного проекта.
+        Semantic search across docstrings within the specified project.
         """
         if not self.db.client:
             return []
@@ -85,7 +85,7 @@ class VectorCodeAST:
             with_payload=True,
         )
 
-        # Поддерживаем обратную совместимость и моки в тестах
+        # Support backward compatibility and mocks in tests
         points = search_result.points if hasattr(search_result, "points") else search_result
 
         return [
@@ -100,7 +100,7 @@ class VectorCodeAST:
 
     async def delete_project(self, project_id: str) -> None:
         """
-        Удаляет все вектора, принадлежащие конкретному проекту.
+        Deletes all vectors belonging to a specific project.
         """
 
         if not self.db.client:
@@ -118,4 +118,4 @@ class VectorCodeAST:
                 )
             ),
         )
-        main_logger.info(f"[Vector DB] Вектора проекта AST '{project_id}' удалены.")
+        main_logger.info(f"[Vector DB] AST project '{project_id}' vectors deleted.")

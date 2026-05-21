@@ -1,5 +1,12 @@
+"""
+L0 State for the Web HTTP interface.
+
+Stores connection status and history of raw HTTP requests.
+"""
+
+
 class WebHTTPState:
-    """Хранит состояние простых HTTP запросов агента."""
+    """Stores the state of the agent's raw HTTP queries."""
 
     def __init__(self, history_limit: int = 10):
         self.is_online = False

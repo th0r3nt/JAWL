@@ -1,8 +1,8 @@
 """
-Навыки управления собственным профилем агента (Telethon).
+Telethon Account Skills.
 
-Позволяют агенту менять имя, биографию, аватарку, добавлять людей в контакты
-и просматривать детальную информацию о чужих профилях (в том числе сетевой статус).
+Provides tools for profile personalization, managing self-biography, avatars,
+adding contacts, and checking external user information.
 """
 
 from typing import Union
@@ -28,7 +28,7 @@ from src.l3_agent.skills.registry import SkillResult, skill
 
 
 class TelethonAccount:
-    """Группа навыков для управления профилем и контактами."""
+    """Skills for managing profile credentials, avatars, and contacts."""
 
     def __init__(self, tg_client: TelethonClient) -> None:
         self.tg_client = tg_client
@@ -44,18 +44,18 @@ class TelethonAccount:
 
             await client(UpdateProfileRequest(first_name=name, last_name=surname))
 
-            # Обновляем стейт, чтобы контекст агента сразу актуализировался
+            # Trigger state update to refresh system context
             await self.tg_client.update_profile_state()
 
             return SkillResult.ok("True")
 
         except Exception as e:
-            return SkillResult.fail(f"Ошибка при изменении имени: {e}")
+            return SkillResult.fail(f"Error changing profile name: {e}")
 
     @skill()
     async def change_bio(self, text: str) -> SkillResult:
         """
-        Changes profile bio. 
+        Changes profile bio.
         Max length 70 characters.
         """
 
@@ -67,13 +67,13 @@ class TelethonAccount:
             return SkillResult.ok("True")
 
         except Exception as e:
-            return SkillResult.fail(f"Ошибка при изменении био: {e}")
+            return SkillResult.fail(f"Error changing profile bio: {e}")
 
     @skill()
     async def change_avatar(self, filepath: str) -> SkillResult:
         """
-        Sets new profile avatar. 
-        
+        Sets new profile avatar.
+
         filepath: Relative sandbox/ path.
         """
 
@@ -81,9 +81,7 @@ class TelethonAccount:
             safe_path = validate_sandbox_path(filepath)
 
             if not safe_path.exists():
-                return SkillResult.fail(
-                    f"Ошибка: Файл для аватара не найден ({safe_path.name})."
-                )
+                return SkillResult.fail(f"Error: Avatar file not found ({safe_path.name}).")
 
             client = self.tg_client.client()
             uploaded_file = await client.upload_file(str(safe_path))
@@ -94,7 +92,7 @@ class TelethonAccount:
         except PermissionError as e:
             return SkillResult.fail(str(e))
         except Exception as e:
-            return SkillResult.fail(f"Ошибка при изменении аватара: {e}")
+            return SkillResult.fail(f"Error changing avatar: {e}")
 
     @skill()
     async def add_contact(
@@ -118,23 +116,22 @@ class TelethonAccount:
                 )
             )
 
-            name_str = f"{first_name} {last_name}".strip()
             return SkillResult.ok("True")
 
         except ValueError:
             return SkillResult.fail(
-                f"Ошибка: Пользователь '{user_id}' не найден. Проверьте ID или юзернейм."
+                f"Error: User '{user_id}' not found. Verify ID or username."
             )
         except Exception as e:
-            return SkillResult.fail(f"Ошибка при добавлении в контакты: {e}")
+            return SkillResult.fail(f"Error adding contact: {e}")
 
     @skill()
     async def download_avatar(
         self, user_or_chat_id: Union[int, str], dest_filename: str, avatar_index: int = 0
     ) -> SkillResult:
         """
-        Downloads user/chat profile photo to sandbox. 
-        
+        Downloads user/chat profile photo to sandbox.
+
         avatar_index: 0 is current, 1 is previous.
         """
 
@@ -146,40 +143,40 @@ class TelethonAccount:
             client = self.tg_client.client()
             entity = await client.get_entity(parse_int_or_str(user_or_chat_id))
 
-            # Запрашиваем историю фотографий (до нужного нам индекса)
+            # Fetch profile photos up to targeted index
             photos = await client.get_profile_photos(entity, limit=avatar_index + 1)
 
             if not photos or avatar_index >= len(photos):
                 count = len(photos) if photos else 0
                 return SkillResult.fail(
-                    f"Ошибка: Аватар с индексом {avatar_index} не найден. Всего доступно аватаров: {count}."
+                    f"Error: Avatar with index {avatar_index} not found. Total available avatars: {count}."
                 )
 
             target_photo = photos[avatar_index]
 
             main_logger.info(
-                f"[Telegram Telethon] Скачивание аватара (индекс {avatar_index})..."
+                f"[Telegram Telethon] Downloading profile photo (index {avatar_index})..."
             )
             downloaded_path = await client.download_media(target_photo, file=str(safe_path))
 
             if not downloaded_path:
-                return SkillResult.fail("Не удалось скачать аватар (возможно нет доступа).")
+                return SkillResult.fail("Failed to download avatar.")
 
             size_str = format_size(safe_path.stat().st_size)
             main_logger.info(
-                f"[Telegram Telethon] Аватар скачан: {safe_path.name} ({size_str})"
+                f"[Telegram Telethon] Avatar downloaded: {safe_path.name} ({size_str})"
             )
 
             return SkillResult.ok(
-                f"Аватар успешно скачан и сохранен как: sandbox/{safe_path.name} ({size_str})"
+                f"Avatar downloaded successfully and saved as: sandbox/{safe_path.name} ({size_str})"
             )
 
         except PermissionError as e:
             return SkillResult.fail(str(e))
         except ValueError:
-            return SkillResult.fail("Ошибка: Пользователь или чат не найден.")
+            return SkillResult.fail("Error: User or chat not found.")
         except Exception as e:
-            return SkillResult.fail(f"Ошибка при скачивании аватара: {e}")
+            return SkillResult.fail(f"Error downloading avatar: {e}")
 
     @skill()
     async def get_user_info(self, user_id: Union[int, str]) -> SkillResult:
@@ -194,60 +191,55 @@ class TelethonAccount:
             full_user = await client(GetFullUserRequest(target_entity))
             user = full_user.users[0]
 
-            lines = [f"Информация о пользователе {user_id}:"]
-            lines.append(f"Имя: {user.first_name or ''} {user.last_name or ''}".strip())
+            lines = [f"User profile details for {user_id}:"]
+            lines.append(f"Name: {user.first_name or ''} {user.last_name or ''}".strip())
 
             if user.username:
-                lines.append(f"Юзернейм: @{user.username}")
+                lines.append(f"Username: @{user.username}")
 
             if full_user.full_user.about:
-                lines.append(f"О себе (Bio): {full_user.full_user.about}")
+                lines.append(f"Bio: {full_user.full_user.about}")
 
-            # Парсинг сетевого статуса
-            status_str = "Неизвестно (или скрыто настройками приватности)"
+            # Parsing network status
+            status_str = "Hidden / Restricted by privacy settings"
             if isinstance(user.status, UserStatusOnline):
-                status_str = "В сети (Online)"
+                status_str = "Online"
             elif isinstance(user.status, UserStatusOffline):
                 dt_str = format_datetime(user.status.was_online, self.tg_client.timezone)
-                status_str = f"Был(а) в сети: {dt_str}"
+                status_str = f"Last seen: {dt_str}"
             elif isinstance(user.status, UserStatusRecently):
-                status_str = "Был(а) недавно"
+                status_str = "Last seen recently"
             elif isinstance(user.status, UserStatusLastWeek):
-                status_str = "Был(а) на этой неделе"
+                status_str = "Last seen within a week"
             elif isinstance(user.status, UserStatusLastMonth):
-                status_str = "Был(а) в этом месяце"
+                status_str = "Last seen within a month"
 
-            lines.append(f"Сетевой статус: {status_str}")
+            lines.append(f"Status: {status_str}")
 
             if user.bot:
-                lines.append("Статус аккаунта: Бот")
+                lines.append("Profile Type: Bot")
             if user.restricted:
-                lines.append(
-                    "[Внимание: На аккаунт наложены ограничения Telegram (Restricted)]"
-                )
+                lines.append("[Attention: Account is restricted by Telegram]")
             if user.scam or user.fake:
-                lines.append("[Внимание: Аккаунт помечен как SCAM или FAKE]")
+                lines.append("[Attention: Account has SCAM or FAKE label]")
 
             return SkillResult.ok("\n".join(lines))
 
         except ValueError:
-            return SkillResult.fail(
-                "Ошибка: Пользователь не найден. Рекомендуется проверить ID или юзернейм."
-            )
+            return SkillResult.fail("Error: User not found. Please verify ID or username.")
         except Exception as e:
-            return SkillResult.fail(f"Ошибка при получении информации о пользователе: {e}")
+            return SkillResult.fail(f"Error fetching user info: {e}")
 
     @skill()
     async def set_personal_channel(self, channel_id: Union[int, str]) -> SkillResult:
         """
-        Sets specified channel as personal (shows in bio). 
+        Sets specified channel as personal (shows in bio).
         Pass empty string to remove.
         """
 
         try:
             client = self.tg_client.client()
 
-            # Обрабатываем удаление канала
             if not channel_id or str(channel_id).strip() == "":
                 target_entity = None
             else:
@@ -255,21 +247,18 @@ class TelethonAccount:
 
             await client(UpdatePersonalChannelRequest(channel=target_entity))
 
-            # Актуализируем стейт агента, чтобы он сразу "осознал", что профиль обновился
+            # Trigger state update
             await self.tg_client.update_profile_state()
 
-            if target_entity:
-                return SkillResult.ok("True")
-            else:
-                return SkillResult.ok("True")
+            return SkillResult.ok("True")
 
         except ValueError:
             return SkillResult.fail(
-                f"Ошибка: Канал '{channel_id}' не найден. Проверьте ID или юзернейм."
+                f"Error: Channel '{channel_id}' not found. Verify ID or username."
             )
         except Exception as e:
             if "CHANNEL_PRIVATE" in str(e):
                 return SkillResult.fail(
-                    "Ошибка: Канал приватный, либо у вас нет к нему доступа."
+                    "Error: Channel is private, or you do not have permission to access it."
                 )
-            return SkillResult.fail(f"Ошибка при установке личного канала: {e}")
+            return SkillResult.fail(f"Error updating personal channel: {e}")

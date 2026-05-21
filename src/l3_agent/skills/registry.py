@@ -1,9 +1,9 @@
 """
-Глобальный реестр навыков (Skills Registry) и слой защиты (Guard Layer).
+Global Skills Registry and Guard Layer.
 
-Отвечает за регистрацию нативных и кастомных функций, динамическое создание
-Pydantic-моделей для валидации аргументов (защита от галлюцинаций LLM) и
-Role-Based Access Control (RBAC) для субагентов.
+Handles registration of native and custom functions, dynamic creation of Pydantic
+models for argument validation (protection against LLM hallucinations), and
+Role-Based Access Control (RBAC) for subagents.
 """
 
 import inspect
@@ -26,7 +26,7 @@ from src.l3_agent.subconscious.schema import Pattern
 @dataclass
 class SkillResult:
     """
-    Стандартизированный ответ любого инструмента агента.
+    Standardized response of any agent tool.
     """
 
     is_success: bool
@@ -45,12 +45,12 @@ _REGISTRY: Dict[str, Dict[str, Any]] = {}
 
 
 def clear_registry() -> None:
-    """Очищает глобальный реестр (вызывается при ребуте агента)."""
+    """Clears the global registry (called during agent reboot)."""
     _REGISTRY.clear()
 
 
 def unregister_skill(skill_name: str) -> None:
-    """Удаляет навык из реестра по имени."""
+    """Removes a skill from the registry by name."""
     if skill_name in _REGISTRY:
         del _REGISTRY[skill_name]
 
@@ -59,7 +59,7 @@ def _build_skill_name(
     func: Callable[..., Any], override: Optional[str] = None, instance: Optional[Any] = None
 ) -> str:
     """
-    Генерирует чистое имя функции (убирая системные префиксы src.l2_interfaces...).
+    Generates a clean function name (removing system prefixes like src.l2_interfaces...).
     """
 
     if override:
@@ -77,8 +77,8 @@ def _build_skill_name(
 
 def _create_pydantic_guard(func: Callable[..., Any], skill_name: str) -> type[BaseModel]:
     """
-    Динамически генерирует Pydantic модель (Guard) на основе сигнатуры функции (type-hints).
-    Обеспечивает Type Coercion (приведение типов) и защиту от мусорных параметров.
+    Dynamically generates a Pydantic model (Guard) based on the function signature (type-hints).
+    Provides Type Coercion and protects against junk parameters.
     """
 
     sig = inspect.signature(func)
@@ -107,7 +107,7 @@ def _register_callable(
     hidden: bool = False,
 ) -> None:
     """
-    Внутренний метод регистрации Python-функции в реестре.
+    Internal method to register a Python function in the registry.
     """
 
     skill_name = _build_skill_name(func, override, instance)
@@ -126,7 +126,7 @@ def _register_callable(
         formatted_params.append(param_str)
 
     clean_sig = f"({', '.join(formatted_params)})"
-    raw_doc = inspect.getdoc(func) or "Без описания."
+    raw_doc = inspect.getdoc(func) or "No description."
     clean_doc = " ".join(raw_doc.split())
 
     doc_str = f"{skill_name}{clean_sig} - {clean_doc}"
@@ -141,7 +141,7 @@ def _register_callable(
         "subconscious": subconscious or [],
         "hidden": hidden,
     }
-    log = f"[Skills] Зарегистрирован скилл: {skill_name}"
+    log = f"[Skills] Registered skill: {skill_name}"
     agent_logger.debug(log)
 
 
@@ -149,7 +149,7 @@ def register_custom_callable(
     func: Callable[..., Any], skill_name: str, description: str, filepath: str
 ) -> None:
     """
-    Регистрирует кастомный прокси-скилл (скрипт из песочницы).
+    Registers a custom proxy skill (script from the sandbox).
     """
 
     sig = inspect.signature(func)
@@ -162,7 +162,7 @@ def register_custom_callable(
 
     clean_sig = f"({', '.join(formatted_params)})"
     clean_doc = " ".join(description.split())
-    doc_str = f"`{skill_name}{clean_sig}` - {clean_doc} [Файл: {filepath}]"
+    doc_str = f"`{skill_name}{clean_sig}` - {clean_doc} [File: {filepath}]"
 
     _REGISTRY[skill_name] = {
         "func": func,
@@ -174,7 +174,7 @@ def register_custom_callable(
         "subconscious": [],
         "hidden": False,
     }
-    log = f"[Skills] Зарегистрирован кастомный скилл: {skill_name}"
+    log = f"[Skills] Registered custom skill: {skill_name}"
     agent_logger.info(log)
 
 
@@ -188,14 +188,14 @@ def skill(
     hidden: bool = False,
 ) -> Callable[[F], F]:
     """
-    Декоратор, который автоматически регистрирует новый навык для агента.
-    Берет dockstring, аргументы и их типы, формируя контекстный блок 'function(arg1: type) - dockstring'.
+    Decorator that automatically registers a new skill for the agent.
+    Extracts docstring, arguments, and their types, forming the context block 'function(arg1: type) - docstring'.
 
     Args:
-        name_override: Переопределение названия функции (по умолчанию берется 'Класс.имя_функции').
-        swarm: Массив субагентов, которые могут использовать этот навык (RBAC).
-        subconscious: Массив паттернов подсознания, которые могут использовать этот навык.
-        hidden: Если True - главный агент не будет видеть этот навык (полезно для системных функций).
+        name_override: Name override (defaults to 'Class.func_name').
+        swarm: Array of subagents authorized to invoke this skill (RBAC).
+        subconscious: Array of subconscious patterns authorized to invoke this skill.
+        hidden: If True, hides the skill from the main agent prompt (useful for system-only tasks).
     """
 
     def decorator(func: F) -> F:
@@ -216,7 +216,7 @@ def skill(
 
 
 def register_instance(instance: Any) -> None:
-    """Регистрирует все задекорированные методы внутри переданного инстанса класса."""
+    """Registers all decorated methods inside the passed class instance."""
     for attr_name in dir(instance):
         method = getattr(instance, attr_name)
         if callable(method) and getattr(method, "__is_skill__", False):
@@ -236,8 +236,8 @@ def register_instance(instance: Any) -> None:
 
 def get_skills_library(subconscious_config: Optional[SubconsciousConfig] = None) -> str:
     """
-    Собирает все навыки. Автоматически скрывает навыки, если они делегированы
-    активному подсознательному паттерну, чтобы разгрузить контекст Оркестратора.
+    Collects all skills. Automatically hides skills if they are delegated to
+    an active subconscious pattern to offload the Orchestrator's context.
     """
     active_docs = []
     custom_docs = []
@@ -252,11 +252,10 @@ def get_skills_library(subconscious_config: Optional[SubconsciousConfig] = None)
             custom_docs.append(data["doc_string"])
             continue
 
-        # Dynamic Visibility для Подсознания
+        # Dynamic Visibility for Subconscious
         if subconscious_config and subconscious_config.enabled:
             patterns_list = data.get("subconscious", [])
             if patterns_list:
-                # Проверяем, включен ли хотя бы один паттерн, требующий этот навык
                 is_used_by_active_pattern = False
                 for p in patterns_list:
                     p_cfg = getattr(subconscious_config.patterns, p.value, None)
@@ -264,7 +263,6 @@ def get_skills_library(subconscious_config: Optional[SubconsciousConfig] = None)
                         is_used_by_active_pattern = True
                         break
 
-                # Если навык обслуживает включенное подсознание - скрываем его от главного агента, чтобы не перегружать контекст
                 if is_used_by_active_pattern:
                     continue
 
@@ -284,9 +282,8 @@ def get_skills_library(subconscious_config: Optional[SubconsciousConfig] = None)
                 if not visibility_check(instance):
                     continue
             except Exception as e:
-                # Ошибка в кастомном декораторе видимости
                 agent_logger.warning(
-                    f"[Skills Registry] Исключение в __visibility_check__ для {skill_name}: {e}"
+                    f"[Skills Registry] Exception in __visibility_check__ for {skill_name}: {e}"
                 )
 
         active_docs.append(doc)
@@ -313,20 +310,19 @@ async def execute_skill(
     actions: List[ActionCall], logger: logging.Logger = agent_logger
 ) -> str:
     """
-    Асинхронно и параллельно выполняет массив запрошенных агентом действий.
+    Asynchronously and parallelly executes an array of requested agent actions.
 
     Args:
-        actions: Список объектов ActionCall.
-        logger: Логгер целевой подсистемы (по умолчанию agent_logger).
+        actions: List of ActionCall objects.
+        logger: Destination logger (defaults to agent_logger).
     """
     if not actions:
-        return "Цикл завершен: действий не передано."
+        return "Cycle completed: no actions provided."
 
     tasks = []
     for act in actions:
         name = act.tool_name
         params = act.parameters
-        # Убрали ручное логирование [Agent Action] отсюда, оно теперь внутри call_skill
         tasks.append(call_skill(name, params, logger=logger))
 
     results = await asyncio.gather(*tasks)
@@ -338,15 +334,15 @@ async def call_skill(
     name: str, params: Dict[str, Any], logger: logging.Logger = agent_logger
 ) -> SkillResult:
     """
-    Низкоуровневый вызов отдельного навыка с прогоном параметров через Pydantic Guard Layer.
+    Low-level call of an individual skill passing parameters through the Pydantic Guard Layer.
     """
-    params_str = truncate_text(str(params), max_chars=250, suffix="... [Параметры обрезаны]")
+    params_str = truncate_text(str(params), max_chars=250, suffix="... [Params truncated]")
 
     logger.info(f"[Agent Action] {name}({params_str})")
 
     item = _REGISTRY.get(name)
     if not item:
-        err_msg = f"Скилл '{name}' не найден."
+        err_msg = f"Skill '{name}' not found."
         logger.warning(f"[Agent Action Result] {err_msg}")
         return SkillResult.fail(err_msg)
 
@@ -358,22 +354,22 @@ async def call_skill(
         clean_kwargs = validated_params.model_dump()
     except ValidationError as e:
         errors = [
-            f"- Аргумент '{err['loc'][0] if err['loc'] else 'unknown'}': {err['msg']}"
+            f"- Parameter '{err['loc'][0] if err['loc'] else 'unknown'}': {err['msg']}"
             for err in e.errors()
         ]
-        err_msg = "Ошибка валидации параметров:\n" + "\n".join(errors)
-        logger.warning(f"[Guard] Отклонен вызов {name}: Ошибка типов.")
+        err_msg = "Parameter validation error:\n" + "\n".join(errors)
+        logger.warning(f"[Guard] Rejected call {name}: Type error.")
         return SkillResult.fail(err_msg)
 
     try:
         result = await func(**clean_kwargs)
         res_msg = truncate_text(
-            str(result.message), max_chars=200, suffix="... [Результат обрезан для логов]"
+            str(result.message), max_chars=200, suffix="... [Result truncated for logs]"
         )
         status = "Success" if result.is_success else "Fail"
 
         logger.info(f"[Agent Action Result] {name} ({status}): {res_msg}")
         return result
     except Exception as e:
-        logger.error(f"[Agent Action Result] Ошибка в скилле {name}: {str(e)}")
-        return SkillResult.fail(f"Внутренняя ошибка навыка: {str(e)}")
+        logger.error(f"[Agent Action Result] Error in skill {name}: {str(e)}")
+        return SkillResult.fail(f"Internal skill error: {str(e)}")

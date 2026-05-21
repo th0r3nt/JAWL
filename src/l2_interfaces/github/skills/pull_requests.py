@@ -1,5 +1,5 @@
 """
-Навыки для взаимодействия с GitHub Pull Requests.
+Skills for interacting with GitHub Pull Requests.
 """
 
 from src.utils._tools import truncate_text
@@ -12,7 +12,7 @@ from src.l2_interfaces.github.decorators import require_agent_account
 
 
 class GithubPullRequests:
-    """Навыки для работы с Pull Requests."""
+    """Skills for working with Pull Requests."""
 
     def __init__(self, client: GithubClient):
         self.client = client
@@ -34,18 +34,18 @@ class GithubPullRequests:
             self.client.state.add_history(f"list_prs: {owner}/{repo} ({state})")
 
             if not data:
-                return SkillResult.ok(f"Нет {state} PRs в репозитории.")
+                return SkillResult.ok(f"No {state} PRs in the repository.")
 
-            lines = [f"Pull Requests ({state}) в {owner}/{repo}:"]
+            lines = [f"Pull Requests ({state}) in {owner}/{repo}:"]
             for pr in data:
                 user = (pr.get("user") or {}).get("login", "Unknown")
                 lines.append(
-                    f"- #{pr.get('number')} | {pr.get('title')} | by @{user} | Ветка: {pr.get('head', {}).get('ref', '?')} -> {pr.get('base', {}).get('ref', '?')}"
+                    f"- #{pr.get('number')} | {pr.get('title')} | by @{user} | Branch: {pr.get('head', {}).get('ref', '?')} -> {pr.get('base', {}).get('ref', '?')}"
                 )
 
             return SkillResult.ok("\n".join(lines))
         except Exception as e:
-            return SkillResult.fail(f"Ошибка при получении списка PR: {e}")
+            return SkillResult.fail(f"Error retrieving PR list: {e}")
 
     @skill()
     async def get_pull_request_diff(
@@ -67,18 +67,18 @@ class GithubPullRequests:
             self.client.state.add_history(f"read_pr_diff: {owner}/{repo} #{pull_number}")
 
             if not diff_text:
-                return SkillResult.ok("В этом PR нет изменений в коде.")
+                return SkillResult.ok("There are no code changes in this PR.")
 
             diff_text = truncate_text(
                 diff_text,
                 20000,
-                "\n... [Diff слишком большой, обрезан для экономии контекста]",
+                "\n... [Diff is too large, truncated to save context]",
             )
 
-            return SkillResult.ok(f"Diff для PR #{pull_number}:\n```diff\n{diff_text}\n```")
+            return SkillResult.ok(f"Diff for PR #{pull_number}:\n```diff\n{diff_text}\n```")
 
         except Exception as e:
-            return SkillResult.fail(f"Ошибка при чтении Diff PR: {e}")
+            return SkillResult.fail(f"Error reading Diff PR: {e}")
 
     @skill()
     @require_agent_account()
@@ -86,15 +86,15 @@ class GithubPullRequests:
         self, owner: str, repo: str, title: str, head: str, base: str = "main", body: str = ""
     ) -> SkillResult:
         """
-        Creates new Pull Request. 
-        
-        head: Branch containing changes. 
+        Creates new Pull Request.
+
+        head: Branch containing changes.
         base: Branch to merge into.
         """
 
         if not self.client.config.agent_account:
             return SkillResult.fail(
-                "Ошибка: Для создания PR нужно включить 'agent_account: true' в настройках и добавить токен."
+                "Error: Creating a PR requires 'agent_account: true' enabled in settings and a token added."
             )
 
         try:
@@ -108,9 +108,9 @@ class GithubPullRequests:
 
             pr_num = data.get("number")
             self.client.state.add_history(f"create_pr: {owner}/{repo} #{pr_num}")
-            main_logger.info(f"[Github] Создан Pull Request #{pr_num} в {owner}/{repo}")
+            main_logger.info(f"[Github] Created Pull Request #{pr_num} in {owner}/{repo}")
 
             return SkillResult.ok(f"True. URL: {data.get('html_url')}")
 
         except Exception as e:
-            return SkillResult.fail(f"Ошибка при создании Pull Request: {e}")
+            return SkillResult.fail(f"Error creating Pull Request: {e}")

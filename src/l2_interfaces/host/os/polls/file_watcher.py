@@ -1,7 +1,8 @@
 """
-Асинхронный агрегатор файловых событий на базе Watchdog.
-Группирует массовые спам-события (создание/удаление) в батчи.
-Вычисляет Git-подобные Diff-ы (добавлено/удалено строк) для текстовых файлов и инжектит их в L0 State.
+Asynchronous file events aggregator based on Watchdog.
+
+Groups mass spam events (creation/deletion) into batches.
+Calculates Git-like Diffs (added/removed lines) for text files and injects them into L0 State.
 """
 
 import asyncio
@@ -26,7 +27,7 @@ from src.l2_interfaces.host.os.polls.tree_builder import TreeBuilder
 
 
 class _SandboxWatchdogHandler(FileSystemEventHandler):
-    """Пробрасывает события Watchdog в асинхронный цикл FileWatcher."""
+    """Forwards Watchdog events to the asynchronous FileWatcher loop."""
 
     def __init__(self, watcher_instance: "FileWatcher", loop: asyncio.AbstractEventLoop):
         self.watcher = watcher_instance
@@ -65,7 +66,7 @@ class _SandboxWatchdogHandler(FileSystemEventHandler):
 
 
 class FileWatcher:
-    """Мониторинг файловой системы (Watchdog, генерация Diff-ов, построение деревьев)."""
+    """File system monitoring (Watchdog, Diff generation, tree building)."""
 
     def __init__(self, client: HostOSClient, state: HostOSState, bus: EventBus):
         self.client = client
@@ -94,10 +95,10 @@ class FileWatcher:
         self._batch_queue: dict[str, Any] = {}
         self._batch_task: asyncio.Task | None = None
         self._batch_delay: float = 3.0
-        self._last_event_time: float = 0.0  # Трекер времени последнего события
+        self._last_event_time: float = 0.0  # Track time of the last event
 
         self._file_cache: dict[str, str] = {}
-        self._diff_size_limit = 1024 * 100  # Макс 100 КБ для кэша одного файла
+        self._diff_size_limit = 1024 * 100  # Max 100 KB cache for a single file
 
     def start(self):
         if self._is_running:
@@ -118,9 +119,7 @@ class FileWatcher:
             try:
                 self.track_path(p, save=False)
             except Exception as e:
-                main_logger.warning(
-                    f"[Host OS] Не удалось восстановить отслеживание для {p}: {e}"
-                )
+                main_logger.warning(f"[Host OS] Failed to restore tracking for {p}: {e}")
 
         self._observer.start()
         self._task = asyncio.create_task(self._slow_loop())
@@ -142,7 +141,7 @@ class FileWatcher:
             return False
         path_obj = Path(path_str)
         if not path_obj.exists() or not path_obj.is_dir():
-            raise ValueError(f"Путь не существует или не является директорией: {path_str}")
+            raise ValueError(f"Path does not exist or is not a directory: {path_str}")
 
         handler = _SandboxWatchdogHandler(self, asyncio.get_running_loop())
         watch = self._observer.schedule(handler, path_str, recursive=True)
@@ -157,7 +156,7 @@ class FileWatcher:
             return False
         if path_str == str(self.client.sandbox_dir):
             raise ValueError(
-                "Отказано в доступе: запрещено отключать мониторинг корневой песочницы."
+                "Access denied: disabling monitoring of the root sandbox is forbidden."
             )
 
         watch = self._watches.pop(path_str)
@@ -181,14 +180,14 @@ class FileWatcher:
             return []
 
     async def _slow_loop(self):
-        """Резервный поллинг файловой системы (на случай пропуска событий Watchdog)."""
+        """Fallback file system polling (in case Watchdog events are missed)."""
         while self._is_running:
             try:
                 self._update_file_trees()
             except asyncio.CancelledError:
                 break
             except Exception as e:
-                main_logger.error(f"[Host OS] Ошибка в медленном цикле файлов: {e}")
+                main_logger.error(f"[Host OS] Error in slow files loop: {e}")
             await asyncio.sleep(self.client.config.monitoring_interval_sec)
 
     async def handle_file_system_event(self, sys_event_config, filepath: str):
@@ -199,22 +198,24 @@ class FileWatcher:
 
     async def _process_batch(self):
         start_time = time.time()
-        max_hold_time = 15.0  # Жесткий лимит удержания очереди
+        max_hold_time = 15.0  # Hard limit on batch holding time
 
         while True:
             now = time.time()
             time_since_last = now - self._last_event_time
             time_since_start = now - start_time
 
-            # Если тишина длится 3 секунды ИЛИ мы ждем уже 15 секунд - сбрасываем батч
+            # If silence lasts for 3 seconds OR we have been waiting for 15 seconds - flush the batch
             if time_since_last >= self._batch_delay or time_since_start >= max_hold_time:
                 break
 
-            # Вычисляем, сколько еще спать (до наступления тишины или до хард-лимита)
+            # Calculate how much more to sleep (until silence or hard limit)
             sleep_time = min(
                 self._batch_delay - time_since_last, max_hold_time - time_since_start
             )
-            await asyncio.sleep(max(0.1, sleep_time))  # max() защищает от отрицательного сна
+            await asyncio.sleep(
+                max(0.1, sleep_time)
+            )  # max() protects from negative sleep duration
 
         queue_snapshot = self._batch_queue.copy()
         self._batch_queue.clear()
@@ -235,11 +236,11 @@ class FileWatcher:
                 1 for e in queue_snapshot.values() if e == Events.HOST_OS_FILE_DELETED
             )
 
-            msg = f"Массовая файловая операция в песочнице. Создано: {created}, Изменено: {modified}, Удалено: {deleted}."
+            msg = f"Mass file operation in the sandbox. Created: {created}, Modified: {modified}, Deleted: {deleted}."
             for fp, ev in queue_snapshot.items():
                 if ev == Events.HOST_OS_FILE_DELETED:
                     self._file_cache.pop(fp, None)
-                    # Вычисляем относительный путь и чистим метаданные
+                    # Calculate relative path and clear metadata
                     try:
                         rel_path = str(Path(fp).relative_to(self.client.sandbox_dir))
                     except ValueError:
@@ -247,7 +248,7 @@ class FileWatcher:
                     self.client.remove_file_metadata(rel_path)
 
             await self.bus.publish(
-                Events.HOST_OS_FILE_MODIFIED, filepath="[Массив файлов]", message=msg
+                Events.HOST_OS_FILE_MODIFIED, filepath="[File Array]", message=msg
             )
             return
 
@@ -312,7 +313,7 @@ class FileWatcher:
                                     self.state.recent_file_changes.pop()
 
                             if len(diff_str) > limit:
-                                diff_str = diff_str[:limit] + "\n... [Diff обрезан]"
+                                diff_str = diff_str[:limit] + "\n... [Diff truncated]"
 
                             diff_block = (
                                 f"\n\nDiff preview:\n```diff\n{diff_str}\n```"
@@ -320,29 +321,29 @@ class FileWatcher:
                                 else ""
                             )
                             diff_msg = (
-                                f"(Изменения: +{added} симв. / -{deleted} симв.){diff_block}"
+                                f"(Changes: +{added} chars / -{deleted} chars).{diff_block}"
                             )
                         else:
-                            diff_msg = "(Сохранен без изменений текста)"
+                            diff_msg = "(Saved without text changes)"
                     elif old_content is None:
-                        diff_msg = f"(Зафиксирован: {size} байт)"
+                        diff_msg = f"(Captured: {size} bytes)"
 
                     self._file_cache[filepath] = new_content
             except UnicodeDecodeError:
-                # Ожидаемо для картинок/бинарников, логировать не нужно
+                # Expected for images/binaries, no logging is needed
                 pass
             except Exception as e:
                 main_logger.debug(
-                    f"[Host OS FileWatcher] Не удалось вычислить diff для файла {filepath}: {e}"
+                    f"[Host OS FileWatcher] Failed to calculate diff for file {filepath}: {e}"
                 )
 
         action_word = (
-            "создан" if sys_event_config == Events.HOST_OS_FILE_CREATED else "изменен"
+            "created" if sys_event_config == Events.HOST_OS_FILE_CREATED else "modified"
         )
         if sys_event_config == Events.HOST_OS_FILE_DELETED:
-            action_word = "удален"
+            action_word = "deleted"
 
-        message = f"Файл '{rel_path}' был {action_word}. {diff_msg}".strip()
+        message = f"File '{rel_path}' was {action_word}. {diff_msg}".strip()
         await self.bus.publish(sys_event_config, filepath=rel_path, message=message)
 
     def _update_file_trees(self):
@@ -354,7 +355,7 @@ class FileWatcher:
         new_files = current_paths - self._last_sandbox_files
         if new_files:
             main_logger.info(
-                f"[Host OS] В песочнице появились новые файлы/папки: {', '.join(new_files)}"
+                f"[Host OS] New files/folders appeared in the sandbox: {', '.join(new_files)}"
             )
 
         sandbox_lines = self.tree_builder.build_tree(sandbox, use_emojis=False, max_depth=99)
@@ -362,11 +363,11 @@ class FileWatcher:
 
         if len(sandbox_lines) > max_tree_lines:
             sandbox_lines = sandbox_lines[:max_tree_lines] + [
-                f"└── ...[Дерево обрезано: показано {max_tree_lines} элементов]"
+                f"└── ...[Tree truncated: showing {max_tree_lines} elements]"
             ]
 
         self.state.sandbox_files = (
-            "sandbox/\n" + "\n".join(sandbox_lines) if sandbox_lines else "Пусто"
+            "sandbox/\n" + "\n".join(sandbox_lines) if sandbox_lines else "Empty"
         )
         self._last_sandbox_files = current_paths
 
@@ -379,11 +380,11 @@ class FileWatcher:
 
             if len(fw_lines) > max_tree_lines:
                 fw_lines = fw_lines[:max_tree_lines] + [
-                    f"└── ...[Дерево обрезано: показано {max_tree_lines} элементов]"
+                    f"└── ...[Tree truncated: showing {max_tree_lines} elements]"
                 ]
 
             self.state.framework_files = (
-                f"🏠 {fw_dir.name}/\n" + "\n".join(fw_lines) if fw_lines else "Пусто"
+                f"🏠 {fw_dir.name}/\n" + "\n".join(fw_lines) if fw_lines else "Empty"
             )
         else:
             self.state.framework_files = ""
@@ -393,28 +394,26 @@ class FileWatcher:
 
         for watch_path_str in self._watches.keys():
             path_obj = Path(watch_path_str)
-            # Пропускаем песочницу, так как она уже отрисована выше
+            # Skip the sandbox as it is already drawn above
             if path_obj == self.client.sandbox_dir:
                 continue
 
             try:
-                # Строим дерево
+                # Build tree
                 lines = self.tree_builder.build_tree(
                     path_obj, use_emojis=True, max_depth=fw_depth
                 )
 
                 if len(lines) > max_tree_lines:
                     lines = lines[:max_tree_lines] + [
-                        f"└── ...[Дерево обрезано: показано {max_tree_lines} элементов]"
+                        f"└── ...[Tree truncated: showing {max_tree_lines} elements]"
                     ]
 
                 tree_str = f"{path_obj.name}/\n" + "\n".join(lines)
                 tracked_trees_blocks.append(tree_str)
 
             except Exception as e:
-                main_logger.debug(
-                    f"[Host OS FileWatcher] Ошибка обновления структуры дерева: {e}"
-                )
+                main_logger.debug(f"[Host OS FileWatcher] Error updating tree structure: {e}")
 
         if tracked_trees_blocks:
             self.state.tracked_dirs_trees = "\n\n".join(tracked_trees_blocks)

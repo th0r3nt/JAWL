@@ -1,11 +1,11 @@
-# Настройка Мультимодальности (Зрение)
+# Multimodality Configuration (Vision)
 
-Интерфейс `multimodality` позволяет агенту "видеть". Он предоставляет навыки для загрузки локальных изображений (или скриншотов веб-страниц и ОС) в контекст языковой модели.
+The `multimodality` interface allows the agent to "see". It provides skills to upload local images (or screenshots of web pages and the OS) into the language model's context.
 
-## Важное требование
-Интерфейс сработает только в том случае, если ваша базовая LLM модель физически поддерживает обработку изображений (например, `gpt-4o`, `claude-3-5-sonnet`, `gemini-1.5-pro`). 
+## Important Requirement
+This interface will function only if your primary LLM model physically supports image processing (for example, `gpt-4o`, `claude-3-5-sonnet`, `gemini-1.5-pro`).
 
-В файле `settings.yaml` параметр `llm.is_multimodal` должен быть установлен в `true`. Если он установлен в `false`, интерфейс принудительно отключится при старте системы (с уведомлением в логах), чтобы избежать падений API.
+In the `settings.yaml` file, the `llm.is_multimodal` parameter must be set to `true`. If set to `false`, the interface will be forcibly disabled at startup (with a warning in logs) to prevent API crashes.
 
-## Механика работы (Инъекция Base64)
-Агент не отправляет картинки отдельными запросами. Когда он вызывает навык просмотра, система ставит системный маркер (например, `[SYSTEM_MARKER_IMAGE_ATTACHED: path/to/image.jpg]`). На следующем шаге ReAct-цикла, сборщик промптов `ReactLoop` находит этот маркер, читает картинку с диска, конвертирует ее в `Base64` и инжектит прямо в тело запроса к LLM вместе с текущим контекстом.
+## How It Works (Base64 Injection)
+The agent does not send images via separate requests. When it invokes a viewing skill, the system places a system marker (for example, `[SYSTEM_MARKER_IMAGE_ATTACHED: path/to/image.jpg]`). On the next step of the ReAct cycle, the prompt builder `ReactLoop` locates this marker, reads the image from disk, encodes it to `Base64`, and injects it directly into the request body sent to the LLM along with the current context.

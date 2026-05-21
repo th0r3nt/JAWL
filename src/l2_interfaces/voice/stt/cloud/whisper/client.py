@@ -1,8 +1,8 @@
 """
-Stateful-клиент для работы с OpenAI Whisper API (и совместимыми).
+Stateful client for working with OpenAI Whisper API (and compatible ones).
 
-Управляет пулом HTTP-сессий через библиотеку opena` и инкапсулирует
-логику отправки бинарных аудио-данных на сервер.
+Manages HTTP sessions pool via the openai library and encapsulates
+the logic of sending binary audio data to the server.
 """
 
 from typing import Any, Optional, Tuple
@@ -14,7 +14,7 @@ from src.l2_interfaces.voice.stt.cloud.whisper.state import CloudWhisperSTTState
 
 
 class CloudWhisperSTTClient:
-    """Менеджер соединений Cloud Whisper STT."""
+    """Cloud Whisper STT connection manager."""
 
     def __init__(
         self,
@@ -24,13 +24,13 @@ class CloudWhisperSTTClient:
         api_url: Optional[str] = None,
     ) -> None:
         """
-        Инициализирует клиент.
+        Initializes the client.
 
         Args:
-            state: L0 стейт (приборная панель).
-            config: Конфигурация интерфейса из YAML.
-            api_key: Ключ API.
-            api_url: Опциональный кастомный URL (например, для Groq или локального vLLM).
+            state: L0 state (dashboard).
+            config: Interface configuration from YAML.
+            api_key: API key.
+            api_url: Optional custom URL (e.g., for Groq or local vLLM).
         """
 
         self.state = state
@@ -42,7 +42,7 @@ class CloudWhisperSTTClient:
 
     async def start(self) -> None:
         """
-        Инициализирует HTTP-клиент OpenAI.
+        Initializes the OpenAI HTTP client.
         """
         try:
             self._client = AsyncOpenAI(
@@ -51,15 +51,15 @@ class CloudWhisperSTTClient:
                 timeout=self.config.timeout_sec,
             )
             self.state.is_online = True
-            main_logger.info("[Cloud Whisper STT] Интерфейс запущен.")
+            main_logger.info("[Cloud Whisper STT] Interface started.")
 
         except Exception as e:
-            main_logger.error(f"[Cloud Whisper STT] Ошибка инициализации клиента: {e}")
+            main_logger.error(f"[Cloud Whisper STT] Client initialization error: {e}")
             self.state.is_online = False
 
     async def stop(self) -> None:
         """
-        Штатно закрывает HTTP-сессию.
+        Correctly closes the HTTP session.
         """
         if self._client:
             await self._client.close()
@@ -67,21 +67,21 @@ class CloudWhisperSTTClient:
 
     async def transcribe(self, file_tuple: Tuple[str, bytes]) -> str:
         """
-        Отправляет аудиофайл в API для транскрибации.
+        Sends audio file to API for transcription.
 
         Args:
-            file_tuple: Кортеж (имя_файла, байты_файла). Формат, требуемый SDK OpenAI.
+            file_tuple: Tuple (filename, file_bytes). Format required by OpenAI SDK.
 
         Returns:
-            Распознанный текст (str).
+            Transcribed text (str).
 
         Raises:
-            RuntimeError: Если клиент не запущен.
-            Exception: При ошибках сети или API.
+            RuntimeError: If client is not started.
+            Exception: On network or API errors.
         """
 
         if not self._client:
-            raise RuntimeError("Клиент Whisper не инициализирован.")
+            raise RuntimeError("Whisper client is not initialized.")
 
         response = await self._client.audio.transcriptions.create(
             model=self.config.model,
@@ -92,7 +92,7 @@ class CloudWhisperSTTClient:
 
     async def get_context_block(self, **kwargs: Any) -> str:
         """
-        Формирует блок состояния для системного промпта агента.
+        Formats the state block for the agent system prompt.
         """
         desc = "Description: STT transcription via OpenAI Whisper."
 

@@ -1,8 +1,8 @@
 """
-Реестр ролей субагентов (RBAC).
+Subagents Roles Directory (RBAC).
 
-Хранит статические описания всех доступных в системе профессий субагентов.
-Определяет их идентификаторы, названия и файлы системных промптов.
+Defines static definitions, identifiers, prompts, and system descriptions
+for background subagents to enforce strict Role-Based Access Control.
 """
 
 from typing import List, Optional
@@ -10,63 +10,63 @@ from pydantic import BaseModel
 
 
 class SubagentRole(BaseModel):
-    """Модель описания роли субагента."""
+    """Model container for subagent role metadata."""
 
-    id: str  # Уникальный ID для вызова LLM
-    name: str  # Человекочитаемое имя
-    description: str  # Инструкция для главного агента (зачем вызывать эту роль)
-    prompt_file: str  # Имя файла с промптом в папке roles/
+    id: str
+    name: str
+    description: str
+    prompt_file: str
 
 
 class Subagents:
     """
-    Реестр всех доступных ролей субагентов в системе.
-    Определяет специализацию и доступы каждого типа работника.
+    Directory of active subagent roles and privileges.
+    Sets execution boundaries and authorized skills pool for each role.
     """
 
     CODER = SubagentRole(
         id="coder",
         name="Software Engineer",
-        description="Вызывать для делегирования задач по написанию скриптов, рефакторингу, дебагу и работе с файловой системой или локальными Git-репозиториями.",
+        description="Invoke to delegate software development, refactoring, debugging, file system operations, and git version control tasks.",
         prompt_file="CODER.md",
     )
 
     WEB_RESEARCHER = SubagentRole(
         id="web_researcher",
         name="OSINT Analyst",
-        description="Вызывать для параллельного глубокого поиска информации в интернете, чтения статей, парсинга данных и фактчекинга.",
+        description="Invoke to delegate deep parallel web research, article parsing, data scraping, and fact-checking.",
         prompt_file="WEB_SEARCHER.md",
     )
 
     ARCHIVIST = SubagentRole(
         id="archivist",
         name="Database Archivist",
-        description="Вызывать для ревизии и очистки твоей памяти. Умеет читать Vector DB, удалять старый мусор и консолидировать факты.",
+        description="Invoke to delegate memory audits. Capable of reading Vector DB to purge old garbage and consolidate facts.",
         prompt_file="ARCHIVIST.md",
     )
 
     QA_ENGINEER = SubagentRole(
         id="qa_engineer",
         name="QA Engineer",
-        description="Вызывать для написания unit-тестов и проверки твоего кода на прочность. Он найдет краевые случаи и вернет список багов.",
+        description="Invoke to delegate unit testing. Gathers edge cases, runs test suites, and returns prioritized bug reports.",
         prompt_file="QA_ENGINEER.md",
     )
 
     SYSADMIN = SubagentRole(
         id="sysadmin",
         name="System Administrator",
-        description="Вызывать для установки зависимостей (pip/npm), выполнения сырых shell-команд, мониторинга ОС (RAM/CPU), управления процессами и работы с сетью.",
+        description="Invoke to delegate dependency installation, raw shell commands execution, OS metrics monitoring, process management, and network diagnostics.",
         prompt_file="SYSADMIN.md",
     )
 
     @classmethod
     def all(cls) -> List[SubagentRole]:
-        """Возвращает список всех зарегистрированных ролей."""
+        """Returns list of all registered roles."""
         return [v for k, v in vars(cls).items() if isinstance(v, SubagentRole)]
 
     @classmethod
     def get_by_id(cls, role_id: str) -> Optional[SubagentRole]:
-        """Поиск роли по строковому ID (который передает LLM)."""
+        """Resolves role by its unique string identifier."""
         for role in cls.all():
             if role.id == role_id:
                 return role

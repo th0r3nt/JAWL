@@ -1,5 +1,5 @@
 """
-Служебный модуль описания векторных коллекций.
+Helper module describing vector collections.
 """
 
 from typing import TYPE_CHECKING
@@ -10,17 +10,17 @@ if TYPE_CHECKING:
 
 class VectorCollection:
     """
-    Абстракция над коллекцией (пространством имен) в Qdrant.
-    Позволяет CRUD-модулям работать с изолированным куском БД.
+    Abstraction over a collection (namespace) in Qdrant.
+    Allows CRUD modules to work with an isolated partition of the DB.
     """
 
     def __init__(self, db: "VectorDB", collection_name: str) -> None:
         """
-        Инициализирует ссылку на коллекцию.
+        Initializes a reference to the collection.
 
         Args:
-            db: Ссылка на инстанс базы данных.
-            collection_name: Имя коллекции (например 'knowledge' или 'thoughts').
+            db: Reference to the database instance.
+            collection_name: Name of the collection (e.g., 'knowledge' or 'thoughts').
         """
         self.db = db
         self.name = collection_name

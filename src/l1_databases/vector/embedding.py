@@ -1,9 +1,9 @@
 """
-Векторный синтезатор (Embedding Model Wrapper).
+Embedding Model Wrapper.
 
-Обертка над библиотекой FastEmbed (ONNX).
-Отвечает за генерацию числовых векторов (эмбеддингов) из текста
-исключительно локально на CPU хост-машины, что экономит деньги и гарантирует приватность.
+Wrapper over the FastEmbed library (ONNX).
+Responsible for generating numerical vectors (embeddings) from text
+strictly locally on the host machine's CPU, saving money and guaranteeing privacy.
 """
 
 import os
@@ -16,22 +16,22 @@ from src.utils.logger import main_logger
 
 class EmbeddingModel:
     """
-    Класс для генерации векторных представлений (embeddings).
-    Использует FastEmbed (ONNX) для быстрой работы на CPU.
-    Имеет встроенный механизм восстановления при повреждении кэша.
+    Class for generating vector representations (embeddings).
+    Uses FastEmbed (ONNX) for fast performance on CPU.
+    Has a built-in recovery mechanism in case of cache corruption.
     """
 
     def __init__(
         self, model_path: str, model_name: str = "intfloat/multilingual-e5-small"
     ) -> None:
         """
-        Инициализирует и скачивает (при необходимости) ONNX-модель.
-        Содержит встроенный Fallback: при повреждении файлов модели автоматически сносит кэш
-        и скачивает веса заново.
+        Initializes and downloads (if necessary) the ONNX model.
+        Contains a built-in Fallback: in case of model file corruption, automatically wipes the cache
+        and downloads the weights again.
 
         Args:
-            model_path: Директория для хранения весов модели.
-            model_name: Идентификатор модели в репозитории FastEmbed.
+            model_path: Directory for storing model weights.
+            model_name: Model identifier in the FastEmbed repository.
         """
 
         os.makedirs(model_path, exist_ok=True)
@@ -39,51 +39,47 @@ class EmbeddingModel:
         self.model_path = model_path
         self.model_name = model_name
 
-        main_logger.info(
-            f"[Vector DB] Инициализация локальной embedding модели: {self.model_name}."
-        )
+        main_logger.info(f"[Vector DB] Initializing local embedding model: {self.model_name}.")
 
         try:
-            # Пытаемся загрузить модель из кэша (или скачать)
+            # Try to load the model from cache (or download)
             self.model = TextEmbedding(model_name=self.model_name, cache_dir=self.model_path)
 
         except Exception as e:
-            # Если словили ошибку (например ONNXRuntimeError: NO_SUCHFILE), значит кэш поврежден
+            # If an error is caught (e.g. ONNXRuntimeError: NO_SUCHFILE), it means the cache is corrupted
             main_logger.warning(
-                f"[Vector DB] Обнаружено повреждение файлов модели эмбеддингов ({e}). "
-                "Очистка кэша и повторная загрузка."
+                f"[Vector DB] Detected embedding model file corruption ({e}). "
+                "Clearing cache and re-downloading."
             )
-            # Сносим папку с битым кэшем
+            # Wipe the folder with the corrupted cache
             shutil.rmtree(self.model_path, ignore_errors=True)
             os.makedirs(self.model_path, exist_ok=True)
 
-            # Пробуем инициализировать (и скачать) заново
+            # Attempt to initialize (and download) again
             self.model = TextEmbedding(model_name=self.model_name, cache_dir=self.model_path)
 
-        main_logger.info(
-            f"[Vector DB] Embedding модель готова к работе (путь: {self.model_path})."
-        )
+        main_logger.info(f"[Vector DB] Embedding model is ready (path: {self.model_path}).")
 
     async def get_embedding(self, text: str) -> list[float]:
         """
-        Синтезирует эмбеддинг для переданного текста.
-        Выполняется в отдельном потоке (asyncio.to_thread), чтобы тяжелые вычисления
-        ONNXRuntime не блокировали асинхронный Event Loop ядра агента.
+        Synthesizes an embedding for the passed text.
+        Executed in a separate thread (asyncio.to_thread) so that heavy ONNXRuntime
+        computations do not block the asynchronous Event Loop of the agent core.
 
         Args:
-            text: Входящий текст для векторизации.
+            text: Incoming text for vectorization.
 
         Returns:
-            Сгенерированный тензор чисел (List of floats).
+            Generated list of floats (tensor).
 
         Raises:
-            RuntimeError: Если модель не была успешно загружена.
+            RuntimeError: If the model has not been successfully loaded.
         """
 
         if not self.model:
-            raise RuntimeError("Ошибка: модель не инициализирована.")
+            raise RuntimeError("Error: model is not initialized.")
 
-        # FastEmbed возвращает генератор, берем первый элемент и конвертируем в list
+        # FastEmbed returns a generator, take the first element and convert to list
         embedding_generator = await asyncio.to_thread(self.model.embed, text)
         embeddings_list = list(embedding_generator)
 
@@ -91,28 +87,28 @@ class EmbeddingModel:
 
     async def get_embeddings_batch(self, texts: list[str]) -> list[list[float]]:
         """
-        Генерирует эмбеддинги для массива строк одновременно (Batching).
-        Используется в механизме GraphRAG для резкого ускорения векторизации
-        множественных запросов (нейросети работают с батчами на порядки быстрее).
+        Generates embeddings for an array of strings simultaneously (Batching).
+        Used in the GraphRAG mechanism to drastically speed up vectorization
+        of multiple queries (neural networks process batches orders of magnitude faster).
 
         Args:
-            texts: Список текстов для векторизации.
+            texts: List of texts for vectorization.
 
         Returns:
-            Список тензоров (List of lists of floats).
+            List of lists of floats (tensors).
 
         Raises:
-            RuntimeError: Если модель не инициализирована.
+            RuntimeError: If the model is not initialized.
         """
 
         if not self.model:
-            raise RuntimeError("Ошибка: модель не инициализирована.")
+            raise RuntimeError("Error: model is not initialized.")
 
         if not texts:
             return []
 
-        # FastEmbed поддерживает передачу списка строк
+        # FastEmbed supports passing a list of strings
         embedding_generator = await asyncio.to_thread(self.model.embed, texts)
 
-        # Конвертируем генератор numpy array в обычный питоновский список списков
+        # Convert numpy array generator to a regular Python list of lists
         return [emb.tolist() for emb in embedding_generator]

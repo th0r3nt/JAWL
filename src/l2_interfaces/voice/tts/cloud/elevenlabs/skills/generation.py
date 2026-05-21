@@ -1,5 +1,5 @@
 """
-Навыки агента для синтеза речи.
+Agent skills for speech synthesis.
 """
 
 import uuid
@@ -14,7 +14,7 @@ from src.l2_interfaces.host.os.client import HostOSClient
 
 
 class CloudElevenLabsTTSGeneration:
-    """Инструменты генерации речи."""
+    """Speech generation tools."""
 
     def __init__(self, client: CloudElevenLabsTTSClient, host_os: HostOSClient):
         self.client = client
@@ -29,23 +29,23 @@ class CloudElevenLabsTTSGeneration:
         voices = self.client.state.available_voices_cache
         if not voices:
             return SkillResult.fail(
-                "Кэш голосов пуст. Возможно, интерфейс не инициализирован."
+                "Voice cache is empty. Perhaps the interface is not initialized."
             )
 
-        return SkillResult.ok("Доступные голоса:\n- " + "\n- ".join(voices))
+        return SkillResult.ok("Available voices:\n- " + "\n- ".join(voices))
 
     @skill()
     async def generate_speech(
         self, text: str, voice_id: str = None, filename: str = None
     ) -> SkillResult:
         """
-        Synthesizes speech from text. 
-        
-        voice_id: Optional voice ID. 
+        Synthesizes speech from text.
+
+        voice_id: Optional voice ID.
         filename: Optional output filename.
         """
         if not text.strip():
-            return SkillResult.fail("Текст для озвучки не может быть пустым.")
+            return SkillResult.fail("Text for voiceover cannot be empty.")
 
         v_id = voice_id if voice_id else self.client.voice_manager.main_voice
         f_name = filename if filename else f"speech_{uuid.uuid4().hex[:8]}.mp3"
@@ -54,7 +54,7 @@ class CloudElevenLabsTTSGeneration:
             f_name = f"sandbox/_system/download/{f_name}"
 
         try:
-            # Безопасно резолвим путь через гейткипер
+            # Safely resolve the path via gatekeeper
             safe_path = self.host_os.validate_path(f_name, is_write=True)
             safe_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -65,7 +65,7 @@ class CloudElevenLabsTTSGeneration:
             }
 
             main_logger.info(
-                f"[ElevenLabs] Генерация речи начата (Голос: {v_id}, Файл: {safe_path.name})"
+                f"[ElevenLabs] Speech generation started (Voice: {v_id}, File: {safe_path.name})"
             )
 
             binary_audio = await self.client.request(
@@ -77,14 +77,14 @@ class CloudElevenLabsTTSGeneration:
 
             await asyncio.to_thread(_save)
 
-            # Асинхронно обновляем квоту в стейте, чтобы не блочить агента
+            # Update quota in state asynchronously to not block the agent
             asyncio.create_task(self.client.update_quota())
 
             size_str = format_size(safe_path.stat().st_size)
             rel_path = safe_path.relative_to(self.host_os.sandbox_dir).as_posix()
 
             self.client.state.add_history(
-                f"Сгенерирован {rel_path} (size: {size_str}, text: {text})"
+                f"Generated {rel_path} (size: {size_str}, text: {text})"
             )
 
             return SkillResult.ok("True")
@@ -93,5 +93,5 @@ class CloudElevenLabsTTSGeneration:
             return SkillResult.fail(str(e))
 
         except Exception as e:
-            main_logger.error(f"[ElevenLabs] Ошибка генерации: {e}")
-            return SkillResult.fail(f"Ошибка API генерации речи: {e}")
+            main_logger.error(f"[ElevenLabs] Generation error: {e}")
+            return SkillResult.fail(f"Speech generation API error: {e}")

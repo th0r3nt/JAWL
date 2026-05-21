@@ -1,8 +1,8 @@
 """
-Навыки агента для взаимодействия с электронной почтой.
+Agent skills for interacting with email.
 
-Позволяют агенту читать инбокс, отправлять письма и безвозвратно удалять мусор.
-Включают встроенную защиту от огромных писем-рассылок (обрезка через truncate_text).
+Allows the agent to read the inbox, send emails, and permanently delete trash.
+Includes built-in protection against giant newsletter emails (truncation via truncate_text).
 """
 
 import asyncio
@@ -19,7 +19,7 @@ from src.l3_agent.skills.registry import SkillResult, skill
 
 
 class EmailSkills:
-    """Навыки для чтения, отправки и удаления писем."""
+    """Skills for reading, sending, and deleting emails."""
 
     def __init__(self, client: EmailClient) -> None:
         self.client = client
@@ -34,33 +34,33 @@ class EmailSkills:
             with self.client.imap_connection() as mail:
                 status, msg_data = mail.uid("fetch", str(uid).encode(), "(RFC822)")
                 if status != "OK" or not msg_data[0]:
-                    return False, "Письмо не найдено."
+                    return False, "Email not found."
 
                 raw_email = msg_data[0][1]
                 msg = email.message_from_bytes(raw_email)
 
-                subject = decode_mime_header(msg.get("Subject", "Без темы"))
-                sender = decode_mime_header(msg.get("From", "Неизвестен"))
-                date = msg.get("Date", "Неизвестно")
+                subject = decode_mime_header(msg.get("Subject", "No subject"))
+                sender = decode_mime_header(msg.get("From", "Unknown"))
+                date = msg.get("Date", "Unknown")
 
                 body = extract_text_from_email(msg)
 
-                # Защита от гигантских рассылок и писем с вложениями
+                # Protection against giant newsletters and emails with attachments
                 body = truncate_text(body, 15000)
 
-                report = f"От: {sender}\nДата: {date}\nТема: {subject}\n\n{body}"
+                report = f"From: {sender}\nDate: {date}\nSubject: {subject}\n\n{body}"
                 return True, report
 
         try:
             success, text = await asyncio.to_thread(_read)
             if success:
-                main_logger.info(f"[Email] Прочитано письмо UID: {uid}")
+                main_logger.info(f"[Email] Read email UID: {uid}")
                 return SkillResult.ok(text)
 
             return SkillResult.fail(text)
 
         except Exception as e:
-            return SkillResult.fail(f"Ошибка при чтении письма: {e}")
+            return SkillResult.fail(f"Error reading email: {e}")
 
     @skill()
     async def send_email(self, to_email: str, subject: str, body: str) -> SkillResult:
@@ -80,10 +80,10 @@ class EmailSkills:
 
         try:
             await asyncio.to_thread(_send)
-            return SkillResult.ok(f"Письмо успешно отправлено на {to_email}.")
+            return SkillResult.ok(f"Email successfully sent to {to_email}.")
 
         except Exception as e:
-            return SkillResult.fail(f"Ошибка при отправке письма: {e}")
+            return SkillResult.fail(f"Error sending email: {e}")
 
     @skill()
     async def delete_email(self, uid: int) -> SkillResult:
@@ -93,17 +93,17 @@ class EmailSkills:
 
         def _delete() -> None:
             with self.client.imap_connection() as mail:
-                # Ставим флаг "Удалено"
+                # Set the "Deleted" flag
                 mail.uid("STORE", str(uid).encode(), "+FLAGS", "(\\Deleted)")
-                # Применяем удаление для всего ящика
+                # Apply deletion to the entire mailbox
                 mail.expunge()
 
         try:
             await asyncio.to_thread(_delete)
-            # Синхронизируем стейт
+            # Synchronize state
             await asyncio.to_thread(self.client.update_state_view)
 
-            return SkillResult.ok("Письмо успешно удалено.")
+            return SkillResult.ok("Email successfully deleted.")
 
         except Exception as e:
-            return SkillResult.fail(f"Ошибка при удалении письма: {e}")
+            return SkillResult.fail(f"Error deleting email: {e}")

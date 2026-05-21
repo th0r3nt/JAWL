@@ -1,8 +1,8 @@
-# Уровни доступа Meta (`meta.access_level`)
+# Meta Access Levels (`meta.access_level`)
 
-Meta-интерфейс позволяет агенту изменять конфигурацию системы "на лету" без перезагрузки или ручного редактирования YAML-файлов.
+The Meta interface allows the agent to modify the system configuration "on the fly" without a reboot or manual editing of YAML files.
 
-* **0 (SAFE):** Агент имеет право изменять только базовые параметры LLM (модель и температуру генерации).
-* **1 (CONFIGURATOR):** Агент получает право управлять контекстом (изменять глубину памяти) и лимитами баз данных.
-* **2 (ARCHITECT):** Агент получает доступ к жизненному циклу системы (команды на выключение и перезагрузку), а также возможность программно включать или отключать L2-интерфейсы.
-* **3 (CREATOR):** Максимальный уровень. Дает агенту право писать Python-скрипты в песочнице и динамически регистрировать их в ядре как свои нативные навыки (`execute_skill`). Агент получает способность самостоятельно расширять свой функционал и интегрироваться с любыми внешними API.
+* **0 (SAFE):** The agent has the right to modify only basic LLM parameters (target model name and generation temperature).
+* **1 (CONFIGURATOR):** The agent receives the right to manage memory limits and context depth.
+* **2 (ARCHITECT):** The agent receives access to the system lifecycle (commands to shutdown and reboot), as well as the ability to programmatically enable or disable L2 interfaces.
+* **3 (CREATOR):** Maximum level. Grants the agent the right to write Python scripts in the sandbox and dynamically register them in the core as its own native skills (`execute_skill`). The agent gains the ability to autonomously extend its own functionality and integrate with any external APIs.

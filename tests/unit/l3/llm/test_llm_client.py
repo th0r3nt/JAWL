@@ -61,7 +61,7 @@ async def test_llm_client_no_key_raises_error(mock_rotator):
     mock_rotator.get_next_key = MagicMock(return_value=None)
     client = LLMClient(api_url="", api_keys_rotator=mock_rotator)
 
-    with pytest.raises(RuntimeError, match="Нет доступных API ключей"):
+    with pytest.raises(RuntimeError, match="No API keys available"):
         client.get_session()
 
 

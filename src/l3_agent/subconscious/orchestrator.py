@@ -1,5 +1,8 @@
 """
-Главный Оркестратор Подсознания.
+Main Subconscious Orchestrator.
+
+Manages background cognitive processes (Consolidation, Reflection, Forgetting)
+running parallel to the main ReAct reasoning loop.
 """
 
 import asyncio
@@ -24,7 +27,7 @@ from src.l3_agent.subconscious.runner import SubconsciousRunner
 
 
 class SubconsciousOrchestrator:
-    """Управляет фоновой когнитивной активностью агента."""
+    """Manages background cognitive activity of the agent."""
 
     def __init__(
         self,
@@ -50,12 +53,13 @@ class SubconsciousOrchestrator:
             root_dir=root_dir,
         )
 
+        # FIXED: Changed asyncio.semaphore to asyncio.Semaphore
         self._semaphores = {p: asyncio.Semaphore(1) for p in Pattern}
         self.background_tasks: set[asyncio.Task] = set()
 
     def setup_routing(self) -> None:
         """
-        Подписывается на системные события.
+        Subscribes to system events.
         """
 
         self.bus.subscribe(Events.REACT_TICK_SAVED, self.poller.on_tick_saved)
@@ -63,7 +67,7 @@ class SubconsciousOrchestrator:
 
     async def _on_pattern_triggered(self, **kwargs) -> None:
         """
-        Ловит триггер от поллера и запускает Runner в фоне.
+        Captures the poller trigger and spawns the Runner in the background.
         """
         pattern = kwargs.get("pattern")
         if not pattern or not isinstance(pattern, Pattern):
@@ -75,10 +79,11 @@ class SubconsciousOrchestrator:
 
     async def _safe_run_pattern(self, pattern: Pattern) -> None:
         """
-        Обертка с семафором, чтобы предотвратить Database Locks от одновременного запуска.
+        Semaphore wrapper to prevent database locks from parallel pattern execution.
         """
+        
         if self._semaphores[pattern].locked():
-            log = f"[Subconscious] Паттерн {pattern.value.upper()} уже выполняется, пропуск."
+            log = f"[Subconscious] Pattern {pattern.value.upper()} already running, skipping."
             subc_logger.debug(log)
             return
 
@@ -88,5 +93,5 @@ class SubconsciousOrchestrator:
                 await self.runner.run(pattern, ticks_to_analyze=limit)
 
             except Exception as e:
-                log = f"[Subconscious] Критическая ошибка в паттерне {pattern.value.upper()}: {e}"
+                log = f"[Subconscious] Critical error in pattern {pattern.value.upper()}: {e}"
                 subc_logger.error(log)

@@ -16,7 +16,7 @@ class EventLevel(int, Enum):
 
 
 # ============================================
-# МОДЕЛЬ ОДНОГО СОБЫТИЯ
+# EVENT CONFIG MODEL
 # ============================================
 
 
@@ -32,8 +32,8 @@ class EventConfig(BaseModel):
 
 class Events:
     """
-    Глобальный реестр всех доступных событий в системе JAWL.
-    Определяет уровни важности для корректной работы Heartbeat-акселератора.
+    Global system events directory.
+    Defines event priority levels for the Heartbeat sleep accelerator.
     """
 
     # ============================================
@@ -42,42 +42,42 @@ class Events:
 
     TELETHON_MESSAGE_INCOMING = EventConfig(
         name="TELETHON_MESSAGE_INCOMING",
-        description="Входящее сообщение.",
-        level=EventLevel.HIGH,
+        description="Incoming private/DM message.",
+        level=EventLevel.CRITICAL,
         requires_attention=True,
     )
 
     TELETHON_GROUP_MENTION = EventConfig(
         name="TELETHON_GROUP_MENTION",
-        description="Упоминание.",
-        level=EventLevel.MEDIUM,
+        description="Mention or group notification.",
+        level=EventLevel.HIGH,
         requires_attention=True,
     )
 
     TELETHON_MESSAGE_REACTION = EventConfig(
         name="TELETHON_MESSAGE_REACTION",
-        description="Эмодзи-реакция на сообщение.",
+        description="Emoji reaction on message.",
         level=EventLevel.LOW,
         requires_attention=False,
     )
 
     TELETHON_CHANNEL_MESSAGE = EventConfig(
         name="TELETHON_CHANNEL_MESSAGE",
-        description="Сообщение в канале.",
+        description="Incoming channel post.",
         level=EventLevel.BACKGROUND,
         requires_attention=False,
     )
 
     TELETHON_CHAT_ACTION = EventConfig(
         name="TELETHON_CHAT_ACTION",
-        description="Системное действие в чате.",
+        description="System chat action event.",
         level=EventLevel.LOW,
         requires_attention=False,
     )
 
     TELETHON_GROUP_MESSAGE = EventConfig(
         name="TELETHON_GROUP_MESSAGE",
-        description="Сообщение в чате.",
+        description="Background group/thread message.",
         level=EventLevel.BACKGROUND,
         requires_attention=False,
     )
@@ -88,28 +88,28 @@ class Events:
 
     AIOGRAM_MESSAGE_INCOMING = EventConfig(
         name="AIOGRAM_MESSAGE_INCOMING",
-        description="Входящее сообщение боту (Aiogram).",
-        level=EventLevel.HIGH,
+        description="Incoming message to bot (Aiogram).",
+        level=EventLevel.CRITICAL,
         requires_attention=True,
     )
 
     AIOGRAM_GROUP_MENTION = EventConfig(
         name="AIOGRAM_GROUP_MENTION",
-        description="Упоминание бота в группе (Aiogram).",
-        level=EventLevel.MEDIUM,
+        description="Group mention of the bot (Aiogram).",
+        level=EventLevel.HIGH,
         requires_attention=True,
     )
 
     AIOGRAM_CHAT_ACTION = EventConfig(
         name="AIOGRAM_CHAT_ACTION",
-        description="Системное действие в чате бота (вход/выход юзера, смена названия, закреп).",
+        description="System action in bot chat (join/leave, name change, pin).",
         level=EventLevel.LOW,
         requires_attention=False,
     )
 
     AIOGRAM_GROUP_MESSAGE = EventConfig(
         name="AIOGRAM_GROUP_MESSAGE",
-        description="Обычное сообщение в группе, где есть бот.",
+        description="Regular message in group where bot is present.",
         level=EventLevel.BACKGROUND,
         requires_attention=False,
     )
@@ -120,28 +120,28 @@ class Events:
 
     HOST_OS_FILE_CREATED = EventConfig(
         name="OS_FILE_CREATED",
-        description="В песочнице (sandbox) появился новый файл.",
+        description="New file appeared in sandbox directory.",
         level=EventLevel.MEDIUM,
         requires_attention=True,
     )
 
     HOST_OS_FILE_MODIFIED = EventConfig(
         name="OS_FILE_MODIFIED",
-        description="Файл в песочнице был изменен.",
+        description="File within sandbox modified.",
         level=EventLevel.LOW,
         requires_attention=False,
     )
 
     HOST_OS_FILE_DELETED = EventConfig(
         name="HOST_OS_FILE_DELETED",
-        description="Файл в песочнице был удален.",
-        level=EventLevel.LOW,  # Фоновое уведомление
+        description="File within sandbox deleted.",
+        level=EventLevel.LOW,
         requires_attention=False,
     )
 
     HOST_OS_SANDBOX_EVENT = EventConfig(
         name="HOST_OS_SANDBOX_EVENT",
-        description="Событие от фонового демона или скрипта в песочнице.",
+        description="Event signal from sandbox daemon/script.",
         level=EventLevel.HIGH,
         requires_attention=True,
     )
@@ -152,8 +152,8 @@ class Events:
 
     WEBHOOK_MESSAGE_INCOMING = EventConfig(
         name="WEBHOOK_MESSAGE_INCOMING",
-        description="Поступил входящий HTTP Webhook от внешнего сервиса.",
-        level=EventLevel.HIGH, # Будит агента с высоким приоритетом
+        description="Incoming HTTP Webhook received from external integration.",
+        level=EventLevel.HIGH,
         requires_attention=True,
     )
 
@@ -163,7 +163,7 @@ class Events:
 
     RSS_NEW_ENTRY = EventConfig(
         name="RSS_NEW_ENTRY",
-        description="Новая публикация в отслеживаемой RSS-ленте.",
+        description="New entry in tracked RSS feed.",
         level=EventLevel.BACKGROUND,
         requires_attention=False,
     )
@@ -174,21 +174,21 @@ class Events:
 
     HOST_TERMINAL_MESSAGE = EventConfig(
         name="HOST_TERMINAL_MESSAGE",
-        description="Входящее сообщение от пользователя через локальный терминал.",
-        level=EventLevel.CRITICAL,  # Сам святой админ пишет как никак
+        description="Incoming message from operator terminal.",
+        level=EventLevel.CRITICAL,
         requires_attention=True,
     )
 
     HOST_TERMINAL_OPENED = EventConfig(
         name="HOST_TERMINAL_OPENED",
-        description="Окно терминала открыто.",
+        description="Terminal UI window connected.",
         level=EventLevel.MEDIUM,
         requires_attention=False,
     )
 
     HOST_TERMINAL_CLOSED = EventConfig(
         name="HOST_TERMINAL_CLOSED",
-        description="Окно терминала закрыто.",
+        description="Terminal UI window disconnected.",
         level=EventLevel.LOW,
         requires_attention=False,
     )
@@ -199,7 +199,7 @@ class Events:
 
     EMAIL_INCOMING = EventConfig(
         name="EMAIL_INCOMING",
-        description="Входящее электронное письмо.",
+        description="Incoming email message.",
         level=EventLevel.HIGH,
         requires_attention=True,
     )
@@ -210,7 +210,7 @@ class Events:
 
     GITHUB_REPO_ACTIVITY = EventConfig(
         name="GITHUB_REPO_ACTIVITY",
-        description="Активность в отслеживаемом GitHub репозитории (коммит, issue, PR).",
+        description="Activity event in tracked GitHub repository (push, issue, PR).",
         level=EventLevel.MEDIUM,
         requires_attention=True,
     )
@@ -221,14 +221,14 @@ class Events:
 
     SYSTEM_DASHBOARD_UPDATE = EventConfig(
         name="SYSTEM_DASHBOARD_UPDATE",
-        description="Обновление кастомного дашборда из песочницы или навыков.",
+        description="Passive custom dashboard block update from skills or sandbox.",
         level=EventLevel.INFO,
-        requires_attention=False,  # Не нужно будить агента экстренно ради инфо-апдейта
+        requires_attention=False,
     )
 
     SYSTEM_CONFIG_UPDATED = EventConfig(
         name="SYSTEM_CONFIG_UPDATED",
-        description="Обновление конфигурации системы через Meta-интерфейс.",
+        description="System configuration updated via Meta interface.",
         level=EventLevel.INFO,
         requires_attention=False,
     )
@@ -239,7 +239,7 @@ class Events:
 
     SYSTEM_CALENDAR_ALARM = EventConfig(
         name="SYSTEM_CALENDAR_ALARM",
-        description="Сработал таймер или регулярная задача из календаря.",  # TODO: в коде вообще используется поле description?
+        description="Calendar timer or scheduled alarm triggered.",
         level=EventLevel.HIGH,
         requires_attention=True,
     )
@@ -250,7 +250,7 @@ class Events:
 
     SUBAGENT_TASK_COMPLETED = EventConfig(
         name="SUBAGENT_TASK_COMPLETED",
-        description="Субагент закончил свою работу.",
+        description="Subagent finished execution and compiled a final report.",
         level=EventLevel.HIGH,
         requires_attention=True,
     )
@@ -261,46 +261,46 @@ class Events:
 
     SUBCONSCIOUS_TRIGGERED = EventConfig(
         name="SUBCONSCIOUS_TRIGGERED",
-        description="Триггер подсознательной модели.",
+        description="Subconscious cognitive process trigger.",
         level=EventLevel.BACKGROUND,
         requires_attention=False,
     )
 
     # ============================================
-    # Общие системные события
+    # General System Events
     # ============================================
 
     SYSTEM_CORE_START = EventConfig(
         name="SYSTEM_CORE_START",
-        description="Запуск всей системы.",
+        description="System initialization completed.",
         level=EventLevel.CRITICAL,
         requires_attention=True,
     )
 
     SYSTEM_CORE_STOP = EventConfig(
         name="SYSTEM_CORE_STOP",
-        description="Отключение всей системы.",
+        description="System shutdown.",
         level=EventLevel.CRITICAL,
         requires_attention=False,
     )
 
     SYSTEM_SHUTDOWN_REQUESTED = EventConfig(
         name="SYSTEM_SHUTDOWN_REQUESTED",
-        description="Агент запросил полное выключение системы.",
+        description="Agent requested full system shutdown.",
         level=EventLevel.CRITICAL,
         requires_attention=False,
     )
 
     SYSTEM_REBOOT_REQUESTED = EventConfig(
         name="SYSTEM_REBOOT_REQUESTED",
-        description="Агент запросил перезагрузку системы.",
+        description="Agent requested full system reboot.",
         level=EventLevel.CRITICAL,
         requires_attention=False,
     )
 
     REACT_TICK_SAVED = EventConfig(
         name="REACT_TICK_SAVED",
-        description="Агент успешно завершил Tick.",
+        description="Reasoning step successfully completed.",
         level=EventLevel.INFO,
         requires_attention=False,
     )

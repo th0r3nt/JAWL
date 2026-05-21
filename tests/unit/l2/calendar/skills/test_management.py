@@ -28,7 +28,7 @@ async def test_add_one_time_alarm_past_fails(calendar_skills):
     res = await calendar_skills.add_one_time_alarm("Old Task", past_time_str)
 
     assert res.is_success is False
-    assert "уже в прошлом" in res.message
+    assert "already in the past" in res.message
 
 
 @pytest.mark.asyncio

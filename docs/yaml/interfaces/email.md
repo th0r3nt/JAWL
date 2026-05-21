@@ -1,18 +1,18 @@
-# Настройка Email (Почта)
+# Email Configuration (Mail)
 
-Интерфейс `email` превращает агента в личного ассистента, способного читать, анализировать и отправлять электронные письма. Система автоматически парсит MIME-структуры и извлекает чистый текст, вырезая HTML-мусор для экономии токенов.
+The `email` interface transforms the agent into a personal assistant capable of reading, analyzing, and sending emails. The system automatically parses MIME structures and extracts clean text, stripping HTML clutter to save context tokens.
 
-## Авторизация (Важно)
-В файле `.env` укажите логин и пароль:
+## Authorization (Important)
+In your `.env` file, specify login and password:
 * `EMAIL_ACCOUNT="agent.jawl@gmail.com"`
 * `EMAIL_PASSWORD="app_password_here"`
 
-**Критически важно:** Если вы используете Gmail, Yandex или Mail.ru, ваш обычный пароль от аккаунта **не подойдет**. Провайдеры блокируют вход по обычному паролю через скрипты. Вам необходимо включить двухфакторную аутентификацию (2FA) в настройках вашей почты и создать специальный **"Пароль приложения" (App Password)**. 
+**Critically Important:** If you use Gmail, Yandex, or Mail.ru, your regular account password **will not work**. Providers block access via scripts using regular passwords. You must enable two-factor authentication (2FA) in your email settings and generate a dedicated **"App Password"**.
 
-Система сама определит IMAP и SMTP сервера на основе домена почты (поддерживаются gmail, yandex, mail.ru, outlook).
+The system will automatically resolve IMAP and SMTP servers based on the email domain (supports gmail, yandex, mail.ru, outlook).
 
-## Параметры (`email`)
+## Parameters (`email`)
 
 * **`enabled`**: `true` / `false`.
-* **`polling_interval_sec`**: Как часто (в секундах) опрашивать сервер на наличие новых писем. По умолчанию 60.
-* **`recent_limit`**: Сколько последних писем отображать на приборной панели. Заголовки (Subject) и отправитель подтягиваются автоматически.
+* **`polling_interval_sec`**: How often (in seconds) to poll the server for new emails. Default is 60.
+* **`recent_limit`**: How many of the latest emails to display on the dashboard. Headers (Subject) and senders are populated automatically.

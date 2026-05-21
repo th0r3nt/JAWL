@@ -1,8 +1,8 @@
 """
-Утилиты для парсинга электронной почты.
+Utilities for parsing email messages.
 
-Скрывают в себе боль работы с кодировками MIME, вложенными Multipart-сущностями
-и HTML-мусором, возвращая агенту чистый и понятный текст.
+Hides the complexity of working with MIME encodings, nested Multipart entities,
+and HTML junk, returning clean, understandable text to the agent.
 """
 
 from email.header import decode_header
@@ -12,15 +12,16 @@ import re
 from src.utils._tools import clean_html
 from src.utils.logger import main_logger
 
+
 def decode_mime_header(header_value: str) -> str:
     """
-    Нормально декодирует MIME-заголовки (например '=?UTF-8?B?...?=').
+    Correctly decodes MIME headers (e.g. '=?UTF-8?B?...?=').
 
     Args:
-        header_value: Сырая строка заголовка из IMAP.
+        header_value: Raw header string from IMAP.
 
     Returns:
-        Человекочитаемая строка.
+        Human-readable string.
     """
     if not header_value:
         return "Unknown"
@@ -38,22 +39,22 @@ def decode_mime_header(header_value: str) -> str:
 
 
 def strip_html_tags(text: str) -> str:
-    """Суровый и дешевый способ вырезать HTML-теги для экономии контекста."""
+    """Rigorous and cheap way to strip HTML tags to save context."""
     clean = re.compile("<.*?>", re.DOTALL)
     return re.sub(clean, " ", text).strip()
 
 
 def extract_text_from_email(msg: email.message.Message) -> str:
     """
-    Вытаскивает чистый текст из лапши MIME-частей (Multipart писем).
-    Отдает приоритет 'text/plain', но если есть только HTML — вырезает из него теги
-    с помощью утилиты clean_html.
+    Extracts clean text from the nested MIME parts (Multipart emails).
+    Prioritizes 'text/plain', but if only HTML is available, strips tags
+    using the clean_html utility.
 
     Args:
-        msg: Объект письма email.message.Message.
+        msg: email.message.Message email object.
 
     Returns:
-        Очищенный от HTML текст письма.
+        Cleaned text from the email.
     """
     text_parts = []
     html_parts = []
@@ -78,7 +79,7 @@ def extract_text_from_email(msg: email.message.Message) -> str:
                         html_parts.append(decoded_body)
             except Exception as e:
                 main_logger.debug(
-                    f"[Email MIME] Не удалось декодировать MIME-часть ({part.get_content_type()}): {e}"
+                    f"[Email MIME] Failed to decode MIME part ({part.get_content_type()}): {e}"
                 )
 
     else:
@@ -94,11 +95,11 @@ def extract_text_from_email(msg: email.message.Message) -> str:
         except Exception:
             pass
 
-    # Отдаем приоритет чистому тексту. Если его нет — берем HTML и чистим.
+    # Prioritize plain text. If not available - take HTML and clean it.
     if text_parts:
         return "\n".join(text_parts).strip()
     elif html_parts:
         raw_html = "\n".join(html_parts)
         return clean_html(raw_html)
 
-    return "[Пустое сообщение или неподдерживаемый формат]"
+    return "[Empty message or unsupported format]"

@@ -1,6 +1,7 @@
 """
-Плагин интерфейса Web HTTP.
-Обеспечивает сырые запросы и загрузку файлов.
+Web HTTP interface plugin.
+
+Provides raw requests and file downloading capabilities.
 """
 
 from typing import List, Any, Dict, Optional
@@ -34,7 +35,7 @@ class WebHTTPPlugin(BaseInterface):
     ) -> List[Any]:
         config = container.interfaces_config.web.http
 
-        # Инициализируем L0 State и отдаем контейнеру
+        # Initialize L0 State and register in the container
         state = WebHTTPState(history_limit=10)
         container.l0_states["web_http"] = state
 
@@ -48,5 +49,5 @@ class WebHTTPPlugin(BaseInterface):
             section=ContextSection.INTERFACES,
         )
 
-        main_logger.info("[Web HTTP] Интерфейс загружен.")
+        main_logger.info("[Web HTTP] Interface loaded.")
         return []

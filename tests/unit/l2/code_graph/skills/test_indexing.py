@@ -27,7 +27,7 @@ async def test_index_codebase_success(mock_to_thread, indexing_skill):
     res = await indexing_skill.index_codebase("sandbox/my_app", "my_app")
 
     assert res.is_success is True
-    assert "10 файлов" in res.message
+    assert "10 files" in res.message
     assert "my_app" in indexing_skill.client.state.active_indexes
     indexing_skill.client.host_os.validate_path.assert_called_once()
 
@@ -100,7 +100,7 @@ async def test_indexing_syntax_error_resilience(tmp_path, indexing_skill):
 
     # Плохой файл (SyntaxError)
     (project_dir / "broken.py").write_text(
-        "def broken_func(   # забыл закрыть скобку", encoding="utf-8"
+        "def broken_func(   # забыл closedь скобку", encoding="utf-8"
     )
 
     import asyncio

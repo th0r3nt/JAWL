@@ -30,7 +30,7 @@ async def test_spawn_disabled(swarm_manager):
     swarm_manager.config.enabled = False
     res = await swarm_manager.spawn_subagent("coder", "Task")
     assert res.is_success is False
-    assert "отключена" in res.message
+    assert "disabled" in res.message
 
 
 @pytest.mark.asyncio
@@ -38,14 +38,14 @@ async def test_spawn_unknown_model(swarm_manager):
     swarm_manager.config.subagent_model = "unknown"
     res = await swarm_manager.spawn_subagent("coder", "Task")
     assert res.is_success is False
-    assert "не указана модель" in res.message
+    assert "No subagent model specified" in res.message
 
 
 @pytest.mark.asyncio
 async def test_spawn_unknown_role(swarm_manager):
     res = await swarm_manager.spawn_subagent("hacker", "Task")
     assert res.is_success is False
-    assert "недоступна" in res.message
+    assert "unavailable" in res.message
 
 
 @pytest.mark.asyncio
@@ -58,7 +58,7 @@ async def test_spawn_success_background_task(mock_loop_class, swarm_manager):
     res = await swarm_manager.spawn_subagent("coder", "Fix bugs")
 
     assert res.is_success is True
-    assert "успешно запущен" in res.message
+    assert "successfully spawned" in res.message
 
     assert len(swarm_manager.active_tasks) == 1
 

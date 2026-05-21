@@ -1,9 +1,9 @@
 """
-Клиент интерфейса мультимодальности (Зрения).
+Multimodality (Vision) interface client.
 
-Сам по себе интерфейс крайне прост, так как основная магия происходит
-во время инъекции изображений в ReAct-цикле (L3).
-Здесь же инициализируется лишь маркер доступности и заглушка контекста.
+The interface itself is extremely simple, as the main magic occurs
+during image injection in the ReAct loop (L3).
+Here, we only initialize the availability marker and the context placeholder.
 """
 
 from typing import Any
@@ -12,16 +12,16 @@ from src.l2_interfaces.host.os.client import HostOSClient
 
 class MultimodalityClient:
     """
-    Клиент для мультимодальных навыков.
-    Использует гейткипер HostOSClient для безопасного доступа к файлам изображений.
+    Client for multimodal skills.
+    Uses HostOSClient gatekeeper for safe access to image files.
     """
 
     def __init__(self, host_os_client: HostOSClient) -> None:
         """
-        Инициализирует клиент.
+        Initializes the client.
 
         Args:
-            host_os_client: Инициализированный гейткипер ОС для резолва путей.
+            host_os_client: Initialized OS gatekeeper for path resolution.
         """
 
         self.host_os = host_os_client
@@ -29,10 +29,10 @@ class MultimodalityClient:
 
     async def get_context_block(self, **kwargs: Any) -> str:
         """
-        Провайдер контекста для ContextRegistry.
-        Отдает отформатированный блок контекста для агента.
+        Context provider for ContextRegistry.
+        Returns a formatted context block for the agent.
         """
-        
+
         desc = "Description: Processing and understanding images/screenshots."
 
         status = "ON" if self.is_online else "OFF"

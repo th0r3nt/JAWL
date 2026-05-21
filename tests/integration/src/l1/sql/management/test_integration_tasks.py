@@ -59,7 +59,7 @@ async def test_add_task_limit(tasks_manager):
         title="Task 3", description="3", quadrant=2, tags=["type:routine"]
     )
     assert res_fail.is_success is False
-    assert "Достигнут лимит" in res_fail.message
+    assert "limit reached" in res_fail.message
 
 
 def test_validate_tags_hallucinations(tasks_manager):

@@ -1,13 +1,13 @@
 """
-Ядро рассуждений агента (Reasoning and Acting).
+Agent Reasoning and Acting (ReAct) Core.
 
-Модуль реализует Stateless-цикл: собирает контекст, отправляет промпт в LLM,
-парсит JSON-вызовы (Chain-of-Thought + Tool Calls), выполняет навыки и
-сохраняет результаты (Ticks) в базу данных.
+Implements the Stateless loop: gathers context, sends prompt to LLM,
+parses JSON outputs (Chain-of-Thought + Tool Calls), executes skills, and
+commits results (Ticks) to the database.
 """
 
 import asyncio
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Tuple
 
 import base64
 import re
@@ -38,8 +38,8 @@ from src.l3_agent.skills.schema import AgentResponse, ActionCall, parse_llm_json
 
 class ReactLoop:
     """
-    Ядро автономного агента.
-    Реализует паттерн ReAct (Reasoning and Acting) в Stateless режиме.
+    Autonomous agent core.
+    Implements the ReAct (Reasoning and Acting) loop in Stateless mode.
     """
 
     def __init__(
@@ -57,16 +57,20 @@ class ReactLoop:
         tot_generator: Optional[ToTGenerator] = None,
     ) -> None:
         """
-        Инициализирует цикл ReAct.
+        Initializes the ReAct loop.
 
         Args:
-            prompt_builder: Билдер статической части системного промпта.
-            context_builder: Билдер динамического контекста (состояния интерфейсов, память).
-            agent_state: Объект состояния самого агента (L0).
-            sql_ticks: Контроллер базы данных для записи логов действий (тиков).
-            vector_manager: Менеджер векторной памяти.
-            tools: Список доступных инструментов в формате JSON Schema.
-            cooldown_sec: Время ожидания в секундах при получении Rate Limit (429).
+            executor: LLM executor instance.
+            prompt_builder: Static system prompt compiler.
+            context_builder: Context builder (manages L0 States and episodic memory).
+            agent_state: Agent State L0 instance.
+            sql_ticks: SQLite ticks controller.
+            vector_manager: Vector DB manager.
+            tools: List of available JSON schema tools.
+            event_bus: Global event bus.
+            cooldown_sec: Interval in seconds to wait when hitting Rate Limits (429).
+            tot_config: Optional Tree of Thoughts configuration.
+            tot_generator: Optional Tree of Thoughts generator.
         """
 
         self.executor = executor
@@ -87,19 +91,18 @@ class ReactLoop:
         self.tot_config = tot_config
         self.tot_generator = tot_generator
 
-        # Хранилище Event Log: входящие события с интерфейсов, которые приходят между шагами раздумий агента
         self.current_events: List[Dict[str, Any]] = []
 
     async def run(
         self, event_name: str, payload: Dict[str, Any], missed_events: List[Dict[str, Any]]
     ) -> None:
         """
-        Запускает ReAct цикл вызова к LLM (Оркестратор).
+        Launches the ReAct loop call to the LLM (Orchestrator).
 
         Args:
-            event_name: Главная причина пробуждения агента.
-            payload: Данные главного триггера.
-            missed_events: Лог событий, которые произошли, пока агент спал.
+            event_name: Primary trigger event name.
+            payload: Primary trigger event payload parameters dict.
+            missed_events: List of missed background events.
         """
 
         self.current_events = missed_events.copy()
@@ -107,27 +110,27 @@ class ReactLoop:
         try:
             self.agent_state.reset_step()
 
-            log = f"[ReAct] Цикл инициирован. Причина: {event_name} (LLM Model: {self.agent_state.llm_model})."
+            log = f"[ReAct] Reasoning cycle initialized. Reason: {event_name} (LLM Model: {self.agent_state.llm_model})."
             agent_logger.info(log)
 
             prompt = self.prompt_builder.build()
 
-            # ======================================================================
-            # ГЛАВНЫЙ ЦИКЛ
-            # ======================================================================
+            # ==================================================================
+            # MAIN LOOP
+            # ==================================================================
 
             while self.agent_state.current_step <= self.agent_state.max_react_steps:
                 self.agent_state.update_state(AgentStatus.THINKING)
 
-                # =======================================================
-                # Генерация дерева мыслей
+                # --------------------------------------------------------------
+                # Tree of Thoughts generation
+                # --------------------------------------------------------------
 
                 if (
                     self.tot_config
                     and self.tot_config.enabled
                     and self.tot_config.mode in ("auto", "hybrid")
                 ):
-                    # Генерируем на 1-м шаге, а затем каждые N шагов
                     if (self.agent_state.current_step == 1) or (
                         (self.agent_state.current_step - 1)
                         % self.tot_config.auto_interval_steps
@@ -138,18 +141,20 @@ class ReactLoop:
                             event_name,
                             payload,
                             missed_events,
-                            task_description="Автоматическая генерация древа мыслей для оценки текущего вектора.",
+                            task_description="Automated thoughts tree generation to evaluate current vector.",
                         )
                         if tree_md:
                             self.agent_state.current_thoughts_tree = tree_md
 
-                # =======================================================
-                # Сборка контекста и промпта
+                # --------------------------------------------------------------
+                # Context and Prompt compilation
+                # --------------------------------------------------------------
 
                 messages = await self._prepare_messages(prompt, event_name, payload)
 
-                # =======================================================
-                # Вызов LLM
+                # --------------------------------------------------------------
+                # LLM execution call
+                # --------------------------------------------------------------
 
                 raw_answer = await self.executor.execute(
                     model_name=self.agent_state.llm_model,
@@ -162,15 +167,16 @@ class ReactLoop:
                 )
                 if raw_answer is None:
                     self.agent_state.update_state(AgentStatus.ERROR)
-                    break  # Критическая ошибка или таймауты
+                    break
 
-                # =======================================================
-                # Парсинг ответа
+                # --------------------------------------------------------------
+                # Response parsing
+                # --------------------------------------------------------------
 
-                parsed_response = await self._parse_response(raw_answer)
-                if parsed_response is None:
+                parsed_response, error_msg = self._parse_response(raw_answer)
+                if error_msg:
                     self.agent_state.next_step()
-                    continue  # Ошибка парсинга (агент исправится на следующем шаге)
+                    continue
 
                 thoughts = parsed_response.thoughts.strip()
                 actions = parsed_response.actions
@@ -179,15 +185,17 @@ class ReactLoop:
                     log = f"[Thoughts]:\n{thoughts}\n"
                     agent_logger.info(log)
 
-                # =======================================================
-                # Проверка на завершение цикла
+                # --------------------------------------------------------------
+                # Completion checks
+                # --------------------------------------------------------------
 
                 if not actions:
                     await self._handle_completion(thoughts)
                     break
 
-                # =======================================================
-                # Выполнение действий
+                # --------------------------------------------------------------
+                # Actions execution
+                # --------------------------------------------------------------
 
                 await self._execute_actions(thoughts, actions)
 
@@ -196,28 +204,27 @@ class ReactLoop:
         finally:
             self.agent_state.update_state(AgentStatus.IDLE)
 
-    # ==================================================================================
-    # ПРИВАТНЫЕ МЕТОДЫ
-    # ==================================================================================
+    # -------------------------------------------------------------------------
+    # Private Helpers
+    # -------------------------------------------------------------------------
 
     async def _prepare_messages(
         self, prompt: str, event_name: str, payload: Dict[str, Any]
     ) -> List[Dict[str, Any]]:
         """
-        Собирает контекст, формирует сообщения для LLM и инжектит мультимодальность.
+        Assembles context, formats messages for the LLM, and injects multimodality.
 
         Args:
-            prompt: Статический системный промпт.
-            event_name: Имя главного события-триггера.
-            payload: Данные события-триггера.
+            prompt: Static system prompt.
+            event_name: Primary wakeup event.
+            payload: Primary wakeup payload.
 
         Returns:
-            Список словарей в формате OpenAI Messages API.
+            List[Dict[str, Any]]: Messages list in OpenAI format.
         """
 
         context = await self.context_builder.build(event_name, payload, self.current_events)
 
-        # Очищаем события, чтобы на следующих шагах цикла LLM не видела их повторно
         if self.agent_state.current_step >= 5:
             self.current_events.clear()
 
@@ -228,16 +235,16 @@ class ReactLoop:
 
         messages = copy.deepcopy(messages)
 
-        # Асинхронно инжектим картинки
         messages = await self._inject_images_to_payload(messages)
 
-        self.agent_state.last_input_tokens = self.executor.tracker.count_messages_tokens(messages)
+        self.agent_state.last_input_tokens = self.executor.tracker.count_messages_tokens(
+            messages
+        )
 
-        # Асинхронно дампим контекст, чтобы не блокировать Event Loop при записи файла
         await asyncio.to_thread(self._dump_context_to_file, messages)
 
         log = (
-            f"[ReAct] Шаг {self.agent_state.current_step}/{self.agent_state.max_react_steps}."
+            f"[ReAct] Step {self.agent_state.current_step}/{self.agent_state.max_react_steps}."
         )
         main_logger.info(log)
         agent_logger.info(log)
@@ -246,17 +253,16 @@ class ReactLoop:
 
     async def _execute_actions(self, thoughts: str, actions: List[ActionCall]) -> None:
         """
-        Выполняет запрошенные инструменты, обновляет стейт и сохраняет результат в БД.
+        Executes requested tools, updates state, and commits results to the DB.
 
         Args:
-            thoughts: Внутренний монолог агента (CoT).
-            actions: Список запрошенных инструментов для вызова.
+            thoughts: Internal monologue (CoT).
+            actions: List of actions to execute.
         """
 
         self.agent_state.update_state(AgentStatus.ACTING)
         results_str = await execute_skill(actions=actions)
 
-        # Обновляем стейт для RAG
         self.agent_state.last_thoughts = thoughts
         self.agent_state.last_actions_result = results_str
 
@@ -267,7 +273,6 @@ class ReactLoop:
                     args_to_rag.append(val)
         self.agent_state.last_action_args = args_to_rag
 
-        # Сохраняем логи (Tick) в БД
         await self.sql_ticks.save_tick(
             thoughts=thoughts,
             actions=[a.model_dump() for a in actions],
@@ -281,13 +286,13 @@ class ReactLoop:
 
     async def _handle_completion(self, thoughts: str) -> None:
         """
-        Логика корректного завершения (отсутствие actions).
+        Logic for graceful completion (absence of actions).
 
         Args:
-            thoughts: Последняя мысль агента перед уходом в сон.
+            thoughts: Final thoughts of the agent prior to sleep.
         """
 
-        log = "[ReAct] Передан пустой массив действий. Завершение."
+        log = "[ReAct] Empty actions list received. Concluding cycle."
         agent_logger.info(log)
 
         await self.sql_ticks.save_tick(
@@ -301,60 +306,30 @@ class ReactLoop:
         )
         await self.event_bus.publish(Events.REACT_TICK_SAVED)
 
-    async def _parse_response(self, raw_answer: str) -> Optional[AgentResponse]:
+    def _parse_response(
+        self, raw_answer: str
+    ) -> Tuple[Optional[AgentResponse], Optional[str]]:
         """
-        Парсит JSON-ответ агента.
-        В случае ошибки возвращает None и записывает Traceback (ошибку) в БД.
+        Parses the agent's JSON response.
         """
-
-        parsed_response, error_msg = parse_llm_json(raw_answer)
-
-        if parsed_response is not None:
-            return parsed_response
-
-        # Если { } не найдено вообще, значит LLM просто решила поболтать текстом
-        if "System Error" in error_msg and "{" not in raw_answer:
-            return AgentResponse(
-                observation="[Plain Text]",
-                reasoning="",
-                reflection=raw_answer.strip(),
-                actions=[],
-            )
-
-        # Ошибка структуры
-        log = "[ReAct] Ошибка структуры JSON."
-
-        agent_logger.warning(log)
-
-        await self.sql_ticks.save_tick(
-            thoughts="[System: LLM provided invalid JSON format]",
-            actions=[{"tool_name": "unknown", "parameters": {"raw": raw_answer[:500]}}],
-            results={
-                "execution_report": f"Format Error: {error_msg}",
-                "step": self.agent_state.current_step,
-                "max_steps": self.agent_state.max_react_steps,
-            },
-        )
-        await self.event_bus.publish(Events.REACT_TICK_SAVED)
-        self.agent_state.last_actions_result = f"Format Error: {error_msg}"
-        return None
+        return parse_llm_json(raw_answer)
 
     def add_realtime_event(self, event_data: Dict[str, Any]) -> None:
         """
-        Добавляет входящее событие в контекст агента (вызывается извне, когда агент бодрствует).
+        Adds an incoming event to the agent's context (called externally when the agent is awake).
 
         Args:
-            event_data: Данные о событии для инъекции в список пропущенных событий.
+            event_data: Event payload dict.
         """
 
         self.current_events.append(event_data)
 
     def _dump_context_to_file(self, messages: List[Dict[str, Any]]) -> None:
         """
-        Создает дамп контекста (system prompt) в Markdown-файл для отладки.
+        Creates a context dump (system prompt) to a Markdown file for debugging.
 
         Args:
-            messages: Массив сообщений (system и user) OpenAI формата.
+            messages: Messages array.
         """
 
         dump_prompt_to_file(
@@ -362,7 +337,7 @@ class ReactLoop:
         )
 
     def _encode_image(self, image_path: str) -> str:
-        """Кодирует картинку с диска в Base64."""
+        """Encodes an image from disk to Base64."""
         with open(image_path, "rb") as image_file:
             return base64.b64encode(image_file.read()).decode("utf-8")
 
@@ -370,13 +345,13 @@ class ReactLoop:
         self, messages: List[Dict[str, Any]]
     ) -> List[Dict[str, Any]]:
         """
-        Инжектит Base64 изображения в User-промпт, если находит системный маркер.
+        Injects Base64 images into the User prompt if a system marker is found.
 
         Args:
-            messages: Массив сообщений.
+            messages: Messages list.
 
         Returns:
-            Модифицированный массив сообщений с внедренным мультимодальным контекстом.
+            List[Dict[str, Any]]: Messages list with Base64 payloads injected.
         """
 
         last_result = self.agent_state.last_actions_result
@@ -398,7 +373,6 @@ class ReactLoop:
                 try:
                     path_obj = Path(img_path)
                     if path_obj.exists():
-                        # Выполняем I/O операцию и энкодинг в отдельном потоке
                         base64_data = await asyncio.to_thread(
                             self._encode_image, str(path_obj)
                         )
@@ -412,12 +386,12 @@ class ReactLoop:
                             }
                         )
 
-                        log = f"[ReAct] Изображение {path_obj.name} успешно инжектировано."
+                        log = f"[ReAct] Image {path_obj.name} successfully injected."
                         agent_logger.info(log)
 
                 except Exception as e:
-                    log = f"[ReAct] Ошибка инжектирования Base64: {e}"
-                    main_logger.error(f"[ReAct] Ошибка инжектирования Base64: {e}")
+                    log = f"[ReAct] Base64 injection error: {e}"
+                    main_logger.error(f"[ReAct] Base64 injection error: {e}")
                     agent_logger.error(log)
 
             user_msg["content"] = new_content

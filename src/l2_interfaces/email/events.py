@@ -1,8 +1,8 @@
 """
-Фоновый поллер почтового ящика (IMAP).
+Background email poller (IMAP).
 
-Регулярно опрашивает сервер на наличие новых непрочитанных писем.
-Генерирует событие 'EMAIL_INCOMING' в EventBus для пробуждения агента.
+Regularly polls the server for new unread emails.
+Generates an 'EMAIL_INCOMING' event in the EventBus to wake up the agent.
 """
 
 import asyncio
@@ -20,19 +20,19 @@ from src.l2_interfaces.email.utils import decode_mime_header
 
 
 class EmailEvents:
-    """Фоновый мониторинг новых писем."""
+    """Background monitoring of new emails."""
 
     def __init__(
         self, client: EmailClient, state: EmailState, event_bus: EventBus, interval_sec: int
     ) -> None:
         """
-        Инициализирует поллер почты.
+        Initializes the mail poller.
 
         Args:
-            client: Экземпляр EmailClient.
-            state: Объект состояния интерфейса.
-            event_bus: Глобальная шина событий.
-            interval_sec: Интервал между запросами к IMAP.
+            client: EmailClient instance.
+            state: Interface state object.
+            event_bus: Global event bus.
+            interval_sec: Interval between requests to IMAP.
         """
         self.client = client
         self.state = state
@@ -41,39 +41,40 @@ class EmailEvents:
         self._is_running = False
         self._polling_task: Optional[asyncio.Task] = None
 
-        # LRU-кэш UIDов уже обработанных писем.
-        # Ограничен сверху: без этого он рос бы бесконечно у юзеров, которые
-        # копят UNSEEN-письма, не читая их (таких больше, чем кажется).
-        # OrderedDict + move_to_end делает O(1) на seen-check, insert и evict.
+        # LRU cache of already processed email UIDs.
+        # Hard bounded: otherwise it would grow infinitely for users who
+        # accumulate UNSEEN emails without reading them.
+        # OrderedDict + move_to_end provides O(1) on seen-check, insert, and evict.
         self._seen_uids_capacity: int = 10_000
         self._seen_uids: "OrderedDict[str, None]" = OrderedDict()
 
     async def start(self) -> None:
-        """Запускает цикл фонового мониторинга."""
+        """Starts background polling cycle."""
         if not self.client.state.is_online or self._is_running:
             return
 
         self._is_running = True
         self._polling_task = asyncio.create_task(self._loop())
-        main_logger.info("[Email] Фоновый поллинг новых писем запущен.")
+        main_logger.info("[Email] Background unread mail polling started.")
 
     async def stop(self) -> None:
-        """Останавливает цикл."""
+        """Stops the cycle."""
         self._is_running = False
         if self._polling_task:
             self._polling_task.cancel()
             self._polling_task = None
+        main_logger.info("[Email] Background unread mail polling stopped.")
 
     def _check_new_emails(self) -> List[Dict[str, str]]:
         """
-        Подключается к IMAP и ищет сообщения с флагом UNSEEN.
+        Connects to IMAP and searches for messages with the UNSEEN flag.
 
         Returns:
-            Список словарей с метаданными о новых письмах.
+            List of dicts with metadata about new emails.
         """
         try:
             with self.client.imap_connection() as mail:
-                # Ищем непрочитанные
+                # Search for unread
                 status, messages = mail.uid("search", None, "UNSEEN")
                 if status != "OK" or not messages[0]:
                     return []
@@ -84,53 +85,53 @@ class EmailEvents:
                 for uid in new_uids:
                     uid_str = uid.decode()
                     if uid_str in self._seen_uids:
-                        # Освежаем LRU-позицию, чтобы не вытеснить активный UID.
+                        # Refresh LRU position to not evict active UID.
                         self._seen_uids.move_to_end(uid_str)
                         continue
 
                     self._seen_uids[uid_str] = None
                     if len(self._seen_uids) > self._seen_uids_capacity:
-                        # Выбрасываем самый старый UID (FIFO-грань LRU).
+                        # Evict the oldest UID (FIFO edge of LRU).
                         self._seen_uids.popitem(last=False)
 
-                    # Читаем заголовки для ивента
+                    # Read headers for the event
                     res, msg_data = mail.uid(
                         "fetch", uid, "(BODY[HEADER.FIELDS (SUBJECT FROM)])"
                     )
                     if res == "OK" and msg_data[0]:
                         msg = email.message_from_bytes(msg_data[0][1])
-                        subject = decode_mime_header(msg.get("Subject", "Без темы"))
-                        sender = decode_mime_header(msg.get("From", "Неизвестен"))
+                        subject = decode_mime_header(msg.get("Subject", "No subject"))
+                        sender = decode_mime_header(msg.get("From", "Unknown"))
 
                         events_to_emit.append(
                             {"uid": uid_str, "subject": subject, "sender": sender}
                         )
                 return events_to_emit
         except Exception as e:
-            main_logger.error(f"[Email] Ошибка при проверке почты: {e}")
+            main_logger.error(f"[Email] Error checking mail: {e}")
             return []
 
     async def _loop(self) -> None:
-        """Главный цикл опроса почты."""
+        """Main mail polling loop."""
         while self._is_running:
             try:
                 new_emails = await asyncio.to_thread(self._check_new_emails)
 
                 if new_emails:
-                    # Дергаем обновление дашборда
+                    # Trigger dashboard update
                     await asyncio.to_thread(self.client.update_state_view)
 
-                    # Кидаем агенту ивенты
+                    # Publish events to the agent
                     for mail_evt in new_emails:
                         await self.bus.publish(
                             Events.EMAIL_INCOMING,
                             uid=mail_evt["uid"],
                             sender_name=mail_evt["sender"],
-                            message=f"Новое письмо. Тема: {mail_evt['subject']}",
+                            message=f"New email. Subject: {mail_evt['subject']}",
                         )
             except asyncio.CancelledError:
                 break
             except Exception as e:
-                main_logger.error(f"[Email] Ошибка в цикле мониторинга почты: {e}")
+                main_logger.error(f"[Email] Error in mail monitoring loop: {e}")
 
             await asyncio.sleep(self.interval)

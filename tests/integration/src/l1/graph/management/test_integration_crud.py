@@ -110,7 +110,7 @@ async def test_link_concepts_invalid_relation(graph_manager):
     
     res = await crud.link_concepts("A", "B", "MAGIC_LINK")
     assert res.is_success is False
-    assert "Неизвестный тип связи" in res.message
+    assert "Unknown relationship type" in res.message
 
 
 # ====================================================================
@@ -131,12 +131,12 @@ async def test_get_concept_neighborhood(graph_manager):
     assert res.is_success is True
     
     content = res.message
-    assert "Концепт: Agent" in content
+    assert "Concept: Agent" in content
     assert "Autonomous system" in content
     # Исходящая связь
     assert "-[REQUIRES]-> (LLM) (Для мыслей)" in content
     # Входящая связь
-    assert "<-[OWNS]- от (Developer) (Создатель)" in content
+    assert "<-[OWNS]- of (Developer) (Создатель)" in content
 
 
 @pytest.mark.asyncio
@@ -146,7 +146,7 @@ async def test_get_concept_neighborhood_not_found(graph_manager):
     
     res = await crud.get_concept_neighborhood("Ghost")
     assert res.is_success is True # Это не сбой навыка, а нормальный ответ LLM
-    assert "не найден в графе" in res.message
+    assert "not found in the graph" in res.message
 
 
 # ====================================================================
@@ -165,7 +165,7 @@ async def test_archive_concept(graph_manager):
     
     # При исследовании должно сказать, что он в архиве
     res_explore = await crud.get_concept_neighborhood("LegacyApp")
-    assert "был заархивирован" in res_explore.message
+    assert "was archived" in res_explore.message
 
 
 @pytest.mark.asyncio
@@ -180,7 +180,7 @@ async def test_remove_link(graph_manager):
     
     # Проверяем, что узлы остались, а связь исчезла
     res_explore = await crud.get_concept_neighborhood("Module A")
-    assert "Изолированный узел" in res_explore.message
+    assert "Isolated node" in res_explore.message
 
 
 @pytest.mark.asyncio
@@ -195,8 +195,8 @@ async def test_erase_concept(graph_manager):
     
     # Center уничтожен
     res_explore = await crud.get_concept_neighborhood("Center")
-    assert "не найден в графе" in res_explore.message
+    assert "not found in the graph" in res_explore.message
     
     # Satellite выжил, но потерял связи
     res_sat = await crud.get_concept_neighborhood("Satellite")
-    assert "Изолированный узел" in res_sat.message
+    assert "Isolated node" in res_sat.message

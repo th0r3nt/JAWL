@@ -23,6 +23,6 @@ def test_cloud_whisper_state_history_limits() -> None:
 
 
 def test_cloud_whisper_state_empty_history() -> None:
-    """Тест: Форматирование пустой истории."""
+    """Тест: Форматирование emptyой истории."""
     state = CloudWhisperSTTState()
-    assert "не транскрибировались" in state.recent_history
+    assert "were not transcribed" in state.recent_history

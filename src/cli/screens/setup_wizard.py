@@ -1,9 +1,9 @@
 """
-Экран мастера настройки.
+Setup Wizard CLI Screen.
 
-Предоставляет выбор конфигурационного файла (settings.yaml или interfaces.yaml)
-и передает управление универсальному визуальному редактому (YamlEditor).
-Оснащен защитой от рассинхрона памяти (запрет редактирования, если агент сейчас работает).
+Allows selecting system configuration files (settings.yaml or interfaces.yaml)
+and passes control to the universal interactive YamlEditor.
+Protects against memory desyncs by blocking edits when the agent is running.
 """
 
 import shutil
@@ -29,14 +29,7 @@ CONFIG_DIR = ROOT_DIR / "config"
 
 def _ensure_yaml_exists(file_name: str) -> Optional[Path]:
     """
-    Проверяет наличие файла конфигурации.
-    Если он отсутствует, автоматически создает его копию из шаблона (.example.yaml).
-
-    Args:
-        file_name: Имя файла (например, 'settings.yaml').
-
-    Returns:
-        Path к файлу, если он существует (или был создан), иначе None.
+    Validates file presence. Copies template .example.yaml if missing.
     """
 
     target_file = CONFIG_DIR / file_name
@@ -45,9 +38,9 @@ def _ensure_yaml_exists(file_name: str) -> Optional[Path]:
     if not target_file.exists():
         if example_file.exists():
             shutil.copy2(example_file, target_file)
-            print_info(f" Создан базовый файл конфигурации {file_name}")
+            print_info(f" Created base configuration file {file_name}")
         else:
-            print_error(f"Не найден шаблон файла ({example_file.name}).")
+            print_error(f"Template file not found ({example_file.name}).")
             return None
 
     return target_file
@@ -55,17 +48,15 @@ def _ensure_yaml_exists(file_name: str) -> Optional[Path]:
 
 def setup_wizard_screen() -> None:
     """
-    Главный цикл экрана выбора конфигурации.
-    Блокирует доступ, если процесс агента активен.
+    Interactive config file selection screen.
     """
 
-    set_window_title("JAWL - Мастер настройки")
+    set_window_title("JAWL - Setup Wizard")
 
-    # Защита от рассинхронизации ОЗУ и Диска
     if _is_agent_running():
-        print_error("Ошибка: Нельзя изменять конфигурацию во время работы агента.")
+        print_error("Error: Cannot change configuration while the agent is running.")
         print_info(
-            " Остановите агента в главном меню (чтобы избежать рассинхронизации Pydantic моделей в памяти)."
+            " Stop the agent from the main menu (to prevent desynchronization of Pydantic models in memory)."
         )
         wait_for_enter()
         return
@@ -76,18 +67,18 @@ def setup_wizard_screen() -> None:
         draw_header()
 
         choice = questionary.select(
-            "Выберите конфигурационный файл для редактирования:",
+            "Select configuration file to edit:",
             choices=[
-                questionary.Choice("[*] Настройки системы (settings.yaml)", "settings.yaml"),
+                questionary.Choice("[*] System Settings (settings.yaml)", "settings.yaml"),
                 questionary.Choice(
-                    "[*] Интерфейсы и доступы (interfaces.yaml)", "interfaces.yaml"
+                    "[*] Interfaces and Access Levels (interfaces.yaml)", "interfaces.yaml"
                 ),
                 questionary.Separator(" "),
-                questionary.Choice("[x] Выход в главное меню", "exit"),
+                questionary.Choice("[x] Exit to main menu", "exit"),
             ],
             style=style,
             qmark="",
-            instruction="\n Используйте стрелочки ↑/↓ и Enter\n",
+            instruction="\n Use arrows ↑/↓ and Enter\n",
         ).ask()
 
         if choice is None or choice == "exit":
@@ -96,6 +87,5 @@ def setup_wizard_screen() -> None:
         target_path = _ensure_yaml_exists(choice)
 
         if target_path:
-            # Делегируем работу универсальному движку
-            editor = YamlEditor(file_path=target_path, title=f"Редактор: {choice}")
+            editor = YamlEditor(file_path=target_path, title=f"Editor: {choice}")
             editor.run()

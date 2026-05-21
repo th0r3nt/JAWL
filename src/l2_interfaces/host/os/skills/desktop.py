@@ -1,7 +1,7 @@
 """
-Навыки для физического взаимодействия с графическим интерфейсом хост-машины (GUI).
-Кроссплатформенная реализация (Windows/macOS/Linux). 
-На headless-серверах (без монитора) безопасно возвращают Fail без краша системы.
+Skills for physical interaction with the host system's graphical user interface (GUI).
+Cross-platform implementation supporting Windows, macOS, and Linux.
+Returns failure gracefully on headless servers without crashing the system.
 """
 
 import os
@@ -24,8 +24,8 @@ from src.l3_agent.skills.registry import SkillResult, skill
 
 class HostOSDesktop:
     """
-    Навыки для взаимодействия с графическим интерфейсом (Desktop) хост-машины.
-    Написаны кроссплатформенно. На headless-серверах (VPS) безопасно возвращают fail.
+    Agent tools for interacting with the host OS Desktop GUI.
+    Cross-platform implementation. Safely returns fail on headless servers (VPS).
     """
 
     def __init__(self, host_os_client: HostOSClient):
@@ -46,11 +46,11 @@ class HostOSDesktop:
             if success:
                 return SkillResult.ok("True")
             return SkillResult.fail(
-                "Браузер не найден или ОС не поддерживает данную операцию."
+                "Browser not found or the OS does not support this operation."
             )
 
         except Exception as e:
-            return SkillResult.fail(f"Ошибка при открытии браузера: {e}")
+            return SkillResult.fail(f"Error opening browser: {e}")
 
     @skill()
     @require_access(HostOSAccessLevel.SANDBOX)
@@ -61,7 +61,7 @@ class HostOSDesktop:
         try:
             safe_path = self.host_os.validate_path(path, is_write=False)
             if not safe_path.exists():
-                return SkillResult.fail(f"Ошибка: Путь не существует ({path}).")
+                return SkillResult.fail(f"Error: Path does not exist ({path}).")
 
             def _open_native():
                 if sys.platform == "win32":
@@ -78,7 +78,7 @@ class HostOSDesktop:
             return SkillResult.fail(str(e))
 
         except Exception as e:
-            return SkillResult.fail(f"Ошибка при открытии окна: {e}")
+            return SkillResult.fail(f"Error opening window: {e}")
 
     @skill()
     @require_access(HostOSAccessLevel.SANDBOX)
@@ -90,7 +90,6 @@ class HostOSDesktop:
 
             def _notify():
                 if sys.platform == "win32":
-                    # Используем встроенный PowerShell для отправки Toast-уведомления без сторонних либ
                     ps_script = f"""
                     [Reflection.Assembly]::LoadWithPartialName('System.Windows.Forms') | Out-Null;
                     $notify = New-Object System.Windows.Forms.NotifyIcon;
@@ -106,24 +105,21 @@ class HostOSDesktop:
                         ["powershell", "-WindowStyle", "Hidden", "-Command", ps_script]
                     )
                 elif sys.platform == "darwin":
-                    # Нативный AppleScript
                     apple_script = f'display notification "{message}" with title "{title}"'
                     subprocess.run(["osascript", "-e", apple_script])
                 else:
-                    # Нативный Linux notify-send
                     subprocess.run(["notify-send", title, message])
 
-            # Запускаем как фоновую задачу, так как вызов может блокироваться на пару секунд
             asyncio.create_task(asyncio.to_thread(_notify))
             return SkillResult.ok("True")
 
         except FileNotFoundError:
             return SkillResult.fail(
-                "Служба уведомлений недоступна в данной ОС (вероятно, сервер без GUI)."
+                "Notification service is unavailable in this OS (likely a headless server)."
             )
 
         except Exception as e:
-            return SkillResult.fail(f"Ошибка отправки уведомления: {e}")
+            return SkillResult.fail(f"Error sending notification: {e}")
 
     @skill()
     @require_access(HostOSAccessLevel.SANDBOX)
@@ -131,9 +127,9 @@ class HostOSDesktop:
         self, filename: str, with_grid: bool = False, grid_step: int = 100
     ) -> SkillResult:
         """
-        [GUI] Captures main screen screenshot and saves to sandbox. 
-        
-        with_grid: Overlays coordinate grid. 
+        [GUI] Captures main screen screenshot and saves to sandbox.
+
+        with_grid: Overlays coordinate grid.
         grid_step: Grid step in pixels.
         """
         try:
@@ -144,8 +140,6 @@ class HostOSDesktop:
             safe_path.parent.mkdir(parents=True, exist_ok=True)
 
             def _grab():
-                # Убрано all_screens=True, чтобы снимать только основной монитор.
-                # Иначе 3 монитора сжимаются LLM в мыло, и координаты ломаются.
                 img = ImageGrab.grab(all_screens=False)
                 img.save(safe_path)
 
@@ -157,12 +151,12 @@ class HostOSDesktop:
 
         except OSError:
             return SkillResult.fail(
-                "Не удалось сделать скриншот. Графический интерфейс недоступен (headless-сервер)."
+                "Failed to take screenshot. Graphical interface is unavailable (headless server)."
             )
         except PermissionError as e:
             return SkillResult.fail(str(e))
         except Exception as e:
-            return SkillResult.fail(f"Ошибка при создании скриншота: {e}")
+            return SkillResult.fail(f"Error taking screenshot: {e}")
 
     @skill()
     @require_access(HostOSAccessLevel.SANDBOX)
@@ -178,22 +172,21 @@ class HostOSDesktop:
                 elif sys.platform == "darwin":
                     subprocess.run(["pmset", "displaysleepnow"])
                 else:
-                    # Пробуем несколько популярных Linux-локкеров
                     if shutil.which("xdg-screensaver"):
                         subprocess.run(["xdg-screensaver", "lock"])
                     elif shutil.which("gnome-screensaver-command"):
                         subprocess.run(["gnome-screensaver-command", "-l"])
                     else:
-                        raise FileNotFoundError("Команда блокировки экрана не найдена.")
+                        raise FileNotFoundError("Screen lock command not found.")
 
             await asyncio.to_thread(_lock)
             return SkillResult.ok("True")
 
         except FileNotFoundError as e:
-            return SkillResult.fail(f"Не удалось заблокировать экран (GUI недоступен): {e}")
+            return SkillResult.fail(f"Failed to lock screen (GUI is unavailable): {e}")
 
         except Exception as e:
-            return SkillResult.fail(f"Ошибка при блокировке экрана: {e}")
+            return SkillResult.fail(f"Error locking screen: {e}")
 
     @skill()
     @require_access(HostOSAccessLevel.SANDBOX)
@@ -207,29 +200,29 @@ class HostOSDesktop:
                 ctypes.windll.user32.SetCursorPos(x, y)
                 ctypes.windll.user32.mouse_event(2, 0, 0, 0, 0)
                 ctypes.windll.user32.mouse_event(4, 0, 0, 0, 0)
-                return True, f"Клик по координатам ({x}, {y}) выполнен."
+                return True, f"Click at coordinates ({x}, {y}) executed."
 
             elif sys.platform == "darwin":
                 script = f'tell application "System Events"\nclick at {{{x}, {y}}}\nend tell'
                 subprocess.run(["osascript", "-e", script], check=True)
-                return True, f"Клик по координатам ({x}, {y}) выполнен."
+                return True, f"Click at coordinates ({x}, {y}) executed."
 
             else:
                 if shutil.which("xdotool"):
                     subprocess.run(
                         ["xdotool", "mousemove", str(x), str(y), "click", "1"], check=True
                     )
-                    return True, f"Клик по координатам ({x}, {y}) выполнен."
+                    return True, f"Click at coordinates ({x}, {y}) executed."
 
                 else:
-                    raise FileNotFoundError("Для управления мышью установите 'xdotool'.")
+                    raise FileNotFoundError("To control the mouse, please install 'xdotool'.")
 
         try:
             success, msg = await asyncio.to_thread(_click)
             return SkillResult.ok("True") if success else SkillResult.fail(msg)
 
         except Exception as e:
-            return SkillResult.fail(f"Ошибка при клике мыши: {e}")
+            return SkillResult.fail(f"Error executing mouse click: {e}")
 
     @skill()
     @require_access(HostOSAccessLevel.SANDBOX)
@@ -255,27 +248,29 @@ class HostOSDesktop:
                     creationflags=subprocess.CREATE_NO_WINDOW,
                     check=True,
                 )
-                return True, f"Текст '{text}' успешно напечатан."
+                return True, f"Text '{text}' successfully typed."
 
             elif sys.platform == "darwin":
                 escaped_text = text.replace('"', '\\"')
                 script = f'tell application "System Events" to keystroke "{escaped_text}"'
                 subprocess.run(["osascript", "-e", script], check=True)
-                return True, f"Текст '{text}' успешно напечатан."
+                return True, f"Text '{text}' successfully typed."
 
             else:
                 if shutil.which("xdotool"):
                     subprocess.run(["xdotool", "type", text], check=True)
-                    return True, f"Текст '{text}' успешно напечатан."
+                    return True, f"Text '{text}' successfully typed."
                 else:
-                    raise FileNotFoundError("Для эмуляции клавиатуры установите 'xdotool'.")
+                    raise FileNotFoundError(
+                        "To emulate keyboard typing, please install 'xdotool'."
+                    )
 
         try:
             success, msg = await asyncio.to_thread(_type)
             return SkillResult.ok("True") if success else SkillResult.fail(msg)
 
         except Exception as e:
-            return SkillResult.fail(f"Ошибка при вводе текста: {e}")
+            return SkillResult.fail(f"Error typing text: {e}")
 
     @skill()
     @require_access(HostOSAccessLevel.SANDBOX)
@@ -284,21 +279,17 @@ class HostOSDesktop:
         [GUI] Plays audio file.
         """
         try:
-            # Пропускаем через гейткипер (только из sandbox/)
             safe_path = self.host_os.validate_path(filepath, is_write=False)
 
             if not safe_path.is_file():
-                return SkillResult.fail(f"Ошибка: Аудиофайл не найден ({safe_path.name}).")
+                return SkillResult.fail(f"Error: Audio file not found ({safe_path.name}).")
 
             def _play():
                 if sys.platform == "win32":
-                    # Нативная функция Windows, открывает файл в плеере по умолчанию
                     os.startfile(str(safe_path))
                 elif sys.platform == "darwin":
-                    # Нативный консольный плеер macOS, не открывает UI
                     subprocess.Popen(["afplay", str(safe_path)])
                 else:
-                    # Linux: пробуем консольные плееры, иначе открываем в UI
                     if shutil.which("paplay"):
                         subprocess.Popen(["paplay", str(safe_path)])
                     elif shutil.which("mpg123"):
@@ -306,7 +297,6 @@ class HostOSDesktop:
                     else:
                         subprocess.Popen(["xdg-open", str(safe_path)])
 
-            # Вызываем в отдельном потоке, хотя Popen и startfile не блокируют выполнение
             await asyncio.to_thread(_play)
             return SkillResult.ok("True")
 
@@ -314,12 +304,10 @@ class HostOSDesktop:
             return SkillResult.fail(str(e))
 
         except OSError:
-            return SkillResult.fail(
-                "Не удалось запустить аудио. Отсутствует плеер по умолчанию."
-            )
+            return SkillResult.fail("Failed to play audio. No default player found.")
 
         except Exception as e:
-            return SkillResult.fail(f"Ошибка при воспроизведении аудио: {e}")
+            return SkillResult.fail(f"Error playing audio: {e}")
 
     @skill()
     @require_access(HostOSAccessLevel.SANDBOX)
@@ -333,8 +321,6 @@ class HostOSDesktop:
 
             def _read_clipboard():
                 if sys.platform == "win32":
-                    # Читаем буфер в PS, переводим в UTF-8 байты, а затем в Base64.
-                    # Это полностью исключает консольные проблемы с кодировками.
                     ps_script = "try { $t = Get-Clipboard -Raw; if ($t) { [Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($t)) } } catch {}"
                     b64_str = subprocess.check_output(
                         ["powershell", "-NoProfile", "-Command", ps_script],
@@ -358,21 +344,21 @@ class HostOSDesktop:
 
             if not content:
                 return SkillResult.ok(
-                    "Буфер обмена пуст (или содержит не текстовые данные, например файл/картинку)."
+                    "Clipboard is empty (or contains non-text data, e.g., a file or image)."
                 )
 
             from src.utils._tools import truncate_text
 
             clean_content = truncate_text(content, 10000)
 
-            return SkillResult.ok(f"Содержимое буфера обмена:\n```\n{clean_content}\n```")
+            return SkillResult.ok(f"Clipboard content:\n```\n{clean_content}\n```")
 
         except FileNotFoundError:
             return SkillResult.fail(
-                "Не удалось прочитать буфер. В Linux убедитесь, что установлен 'xclip' или 'xsel'."
+                "Failed to read clipboard. On Linux, ensure 'xclip' or 'xsel' is installed."
             )
         except Exception as e:
-            return SkillResult.fail(f"Не удалось получить доступ к буферу обмена: {e}")
+            return SkillResult.fail(f"Failed to access clipboard: {e}")
 
     @skill()
     @require_access(HostOSAccessLevel.SANDBOX)
@@ -386,7 +372,6 @@ class HostOSDesktop:
 
             def _write_clipboard():
                 if sys.platform == "win32":
-                    # Кодируем текст в Base64 на стороне Python, а PowerShell декодирует и кладет в буфер
                     b64_str = base64.b64encode(text.encode("utf-8")).decode("utf-8")
                     ps_script = f"[System.Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('{b64_str}')) | Set-Clipboard"
 
@@ -409,17 +394,17 @@ class HostOSDesktop:
                         elif shutil.which("xsel"):
                             subprocess.run(["xsel", "-ib"], input=text_bytes, check=True)
                         else:
-                            raise FileNotFoundError("xclip/xsel не найдены")
+                            raise FileNotFoundError("xclip/xsel not found")
 
             await asyncio.to_thread(_write_clipboard)
             return SkillResult.ok("True")
 
         except FileNotFoundError:
             return SkillResult.fail(
-                "Не удалось изменить буфер. В Linux убедитесь, что установлен 'xclip' или 'xsel'."
+                "Failed to update clipboard. On Linux, ensure 'xclip' or 'xsel' is installed."
             )
         except Exception as e:
-            return SkillResult.fail(f"Ошибка записи в буфер обмена: {e}")
+            return SkillResult.fail(f"Error writing to clipboard: {e}")
 
     @skill()
     @require_access(HostOSAccessLevel.SANDBOX)
@@ -464,23 +449,23 @@ class HostOSDesktop:
                         if len(parts) >= 4:
                             titles.append(parts[3])
                 else:
-                    raise FileNotFoundError("Для получения списка окон установите 'wmctrl'.")
+                    raise FileNotFoundError("To switch windows, please install 'wmctrl'.")
 
             return titles
 
         try:
             windows = await asyncio.to_thread(_list)
             if not windows:
-                return SkillResult.ok("Активных графических окон не найдено.")
+                return SkillResult.ok("No active graphical windows found.")
             unique_windows = list(dict.fromkeys(windows))
 
-            return SkillResult.ok("Список открытых окон:\n- " + "\n- ".join(unique_windows))
+            return SkillResult.ok("List of open windows:\n- " + "\n- ".join(unique_windows))
 
         except FileNotFoundError as e:
             return SkillResult.fail(str(e))
 
         except Exception as e:
-            return SkillResult.fail(f"Ошибка при получении списка окон: {e}")
+            return SkillResult.fail(f"Error getting window list: {e}")
 
     @skill()
     @require_access(HostOSAccessLevel.SANDBOX)
@@ -497,8 +482,8 @@ class HostOSDesktop:
                 hwnd = win32gui.GetForegroundWindow()
                 if hwnd:
                     win32gui.ShowWindow(hwnd, win32con.SW_MAXIMIZE)
-                    return True, "Активное окно успешно развернуто на весь экран."
-                return False, "Активное окно не найдено."
+                    return True, "Active window successfully maximized."
+                return False, "Active window not found."
 
             elif sys.platform == "darwin":
                 script = """tell application "System Events"
@@ -507,7 +492,7 @@ class HostOSDesktop:
                     set value of attribute "AXFullScreen" of frontWindow to true
                 end tell"""
                 subprocess.run(["osascript", "-e", script], check=True)
-                return True, "Активное окно развернуто на весь экран."
+                return True, "Active window maximized."
 
             else:
                 if shutil.which("xdotool"):
@@ -515,14 +500,14 @@ class HostOSDesktop:
                         ["xdotool", "getactivewindow", "windowsize", "100%", "100%"],
                         check=True,
                     )
-                    return True, "Активное окно развернуто на весь экран."
-                return False, "Для Linux требуется утилита xdotool."
+                    return True, "Active window maximized."
+                return False, "Linux requires the xdotool utility."
 
         try:
             success, msg = await asyncio.to_thread(_maximize)
             return SkillResult.ok("True") if success else SkillResult.fail(msg)
         except Exception as e:
-            return SkillResult.fail(f"Ошибка при развертывании окна: {e}")
+            return SkillResult.fail(f"Error maximizing window: {e}")
 
     @skill()
     @require_access(HostOSAccessLevel.SANDBOX)
@@ -547,13 +532,12 @@ class HostOSDesktop:
                 win32gui.EnumWindows(enum_cb, None)
 
                 if target_hwnd:
-                    # Хак Windows для перехвата фокуса
                     ctypes.windll.user32.keybd_event(0x12, 0, 0, 0)
                     ctypes.windll.user32.keybd_event(0x12, 0, 2, 0)
                     win32gui.ShowWindow(target_hwnd, win32con.SW_RESTORE)
                     win32gui.SetForegroundWindow(target_hwnd)
-                    return True, f"Фокус переключен на окно '{title_substring}'."
-                return False, f"Окно с текстом '{title_substring}' не найдено."
+                    return True, f"Focus switched to window '{title_substring}'."
+                return False, f"Window with title '{title_substring}' not found."
 
             elif sys.platform == "darwin":
                 script = f"""tell application "System Events"
@@ -561,22 +545,22 @@ class HostOSDesktop:
                     set frontmost of targetProc to true
                 end tell"""
                 subprocess.run(["osascript", "-e", script], check=True)
-                return True, "Фокус переключен."
+                return True, "Focus switched."
 
             else:
                 if shutil.which("wmctrl"):
                     subprocess.run(["wmctrl", "-a", title_substring], check=True)
-                    return True, "Фокус переключен."
+                    return True, "Focus switched."
 
                 else:
-                    raise FileNotFoundError("Для переключения окон установите 'wmctrl'.")
+                    raise FileNotFoundError("To switch windows, please install 'wmctrl'.")
 
         try:
             success, msg = await asyncio.to_thread(_focus)
             return SkillResult.ok("True") if success else SkillResult.fail(msg)
 
         except Exception as e:
-            return SkillResult.fail(f"Ошибка при переключении фокуса: {e}")
+            return SkillResult.fail(f"Error switching focus: {e}")
 
     @skill()
     @require_access(HostOSAccessLevel.SANDBOX)
@@ -615,7 +599,7 @@ class HostOSDesktop:
                     if k in vk_map:
                         vks.append(vk_map[k])
                     else:
-                        return False, f"Неизвестная клавиша для Windows: {k}"
+                        return False, f"Unknown key for Windows: {k}"
 
                 for vk in vks:
                     ctypes.windll.user32.keybd_event(vk, 0, 0, 0)
@@ -624,7 +608,7 @@ class HostOSDesktop:
                 for vk in reversed(vks):
                     ctypes.windll.user32.keybd_event(vk, 0, 2, 0)
 
-                return True, f"Комбинация '{hotkey}' успешно нажата."
+                return True, f"Combination '{hotkey}' successfully pressed."
 
             elif sys.platform == "darwin":
                 keys = hk.split("+")
@@ -644,7 +628,7 @@ class HostOSDesktop:
                         main_key = k
 
                 if not main_key:
-                    return False, "Не указана основная клавиша."
+                    return False, "Main key not specified."
 
                 using_str = f" using {{{', '.join(modifiers)}}}" if modifiers else ""
 
@@ -664,20 +648,20 @@ class HostOSDesktop:
                     script = f'tell application "System Events" to keystroke "{main_key}"{using_str}'
 
                 subprocess.run(["osascript", "-e", script], check=True)
-                return True, f"Комбинация '{hotkey}' успешно нажата."
+                return True, f"Combination '{hotkey}' successfully pressed."
 
             else:
                 if shutil.which("xdotool"):
                     linux_hk = hk.replace("win", "super").replace("cmd", "super")
                     subprocess.run(["xdotool", "key", linux_hk], check=True)
-                    return True, f"Комбинация '{hotkey}' успешно нажата."
+                    return True, f"Combination '{hotkey}' successfully pressed."
 
                 else:
-                    raise FileNotFoundError("Установите 'xdotool'.")
+                    raise FileNotFoundError("Please install 'xdotool'.")
 
         try:
             success, msg = await asyncio.to_thread(_press)
             return SkillResult.ok(msg) if success else SkillResult.fail(msg)
 
         except Exception as e:
-            return SkillResult.fail(f"Ошибка при эмуляции нажатия: {e}")
+            return SkillResult.fail(f"Error during keystroke emulation: {e}")

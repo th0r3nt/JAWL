@@ -1,8 +1,8 @@
 """
-Фасад для слоя семантической векторной памяти.
+Facade for the vector memory layer.
 
-Оркестрирует запуск Qdrant клиента, загрузку ONNX Embedding-модели
-и сборку CRUD-контроллеров для знаний, мыслей и Code Graph.
+Orchestrates Qdrant client startup, ONNX Embedding model loading,
+and assembly of CRUD controllers for knowledge, thoughts, and Code Graph.
 """
 
 from pathlib import Path
@@ -17,8 +17,8 @@ from src.l1_databases.vector.management.code_ast import VectorCodeAST
 
 class VectorManager:
     """
-    Фасад для векторного слоя памяти.
-    Инкапсулирует инициализацию клиента Qdrant, модели FastEmbed и CRUD-обработчиков.
+    Facade for the vector memory layer.
+    Encapsulates initialization of the Qdrant client, FastEmbed model, and CRUD handlers.
     """
 
     def __init__(
@@ -31,15 +31,15 @@ class VectorManager:
         timezone: int = 0,
     ) -> None:
         """
-        Инициализирует фасад векторной БД.
+        Initializes the vector DB facade.
 
         Args:
-            db_path: Путь к хранилищу Qdrant.
-            embedding_model_path: Путь к кэшу моделей FastEmbed.
-            embedding_model_name: Название модели (напр. 'intfloat/multilingual-e5-large').
-            vector_size: Размерность вектора.
-            similarity_threshold: Порог косинусного сходства для отсева нерелевантного шума.
-            timezone: Смещение часового пояса.
+            db_path: Path to the Qdrant storage.
+            embedding_model_path: Path to the FastEmbed models cache.
+            embedding_model_name: Model name (e.g., 'intfloat/multilingual-e5-large').
+            vector_size: Vector dimension.
+            similarity_threshold: Cosine similarity threshold for filtering out irrelevant noise.
+            timezone: Timezone offset.
         """
 
         self.collection_name_knowledge = "knowledge"
@@ -63,7 +63,7 @@ class VectorManager:
         thoughts_col = VectorCollection(self.db, self.collection_name_thoughts)
         code_ast_col = VectorCollection(self.db, self.collection_name_code_ast)
 
-        # Передаем timezone в CRUD-обработчики
+        # Pass timezone to CRUD handlers
 
         self.knowledge = VectorKnowledge(
             db=self.db,
@@ -88,9 +88,9 @@ class VectorManager:
         )
 
     async def connect(self) -> None:
-        """Открывает подключение к Qdrant и создает структуры данных."""
+        """Opens connection to Qdrant and creates data structures."""
         await self.db.connect()
 
     async def disconnect(self) -> None:
-        """Безопасно закрывает подключение к Qdrant."""
+        """Safely closes connection to Qdrant."""
         await self.db.disconnect()

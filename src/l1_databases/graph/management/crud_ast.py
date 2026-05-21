@@ -13,7 +13,7 @@ from src.l1_databases.graph.schema import (
 
 
 class GraphASTCRUD:
-    """Низкоуровневый контроллер для управления узлами AST в графовой базе."""
+    """Low-level controller for managing AST nodes in the graph database."""
 
     def __init__(self, db: GraphDB) -> None:
         self.db = db
@@ -22,13 +22,13 @@ class GraphASTCRUD:
         self, node_id: str, name: str, node_type: CodeNodeType, file_path: str, project_id: str
     ) -> None:
         """
-        Добавляет или обновляет узел кода.
+        Adds or updates a code node.
         """
 
         async with self.db.write_lock:
 
             def _sync() -> None:
-                # Защита от инъекций Cypher (KuzuDB падает на кавычках)
+                # Cypher Injection protection (KuzuDB crashes on quotes)
                 s_id = json.dumps(node_id, ensure_ascii=False)
                 s_name = json.dumps(name, ensure_ascii=False)
                 s_type = json.dumps(node_type, ensure_ascii=False)
@@ -58,7 +58,7 @@ class GraphASTCRUD:
         self, source_id: str, target_id: str, relation: CodeRelationType
     ) -> None:
         """
-        Связывает два узла (например, FILE -> IMPORTS -> FILE).
+        Links two nodes (e.g., FILE -> IMPORTS -> FILE).
         """
 
         async with self.db.write_lock:
@@ -67,7 +67,7 @@ class GraphASTCRUD:
                 s_src = json.dumps(source_id, ensure_ascii=False)
                 s_tgt = json.dumps(target_id, ensure_ascii=False)
 
-                # Проверяем, существует ли уже такая связь
+                # Verify if such relation already exists
                 check_q = f"MATCH (a:{CODE_NODE_TABLE} {{id: {s_src}}})-[e:{relation}]->(b:{CODE_NODE_TABLE} {{id: {s_tgt}}}) RETURN e"
                 res = self.db.conn.execute(check_q)
                 if res.has_next():
@@ -85,19 +85,19 @@ class GraphASTCRUD:
 
     async def get_dependencies(self, node_id: str) -> List[Dict[str, Any]]:
         """
-        Возвращает узлы, от которых зависит переданный узел (исходящие связи).
+        Returns nodes that the passed node depends on (outgoing relations).
         """
         return await self._get_edges(node_id, direction="out")
 
     async def get_usages(self, node_id: str) -> List[Dict[str, Any]]:
         """
-        Возвращает узлы, которые используют переданный узел (входящие связи - кто от нас зависит).
+        Returns nodes that use the passed node (incoming relations - who depends on us).
         """
         return await self._get_edges(node_id, direction="in")
 
     async def _get_edges(self, node_id: str, direction: str) -> List[Dict[str, Any]]:
         """
-        Вспомогательный метод для извлечения связей.
+        Helper method to extract relations.
         """
 
         async with self.db.write_lock:
@@ -130,7 +130,7 @@ class GraphASTCRUD:
 
     async def delete_project(self, project_id: str) -> None:
         """
-        Удаляет все узлы и связи, принадлежащие конкретному проекту.
+        Deletes all nodes and relations belonging to a specific project.
         """
 
         async with self.db.write_lock:
@@ -138,22 +138,22 @@ class GraphASTCRUD:
             def _sync() -> None:
                 s_proj = json.dumps(project_id, ensure_ascii=False)
 
-                # В KuzuDB нет DETACH DELETE, поэтому удаляем все связи вручную
+                # KuzuDB lacks DETACH DELETE, so we remove all relations manually
                 for rel in CODE_EDGE_TABLES:
-                    # Исходящие
+                    # Outgoing
                     self.db.conn.execute(
                         f"MATCH (n:{CODE_NODE_TABLE} {{project_id: {s_proj}}})-[e:{rel}]->() DELETE e"
                     )
-                    # Входящие
+                    # Incoming
                     self.db.conn.execute(
                         f"MATCH (n:{CODE_NODE_TABLE} {{project_id: {s_proj}}})<-[e:{rel}]-() DELETE e"
                     )
 
-                # Затем удаляем сами узлы
+                # Then remove the nodes themselves
                 self.db.conn.execute(
                     f"MATCH (n:{CODE_NODE_TABLE} {{project_id: {s_proj}}}) DELETE n"
                 )
 
-                main_logger.info(f"[Graph DB] Проект AST '{project_id}' полностью удален.")
+                main_logger.info(f"[Graph DB] AST project '{project_id}' completely deleted.")
 
             await asyncio.to_thread(_sync)

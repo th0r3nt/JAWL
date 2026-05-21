@@ -1,8 +1,8 @@
 """
-CRUD-контроллер для коллекции 'knowledge' (База знаний).
+CRUD controller for the 'knowledge' collection (Knowledge Base).
 
-Хранит долгосрочные, объективные факты из внешнего мира (документация, прочитанные статьи, лор).
-Поддерживает поиск по схожести (similarity search) с жесткой фильтрацией по тегам.
+Stores long-term, objective facts from the external world (documentation, read articles, lore).
+Supports similarity search with strict tag filtering.
 """
 
 import time
@@ -23,26 +23,26 @@ if TYPE_CHECKING:
     from src.l1_databases.vector.embedding import EmbeddingModel
     from src.l1_databases.vector.collections import VectorCollection
 
-# Жестко заданный список тегов для классификации
+# Strictly predefined list of tags for classification
 VectorTag = Literal[
-    # Домены знаний
-    "domain:tech",  # Техническая инфа
-    "domain:lore",  # Инфа про субъектов
-    "domain:self",  # Инфа про себя
-    # Типы знаний
-    "type:fact",  # Строгие факты
-    "type:concept",  # Абстрактные знания
-    "type:rule",  # Правила поведения
-    # Длительность знаний
-    "retention:core",  # Фундаментально
-    "retention:ephemeral",  # Временно
+    # Knowledge domains
+    "domain:tech",  # Technical information
+    "domain:lore",  # Lore regarding subjects/objects
+    "domain:self",  # Self information/architecture
+    # Knowledge types
+    "type:fact",  # Strict facts
+    "type:concept",  # Abstract knowledge
+    "type:rule",  # Core rules
+    # Knowledge retention
+    "retention:core",  # Fundamental
+    "retention:ephemeral",  # Short-term/ephemeral
 ]
 
 ReliabilityLevel = Literal["verified", "assumption", "untrusted"]
 
 
 class VectorKnowledge:
-    """Интерфейс агента к базе объективных знаний."""
+    """Agent interface to the objective knowledge base."""
 
     def __init__(
         self,
@@ -53,14 +53,14 @@ class VectorKnowledge:
         timezone: int = 0,
     ) -> None:
         """
-        Инициализирует контроллер знаний.
+        Initializes the knowledge controller.
 
         Args:
-            db: Подключение к Qdrant.
-            embedding_model: Синтезатор векторов FastEmbed.
-            collection: Ссылка на коллекцию.
-            similarity_threshold: Порог косинусного сходства (Cosine Distance).
-            timezone: Смещение часового пояса.
+            db: Connection to Qdrant.
+            embedding_model: FastEmbed vector synthesizer.
+            collection: Reference to the collection.
+            similarity_threshold: Cosine similarity threshold (Cosine Distance).
+            timezone: Timezone offset.
         """
         self.db = db
         self.collection = collection
@@ -79,17 +79,17 @@ class VectorKnowledge:
         reliability: ReliabilityLevel = "verified",
     ) -> SkillResult:
         """
-        Vectorizes and saves knowledge snippet to database. 
-        
-        source: Origin of the fact. 
+        Vectorizes and saves knowledge snippet to database.
+
+        source: Origin of the fact.
         reliability: level of trustworthiness.
         """
 
         if not tags:
-            return SkillResult.fail("Ошибка: Необходимо указать хотя бы один тег из списка.")
+            return SkillResult.fail("Error: You must specify at least one tag from the list.")
 
         if not self.db.client:
-            return SkillResult.fail("Векторная БД не инициализирована.")
+            return SkillResult.fail("Vector DB is not initialized.")
 
         try:
             vector = await self.embedding_model.get_embedding(str(knowledge_text))
@@ -109,12 +109,12 @@ class VectorKnowledge:
                 wait=True,
             )
 
-            msg = f"[Vector DB] Знание успешно сохранено в базе данных (ID: {point_id}). Теги: {tags}"
+            msg = f"[Vector DB] Knowledge successfully saved to the database (ID: {point_id}). Tags: {tags}"
             main_logger.info(msg)
             return SkillResult.ok(f"True. ID: {point_id}")
 
         except Exception as e:
-            msg = f"[Vector DB] Ошибка при сохранении знания в базе данных: {e}"
+            msg = f"[Vector DB] Error saving knowledge to the database: {e}"
             main_logger.error(msg)
             return SkillResult.fail(msg)
 
@@ -126,8 +126,8 @@ class VectorKnowledge:
         self, query: str, limit: int = 5, tags_filter: Optional[List[VectorTag]] = None
     ) -> SkillResult:
         """
-        Performs semantic search over saved knowledge. 
-        
+        Performs semantic search over saved knowledge.
+
         tags_filter: Optional. Returns only facts containing all specified tags.
         """
 
@@ -135,7 +135,7 @@ class VectorKnowledge:
             query_str = str(query)
             query_vector = await self.embedding_model.get_embedding(query_str)
 
-            # Строим фильтр (Логическое И - должны совпасть все переданные теги)
+            # Build filter (Logical AND - all specified tags must match)
             query_filter = None
             if tags_filter:
                 if isinstance(tags_filter, str):
@@ -163,13 +163,13 @@ class VectorKnowledge:
             )
 
             if not points:
-                msg = "[Vector DB] Поиск знаний не дал результатов."
+                msg = "[Vector DB] Knowledge search returned no results."
                 main_logger.debug(msg)
-                return SkillResult.ok("Поиск знаний не дал результатов.")
+                return SkillResult.ok("Knowledge search returned no results.")
 
-            short_query = truncate_text(query_str.replace("\n", " "), 50, "... [Обрезано]")
+            short_query = truncate_text(query_str.replace("\n", " "), 50, "... [Truncated]")
             main_logger.info(
-                f"[Vector DB] Знания: найдено {len(points)} записей по запросу '{short_query}'"
+                f"[Vector DB] Knowledge: found {len(points)} records for query '{short_query}'"
             )
 
             formatted_results = []
@@ -177,7 +177,7 @@ class VectorKnowledge:
                 score = round(point.score, 2)
                 text = point.payload.get("text", "")
 
-                # Защита от битых данных в самой БД (от прошлых галлюцинаций)
+                # Protection against corrupted data in the DB itself (from past hallucinations)
                 point_tags = point.payload.get("tags", [])
                 if isinstance(point_tags, str):
                     point_tags = [point_tags]
@@ -185,24 +185,22 @@ class VectorKnowledge:
                     point_tags = [str(point_tags)]
 
                 tags_str = (
-                    f"[{', '.join(str(t) for t in point_tags)}]"
-                    if point_tags
-                    else "[Без тегов]"
+                    f"[{', '.join(str(t) for t in point_tags)}]" if point_tags else "[No tags]"
                 )
                 time_str = safe_format_timestamp(
                     point.payload.get("created_at"), self.timezone
                 )
 
-                source = point.payload.get("source", "Не указан")
+                source = point.payload.get("source", "Not specified")
                 reliability = point.payload.get("reliability", "verified")
 
-                md_block = f"[ID: `{point.id}`] \n[Время: {time_str}] \n[Источник: {source}] \n[Надежность: {reliability}] \n[Тэги: {tags_str}] \n[Релевантность: {score}/{self.similarity_threshold}] \n{text}"
+                md_block = f"[ID: `{point.id}`] \n[Time: {time_str}] \n[Source: {source}] \n[Reliability: {reliability}] \n[Tags: {tags_str}] \n[Relevance: {score}/{self.similarity_threshold}] \n{text}"
                 formatted_results.append(md_block)
 
             return SkillResult.ok("\n\n".join(formatted_results))
 
         except Exception as e:
-            msg = f"[Vector DB] Ошибка при поиске знаний: {e}"
+            msg = f"[Vector DB] Error searching knowledge: {e}"
             main_logger.error(msg)
             return SkillResult.fail(msg)
 
@@ -219,12 +217,12 @@ class VectorKnowledge:
                 points_selector=models.PointIdsList(points=[str(point_id)]),
                 wait=True,
             )
-            msg = f"[Vector DB] Знание успешно удалено из базы данных (ID: {point_id})."
+            msg = f"[Vector DB] Knowledge successfully deleted from the database (ID: {point_id})."
             main_logger.debug(msg)
             return SkillResult.ok(msg)
 
         except Exception as e:
-            msg = f"[Vector DB] Ошибка при удалении знания: {e}"
+            msg = f"[Vector DB] Error deleting knowledge: {e}"
             main_logger.error(msg)
             return SkillResult.fail(msg)
 
@@ -235,9 +233,9 @@ class VectorKnowledge:
         self, limit: int = 50, tags_filter: Optional[List[VectorTag]] = None
     ) -> SkillResult:
         """
-        Retrieves last N records from knowledge base. 
+        Retrieves last N records from knowledge base.
         """
-        
+
         try:
             query_filter = None
             if tags_filter:
@@ -261,7 +259,7 @@ class VectorKnowledge:
             )
 
             if not records:
-                msg = "[Vector DB] База знаний пуста (или нет записей с указанными тегами)."
+                msg = "[Vector DB] Knowledge base is empty (or there are no records with specified tags)."
                 main_logger.debug(msg)
                 return SkillResult.ok(msg)
 
@@ -276,23 +274,21 @@ class VectorKnowledge:
                     point_tags = [str(point_tags)]
 
                 tags_str = (
-                    f"[{', '.join(str(t) for t in point_tags)}]"
-                    if point_tags
-                    else "[Без тегов]"
+                    f"[{', '.join(str(t) for t in point_tags)}]" if point_tags else "[No tags]"
                 )
                 time_str = safe_format_timestamp(
                     point.payload.get("created_at"), self.timezone
                 )
 
-                source = point.payload.get("source", "Не указан")
+                source = point.payload.get("source", "Not specified")
                 reliability = point.payload.get("reliability", "verified")
 
-                md_block = f"[ID: `{point.id}`] \n[Время: {time_str}] \n[Источник: {source}] \n[Надежность: {reliability}] \n[Тэги: {tags_str}] \n{text}"
+                md_block = f"[ID: `{point.id}`] \n[Time: {time_str}] \n[Source: {source}] \n[Reliability: {reliability}] \n[Tags: {tags_str}] \n{text}"
                 formatted_results.append(md_block)
 
             return SkillResult.ok("\n\n".join(formatted_results))
 
         except Exception as e:
-            msg = f"[Vector DB] Ошибка при чтении базы знаний: {e}"
+            msg = f"[Vector DB] Error reading knowledge base: {e}"
             main_logger.error(msg)
             return SkillResult.fail(msg)

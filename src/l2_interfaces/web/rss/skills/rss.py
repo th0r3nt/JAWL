@@ -1,6 +1,7 @@
 """
-Навыки для чтения Atom/RSS новостных лент.
-Позволяют агенту извлекать чистый контент (Summary/Description) без перехода на оригинальные сайты.
+Skills for reading Atom/RSS news feeds.
+
+Allows the agent to extract clean content (Summary/Description) without navigating to original sites.
 """
 
 from src.utils.logger import main_logger
@@ -10,7 +11,7 @@ from src.l2_interfaces.web.rss.client import WebRSSClient
 
 
 class WebRSSSkills:
-    """Навыки для чтения RSS/Atom лент."""
+    """Skills for reading RSS/Atom feeds."""
 
     def __init__(self, client: WebRSSClient):
         self.client = client
@@ -22,11 +23,11 @@ class WebRSSSkills:
         """
 
         if not self.client.config.feeds:
-            return SkillResult.ok("Список сохраненных RSS-лент пуст.")
+            return SkillResult.ok("List of saved RSS feeds is empty.")
 
-        lines = ["Доступные RSS-ленты:"]
+        lines = ["Available RSS feeds:"]
         for feed in self.client.config.feeds:
-            lines.append(f"- Имя: '{feed.name}' | URL: {feed.url}")
+            lines.append(f"- Name: '{feed.name}' | URL: {feed.url}")
 
         return SkillResult.ok("\n".join(lines))
 
@@ -41,34 +42,32 @@ class WebRSSSkills:
 
             if feed.bozo:
                 main_logger.warning(
-                    f"[Web] Лента {url} имеет ошибки формата, но будет распарсена частично."
+                    f"[Web] Feed {url} has formatting errors but will be partially parsed."
                 )
 
             if not feed.entries:
                 return SkillResult.ok(
-                    f"Лента по адресу '{url}' пуста, недоступна или не содержит записей."
+                    f"Feed at '{url}' is empty, unavailable, or contains no entries."
                 )
 
-            limit = max(1, min(limit, 20))  # Защита от переполнения контекста
-            lines = [f"Последние публикации из '{url}':"]
+            limit = max(1, min(limit, 20))  # Protection against context overflow
+            lines = [f"Latest publications from '{url}':"]
 
             for entry in feed.entries[:limit]:
-                title = clean_html(entry.get("title", "Без заголовка"))
-                link = entry.get("link", "Нет ссылки")
-                date = entry.get("published", entry.get("updated", "Неизвестная дата"))
+                title = clean_html(entry.get("title", "Untitled"))
+                link = entry.get("link", "No link")
+                date = entry.get("published", entry.get("updated", "Unknown date"))
 
-                # Извлекаем саммари и чистим мощным парсером
+                # Extract summary and clean with a powerful HTML tags stripper
                 summary = clean_html(entry.get("summary", entry.get("description", "")))
                 summary = truncate_text(summary, max_chars=400, suffix="...")
 
                 lines.append(
-                    f"### {title}\n* Дата: {date}\n* URL: {link}\n* Summary: {summary}\n"
+                    f"### {title}\n* Date: {date}\n* URL: {link}\n* Summary: {summary}\n"
                 )
 
-            main_logger.info(
-                f"[Web] Прочитана лента '{url}' ({len(feed.entries[:limit])} записей)."
-            )
+            main_logger.info(f"[Web] Feed '{url}' read ({len(feed.entries[:limit])} entries).")
             return SkillResult.ok("\n".join(lines))
 
         except Exception as e:
-            return SkillResult.fail(f"Ошибка при чтении ленты '{url}': {e}")
+            return SkillResult.fail(f"Error reading feed '{url}': {e}")

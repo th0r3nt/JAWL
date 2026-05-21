@@ -1,8 +1,8 @@
 """
-Низкоуровневый клиент для общения с GitHub REST API.
+Low-level client for communicating with GitHub REST API.
 
-Автоматически обрабатывает пагинацию, rate limits и управляет режимами авторизации
-(Full Access vs Read-Only). Изолирует сетевую логику от навыков агента.
+Automatically handles pagination, rate limits, and manages authorization modes
+(Full Access vs Read-Only). Isolates network logic from agent skills.
 """
 
 import asyncio
@@ -20,7 +20,7 @@ from src.l2_interfaces.github.state import GithubState
 
 
 class GithubHTTPError(Exception):
-    """Кастомное исключение для обработки ошибок GitHub API."""
+    """Custom exception for handling GitHub API errors."""
 
     def __init__(self, status: int, payload: Any) -> None:
         self.status = status
@@ -31,8 +31,8 @@ class GithubHTTPError(Exception):
 
 class GithubClient:
     """
-    Клиент GitHub REST API.
-    Stateful - хранит стейт, управляет авторизацией и кэшированием.
+    GitHub REST API Client.
+    Stateful - stores state, manages authorization and caching.
     """
 
     def __init__(
@@ -42,12 +42,12 @@ class GithubClient:
         token: Optional[str] = None,
     ) -> None:
         """
-        Инициализирует клиент GitHub.
+        Initializes the GitHub client.
 
         Args:
-            state: Объект состояния интерфейса на приборной панели агента (L0).
-            config: Конфигурация модуля (лимиты, таймауты).
-            token: Опциональный Personal Access Token для авторизации.
+            state: L0 state (agent dashboard).
+            config: Interface configuration.
+            token: Optional Personal Access Token for authorization.
         """
         self.state = state
         self.config = config
@@ -58,8 +58,8 @@ class GithubClient:
 
     async def start(self) -> None:
         """
-        Запускается при старте системы.
-        Проверяет валидность токена и определяет доступный режим (Agent Account или Read-Only).
+        Starts on system startup.
+        Validates the token and determines the available mode (Agent Account or Read-Only).
         """
         self.state.is_online = True
 
@@ -69,25 +69,25 @@ class GithubClient:
                 login = data.get("login", "Unknown") if isinstance(data, dict) else "Unknown"
                 self.state.account_info = f"Agent account online. Logged in as @{login}"
 
-                main_logger.info(f"[Github] Успешная авторизация как @{login}")
+                main_logger.info(f"[Github] Successful authorization as @{login}")
 
             except GithubHTTPError as e:
-                self.state.account_info = f"Auth Failed (HTTP {e.status}). Read-Only режим."
-                main_logger.error(f"[Github] Ошибка авторизации: {e}. Проверьте токен.")
-                self.config.agent_account = False  # Фоллбэк
+                self.state.account_info = f"Auth Failed (HTTP {e.status}). Read-Only mode."
+                main_logger.error(f"[Github] Authorization error: {e}. Verify token.")
+                self.config.agent_account = False  # Fallback
 
         else:
             auth_type = "token" if self.token else "No token (60 req/hr)"
             self.state.account_info = f"Agent account offline. Read-Only ({auth_type})"
 
-            main_logger.info("[Github] Инициализирован в Read-Only режиме.")
+            main_logger.info("[Github] Initialized in Read-Only mode.")
 
     async def stop(self) -> None:
-        """Останавливает клиент (помечает оффлайн)."""
+        """Stops client (sets offline status)."""
         self.state.is_online = False
 
     def _build_headers(self, extra: Optional[Dict[str, str]] = None) -> Dict[str, str]:
-        """Собирает HTTP-заголовки с учетом авторизации."""
+        """Assembles HTTP headers taking authorization into account."""
         headers = {
             "Accept": "application/vnd.github+json",
             "User-Agent": self.user_agent,
@@ -109,21 +109,21 @@ class GithubClient:
         response_format: Literal["json", "text", "binary"] = "json",
     ) -> Union[dict, list, str, bytes, None]:
         """
-        Низкоуровневый асинхронный HTTP-запрос к API GitHub.
+        Low-level asynchronous HTTP request to the GitHub API.
 
         Args:
-            method: HTTP метод (GET, POST, PUT, DELETE).
-            path: Эндпоинт API (например '/user/repos').
-            params: Query-параметры запроса.
-            body: Полезная нагрузка (JSON).
-            extra_headers: Дополнительные заголовки.
-            response_format: Ожидаемый формат ответа ('json', 'text', 'binary').
+            method: HTTP method (GET, POST, PUT, DELETE).
+            path: API endpoint (e.g. '/user/repos').
+            params: Request query parameters.
+            body: Payload (JSON).
+            extra_headers: Additional headers.
+            response_format: Expected response format ('json', 'text', 'binary').
 
         Returns:
-            Распарсенный ответ от API в зависимости от response_format.
+            Parsed response from the API depending on response_format.
 
         Raises:
-            GithubHTTPError: Если сервер вернул ошибку (4xx, 5xx).
+            GithubHTTPError: If the server returned an error (4xx, 5xx).
         """
 
         def _do_request() -> Union[dict, list, str, bytes, None]:
@@ -175,10 +175,10 @@ class GithubClient:
 
     async def get_context_block(self, **kwargs: Any) -> str:
         """
-        Отдает отформатированный блок контекста для системного промпта агента.
+        Returns a formatted context block for the agent's system prompt.
         """
         desc = "Description: GitHub REST API and local Git operations."
-        
+
         if not self.state.is_online:
             return f"### GITHUB [OFF]\n{desc}\nThe interface is disabled."
 
@@ -195,7 +195,7 @@ class GithubClient:
             events_str = (
                 "\n".join(self.state.recent_watcher_events)
                 if self.state.recent_watcher_events
-                else "  Нет недавних событий."
+                else "  No recent events."
             )
             watchers_block = f"\n\n* Tracked repositories: {repos_list}\n* Latest events in repositories:\n{events_str}\n"
 

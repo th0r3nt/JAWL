@@ -1,8 +1,8 @@
 """
-Навыки получения списков диалогов, чтения истории и управления подписками (Telethon).
+Telethon Chats Skills.
 
-Позволяют агенту читать сообщения в чатах, находить глобальные группы
-через поиск и вступать/покидать их по мере необходимости.
+Provides dialogue lists navigation, history extraction, unread message clearing,
+and channel subscription management skills.
 """
 
 import re
@@ -41,7 +41,7 @@ except ImportError:
 
 
 class TelethonChats:
-    """Группа навыков для чтения и управления чатами."""
+    """Dialogue and channel management skills."""
 
     def __init__(self, tg_client: TelethonClient) -> None:
         self.tg_client = tg_client
@@ -82,35 +82,37 @@ class TelethonChats:
                                 else ""
                             )
                             topics_list.append(
-                                f"      ↳ Топик '{getattr(topic, 'title', 'Unknown')}' (ID: {topic.id}){t_unread}"
+                                f"      ↳ Topic '{getattr(topic, 'title', 'Unknown')}' (ID: {topic.id}){t_unread}"
                             )
                     except Exception as e:
-                        main_logger.error(f"[TelethonChats] Ошибка при получении топиков: {e}")
+                        main_logger.error(f"[TelethonChats] Error fetching topics: {e}")
 
                     if not topics_list and dialog.unread_count > 0:
                         topics_list.append(
-                            f"      ↳ General / Общий топик (UNREAD: {dialog.unread_count})"
+                            f"      ↳ General / Other topics (UNREAD: {dialog.unread_count})"
                         )
 
                     if topics_list:
                         forum_str = "\n" + "\n".join(topics_list)
 
                 chats.append(
-                    f"- {chat_type} | ID: `{dialog.id}` | Название: {dialog.name}{unread}{forum_str}"
+                    f"- {chat_type} | ID: `{dialog.id}` | Title: {dialog.name}{unread}{forum_str}"
                 )
 
             if not chats:
-                return SkillResult.ok("Список чатов пуст.")
+                return SkillResult.ok("Dialogue list is empty.")
 
             res_str = "\n".join(chats)
             if total_dialogs > len(chats):
                 hidden = total_dialogs - len(chats)
-                res_str += f"\n\n...и еще {hidden} чатов скрыто. Увеличьте limit, чтобы загрузить больше."
+                res_str += (
+                    f"\n\n...and {hidden} more chats hidden. Increase limit to load more."
+                )
 
             return SkillResult.ok(res_str)
 
         except Exception as e:
-            return SkillResult.fail(f"Ошибка при получении списка чатов: {e}")
+            return SkillResult.fail(f"Error retrieving chats list: {e}")
 
     @skill()
     async def get_unread_chats(self, limit: int = 20) -> SkillResult:
@@ -140,28 +142,28 @@ class TelethonChats:
                                 unread = getattr(topic, "unread_count", 0)
                                 if unread > 0:
                                     topics_list.append(
-                                        f"      ↳ Топик '{getattr(topic, 'title', 'Unknown')}' (ID: {topic.id}) [UNREAD: {unread}]"
+                                        f"      ↳ Topic '{getattr(topic, 'title', 'Unknown')}' (ID: {topic.id}) [UNREAD: {unread}]"
                                     )
                         except Exception:
                             pass
 
                         if not topics_list:
                             topics_list.append(
-                                f"      ↳ General / Другие топики [UNREAD: {dialog.unread_count}]"
+                                f"      ↳ General / Other topics [UNREAD: {dialog.unread_count}]"
                             )
                         forum_str = "\n" + "\n".join(topics_list)
 
                     chats.append(
-                        f"- {chat_type} | ID: `{dialog.id}` | Название: **{dialog.name}** | UNREAD: {dialog.unread_count}{forum_str}"
+                        f"- {chat_type} | ID: `{dialog.id}` | Title: **{dialog.name}** | UNREAD: {dialog.unread_count}{forum_str}"
                     )
 
             if not chats:
-                return SkillResult.ok("Нет непрочитанных сообщений.")
+                return SkillResult.ok("No unread messages.")
 
             return SkillResult.ok("\n".join(chats))
 
         except Exception as e:
-            return SkillResult.fail(f"Ошибка при поиске непрочитанных чатов: {e}")
+            return SkillResult.fail(f"Error checking unread chats: {e}")
 
     @skill()
     async def read_chat(
@@ -206,18 +208,14 @@ class TelethonChats:
                         if topic_id and getattr(d, "reply_to_msg_id", None) != int(topic_id):
                             continue
                         if d.text:
-                            draft_text = (
-                                f"\n\n[Черновик (Неотправленное сообщение)]:\n{d.text}"
-                            )
+                            draft_text = f"\n\n[Draft (Unsent message)]:\n{d.text}"
                         break
             except Exception:
                 pass
 
             if not messages:
                 base_msg = (
-                    "В этом топике нет сообщений."
-                    if topic_id
-                    else "В этом чате нет сообщений."
+                    "No messages in this topic." if topic_id else "No messages in this chat."
                 )
                 return SkillResult.ok(base_msg + draft_text)
 
@@ -225,9 +223,9 @@ class TelethonChats:
             return SkillResult.ok("\n\n".join(messages) + draft_text)
 
         except ValueError:
-            return SkillResult.fail(f"Ошибка: Некорректный ID чата ({chat_id}).")
+            return SkillResult.fail(f"Error: Invalid chat ID ({chat_id}).")
         except Exception as e:
-            return SkillResult.fail(f"Ошибка при чтении чата {chat_id}: {e}")
+            return SkillResult.fail(f"Error reading chat {chat_id}: {e}")
 
     @skill()
     async def mark_as_read(
@@ -248,7 +246,7 @@ class TelethonChats:
                         if getattr(topic, "unread_count", 0) > 0:
                             await self._mark_chat_read(client, target_entity, topic.id)
                 except Exception as e:
-                    main_logger.error(f"[TelethonChats] Ошибка при очистке топиков: {e}")
+                    main_logger.error(f"[TelethonChats] Error clearing thread unreads: {e}")
 
                 await self._mark_chat_read(client, target_entity)
             else:
@@ -257,7 +255,7 @@ class TelethonChats:
             return SkillResult.ok("True")
 
         except Exception as e:
-            return SkillResult.fail(f"Ошибка при пометке чата {chat_id} как прочитанного: {e}")
+            return SkillResult.fail(f"Error marking chat {chat_id} as read: {e}")
 
     @skill()
     async def search_public_chats(self, query: str, limit: int = 5) -> SkillResult:
@@ -272,23 +270,23 @@ class TelethonChats:
             chats = []
             for chat in result.chats:
                 chat_type = "Channel" if getattr(chat, "broadcast", False) else "Group"
-                username = f"@{chat.username}" if getattr(chat, "username", None) else "Нет"
+                username = f"@{chat.username}" if getattr(chat, "username", None) else "None"
                 participants = getattr(chat, "participants_count", None)
                 part_str = (
-                    f" | Подписчиков: {participants}" if participants is not None else ""
+                    f" | Subscribers: {participants}" if participants is not None else ""
                 )
 
                 chats.append(
-                    f"- {chat_type} | ID: `{chat.id}` | Название: {chat.title} | Юзернейм: {username}{part_str}"
+                    f"- {chat_type} | ID: `{chat.id}` | Title: {chat.title} | Username: {username}{part_str}"
                 )
 
             if not chats:
-                return SkillResult.ok(f"По глобальному запросу '{query}' ничего не найдено.")
+                return SkillResult.ok(f"No global search results found for query '{query}'.")
 
             return SkillResult.ok("\n".join(chats))
 
         except Exception as e:
-            return SkillResult.fail(f"Ошибка при поиске чатов: {e}")
+            return SkillResult.fail(f"Error searching chats: {e}")
 
     @skill()
     async def get_chat_info(self, chat_id: Union[int, str]) -> SkillResult:
@@ -300,42 +298,42 @@ class TelethonChats:
             client = self.tg_client.client()
             entity = await client.get_entity(parse_int_or_str(chat_id))
 
-            lines = [f"Информация о чате {chat_id}:"]
-            lines.append(f"Название: {getattr(entity, 'title', 'Unknown')}")
+            lines = [f"Chat information for {chat_id}:"]
+            lines.append(f"Title: {getattr(entity, 'title', 'Unknown')}")
 
             if getattr(entity, "username", None):
-                lines.append(f"Юзернейм: @{entity.username}")
+                lines.append(f"Username: @{entity.username}")
 
             try:
                 if getattr(entity, "broadcast", False) or getattr(entity, "megagroup", False):
                     full = await client(GetFullChannelRequest(channel=entity))
                     lines.append(
-                        f"Тип: {'Канал' if getattr(entity, 'broadcast', False) else 'Супергруппа'}"
+                        f"Type: {'Channel' if getattr(entity, 'broadcast', False) else 'Supergroup'}"
                     )
                     if full.full_chat.about:
-                        lines.append(f"Описание: {full.full_chat.about}")
+                        lines.append(f"Description: {full.full_chat.about}")
                     lines.append(
-                        f"Участников (подписчиков): {full.full_chat.participants_count}"
+                        f"Participants (subscribers): {full.full_chat.participants_count}"
                     )
                 elif hasattr(entity, "participants_count"):
                     full = await client(GetFullChatRequest(chat_id=entity.id))
-                    lines.append("Тип: Группа")
+                    lines.append("Type: Group")
                     if full.full_chat.about:
-                        lines.append(f"Описание: {full.full_chat.about}")
-                    lines.append(f"Участников: {full.full_chat.participants_count}")
+                        lines.append(f"Description: {full.full_chat.about}")
+                    lines.append(f"Participants: {full.full_chat.participants_count}")
             except Exception:
                 if (
                     hasattr(entity, "participants_count")
                     and entity.participants_count is not None
                 ):
-                    lines.append(f"Участников: {entity.participants_count}")
+                    lines.append(f"Participants: {entity.participants_count}")
 
             return SkillResult.ok("\n".join(lines))
 
         except ValueError:
-            return SkillResult.fail("Ошибка: Некорректный ID чата или юзернейм.")
+            return SkillResult.fail("Error: Invalid chat ID or username.")
         except Exception as e:
-            return SkillResult.fail(f"Ошибка при получении информации о чате: {e}")
+            return SkillResult.fail(f"Error fetching chat info: {e}")
 
     @skill()
     async def join_chat(self, link_or_username: str) -> SkillResult:
@@ -350,9 +348,7 @@ class TelethonChats:
             if "t.me/+" in target or "t.me/joinchat/" in target or target.startswith("+"):
                 hash_match = re.search(r"(?:joinchat/|\+)([\w-]+)", target)
                 if not hash_match:
-                    return SkillResult.fail(
-                        "Ошибка: Не удалось извлечь хэш из пригласительной ссылки."
-                    )
+                    return SkillResult.fail("Error: Failed to extract hash from invite link.")
                 await client(ImportChatInviteRequest(hash_match.group(1)))
             else:
                 await client(JoinChannelRequest(target))
@@ -362,7 +358,7 @@ class TelethonChats:
         except Exception as e:
             if "USER_ALREADY_PARTICIPANT" in str(e):
                 return SkillResult.ok("True")
-            return SkillResult.fail(f"Ошибка при вступлении в чат: {e}")
+            return SkillResult.fail(f"Error joining chat: {e}")
 
     @skill()
     async def leave_chat(self, chat_id: Union[int, str]) -> SkillResult:
@@ -376,9 +372,9 @@ class TelethonChats:
             await client(LeaveChannelRequest(entity))
             return SkillResult.ok("True")
         except ValueError:
-            return SkillResult.fail("Ошибка: Некорректный формат ID чата.")
+            return SkillResult.fail("Error: Invalid chat ID.")
         except Exception as e:
-            return SkillResult.fail(f"Ошибка при выходе из чата: {e}")
+            return SkillResult.fail(f"Error leaving chat: {e}")
 
     @skill()
     async def join_channel_discussion(self, channel_id: Union[int, str]) -> SkillResult:
@@ -394,7 +390,7 @@ class TelethonChats:
 
             if not linked_chat_id:
                 return SkillResult.fail(
-                    f"Ошибка: У канала {channel_id} нет привязанной группы для обсуждений."
+                    f"Error: Channel {channel_id} has no linked discussion group."
                 )
 
             await client(JoinChannelRequest(await client.get_input_entity(linked_chat_id)))
@@ -402,11 +398,11 @@ class TelethonChats:
             return SkillResult.ok("True")
 
         except ValueError:
-            return SkillResult.fail("Ошибка: Некорректный ID канала.")
+            return SkillResult.fail("Error: Invalid channel ID.")
         except Exception as e:
             if "USER_ALREADY_PARTICIPANT" in str(e):
                 return SkillResult.ok("True")
-            return SkillResult.fail(f"Ошибка при вступлении в обсуждение: {e}")
+            return SkillResult.fail(f"Error joining channel discussion: {e}")
 
     @skill()
     async def invite_to_chat(
@@ -417,7 +413,7 @@ class TelethonChats:
         """
 
         if not users:
-            return SkillResult.fail("Ошибка: Список пользователей пуст.")
+            return SkillResult.fail("Error: User list is empty.")
 
         try:
             client = self.tg_client.client()
@@ -428,9 +424,7 @@ class TelethonChats:
                 try:
                     user_entities.append(await client.get_input_entity(parse_int_or_str(u)))
                 except ValueError:
-                    return SkillResult.fail(
-                        f"Ошибка: Пользователь '{u}' не найден. Проверьте юзернейм."
-                    )
+                    return SkillResult.fail(f"Error: User '{u}' not found. Verify username.")
 
             await client(InviteToChannelRequest(channel=chat_entity, users=user_entities))
 
@@ -440,24 +434,26 @@ class TelethonChats:
             msg = str(e)
             if "USER_PRIVACY_RESTRICTED" in msg:
                 return SkillResult.fail(
-                    "Ошибка: Настройки приватности ограничивают добавление."
+                    "Error: Target user's privacy settings restrict adding them."
                 )
             if "CHAT_ADMIN_REQUIRED" in msg:
-                return SkillResult.fail("Ошибка: Нет прав на приглашение в этот чат.")
+                return SkillResult.fail(
+                    "Error: Admin rights required to invite users in this chat."
+                )
             if "USER_ALREADY_PARTICIPANT" in msg:
                 return SkillResult.ok("True")
             if "USER_NOT_MUTUAL_CONTACT" in msg:
                 return SkillResult.fail(
-                    "Ошибка: Пользователя можно пригласить только если вы взаимные контакты."
+                    "Error: User can only be invited if you are mutual contacts."
                 )
-            return SkillResult.fail(f"Ошибка при инвайтинге: {e}")
+            return SkillResult.fail(f"Error adding users to chat: {e}")
 
     # ===============================================================
-    # Внутренние методы
+    # Internal methods
     # ===============================================================
 
     async def _get_topics(self, client: Any, entity: Any, limit: int = 100) -> list:
-        """Вспомогательный метод для получения структуры Форума."""
+        """Auxiliary method to fetch Forum topic structures."""
 
         if not GetForumTopicsRequest:
             return []
@@ -474,13 +470,13 @@ class TelethonChats:
             )
             return getattr(result, "topics", [])
         except Exception as e:
-            main_logger.error(f"[TelethonChats] Ошибка _get_topics: {e}")
+            main_logger.error(f"[TelethonChats] Error calling _get_topics: {e}")
             return []
 
     async def _mark_chat_read(
         self, client: Any, target_entity: Any, topic_id: Optional[int] = None
     ) -> None:
-        """Вспомогательный метод: жестко гасит UNREAD, меншны и реакции в чате/топике."""
+        """Auxiliary method: clears UNREAD, mentions, and reactions in chat/topic."""
 
         try:
             kwargs_ack = {"reply_to": int(topic_id)} if topic_id else {}
@@ -498,4 +494,4 @@ class TelethonChats:
                     await client(ReadReactionsRequest(peer=target_entity))
 
         except Exception as e:
-            main_logger.debug(f"[TelethonChats] Ошибка при очистке реакций/меншнов: {e}")
+            main_logger.debug(f"[TelethonChats] Error clearing mentions/reactions: {e}")

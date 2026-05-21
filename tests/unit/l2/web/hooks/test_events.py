@@ -117,10 +117,10 @@ async def test_webhook_port_collision_graceful_degradation(hooks_events):
         sock.bind((host, port))
         sock.listen(1)
 
-        # Пытаемся запустить сервер вебхуков
+        # Пытаемся заemptyить сервер вебхуков
         await hooks_events.start()
 
-        # Сервер не должен был запуститься
+        # Сервер не должен был заemptyиться
         assert hooks_events.state.is_online is False
         assert hooks_events.runner is None
 

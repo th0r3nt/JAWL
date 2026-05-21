@@ -57,7 +57,7 @@ async def test_integration_eventbus_wakes_heartbeat():
     await asyncio.sleep(0.01)
 
     # 5. Проверяем результаты
-    # ReAct цикл должен был запуститься несмотря на то, что час еще не прошел
+    # ReAct цикл должен был заemptyиться несмотря на то, что час еще не прошел
     mock_react_loop.run.assert_awaited_once()
 
     call_kwargs = mock_react_loop.run.call_args[1]

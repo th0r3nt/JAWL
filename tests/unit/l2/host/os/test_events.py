@@ -16,7 +16,7 @@ def test_os_events_update_telemetry(os_client):
 
     assert "CPU:" in state.telemetry
     assert "RAM:" in state.telemetry
-    assert "Топ процессов (RAM):" in state.telemetry
+    assert "Top processes (RAM):" in state.telemetry
     assert len(state.telemetry) > 20
 
 

@@ -1,5 +1,5 @@
 """
-Навыки агента для работы с профилями и уведомлениями GitHub.
+Agent skills for working with GitHub profiles and notifications.
 """
 
 from src.utils.logger import main_logger
@@ -11,7 +11,7 @@ from src.l3_agent.skills.registry import SkillResult, skill
 
 
 class GithubAccounts:
-    """Навыки для работы с профилями и уведомлениями."""
+    """Skills for working with profiles and notifications."""
 
     def __init__(self, client: GithubClient) -> None:
         self.client = client
@@ -27,29 +27,29 @@ class GithubAccounts:
             self.client.state.add_history(f"get_user: {username}")
 
             if not isinstance(data, dict):
-                return SkillResult.fail("Не удалось распарсить профиль.")
+                return SkillResult.fail("Failed to parse profile.")
 
             lines = [
-                f"Пользователь: {data.get('login')} ({data.get('name', 'Без имени')})",
-                f"Био: {data.get('bio', 'Пусто')}",
-                f"Публичных реп: {data.get('public_repos')} | Gists: {data.get('public_gists')}",
-                f"Подписчиков: {data.get('followers')} | Подписок: {data.get('following')}",
-                f"Компания: {data.get('company', 'Нет')} | Локация: {data.get('location', 'Нет')}",
+                f"User: {data.get('login')} ({data.get('name', 'Unnamed')})",
+                f"Bio: {data.get('bio', 'None')}",
+                f"Public repos: {data.get('public_repos')} | Gists: {data.get('public_gists')}",
+                f"Followers: {data.get('followers')} | Following: {data.get('following')}",
+                f"Company: {data.get('company', 'None')} | Location: {data.get('location', 'None')}",
             ]
-            main_logger.info(f"[Github] Прочитан профиль пользователя {username}")
+            main_logger.info(f"[Github] Read profile of user {username}")
             return SkillResult.ok("\n".join(lines))
         except Exception as e:
-            return SkillResult.fail(f"Ошибка при получении профиля: {e}")
+            return SkillResult.fail(f"Error retrieving user profile: {e}")
 
     @skill()
     @require_agent_account()
     async def get_my_notifications(self, unread_only: bool = True) -> SkillResult:
         """
-        Checks incoming GitHub notifications. 
+        Checks incoming GitHub notifications.
         """
 
         if not self.client.config.agent_account:
-            return SkillResult.fail("Ошибка: Для проверки уведомлений нужен Agent Account.")
+            return SkillResult.fail("Error: Checking notifications requires Agent Account.")
 
         try:
             query = "?all=false" if unread_only else "?all=true"
@@ -57,22 +57,22 @@ class GithubAccounts:
             self.client.state.add_history("get_notifications")
 
             if not data or not isinstance(data, list):
-                return SkillResult.ok("Новых уведомлений нет.")
+                return SkillResult.ok("No new notifications.")
 
-            lines = ["Ваши последние уведомления:"]
-            for n in data[:15]:  # Лимит 15
+            lines = ["Your latest notifications:"]
+            for n in data[:15]:  # Limit to 15
                 repo = (n.get("repository") or {}).get("full_name", "Unknown")
                 subject = n.get("subject", {})
                 title = subject.get("title", "No title")
                 n_type = subject.get("type", "Unknown")
                 reason = n.get("reason", "unknown")
-                lines.append(f"- [{repo}] {n_type}: '{title}' (Причина: {reason})")
+                lines.append(f"- [{repo}] {n_type}: '{title}' (Reason: {reason})")
 
-            main_logger.info(f"[Github] Проверены уведомления (Найдено: {len(data)})")
+            main_logger.info(f"[Github] Checked notifications (Found: {len(data)})")
             return SkillResult.ok("\n".join(lines))
 
         except Exception as e:
-            return SkillResult.fail(f"Ошибка при проверке уведомлений: {e}")
+            return SkillResult.fail(f"Error checking notifications: {e}")
 
     @skill()
     @require_agent_account()
@@ -82,20 +82,20 @@ class GithubAccounts:
         """
 
         if not self.client.config.agent_account:
-            return SkillResult.fail("Ошибка: Для этого действия нужен Agent Account.")
+            return SkillResult.fail("Error: This action requires Agent Account.")
 
         try:
-            # PUT /notifications помечает все уведомления прочитанными
+            # PUT /notifications marks all notifications as read
             await self.client.request("PUT", "/notifications")
             self.client.state.add_history("mark_notifications_read")
 
-            # Мгновенно очищаем дашборд агента, не дожидаясь следующего тика фонового поллинга
-            self.client.state.unread_notifications = "Нет новых уведомлений."
+            # Instantly clear the dashboard, without waiting for the next poller tick
+            self.client.state.unread_notifications = "No new notifications."
 
-            main_logger.info("[Github] Все уведомления агента помечены как прочитанные.")
+            main_logger.info("[Github] All agent notifications marked as read.")
             return SkillResult.ok(
-                "Все уведомления успешно помечены как прочитанные (инбокс очищен)."
+                "All notifications successfully marked as read (inbox cleared)."
             )
 
         except Exception as e:
-            return SkillResult.fail(f"Ошибка при очистке уведомлений: {e}")
+            return SkillResult.fail(f"Error marking notifications as read: {e}")

@@ -1,8 +1,8 @@
 """
-Навыки модерации и управления участниками чатов (Telethon).
+Telethon Moderation Skills.
 
-Позволяют блокировать (Blacklist), мутить (Read-Only) и выкидывать
-пользователей (Kick) из администрируемых агентом групп и каналов.
+Provides administrative moderating tools: banning (chat/global blacklist),
+kicking, muting (Read-Only) users, and checking ban lists.
 """
 
 import datetime
@@ -17,7 +17,7 @@ from src.utils.logger import main_logger
 
 
 class TelethonModeration:
-    """Инструментарий карательных мер администратора."""
+    """Administrative moderator tools."""
 
     def __init__(self, tg_client: TelethonClient) -> None:
         self.tg_client = tg_client
@@ -25,7 +25,7 @@ class TelethonModeration:
     @skill()
     async def ban_user(self, user_id: int, chat_id: Optional[int] = None) -> SkillResult:
         """
-        Bans user. 
+        Bans user.
         If chat_id omitted, blocks globally in personal blacklist.
         """
 
@@ -36,25 +36,23 @@ class TelethonModeration:
             if chat_id:
                 target_chat = int(chat_id)
                 await client.edit_permissions(target_chat, target_user, view_messages=False)
-                msg = f"[Telegram Telethon] Пользователь {target_user} забанен в чате {target_chat}."
+                msg = f"[Telegram Telethon] User {target_user} banned in chat {target_chat}."
             else:
                 await client(BlockRequest(id=target_user))
-                msg = (
-                    f"[Telegram Telethon] Пользователь {target_user} добавлен в глобальный ЧС."
-                )
+                msg = f"[Telegram Telethon] User {target_user} added to global blacklist."
 
             main_logger.info(msg)
             return SkillResult.ok("True")
 
         except ValueError:
-            return SkillResult.fail("Ошибка: ID пользователя и чата должны быть числами.")
+            return SkillResult.fail("Error: User and chat IDs must be integers.")
         except Exception as e:
-            return SkillResult.fail(f"Ошибка при блокировке: {e}")
+            return SkillResult.fail(f"Error banning user: {e}")
 
     @skill()
     async def unban_user(self, user_id: int, chat_id: Optional[int] = None) -> SkillResult:
         """
-        Unbans user. 
+        Unbans user.
         If chat_id omitted, unblocks from personal blacklist.
         """
 
@@ -65,20 +63,18 @@ class TelethonModeration:
             if chat_id:
                 target_chat = int(chat_id)
                 await client.edit_permissions(target_chat, target_user)
-                msg = f"[Telegram Telethon] Пользователь {target_user} разбанен в чате {target_chat}."
+                msg = f"[Telegram Telethon] User {target_user} unbanned in chat {target_chat}."
             else:
                 await client(UnblockRequest(id=target_user))
-                msg = (
-                    f"[Telegram Telethon] Пользователь {target_user} удален из глобального ЧС."
-                )
+                msg = f"[Telegram Telethon] User {target_user} removed from global blacklist."
 
             main_logger.info(msg)
             return SkillResult.ok("True")
 
         except ValueError:
-            return SkillResult.fail("Ошибка: ID пользователя и чата должны быть числами.")
+            return SkillResult.fail("Error: User and chat IDs must be integers.")
         except Exception as e:
-            return SkillResult.fail(f"Ошибка при разблокировке: {e}")
+            return SkillResult.fail(f"Error unbanning user: {e}")
 
     @skill()
     async def kick_user(self, user_id: int, chat_id: int) -> SkillResult:
@@ -93,14 +89,14 @@ class TelethonModeration:
 
             await client.kick_participant(target_chat, target_user)
 
-            msg = f"[Telegram Telethon] Пользователь {target_user} выгнан (kick) из чата {target_chat}."
+            msg = f"[Telegram Telethon] User {target_user} kicked from chat {target_chat}."
             main_logger.info(msg)
             return SkillResult.ok("True")
 
         except ValueError:
-            return SkillResult.fail("Ошибка: ID пользователя и чата должны быть числами.")
+            return SkillResult.fail("Error: User and chat IDs must be integers.")
         except Exception as e:
-            return SkillResult.fail(f"Ошибка при кике пользователя: {e}")
+            return SkillResult.fail(f"Error kicking user: {e}")
 
     @skill()
     async def mute_user(
@@ -125,23 +121,23 @@ class TelethonModeration:
             )
 
             duration_str = (
-                f"на {duration_minutes} минут" if duration_minutes > 0 else "навсегда"
+                f"for {duration_minutes} minutes" if duration_minutes > 0 else "permanently"
             )
-            msg = f"[Telegram Telethon] Пользователь {target_user} замучен {duration_str} в чате {target_chat}."
+            msg = f"[Telegram Telethon] User {target_user} muted {duration_str} in chat {target_chat}."
             main_logger.info(msg)
             return SkillResult.ok("True")
 
         except ValueError:
-            return SkillResult.fail("Ошибка: Значения должны быть числами.")
+            return SkillResult.fail("Error: IDs and duration must be integers.")
         except Exception as e:
-            return SkillResult.fail(f"Ошибка при муте пользователя: {e}")
+            return SkillResult.fail(f"Error muting user: {e}")
 
     @skill()
     async def get_banned_users(
         self, limit: int = 50, chat_id: Optional[int] = None
     ) -> SkillResult:
         """
-        Returns banned users list. 
+        Returns banned users list.
         If chat_id omitted, returns personal blacklist.
         """
 
@@ -155,19 +151,19 @@ class TelethonModeration:
                     target_chat, filter=ChannelParticipantsKicked, limit=limit
                 ):
                     name = utils.get_display_name(user) or "Unknown"
-                    banned_list.append(f"- ID: `{user.id}` | Имя: {name}")
-                context_str = f"в чате {target_chat}"
+                    banned_list.append(f"- ID: `{user.id}` | Name: {name}")
+                context_str = f"in chat {target_chat}"
             else:
                 blocked_req = await client(GetBlockedRequest(offset=0, limit=limit))
                 for user in blocked_req.users:
                     name = utils.get_display_name(user) or "Unknown"
-                    banned_list.append(f"- ID: `{user.id}` | Имя: {name}")
-                context_str = "в глобальном ЧС"
+                    banned_list.append(f"- ID: `{user.id}` | Name: {name}")
+                context_str = "in global blacklist"
 
             if not banned_list:
-                return SkillResult.ok(f"Список забаненных {context_str} пуст.")
+                return SkillResult.ok(f"Banned list {context_str} is empty.")
 
             return SkillResult.ok("\n".join(banned_list))
 
         except Exception as e:
-            return SkillResult.fail(f"Ошибка при получении списка забаненных: {e}")
+            return SkillResult.fail(f"Error fetching banned list: {e}")

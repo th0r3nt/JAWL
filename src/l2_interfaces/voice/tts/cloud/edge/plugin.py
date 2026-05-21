@@ -1,3 +1,7 @@
+"""
+Edge TTS interface plugin.
+"""
+
 from typing import List, Any, Dict, Optional
 from src.utils.logger import main_logger
 from src.l2_interfaces.base import BaseInterface
@@ -51,5 +55,5 @@ class EdgePlugin(BaseInterface):
             "edge_tts", client.get_context_block, ContextSection.INTERFACES
         )
 
-        main_logger.info("[Edge TTS] Загружен (Plugin).")
+        main_logger.info("[Edge TTS] Loaded (Plugin).")
         return [client]

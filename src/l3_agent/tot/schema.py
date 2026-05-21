@@ -1,6 +1,6 @@
 """
-Схема вызова инструмента для генерации дерева мыслей (Tree of Thoughts).
-Использует рекурсивную структуру (фрактал) для создания вложенных веток (сценариев).
+Tree of Thoughts (ToT) generation schema.
+Utilizes recursive fractal structures to model nested simulation thought branches.
 """
 
 from typing import List, Optional
@@ -9,14 +9,15 @@ from pydantic import BaseModel, Field
 
 class ThoughtBranch(BaseModel):
     name: str
-    description: str
+    # Optional description to prevent model failures on terse responses
+    description: str = ""
     pros: List[str] = Field(default_factory=list)
     cons: List[str] = Field(default_factory=list)
-    # Рекурсивная ссылка на саму себя для вложенных сценариев
+    # Recursive self-reference for nested simulations
     sub_branches: Optional[List["ThoughtBranch"]] = Field(default_factory=list)
 
 
-# Компилируем рекурсивную схему Pydantic
+# Rebuild recursive Pydantic schema
 ThoughtBranch.model_rebuild()
 
 
@@ -29,13 +30,13 @@ TOT_SCHEMA = [
         "type": "function",
         "function": {
             "name": "submit_tree",
-            "description": "Отправляет сгенерированное рекурсивное дерево мыслей в систему.",
+            "description": "Submits the generated recursive thoughts tree to the system.",
             "parameters": {
                 "type": "object",
                 "properties": {
                     "branches": {
                         "type": "array",
-                        "description": "Список макро-стратегий (веток верхнего уровня).",
+                        "description": "List of macro-strategies (top-level branches).",
                         "items": {"$ref": "#/$defs/ThoughtBranch"},
                     }
                 },
@@ -45,34 +46,33 @@ TOT_SCHEMA = [
                     "ThoughtBranch": {
                         "type": "object",
                         "properties": {
-                            "name": {  # Название ветки
+                            "name": {
                                 "type": "string",
-                                "description": "Короткое название стратегии/пути.",
+                                "description": "Short title of the strategy or path.",
                             },
-                            "description": {  # Описание ветки
+                            "description": {
                                 "type": "string",
-                                "description": "Подробное описание логики или тактики.",
+                                "description": "Detailed description of logic or tactics.",
                             },
-                            "pros": {  # Плюсы ветки
+                            "pros": {
                                 "type": "array",
-                                "description": "Список плюсов и преимуществ этого пути.",
+                                "description": "List of pros and advantages of this path.",
                                 "items": {"type": "string"},
                             },
-                            "cons": {  # Минусы ветки
+                            "cons": {
                                 "type": "array",
-                                "description": "Список минусов, рисков и уязвимостей этого пути.",
+                                "description": "List of cons, risks, and vulnerabilities of this path.",
                                 "items": {"type": "string"},
                             },
-                            "sub_branches": {  # Вложенные ветки
+                            "sub_branches": {
                                 "type": "array",
-                                "description": "Вложенные сценарии (микро-тактики).",
+                                "description": "Nested scenarios (micro-tactics).",
                                 "items": {"$ref": "#/$defs/ThoughtBranch"},
                             },
                         },
                         "required": [
                             "name",
-                            "description",
-                        ],  # Убрали pros и cons из обязательных
+                        ],
                         "additionalProperties": False,
                     }
                 },

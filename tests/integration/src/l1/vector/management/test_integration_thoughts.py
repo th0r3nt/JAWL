@@ -17,4 +17,4 @@ async def test_thoughts_save_and_search(thoughts_manager):
 async def test_thoughts_empty_db(thoughts_manager):
     result = await thoughts_manager.get_all_thoughts()
     assert result.is_success
-    assert "пуста" in result.message
+    assert "empty" in result.message

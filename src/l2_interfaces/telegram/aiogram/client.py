@@ -1,8 +1,8 @@
 """
-Stateful-клиент для работы с Telegram Bot API (через библиотеку Aiogram v3).
+Stateful client for working with Telegram Bot API (via Aiogram v3 library).
 
-Управляет сессией aiohttp, хранит инстанс бота и предоставляет провайдер контекста
-(дашборд последних диалогов) для системного промпта агента.
+Manages the aiohttp session, stores the bot instance, and provides a context provider
+(dashboard of recent dialogues) for the system prompt.
 """
 
 from typing import Any, Optional
@@ -17,28 +17,28 @@ from src.l2_interfaces.telegram.aiogram.state import AiogramState
 
 class AiogramClient:
     """
-    Управляет базовым подключением к Telegram через Bot API.
-    Гарантирует безопасное открытие и закрытие HTTP сессий.
+    Manages basic connection to Telegram via Bot API.
+    Guarantees safe opening and closing of HTTP sessions.
     """
 
     def __init__(
         self, bot_token: str, state: AiogramState, proxy_url: Optional[str] = None
     ) -> None:
         """
-        Инициализирует клиент бота.
+        Initializes the bot client.
 
         Args:
-            bot_token (str): Токен, выданный @BotFather.
-            state (AiogramState): L0 стейт (приборная панель агента) для хранения MRU-кэша чатов.
+            bot_token (str): Token issued by @BotFather.
+            state (AiogramState): L0 state (agent dashboard) to store the MRU cache of chats.
 
         Raises:
-            ValueError: Если токен бота пуст.
+            ValueError: If the bot token is empty.
         """
 
         self.state = state
 
         if not bot_token:
-            raise ValueError("Для работы Aiogram необходим bot_token.")
+            raise ValueError("Aiogram requires bot_token.")
 
         self.bot_token = bot_token
         self._bot: Optional[Bot] = None
@@ -47,32 +47,32 @@ class AiogramClient:
 
     def bot(self) -> Bot:
         """
-        Безопасный геттер для получения инстанса бота.
+        Safe getter to retrieve the bot instance.
 
         Returns:
-            Bot: Экземпляр aiogram.Bot.
+            Bot: aiogram.Bot instance.
 
         Raises:
-            RuntimeError: Если клиент еще не был запущен через `start()`.
+            RuntimeError: If the client has not been started via `start()`.
         """
 
         if not self._bot:
-            raise RuntimeError("AiogramClient не запущен. Инстанс бота недоступен.")
+            raise RuntimeError("AiogramClient is not started. Bot instance is unavailable.")
         return self._bot
 
     async def start(self) -> None:
         """
-        Инициализирует бота и делает тестовый запрос (get_me) для валидации токена.
-        Помечает интерфейс как Online в случае успеха.
+        Initializes the bot and makes a test request (get_me) to validate the token.
+        Marks the interface as Online upon success.
 
         Raises:
-            Exception: При невалидном токене или сетевой ошибке.
+            Exception: In case of an invalid token or network error.
         """
 
-        main_logger.info("[Telegram Aiogram] Инициализация Aiogram клиента.")
+        main_logger.info("[Telegram Aiogram] Initializing Aiogram client.")
 
         try:
-            # Настраиваем прокси сессию для aiohttp
+            # Configure proxy session for aiohttp
             if self.proxy_url:
                 if self.proxy_url.startswith("socks"):
                     connector = ProxyConnector.from_url(self.proxy_url)
@@ -84,33 +84,31 @@ class AiogramClient:
             else:
                 self._bot = Bot(token=self.bot_token)
 
-            # Делаем тестовый запрос для проверки токена
+            # Make a test request to verify the token
             me = await self._bot.get_me()
             main_logger.info(
-                f"[Telegram Aiogram] Aiogram успешно авторизован как бот: @{me.username}"
+                f"[Telegram Aiogram] Aiogram successfully authorized as bot: @{me.username}"
             )
             self.state.is_online = True
 
         except Exception as e:
-            main_logger.error(
-                f"[Telegram Aiogram] Критическая ошибка при запуске Aiogram: {e}"
-            )
+            main_logger.error(f"[Telegram Aiogram] Critical error starting Aiogram: {e}")
             raise e
 
     async def stop(self) -> None:
         """
-        Корректно закрывает сессию aiohttp и помечает интерфейс как Offline.
+        Correctly closes the aiohttp session and marks the interface as Offline.
         """
 
         if self._bot:
             await self._bot.session.close()
-            main_logger.info("[Telegram Aiogram] Aiogram клиент отключен.")
+            main_logger.info("[Telegram Aiogram] Aiogram client stopped.")
             self.state.is_online = False
 
     async def get_context_block(self, **kwargs: Any) -> str:
         """
-        Провайдер контекста для ContextRegistry.
-        Отдает отформатированный список последних активных чатов.
+        Context provider for ContextRegistry.
+        Returns a formatted list of recent active chats and their cached messages.
         """
 
         desc = "Description: Telegram Bot API. Connects to the registered bot account."
@@ -118,4 +116,16 @@ class AiogramClient:
         if not self.state.is_online:
             return f"### AIOGRAM [OFF] \n{desc}\nThe interface is disabled."
 
-        return f"### AIOGRAM [ON] \n{desc}\n{self.state.last_chats}"
+        if not self.state._chats_cache:
+            return f"### AIOGRAM [ON] \n{desc}\nDialogues list is empty."
+
+        lines = ["Active dialogues list:"]
+        for chat_id, chat_str in self.state._chats_cache.items():
+            lines.append(f"- {chat_str}")
+            if chat_id in self.state.recent_messages and self.state.recent_messages[chat_id]:
+                lines.append("  Recent messages:")
+                for msg in self.state.recent_messages[chat_id]:
+                    lines.append(f"    {msg}")
+
+        chats_info = "\n".join(lines)
+        return f"### AIOGRAM [ON] \n{desc}\n\n{chats_info}"

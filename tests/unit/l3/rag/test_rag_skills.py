@@ -17,7 +17,7 @@ async def test_recall_information_success():
     res = await skill.recall_information(["Настройка nginx", "SSL сертификаты"])
 
     assert res.is_success is True
-    assert "Результаты поиска в памяти" in res.message
+    assert "Memory recall results" in res.message
     assert "Факт 1" in res.message
     mock_orchestrator.run.assert_called_once_with(["Настройка nginx", "SSL сертификаты"])
 
@@ -30,12 +30,12 @@ async def test_recall_information_empty_queries():
     # Пустой массив
     res1 = await skill.recall_information([])
     assert res1.is_success is False
-    assert "не может быть пустым" in res1.message
+    assert "cannot be empty" in res1.message
 
     # Массив с пробелами и пустыми строками
     res2 = await skill.recall_information(["   ", ""])
     assert res2.is_success is False
-    assert "оказались пустыми" in res2.message
+    assert "All passed queries are empty" in res2.message
 
 
 @pytest.mark.asyncio
@@ -49,4 +49,4 @@ async def test_recall_information_no_results():
 
     # Скилл считается "успешным", просто факт того, что инфы нет - это тоже инфа
     assert res.is_success is True
-    assert "не найдено релевантной информации" in res.message
+    assert "No relevant information found" in res.message

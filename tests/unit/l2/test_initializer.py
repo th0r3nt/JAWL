@@ -104,7 +104,7 @@ def test_initialize_l2_interfaces_discovery(
 
     mock_getmembers.return_value = [("DummyPlugin", DummyPlugin)]
 
-    # Мокаем importlib, чтобы он пропустил фейковый путь
+    # Мокаем importlib, чтобы он проemptyил фейковый путь
     mock_spec = MagicMock()
     mock_spec_from_file.return_value = mock_spec
     mock_module_from_spec.return_value = MagicMock()

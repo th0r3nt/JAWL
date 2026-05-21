@@ -125,7 +125,7 @@ async def test_e2e_subconscious_full_pipeline(tmp_path: Path):
     assert len(ticks) == 1
     assert "завершаю цикл" in ticks[0].thoughts
 
-    # Подсознание должно было запуститься, обратиться к LLM и вызвать скилл
+    # Подсознание должно было заemptyиться, обратиться к LLM и вызвать скилл
     orchestrator.runner._execute_actions.assert_awaited_once()
     actions_called = orchestrator.runner._execute_actions.call_args[0][0]
     assert actions_called[0].tool_name == "mock.skill"

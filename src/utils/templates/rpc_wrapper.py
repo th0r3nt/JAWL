@@ -1,9 +1,9 @@
 """
-Обертка, которая выполняется, когда агент хочет вызвать функцию из sandbox/ файла (RPC).
-Содержит встроенный Sandbox Guard для защиты ядра от взлома.
+Wrapper that is executed when the agent wants to call a function from a sandbox/ file (RPC).
+Contains built-in Sandbox Guard to protect the core from intrusion.
 
-ВАЖНО: см. ``_sandbox_guard.py`` - это best-effort in-process barrier,
-а не настоящая изоляция.
+IMPORTANT: see _sandbox_guard.py - this is a best-effort in-process barrier,
+not real isolation.
 """
 
 import sys
@@ -20,10 +20,10 @@ func_name = sys.argv[2]
 sandbox_dir = Path(sys.argv[3]).resolve()
 framework_dir = sandbox_dir.parent
 
-# Подключаем общий Sandbox Guard (ставит все защиты: I/O, subprocess, fork,
-# ctypes, importlib.reload, скрабинг секретов в env и т.д.).
-# rpc_wrapper копируется в sandbox/_system/.tmp/ при запуске, поэтому ищем
-# _sandbox_guard.py по абсолютному пути внутри framework_dir.
+# Connect the shared Sandbox Guard (sets all protections: I/O, subprocess, fork,
+# ctypes, importlib.reload, secret scrubbing in env, etc.).
+# rpc_wrapper is copied to sandbox/_system/.tmp/ on launch, so look for
+# _sandbox_guard.py by absolute path inside framework_dir.
 _guard_path = framework_dir / "src" / "utils" / "templates" / "_sandbox_guard.py"
 
 if not _guard_path.is_file():
@@ -44,14 +44,14 @@ _guard = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(_guard)
 _guard.install(framework_dir, sandbox_dir)
 
-# Гарантируем наличие путей в sys.path для прямой доступности
+# Guarantee paths are in sys.path for direct availability
 script_dir = str(target_filepath.parent)
 if script_dir not in sys.path:
     sys.path.insert(0, script_dir)
 if str(sandbox_dir) not in sys.path:
     sys.path.insert(0, str(sandbox_dir))
 
-# Умное вычисление имени модуля для поддержки относительных импортов внутри пакетов
+# Smart module name calculation to support relative imports inside packages
 try:
     rel_path = target_filepath.relative_to(sandbox_dir)
     module_name = ".".join(rel_path.with_suffix("").parts)
@@ -72,7 +72,7 @@ def main():
 
         spec = spec_from_file_location(module_name, str(target_filepath))
         if spec is None or spec.loader is None:
-            raise ImportError(f"Не удалось загрузить модуль {target_filepath.name}")
+            raise ImportError(f"Could not load module {target_filepath.name}")
 
         module = module_from_spec(spec)
         sys.modules[module_name] = module
@@ -84,19 +84,19 @@ def main():
 
         spec.loader.exec_module(module)
 
-        # ЛОГИКА ИНСТАНЦИРОВАНИЯ И ВЫЗОВА МЕТОДОВ
+        # INSTANTIATION AND METHOD CALL LOGIC
         if "." in func_name:
             class_name, method_name = func_name.split(".", 1)
             if not hasattr(module, class_name):
                 raise AttributeError(
-                    f"Объект '{class_name}' не найден в модуле {target_filepath.name}"
+                    f"Object '{class_name}' not found in module {target_filepath.name}"
                 )
 
             cls_obj = getattr(module, class_name)
             if inspect.isclass(cls_obj):
                 instance = cls_obj()
                 if not hasattr(instance, method_name):
-                    raise AttributeError(f"В классе '{class_name}' нет метода '{method_name}'")
+                    raise AttributeError(f"Class '{class_name}' has no method '{method_name}'")
                 func = getattr(instance, method_name)
             else:
                 obj = getattr(module, class_name)
@@ -104,7 +104,7 @@ def main():
         else:
             if not hasattr(module, func_name):
                 raise AttributeError(
-                    f"В модуле {target_filepath.name} нет функции '{func_name}'"
+                    f"Module {target_filepath.name} has no function '{func_name}'"
                 )
             func = getattr(module, func_name)
 

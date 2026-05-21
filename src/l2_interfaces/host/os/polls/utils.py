@@ -1,8 +1,12 @@
+"""
+Unified garbage filter. Wipes cache, logs, hidden files, and virtual environments.
+"""
+
 from pathlib import Path
 
 
 def is_ignored(path: Path) -> bool:
-    """Единый фильтр мусора. Отсекает кэш, логи, скрытые файлы и виртуальные окружения."""
+    """Unified garbage filter. Wipes cache, logs, hidden files, and virtual environments."""
     ignore_dirs = {
         "__pycache__",
         ".pytest_cache",
@@ -19,8 +23,17 @@ def is_ignored(path: Path) -> bool:
         "browser_profile",
     }
     ignore_exts = {
-        ".pyc", ".pyo", ".pyd", ".tmp", ".swp", 
-        ".log", ".db", ".sqlite", ".sqlite3", "-journal", "-wal"
+        ".pyc",
+        ".pyo",
+        ".pyd",
+        ".tmp",
+        ".swp",
+        ".log",
+        ".db",
+        ".sqlite",
+        ".sqlite3",
+        "-journal",
+        "-wal",
     }
 
     if path.suffix in ignore_exts or path.name.endswith("~"):
@@ -29,7 +42,7 @@ def is_ignored(path: Path) -> bool:
     for part in path.parts:
         if part in ignore_dirs:
             return True
-        # Игнорируем скрытые папки/файлы, но оставляем .env на случай, если он нужен в песочнице
+        # Ignore hidden folders/files, but leave .env in case it is needed in the sandbox
         if part.startswith(".") and part not in {".", ".env"}:
             return True
 

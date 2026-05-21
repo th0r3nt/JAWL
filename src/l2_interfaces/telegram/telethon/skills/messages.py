@@ -1,8 +1,8 @@
 """
-Навыки агента для прямого взаимодействия с сообщениями (Telethon).
+Telethon Messages Skills.
 
-Позволяют отправлять текст, прикреплять локальные файлы, скачивать медиавложения,
-форвардить, отвечать на inline-кнопки ботов и работать с черновиками (Drafts).
+Provides skills for sending texts, documents, media downloads, forwards,
+interacting with Inline buttons, and managing drafts.
 """
 
 from datetime import timedelta
@@ -20,7 +20,7 @@ from src.l3_agent.skills.registry import SkillResult, skill
 
 
 class TelethonMessages:
-    """Инструментарий отправки и управления сообщениями."""
+    """Tools for sending, editing, and managing messages."""
 
     def __init__(self, tg_client: TelethonClient) -> None:
         self.tg_client = tg_client
@@ -36,7 +36,7 @@ class TelethonMessages:
         time_delay: Optional[int] = None,
     ) -> SkillResult:
         """
-        Sends text message. 
+        Sends text message.
         Markdown supported.
         """
 
@@ -67,16 +67,13 @@ class TelethonMessages:
             except Exception:
                 pass
 
-            schedule_info = f" (отложено на {time_delay} сек)" if time_delay else ""
-            msg = f"Сообщение успешно отправлено{schedule_info}. ID: {sent_msg.id}"
-
             return SkillResult.ok(f"True. ID: {sent_msg.id}")
 
         except ValueError:
-            return SkillResult.fail("Ошибка: Некорректный ID или Username.")
+            return SkillResult.fail("Error: Invalid ID or Username.")
         except Exception as e:
-            main_logger.error(f"Ошибка при отправке сообщения: {e}")
-            return SkillResult.fail(f"Ошибка при отправке сообщения: {e}")
+            main_logger.error(f"Error sending message: {e}")
+            return SkillResult.fail(f"Error sending message: {e}")
 
     @skill()
     async def send_file(
@@ -88,23 +85,21 @@ class TelethonMessages:
         try:
             safe_path = validate_sandbox_path(file_path)
             if not safe_path.is_file():
-                return SkillResult.fail(f"Ошибка: Файл не найден ({safe_path.name}).")
+                return SkillResult.fail(f"Error: File not found ({safe_path.name}).")
 
-            size_str = format_size(safe_path.stat().st_size)
+            size_str = format_size(safe_path.stat().st_size)  # noqa: F841
             client = self.tg_client.client()
             entity = parse_int_or_str(chat_id)
 
             await client.send_file(entity, file=str(safe_path), caption=caption)
 
-            main_logger.info(
-                f"[Telegram Telethon] Файл {safe_path.name} отправлен в {chat_id}"
-            )
+            main_logger.info(f"[Telegram Telethon] File {safe_path.name} sent to {chat_id}")
             return SkillResult.ok("True")
 
         except PermissionError as e:
             return SkillResult.fail(str(e))
         except Exception as e:
-            return SkillResult.fail(f"Ошибка при отправке файла: {e}")
+            return SkillResult.fail(f"Error sending file: {e}")
 
     @skill()
     async def download_file(
@@ -123,29 +118,29 @@ class TelethonMessages:
 
             msg = await client.get_messages(entity, ids=int(message_id))
             if not msg or not msg.media:
-                return SkillResult.fail("Ошибка: Сообщение не найдено или не содержит медиа.")
+                return SkillResult.fail("Error: Message not found or does not contain media.")
 
             main_logger.info(
-                f"[Telegram Telethon] Скачивание файла из сообщения {message_id}..."
+                f"[Telegram Telethon] Downloading file from message {message_id}..."
             )
 
             downloaded_path = await client.download_media(msg, file=str(safe_path))
             if not downloaded_path:
-                return SkillResult.fail(
-                    "Не удалось скачать файл (возможно, формат не поддерживается)."
-                )
+                return SkillResult.fail("Failed to download file.")
 
             size_str = format_size(safe_path.stat().st_size)
-            main_logger.info(f"[Telegram Telethon] Файл скачан: {safe_path.name} ({size_str})")
+            main_logger.info(
+                f"[Telegram Telethon] File downloaded: {safe_path.name} ({size_str})"
+            )
 
             return SkillResult.ok(
-                f"Файл успешно скачан и сохранен: sandbox/{safe_path.name} ({size_str})"
+                f"File downloaded successfully and saved as: sandbox/{safe_path.name} ({size_str})"
             )
 
         except PermissionError as e:
             return SkillResult.fail(str(e))
         except Exception as e:
-            return SkillResult.fail(f"Ошибка при скачивании файла: {e}")
+            return SkillResult.fail(f"Error downloading file: {e}")
 
     @skill()
     async def forward_message(
@@ -164,7 +159,7 @@ class TelethonMessages:
             )
             return SkillResult.ok("True")
         except Exception as e:
-            return SkillResult.fail(f"Ошибка при пересылке: {e}")
+            return SkillResult.fail(f"Error forwarding message: {e}")
 
     @skill()
     async def delete_message(self, msg_id: int, chat_id: Union[int, str]) -> SkillResult:
@@ -179,7 +174,7 @@ class TelethonMessages:
             )
             return SkillResult.ok("True")
         except Exception as e:
-            return SkillResult.fail(f"Ошибка при удалении: {e}")
+            return SkillResult.fail(f"Error deleting message: {e}")
 
     @skill()
     async def edit_message(
@@ -199,7 +194,7 @@ class TelethonMessages:
             )
             return SkillResult.ok("True")
         except Exception as e:
-            return SkillResult.fail(f"Ошибка редактирования: {e}")
+            return SkillResult.fail(f"Error editing message: {e}")
 
     @skill()
     async def click_inline_button(
@@ -214,9 +209,7 @@ class TelethonMessages:
             msg = await client.get_messages(parse_int_or_str(chat_id), ids=int(message_id))
 
             if not msg or not msg.buttons:
-                return SkillResult.fail(
-                    "Ошибка: Сообщение не найдено или у него нет inline-кнопок."
-                )
+                return SkillResult.fail("Error: Message not found or has no inline buttons.")
 
             target_i, target_j = None, None
             for i, row in enumerate(msg.buttons):
@@ -230,7 +223,7 @@ class TelethonMessages:
             if target_i is None:
                 available = [btn.text for row in msg.buttons for btn in row if btn.text]
                 return SkillResult.fail(
-                    f"Ошибка: Кнопка '{button_text}' не найдена. Доступные: {available}"
+                    f"Error: Button '{button_text}' not found. Available: {available}"
                 )
 
             result = await msg.click(target_i, target_j)
@@ -240,12 +233,14 @@ class TelethonMessages:
                 else ""
             )
 
-            return SkillResult.ok(f"True. Callback: {msg_callback}" if msg_callback else "True")
+            return SkillResult.ok(
+                f"True. Callback: {msg_callback}" if msg_callback else "True"
+            )
 
         except ValueError:
-            return SkillResult.fail("Ошибка: Некорректный ID чата или сообщения.")
+            return SkillResult.fail("Error: Invalid chat or message ID.")
         except Exception as e:
-            return SkillResult.fail(f"Ошибка при нажатии кнопки: {e}")
+            return SkillResult.fail(f"Error clicking button: {e}")
 
     @skill()
     async def search_messages(
@@ -271,22 +266,22 @@ class TelethonMessages:
                 messages.append(formatted)
 
             if not messages:
-                return SkillResult.ok(f"По запросу '{query}' в чате ничего не найдено.")
+                return SkillResult.ok(f"No messages found for query '{query}' in this chat.")
 
             messages.reverse()
             return SkillResult.ok(
-                f"Результаты поиска по '{query}':\n\n" + "\n\n".join(messages)
+                f"Search results for query '{query}':\n\n" + "\n\n".join(messages)
             )
 
         except Exception as e:
-            return SkillResult.fail(f"Ошибка при поиске: {e}")
+            return SkillResult.fail(f"Error searching messages: {e}")
 
     @skill()
     async def edit_draft(
         self, chat_id: Union[int, str], text: str, append: bool = True
     ) -> SkillResult:
         """
-        Updates chat draft. 
+        Updates chat draft.
         Appends if append=True.
         """
 
@@ -310,11 +305,10 @@ class TelethonMessages:
                 )
             )
 
-            action_type = "дополнен" if current_text else "создан"
             return SkillResult.ok("True")
 
         except Exception as e:
-            return SkillResult.fail(f"Ошибка при работе с черновиком: {e}")
+            return SkillResult.fail(f"Error saving draft: {e}")
 
     @skill()
     async def delete_draft(self, chat_id: Union[int, str]) -> SkillResult:
@@ -332,4 +326,4 @@ class TelethonMessages:
             return SkillResult.ok("True")
 
         except Exception as e:
-            return SkillResult.fail(f"Ошибка при удалении черновика: {e}")
+            return SkillResult.fail(f"Error deleting draft: {e}")

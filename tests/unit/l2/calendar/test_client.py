@@ -1,5 +1,5 @@
 def test_client_init_creates_file(calendar_client):
-    """Тест: При запуске клиент должен создать пустой JSON, если его нет."""
+    """Тест: При запуске клиент должен создать emptyой JSON, если его нет."""
     assert calendar_client.filepath.exists()
     assert calendar_client.get_all_events() == []
 

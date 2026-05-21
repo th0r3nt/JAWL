@@ -1,24 +1,24 @@
-# Гибридный поиск и контекстная память (Vector-Graph RAG)
+# Hybrid Search and Context Memory (Vector-Graph RAG)
 
-Подсистема `RAG` (Retrieval-Augmented Generation) в JAWL использует **гибридный механизм (Vector-Graph RAG)**. Она объединяет семантический поиск по векторам (Vector DB) с жесткими логическими связями из графа знаний (Graph DB).
+The `RAG` (Retrieval-Augmented Generation) subsystem in JAWL utilizes an innovative **hybrid mechanism (Vector-Graph RAG)**. It combines semantic vector search (Vector DB) with explicit logical connections from the knowledge graph (Graph DB).
 
-## Механика работы (Vector-Graph RAG)
-Когда агент получает сообщение (или задумывается о чем-то), оркестратор RAG извлекает из текста ключевые слова (якоря). Затем запускается итеративный цикл глубины (`depth_limit`):
+## How It Works (Vector-Graph RAG)
+When the agent receives a message (or reflects on a task), the RAG orchestrator extracts search anchors (keywords) from the text. Then, an iterative retrieval cycle of depth (`depth_limit`) is initiated:
 
-1. **Шаг 1:** Векторная БД находит смысловые совпадения, а Графовая БД вытаскивает известные узлы.
-2. **Шаг 2 (Семантическая синхронизация):** Если в найденном куске текста из Векторной БД упоминается другой графовый узел — система автоматически подтягивает и его связи. И наоборот: описания найденных графовых узлов используются как новые текстовые запросы для Векторной БД.
-3. **Результат:** Агент получает в `System Prompt` плотный, дедуплицированный блок фактов и карту логических связей, что полностью исключает "амнезию" на длинных дистанциях.
+1. **Step 1:** Vector DB retrieves semantic matches while Graph DB extracts known concept nodes.
+2. **Step 2 (Semantic Synchronization):** If a retrieved Vector DB text fragment mentions another graph node, the system automatically pulls that node and its adjacent relations. Conversely, descriptions of newly found graph nodes are used as fresh search queries for the Vector DB.
+3. **Result:** The agent receives a dense, clean summary of facts and their logical connection map in its `System Prompt`, permanently preventing "amnesia" on long runs.
 
-## Настройки (`system.context_depth.rag`)
+## Settings (`system.context_depth.rag`)
 
-* **`enabled`**: `true` / `false`. Включение или отключение системы автоматического вспоминания.
-* **`extraction_engine`**: Движок извлечения сущностей из текста (`"flashtext"` или `"rapidfuzz"`).
-  * `"flashtext"` — реактивный алгоритм Ахо-Корасик. Ищет только точные совпадения. Рекомендуется для огромных графов (1000+ узлов) на английском языке.
-  * `"rapidfuzz"` — нечеткий поиск (Fuzzy Matching). Распознает слова в разных падежах (Например: "Стива Джобса" найдет узел "Стив Джобс"). **Рекомендуется для русского языка** и небольших/средних графов.
-* **`depth_limit`**: Глубина рекурсивного поиска (Vector-Graph RAG). 
-  * `1` — Только прямой поиск (быстро, экономит CPU).
-  * `2` — Оптимально. Система найдет неочевидные связи второго уровня (Например, запрос "Matrix" найдет узел "Neo", а "Neo" вытянет векторный факт о "Trinity").
-  * `3+` — Глубокий ресерч. Используйте с осторожностью, может вызвать экспоненциальный рост вычислений (хотя лимиты защитят контекст).
-* **`max_vector_blocks`**: Жесткий лимит на количество текстовых фактов из Vector DB в системном промпте. Защищает от переполнения (Maximum Context Exceeded).
-* **`max_graph_nodes`**: Жесткий лимит на количество узлов из Graph DB.
-* **`max_query_chars`**: Лимит символов на один текстовый чанк. Если агент генерирует гигантскую мысль, `EntityExtractor` разобьет её на куски по `N` символов, чтобы векторное встраивание (Embedding) не потеряло фокус и семантическую плотность.
+* **`enabled`**: `true` / `false`. Enables or disables the automated recall system.
+* **`extraction_engine`**: The entity extraction engine (`"flashtext"` or `"rapidfuzz"`).
+  * `"flashtext"` — high-performance Aho-Corasick algorithm. Matches exact strings only. Recommended for large graphs (1000+ nodes) on English text.
+  * `"rapidfuzz"` — fuzzy matching. Recognizes words in different cases and inflections. **Recommended for Russian language** and small/medium graphs.
+* **`depth_limit`**: Depth of the recursive search (Vector-Graph RAG).
+  * `1` — Direct lookup only (fast, saves CPU).
+  * `2` — Optimal. The system resolves non-obvious second-level relationships (for example, a query "Matrix" finds the "Neo" node, and "Neo" pulls a vector fact about "Trinity").
+  * `3+` — Deep research. Use with caution as it can cause exponential growth in computations (though limits protect the context).
+* **`max_vector_blocks`**: Hard limit on the number of Vector DB facts injected into the system prompt. Protects against context length overflows.
+* **`max_graph_nodes`**: Hard limit on the number of Graph DB nodes injected.
+* **`max_query_chars`**: Maximum characters limit per a single text chunk. If the agent generates a giant thought, the `EntityExtractor` splits it into smaller chunks of `N` characters to keep the semantic density of generated embeddings high.

@@ -1,5 +1,5 @@
 """
-Плагин интерфейса Web Browser (Playwright).
+Web Browser (Playwright) interface plugin.
 """
 
 from typing import List, Any, Dict, Optional
@@ -59,5 +59,5 @@ class WebBrowserPlugin(BaseInterface):
             section=ContextSection.INTERFACES,
         )
 
-        main_logger.info("[Web Browser] Интерфейс загружен..")
+        main_logger.info("[Web Browser] Interface loaded.")
         return [client, events]

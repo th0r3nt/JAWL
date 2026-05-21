@@ -28,7 +28,7 @@ async def test_os_files_delete_out_of_bounds(os_client):
 
     res_del = await writer.delete_file(forbidden_path)
     assert res_del.is_success is False
-    assert "OBSERVER: Запись разрешена строго в папке" in res_del.message
+    assert "OBSERVER: Writing is permitted strictly inside" in res_del.message
 
 
 @pytest.mark.asyncio
@@ -57,7 +57,7 @@ async def test_os_files_delete_directory_root_protection(os_client):
     res = await writer.delete_directory(str(os_client.sandbox_dir))
 
     assert res.is_success is False
-    assert "Запрещено удалять корневую директорию" in res.message
+    assert "Deleting the root sandbox or framework directory is forbidden" in res.message
     assert os_client.sandbox_dir.exists()  # Папка должна выжить
 
 
@@ -98,7 +98,7 @@ async def test_os_files_open_and_close_workspace(os_client):
     target2.touch()
     res_limit = await workspace.open_file("sandbox/editor_test2.py")
     assert res_limit.is_success is False
-    assert "максимальное количество" in res_limit.message
+    assert "Maximum number of files are already open" in res_limit.message
 
     # Закрытие
     res_close = await workspace.close_file("sandbox/editor_test.py")
@@ -146,10 +146,10 @@ async def test_os_files_patch_file(os_client):
     assert res_patch.is_success is True
     assert "return a + b" in target.read_text(encoding="utf-8")
 
-    # Патч с ошибкой (блок не найден)
+    # Патч с ошибкой (блок not found)
     res_fail = await editor.patch_file("sandbox/script.py", "return a * b", "return a / b")
     assert res_fail.is_success is False
-    assert "не найден" in res_fail.message
+    assert "not found" in res_fail.message
 
 
 @pytest.mark.asyncio
@@ -169,6 +169,6 @@ async def test_os_files_read_files_in_directory_char_limit(os_client):
 
     assert res.is_success is True
     # Проверяем, что сработал аварийный тормоз
-    assert "Достигнут глобальный лимит символов" in res.message
+    assert "Reached global character reading limit" in res.message
     # Третий файл банально не влезет в лимит 20 символов
     assert "f3.txt" not in res.message

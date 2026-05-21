@@ -24,4 +24,4 @@ async def test_create_issue_requires_agent_account(mock_github_client):
 
     res = await skills.create_issue("th0r3nt", "JAWL", "New bug")
     assert res.is_success is False
-    assert "нужно включить" in res.message
+    assert "requires 'agent_account: true' enabled" in res.message

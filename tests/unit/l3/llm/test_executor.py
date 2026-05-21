@@ -56,7 +56,7 @@ async def test_executor_rate_limit(mock_sleep, mock_executor_deps):
     mock_session1.chat.completions.create.side_effect = rate_error
 
     executor = LLMExecutor(llm, tracker)
-    res = await executor.execute("model", [], 0.7, MagicMock(), "[Log]")
+    res = await executor.execute("model", [], 0.7, MagicMock(), "[Log]", max_retries=3)
 
     assert res == "Finally Success"
     llm.rotator.cooldown_key.assert_called_once_with("key1", 5)
@@ -109,7 +109,7 @@ async def test_executor_all_keys_exhausted(mock_sleep, mock_executor_deps):
     ]
 
     executor = LLMExecutor(llm, tracker)
-    res = await executor.execute("model", [], 0.7, MagicMock(), "[Log]")
+    res = await executor.execute("model", [], 0.7, MagicMock(), "[Log]", max_retries=3)
 
     assert res == "OK"
     mock_sleep.assert_called_once_with(11)  # wait_time + 1

@@ -1,9 +1,9 @@
 """
-Сборщик статической части системного промпта.
+Builder of the static part of the system prompt.
 
-Отвечает за конкатенацию разрозненных Markdown-файлов (характер, инструкции, примеры)
-в единый статичный System Prompt. Динамический контекст (память, время, логи)
-добавляется отдельно в модуле 'context/builder.py'.
+Responsible for the concatenation of fragmented Markdown files (character, instructions, examples)
+into a single static system prompt. Dynamic context (memory, time, logs)
+is added separately in the 'context/builder.py' module.
 """
 
 from pathlib import Path
@@ -12,8 +12,8 @@ from typing import Literal
 
 class PromptBuilder:
     """
-    Отвечает за сборку статической части промпта (Характер + Инструкции + Скиллы).
-    Динамически фильтрует системные инструкции в зависимости от включенных модулей (YAML).
+    Responsible for compiling the static part of the prompt (Character + Instructions + Skills).
+    Dynamically filters system instructions depending on the enabled modules (YAML).
     """
 
     def __init__(
@@ -30,22 +30,22 @@ class PromptBuilder:
         hypotheses_enabled: bool = False,
     ) -> None:
         """
-        Инициализирует билдер.
+        Initializes the builder.
 
         Args:
-            prompt_dir: Абсолютный путь к директории 'prompt'.
-            drives_enabled: Включен ли модуль внутренних мотиваторов.
-            tasks_enabled: Включен ли модуль долгосрочных задач.
-            traits_enabled: Включен ли модуль черт характера.
-            mental_states_enabled: Включен ли модуль сущностей.
-            swarm_enabled: Включена ли система субагентов.
-            tot_enabled: Включена ли система стратегического планирования (Tree of Thoughts).
-            hypotheses_enabled: Включена ли система гипотез.
+            prompt_dir: Absolute path to the 'prompt' directory.
+            drives_enabled: Whether the internal needs module is enabled.
+            tasks_enabled: Whether the long-term tasks module is enabled.
+            traits_enabled: Whether the personality traits module is enabled.
+            mental_states_enabled: Whether the entity tracking module is enabled.
+            swarm_enabled: Whether the subagents system is enabled.
+            tot_enabled: Whether the strategic planning system (Tree of Thoughts) is enabled.
+            hypotheses_enabled: Whether the hypotheses system is enabled.
         """
 
         self.prompt_dir = Path(prompt_dir)
 
-        # Убеждаемся, что системные папки существуют
+        # Ensure system folders exist
         (self.prompt_dir / "custom").mkdir(parents=True, exist_ok=True)
         (self.prompt_dir / "system" / "optional").mkdir(parents=True, exist_ok=True)
 
@@ -61,17 +61,17 @@ class PromptBuilder:
 
     def _gather_markdown(self, sub_folder: Literal["personality", "system", "custom"]) -> str:
         """
-        Рекурсивно ищет, читает и склеивает все .md файлы в указанной подпапке.
-        Игнорирует примеры (.example.md) и отключает инструкции для выключенных модулей.
+        Recursively searches, reads, and concatenates all .md files in the specified subdirectory.
+        Ignores examples (.example.md) and disables instructions for disabled modules.
 
         Args:
-            sub_folder: Имя целевой поддиректории.
+            sub_folder: Target subdirectory name.
 
         Returns:
-            Конкатенированная строка содержимого всех валидных Markdown файлов.
+            str: Concatenated content of all valid Markdown files.
 
         Raises:
-            RuntimeError: Если файл промпта невозможно прочитать.
+            RuntimeError: If a prompt file cannot be read.
         """
 
         target_dir = self.prompt_dir / sub_folder
@@ -82,7 +82,7 @@ class PromptBuilder:
             f for f in target_dir.rglob("*.md") if not f.name.endswith(".example.md")
         ]
 
-        # Фильтруем системные модули (если они выключены в настройках)
+        # Filter system modules (if they are disabled in settings)
         if not self.drives_enabled:
             valid_files = [f for f in valid_files if f.name.upper() != "DRIVES.md"]
 
@@ -105,7 +105,7 @@ class PromptBuilder:
             valid_files = [f for f in valid_files if f.name.upper() != "TREE_OF_THOUGHTS.md"]
 
         if not self.subconscious_enabled:
-            valid_files =[f for f in valid_files if f.name.upper() != "SUBCONSCIOUS.md"]
+            valid_files = [f for f in valid_files if f.name.upper() != "SUBCONSCIOUS.md"]
 
         if not self.hypotheses_enabled:
             valid_files = [f for f in valid_files if f.name.upper() != "HYPOTHESES.md"]
@@ -129,19 +129,19 @@ class PromptBuilder:
             try:
                 parts.append(file_path.read_text(encoding="utf-8").strip())
             except Exception as e:
-                raise RuntimeError(f"Ошибка чтения файла промпта {file_path}: {e}")
+                raise RuntimeError(f"Error reading prompt file {file_path}: {e}")
 
         return "\n\n\n".join(parts)
 
     def build(self) -> str:
         """
-        Собирает итоговый системный промпт.
+        Assembles the final system prompt.
 
-        Порядок блоков строго регламентирован:
-        Характер (Personality) -> Кастомные промпты агента (Custom) -> Инструкции (System).
+        The order of blocks is strictly regulated:
+        Character (Personality) -> Agent Custom Prompts (Custom) -> Instructions (System).
 
         Returns:
-            Итоговая строка статического промпта для LLM.
+            str: Compiled static prompt string for the LLM.
         """
 
         personality = self._gather_markdown("personality")

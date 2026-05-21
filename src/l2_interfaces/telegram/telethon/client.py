@@ -1,9 +1,9 @@
 """
-Stateful-клиент для работы с Telegram User API (Telethon).
+Stateful client for working with Telegram User API (Telethon).
 
-Хранит сессию локально в SQLite-файле (Session File).
-Обеспечивает авторизацию через терминал при первом запуске (ручной ввод номера и кода)
-и предоставляет провайдер контекста с информацией о профиле и чатах агента.
+Stores session locally in a SQLite file (Session File).
+Provides terminal authorization on the first run (manual entry of phone and code)
+and provides a context provider with info about the agent's profile and chats.
 """
 
 from typing import Any, Optional
@@ -17,7 +17,7 @@ from src.l2_interfaces.telegram.telethon.state import TelethonState
 
 class TelethonClient:
     """
-    Менеджер подключения к серверам Telegram и управления сессией аккаунта.
+    Manager for connecting to Telegram servers and managing account sessions.
     """
 
     def __init__(
@@ -30,14 +30,14 @@ class TelethonClient:
         proxy_url: Optional[str] = None,
     ) -> None:
         """
-        Инициализирует клиент.
+        Initializes the client.
 
         Args:
-            state (TelethonState): Приборная панель L0.
-            api_id (int): API ID приложения Telegram.
-            api_hash (str): Hash приложения Telegram.
-            session_path (str): Путь для сохранения .session файла на диске.
-            timezone (int): Смещение часового пояса (для форматирования логов).
+            state (TelethonState): L0 dashboard.
+            api_id (int): Telegram application API ID.
+            api_hash (str): Telegram application Hash.
+            session_path (str): Path to save the .session file on disk.
+            timezone (int): Timezone offset (for log formatting).
         """
         self.state = state
 
@@ -51,62 +51,64 @@ class TelethonClient:
 
     def client(self) -> TelegramClient:
         """
-        Безопасный доступ к инстансу Telethon.
+        Safe access to the Telethon instance.
 
         Returns:
-            TelegramClient: Активный клиент Telethon.
+            TelegramClient: Active Telethon client.
 
         Raises:
-            RuntimeError: Если `start()` еще не был вызван.
+            RuntimeError: If `start()` has not been called yet.
         """
         if not self._client:
-            raise RuntimeError("TelethonClient не запущен. Инстанс недоступен.")
+            raise RuntimeError("TelethonClient is not started. Instance is unavailable.")
         return self._client
 
     async def start(self) -> None:
         """
-        Запускает клиента и устанавливает соединение.
-        При отсутствии сессии на диске запрашивает ввод номера и кода прямо
-        в консоли сервера (механизм библиотеки Telethon).
+        Starts the client and establishes connection.
+        If no session exists on disk, requests phone and code entry directly
+        in the server console (Telethon library mechanism).
 
         Raises:
-            Exception: При сетевых сбоях или фатальных ошибках MTProto.
+            Exception: In case of network failures or fatal MTProto errors.
         """
-        main_logger.info("[Telegram Telethon] Инициализация клиента.")
+        main_logger.info("[Telegram Telethon] Initializing client.")
 
         try:
-            # Парсим прокси, если он есть
+            # Parse proxy if it exists
             proxy = parse_proxy_url(self.proxy_url) if self.proxy_url else None
-            
-            self._client = TelegramClient(self.session_path, self.api_id, self.api_hash, proxy=proxy)
 
-            # Встроенная магия Telethon для консольной авторизации
+            self._client = TelegramClient(
+                self.session_path, self.api_id, self.api_hash, proxy=proxy
+            )
+
+            # Built-in Telethon magic for console authorization
             await self._client.start()
 
             me = await self._client.get_me()
             name = me.username or me.first_name or "Unknown"
 
-            # Сразу после старта стягиваем полные данные о профиле
+            # Immediately pull full profile data after startup
             await self.update_profile_state()
 
-            main_logger.info(f"[Telegram Telethon] Успешная авторизация как: @{name}")
+            main_logger.info(f"[Telegram Telethon] Successful authorization as: @{name}")
             self.state.is_online = True
 
         except Exception as e:
-            main_logger.error(f"[Telegram Telethon] Критическая ошибка при запуске: {e}")
+            main_logger.error(f"[Telegram Telethon] Critical error on startup: {e}")
             raise e
 
     async def stop(self) -> None:
-        """Корректно отключается от серверов Telegram."""
+        """Correctly disconnects from Telegram servers."""
         if self._client and self._client.is_connected():
             await self._client.disconnect()
-            main_logger.info("[Telegram Telethon] Клиент отключен.")
+            main_logger.info("[Telegram Telethon] Client disconnected.")
             self.state.is_online = False
 
     async def update_profile_state(self) -> None:
         """
-        Выполняет GetFullUserRequest для обновления данных профиля агента
-        в L0 State (имя, username, bio, личный канал).
+        Performs GetFullUserRequest to update the agent's profile data
+        in L0 State (name, username, bio, personal channel).
         """
         if not self._client:
             return
@@ -117,13 +119,13 @@ class TelethonClient:
             if getattr(me, "last_name", None):
                 name += f" {me.last_name}"
 
-            username = f"@{me.username}" if me.username else "Без @username"
+            username = f"@{me.username}" if me.username else "No @username"
 
-            # Для получения "о себе" (bio) и личного канала нужен FullUser запрос
+            # FullUser request is required to get "about" (bio) and personal channel
             full_me = await self._client(GetFullUserRequest(me))
-            bio = full_me.full_user.about or "Пусто"
+            bio = full_me.full_user.about or "Empty"
 
-            # Ищем личный канал (Personal Channel)
+            # Search for personal channel
             channel_info = ""
             personal_channel_id = getattr(full_me.full_user, "personal_channel_id", None)
 
@@ -136,22 +138,20 @@ class TelethonClient:
                     channel_username = getattr(channel, "username", None)
                     un_str = f" (@{channel_username})" if channel_username else ""
 
-                    channel_info = (
-                        f"\nЛичный канал: {channel_name}{un_str} (ID: {personal_channel_id})"
-                    )
+                    channel_info = f"\nPersonal Channel: {channel_name}{un_str} (ID: {personal_channel_id})"
                 except Exception:
-                    channel_info = f"\nЛичный канал: ID {personal_channel_id}"
+                    channel_info = f"\nPersonal Channel: ID {personal_channel_id}"
 
             self.state.account_info = (
-                f"Профиль: {name} ({username}) | Био: {bio}{channel_info}\n---"
+                f"Profile: {name} ({username}) | Bio: {bio}{channel_info}\n---"
             )
         except Exception as e:
-            main_logger.error(f"[Telegram Telethon] Ошибка обновления профиля: {e}")
-            self.state.account_info = "Профиль: Ошибка загрузки данных\n---"
+            main_logger.error(f"[Telegram Telethon] Error updating profile: {e}")
+            self.state.account_info = "Profile: Data load error\n---"
 
     async def get_context_block(self, **kwargs: Any) -> str:
         """
-        Провайдер контекста для ContextRegistry.
+        Context provider for ContextRegistry.
         """
 
         desc = "Description: Telegram User API. Connects to personal Telegram account."

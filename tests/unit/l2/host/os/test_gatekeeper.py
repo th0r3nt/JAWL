@@ -5,90 +5,86 @@ from src.l2_interfaces.host.os.client import HostOSAccessLevel
 
 
 def test_gatekeeper_sandbox(os_client):
-    """Тест SANDBOX (0): доступ строго только в sandbox/."""
     os_client.access_level = HostOSAccessLevel.SANDBOX
 
     safe_path = os_client.sandbox_dir / "test.txt"
     framework_path = os_client.framework_dir / "code.py"
 
-    # Внутри песочницы - ОК
     assert os_client.validate_path(safe_path) == safe_path.resolve()
 
-    # Чтение фреймворка - Запрещено
-    with pytest.raises(PermissionError, match="SANDBOX"):
+    with pytest.raises(
+        PermissionError, match="SANDBOX: Access is permitted"
+    ):
         os_client.validate_path(framework_path, is_write=False)
 
 
 def test_gatekeeper_observer(os_client):
-    """Тест OBSERVER (1): чтение фреймворка, запись только в sandbox/."""
     os_client.access_level = HostOSAccessLevel.OBSERVER
 
     safe_path = os_client.sandbox_dir / "test.txt"
     framework_path = os_client.framework_dir / "code.py"
     os_path = Path("/etc/passwd") if os.name != "nt" else Path("C:/Windows/System32/config")
 
-    # Запись в песочнице - ОК
     assert os_client.validate_path(safe_path, is_write=True) == safe_path.resolve()
 
-    # Запись во фреймворке - Запрещено
-    with pytest.raises(PermissionError, match="OBSERVER"):
+    with pytest.raises(
+        PermissionError,
+        match="OBSERVER: Writing is permitted strictly inside the sandbox/ folder.",
+    ):
         os_client.validate_path(framework_path, is_write=True)
 
-    # Чтение фреймворка - ОК
     assert os_client.validate_path(framework_path, is_write=False) == framework_path.resolve()
 
-    # Чтение чужой системы - Запрещено
-    with pytest.raises(PermissionError, match="OBSERVER"):
+    with pytest.raises(
+        PermissionError, match="OBSERVER: Reading is permitted strictly within JAWL limits."
+    ):
         os_client.validate_path(os_path, is_write=False)
 
 
 def test_gatekeeper_operator(os_client):
-    """Тест OPERATOR (2): чтение и запись (с сессиями) строго внутри фреймворка."""
     os_client.access_level = HostOSAccessLevel.OPERATOR
 
     safe_path = os_client.sandbox_dir / "test.txt"
     framework_path = os_client.framework_dir / "code.py"
     os_path = Path("/etc/passwd") if os.name != "nt" else Path("C:/Windows/System32/config")
 
-    # Чтение/запись в песочнице - ОК
     assert os_client.validate_path(safe_path, is_write=True) == safe_path.resolve()
 
-    # Чтение фреймворка - ОК
     assert os_client.validate_path(framework_path, is_write=False) == framework_path.resolve()
 
-    # Чтение чужой системы - Запрещено
-    with pytest.raises(PermissionError, match="OPERATOR"):
+    with pytest.raises(
+        PermissionError,
+        match="OPERATOR: Access \\(read and write\\) is permitted strictly within the JAWL directory.",
+    ):
         os_client.validate_path(os_path, is_write=False)
 
 
 def test_gatekeeper_env_protection(os_client):
-    """Тест: запрет доступа к .env файлам работает даже в режиме ROOT."""
     os_client.access_level = HostOSAccessLevel.ROOT
     os_client.config.env_access = False
 
     secret_path = os_client.framework_dir / ".env"
     dev_secret_path = os_client.framework_dir / "config" / ".env.dev"
 
-    with pytest.raises(PermissionError, match="SYSTEM DENIED"):
+    with pytest.raises(PermissionError, match="SYSTEM DENIED: Access to configuration files"):
         os_client.validate_path(secret_path, is_write=False)
 
-    with pytest.raises(PermissionError, match="SYSTEM DENIED"):
+    with pytest.raises(PermissionError, match="SYSTEM DENIED: Access to configuration files"):
         os_client.validate_path(dev_secret_path, is_write=True)
 
 
 def test_gatekeeper_framework_api_protection(os_client):
-    """Тест: защита системной папки sandbox/_system/ от изменения агентом."""
-    os_client.access_level = HostOSAccessLevel.ROOT  # Даже рут не может его трогать
+    os_client.access_level = HostOSAccessLevel.ROOT
 
     api_path = os_client.system_dir / "framework_api.py"
 
-    # Чтение разрешено
     assert os_client.validate_path(api_path, is_write=False) == api_path.resolve()
 
-    # Любая запись/удаление/перемещение заблокированы
-    with pytest.raises(PermissionError, match="SYSTEM DENIED: Папка 'sandbox/_system/'"):
+    with pytest.raises(
+        PermissionError,
+        match="SYSTEM DENIED: Folder 'sandbox/_system/' is system-owned and protected.",
+    ):
         os_client.validate_path(api_path, is_write=True)
 
-    # Запись в download разрешена
     dl_path = os_client.download_dir / "test.txt"
     assert os_client.validate_path(dl_path, is_write=True) == dl_path.resolve()

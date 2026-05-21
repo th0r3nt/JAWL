@@ -1,3 +1,9 @@
+"""
+Trafilatura page reader engine (Strategy).
+
+Extracts clean formatted text locally without third-party services.
+"""
+
 import asyncio
 import trafilatura
 
@@ -11,6 +17,8 @@ from src.l3_agent.swarm.roles import Subagents
 
 
 class TrafilaturaReader:
+    """Local webpage extractor via Trafilatura."""
+
     def __init__(self, client: WebSearchClient):
         self.client = client
 
@@ -34,20 +42,20 @@ class TrafilaturaReader:
         try:
             text = await self.read_raw(url)
             if not text:
-                return SkillResult.fail(
-                    f"Ошибка: не удалось прочитать {url} (капча или нет текста)."
-                )
+                return SkillResult.fail(f"Error: failed to read {url} (captcha or no text).")
 
             total_len = len(text)
             if total_len > self.client.max_page_chars:
-                text = truncate_text(text, self.client.max_page_chars, "... [Текст обрезан]")
-                main_logger.info(f"[Web] Прочитана страница (Trafilatura, с обрезкой): {url}")
+                text = truncate_text(text, self.client.max_page_chars, "... [Truncated]")
+                main_logger.info(f"[Web] Page read (Trafilatura, with truncation): {url}")
             else:
-                main_logger.info(f"[Web] Прочитана страница (Trafilatura, полностью): {url}")
+                main_logger.info(f"[Web] Page read (Trafilatura, entirely): {url}")
 
-            header = f"[Веб-страница (Trafilatura) | Прочитано: {len(text)}/{total_len} симв.]\n{'='*40}\n"
-            self.client.state.add_history(f"Чтение страницы: {url}")
+            header = (
+                f"[Webpage (Trafilatura) | Read: {len(text)}/{total_len} chars]\n{'='*40}\n"
+            )
+            self.client.state.add_history(f"Reading page: {url}")
             return SkillResult.ok(header + text)
 
         except Exception as e:
-            return SkillResult.fail(f"Ошибка парсинга страницы: {e}")
+            return SkillResult.fail(f"Page parsing error: {e}")

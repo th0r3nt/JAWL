@@ -1,3 +1,10 @@
+"""
+Main CLI Menu Loop for JAWL.
+
+Provides an interactive console selection for agent controls, chat terminal,
+log viewers, configuration wizards, and database managers.
+"""
+
 import sys
 import time
 
@@ -19,31 +26,31 @@ from src.cli.screens.terminal_chat import terminal_chat_screen
 
 def main_menu() -> None:
     choices = [
-        questionary.Choice("[>] Запустить агента", "start"),
-        questionary.Choice("[■] Остановить агента", "stop"),
-        questionary.Choice("[@] Чат", "terminal"),
-        questionary.Choice("[i] Логи", "logs"),
-        questionary.Choice("[*] Мастер настройки", "setup"),
-        questionary.Choice("[#] Управление базами данных", "db_manager"),
+        questionary.Choice("[>] Start Agent", "start"),
+        questionary.Choice("[■] Stop Agent", "stop"),
+        questionary.Choice("[@] Chat", "terminal"),
+        questionary.Choice("[i] Logs", "logs"),
+        questionary.Choice("[*] Setup Wizard", "setup"),
+        questionary.Choice("[#] Database Manager", "db_manager"),
         questionary.Separator(" "),
-        questionary.Choice("[x] Выход", "exit"),
+        questionary.Choice("[x] Exit", "exit"),
     ]
 
     while True:
-        set_window_title("JAWL - Главное меню")
+        set_window_title("JAWL - Main Menu")
         draw_header()
 
         result = questionary.select(
-            "Добро пожаловать в JAWL. Выберите действие:",
+            "Welcome to JAWL. Choose an action:",
             choices=choices,
             style=get_custom_style(),
             qmark="",
-            instruction="\n Используйте стрелочки ↑/↓ и Enter\n",
+            instruction="\n Use arrows ↑/↓ and Enter\n",
         ).ask()
 
         if result is None or result == "exit":
             draw_header()
-            print_info(" Отключение. До встречи.")
+            print_info(" Shutting down. Goodbye.")
             time.sleep(1)
             sys.exit(0)
 
@@ -60,21 +67,21 @@ def main_menu() -> None:
 
         elif result == "logs":
             log_choice = questionary.select(
-                "Выберите поток логов для просмотра:",
+                "Select a log stream to view:",
                 choices=[
                     questionary.Separator(" "),
-                    questionary.Choice(" Main (всё сразу)", "main"),
-                    questionary.Choice(" Agent (мысли и действия главного агента)", "agent"),
-                    questionary.Choice(" Swarm (работа субагентов)", "swarm"),
-                    questionary.Choice(" ToT (древо стратегий)", "tot"),
+                    questionary.Choice(" Main (everything at once)", "main"),
+                    questionary.Choice(" Agent (main agent thoughts and actions)", "agent"),
+                    questionary.Choice(" Swarm (subagents activity)", "swarm"),
+                    questionary.Choice(" ToT (thoughts simulation tree)", "tot"),
                     questionary.Choice(
-                        " Subconscious (подсознательные паттерны)", "subconscious"
+                        " Subconscious (background cognitive patterns)", "subconscious"
                     ),
                     questionary.Separator(" "),
-                    questionary.Separator("--- Управление ---"),
-                    questionary.Choice(" Очистить все логи", "clear"),
+                    questionary.Separator("--- Controls ---"),
+                    questionary.Choice(" Clear all logs", "clear"),
                     questionary.Separator(" "),
-                    questionary.Choice("↩ Назад", "back"),
+                    questionary.Choice("↩ Back", "back"),
                 ],
                 instruction=" ",
             ).ask()
@@ -85,12 +92,12 @@ def main_menu() -> None:
                 if LOG_DIR.exists():
                     for log_file in LOG_DIR.glob("*.log*"):
                         try:
-                            # Безопасно очищаем файл не удаляя его, чтобы не сломать открытые дескрипторы логгера
+                            # Safely clear the file without deleting to preserve active file descriptors
                             with open(log_file, "w", encoding="utf-8") as f:
                                 f.truncate(0)
                         except Exception:
                             pass
-                print_info(" Все лог-файлы успешно очищены.")
+                print_info(" All log files cleared successfully.")
                 time.sleep(1.5)
             elif log_choice and log_choice != "back":
                 launch_in_new_window(f"--logs-{log_choice}")

@@ -1,3 +1,7 @@
+"""
+GitHub interface plugin.
+"""
+
 from typing import List, Any, Dict, Optional
 from src.utils.logger import main_logger
 from src.l2_interfaces.base import BaseInterface
@@ -55,5 +59,5 @@ class GithubPlugin(BaseInterface):
         container.context_registry.register_provider(
             "github", client.get_context_block, ContextSection.INTERFACES
         )
-        main_logger.info("[Github] Интерфейс загружен (Plugin).")
+        main_logger.info("[Github] Interface loaded (Plugin).")
         return [client, events]

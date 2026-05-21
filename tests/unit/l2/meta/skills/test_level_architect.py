@@ -25,7 +25,7 @@ async def test_toggle_interface_no_keys_fail(meta_client):
 
     res = await skills.toggle_interface("telegram_telethon", True)
     assert res.is_success is False
-    assert "отсутствуют TELETHON_API_ID" in res.message
+    assert "missing TELETHON_API_ID" in res.message
 
 
 @pytest.mark.asyncio

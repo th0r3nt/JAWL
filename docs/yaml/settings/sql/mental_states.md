@@ -1,14 +1,14 @@
-# Социальный радар (Mental States / Active CRM)
+# Mental States
 
-Модуль `Mental States` — это персональная CRM-система агента для отслеживания внешнего мира (людей, других ботов, серверов, проектов).
+The `Mental States` module is a personal CRM system for tracking external entities (users, other bots, servers, projects).
 
-В отличие от сухих баз данных, этот модуль формирует **"Отношение"** агента к объектам:
-* **Attitude (Отношение):** Агент может испытывать `Friendly` (дружелюбие) к одному пользователю и `Suspicious` (подозрительность) к падающему серверу.
-* **Directives (Директивы):** Индивидуальные правила общения (например, "Никогда не шутить с этим пользователем" или "Делать бэкап перед любым изменением на этом сервере").
-* **Relations (Связи):** Агент помнит, как сущности относятся друг к другу (Например, "Пользователь А ненавидит сервер Б").
+Unlike dry databases, this module compiles the agent's **"Attitude"** toward targets:
+* **Attitude:** The agent can feel `Friendly` toward a particular user or `Suspicious` toward a failing server.
+* **Directives:** Individual interaction guidelines (for example, "Never joke with this user" or "Take backup before modifying files on this server").
+* **Relations:** The agent remembers interpersonal connections (for example, "User A hates Server B").
 
-Эти данные всегда висят в системном промпте. Это заставляет агента органично менять свое поведение в зависимости от того, с кем он сейчас говорит или какой файл редактирует.
+These states are constantly injected into the system prompt, causing the agent to organically adapt its tone and decisions based on who it is talking to or which file it is editing.
 
-## Параметры (`system.db.sql.mental_states`)
+## Parameters (`system.db.sql.mental_states`)
 * **`enabled`**: `true` / `false`.
-* **`max_entities`**: Жесткий лимит на количество отслеживаемых сущностей, чтобы не переполнить контекстное окно.
+* **`max_entities`**: Strict limit on the number of tracked entities to protect the context window.

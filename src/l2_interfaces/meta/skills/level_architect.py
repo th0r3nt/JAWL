@@ -1,8 +1,8 @@
 """
-Навыки Meta уровня 2 (ARCHITECT).
+Meta Level 2 skills (ARCHITECT).
 
-Управление системными интерфейсами и жизненным циклом.
-Позволяет агенту аппаратно отключать/включать компоненты JAWL и инициировать ребут.
+System interfaces and lifecycle management.
+Allows the agent to hardware-disable/enable JAWL components and initiate a reboot.
 """
 
 from typing import Literal
@@ -14,7 +14,7 @@ from src.utils.logger import main_logger
 
 
 class MetaArchitect:
-    """Уровень 2 (ARCHITECT). Управление жизненным циклом системы и интерфейсами."""
+    """Level 2 (ARCHITECT). System lifecycle and interfaces management."""
 
     def __init__(self, meta_client: MetaClient) -> None:
         self.client = meta_client
@@ -34,13 +34,13 @@ class MetaArchitect:
         state: bool,
     ) -> SkillResult:
         """
-        Toggles system interfaces via YAML config. 
-        
-        interface: Target module name. 
+        Toggles system interfaces via YAML config.
+
+        interface: Target module name.
         state: True to enable, False to disable.
         """
 
-        # Маппинг ключей из Literal на реальные пути в interfaces.yaml
+        # Mapping keys from Literal to real paths in interfaces.yaml
         ifmap = {
             "host_os": ["host", "os", "enabled"],
             "telegram_telethon": ["telegram", "telethon", "enabled"],
@@ -53,55 +53,50 @@ class MetaArchitect:
 
         path_keys = ifmap[interface]
 
-        # Проверка зависимостей (.env) перед включением
+        # Dependencies verification (.env) before enabling
         if state is True:
             if interface == "telegram_telethon" and not (
                 self.client.has_env_key("TELETHON_API_ID")
                 and self.client.has_env_key("TELETHON_API_HASH")
             ):
                 return SkillResult.fail(
-                    "Ошибка при включении Telethon: отсутствуют TELETHON_API_ID и TELETHON_API_HASH в .env."
+                    "Error enabling Telethon: missing TELETHON_API_ID and TELETHON_API_HASH in .env."
                 )
 
             if interface == "telegram_aiogram" and not self.client.has_env_key(
                 "AIOGRAM_BOT_TOKEN"
             ):
                 return SkillResult.fail(
-                    "Ошибка при включении Aiogram: отсутствует AIOGRAM_BOT_TOKEN в .env."
+                    "Error enabling Aiogram: missing AIOGRAM_BOT_TOKEN in .env."
                 )
 
             if interface == "github" and not self.client.has_env_key("GITHUB_TOKEN"):
                 main_logger.warning(
-                    "[Meta] Github включается без токена (Read-Only режим с лимитом 60 запросов)."
+                    "[Meta] Github is enabled without a token (Read-Only mode with a limit of 60 requests)."
                 )
 
         success = await self.client.update_yaml(self.client.interfaces_path, path_keys, state)
         if success:
-            state_str = "включен" if state else "выключен"
             return SkillResult.ok("True")
 
-        return SkillResult.fail("Ошибка обновления файла конфигурации.")
+        return SkillResult.fail("Error updating configuration file.")
 
     @skill()
-    async def off_system(self, reason: str = "Без причины") -> SkillResult:
+    async def off_system(self, reason: str = "No reason specified") -> SkillResult:
         """
         Shuts down and completely powers off the system.
         """
 
-        main_logger.info(f"[Meta] Запрошено выключение системы. Причина: {reason}")
+        main_logger.info(f"[Meta] Shutdown requested. Reason: {reason}")
         await self.client.bus.publish(Events.SYSTEM_SHUTDOWN_REQUESTED, reason=reason)
-        return SkillResult.ok(
-            "Команда на выключение принята. Инициирована остановка процессов."
-        )
+        return SkillResult.ok("Shutdown command accepted. Stopping processes.")
 
     @skill()
-    async def reboot_system(self, reason: str = "Обновление конфигурации") -> SkillResult:
+    async def reboot_system(self, reason: str = "Configuration update") -> SkillResult:
         """
         Performs full system reboot.
         """
-        
-        main_logger.info(f"[Meta] Запрошена перезагрузка системы. Причина: {reason}")
+
+        main_logger.info(f"[Meta] Reboot requested. Reason: {reason}")
         await self.client.bus.publish(Events.SYSTEM_REBOOT_REQUESTED, reason=reason)
-        return SkillResult.ok(
-            "Команда на перезагрузку принята. Инициирован ребут. I'll be back."
-        )
+        return SkillResult.ok("Reboot command accepted. Initializing reboot. I'll be back.")
