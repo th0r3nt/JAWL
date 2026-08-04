@@ -6,6 +6,10 @@ Allow the agent to modify its currently active LLM model (switch personalities/p
 and adjust generation creativity (Temperature).
 """
 
+from typing import Literal
+
+from src.utils.event.registry import Events
+
 from src.l2_interfaces.meta.client import MetaClient
 from src.l3_agent.skills.registry import SkillResult, skill
 
@@ -15,6 +19,30 @@ class MetaSafe:
 
     def __init__(self, meta_client: MetaClient) -> None:
         self.client = meta_client
+
+    async def sleep(
+        self,
+        duration: int = 1800,
+        depth: Literal["deep", "superficially"] = "deep",
+    ) -> SkillResult:
+        """
+        Puts the agent to sleep for a specified duration with custom event sensitivity depth.
+
+        depth: 'deep' (low event sensitivity) or 'superficially' (high event sensitivity).
+        """
+        if duration < 1:
+            return SkillResult.fail("Error: Sleep duration must be at least 1 second.")
+
+        if depth not in ("deep", "superficially"):
+            return SkillResult.fail("Error: depth must be 'deep' or 'superficially'.")
+
+        await self.client.bus.publish(
+            Events.SYSTEM_SLEEP_REQUESTED, duration=duration, depth=depth
+        )
+        return SkillResult.ok(
+            f"True. Engaged sleep mode for {duration} seconds (depth: '{depth}').",
+            terminate_loop=True,
+        )
 
     @skill()
     async def change_model(self, model_name: str) -> SkillResult:

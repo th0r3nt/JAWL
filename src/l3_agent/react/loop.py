@@ -175,6 +175,23 @@ class ReactLoop:
 
                 parsed_response, error_msg = self._parse_response(raw_answer)
                 if error_msg:
+                    log_err = f"[ReAct] JSON parse error on step {self.agent_state.current_step}: {error_msg}"
+                    agent_logger.warning(log_err)
+                    main_logger.warning(log_err)
+                    agent_logger.debug(f"[ReAct] Raw LLM response was:\n{raw_answer}")
+
+                    # Фиксируем тик-ошибку в БД, чтобы на следующем шаге контекст изменился
+                    await self.sql_ticks.save_tick(
+                        thoughts=f"[JSON Parse Error]: {error_msg}",
+                        actions=[],
+                        results={
+                            "error": error_msg,
+                            "raw_answer": raw_answer[:500],
+                            "step": self.agent_state.current_step,
+                            "max_steps": self.agent_state.max_react_steps,
+                        },
+                    )
+
                     self.agent_state.next_step()
                     continue
 
@@ -183,6 +200,9 @@ class ReactLoop:
 
                 if thoughts:
                     log = f"[Thoughts]:\n{thoughts}\n"
+                    agent_logger.info(log)
+                else:
+                    log = "[Thoughts]: [No structured thoughts provided by LLM]\n"
                     agent_logger.info(log)
 
                 # --------------------------------------------------------------
@@ -198,6 +218,11 @@ class ReactLoop:
                 # --------------------------------------------------------------
 
                 await self._execute_actions(thoughts, actions)
+
+                if getattr(self.agent_state.last_actions_result, "terminate_loop", False):
+                    log = "[ReAct] Early loop termination requested by skill (sleep/shutdown). Concluding cycle."
+                    agent_logger.info(log)
+                    break
 
                 self.agent_state.next_step()
 

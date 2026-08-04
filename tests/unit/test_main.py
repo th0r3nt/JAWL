@@ -48,13 +48,18 @@ async def test_watch_for_stop_file_triggers_shutdown(tmp_path):
     )
 
 
+@patch("src.main.SystemInstanceLock")
 @patch("src.main.SystemOrchestrator")
 @patch("src.main.SystemBuilder")
 @patch("src.main.load_config")
 @patch("src.main.clear_registry")
-def test_main_keyboard_interrupt(mock_clear, mock_load, mock_builder_cls, mock_orchestrator):
+def test_main_keyboard_interrupt(mock_clear, mock_load, mock_builder_cls, mock_orchestrator, mock_lock_cls):
     """Тест: main() ловит KeyboardInterrupt и возвращает код 0."""
     mock_load.return_value = (SettingsConfig(), InterfacesConfig())
+
+    mock_lock = MagicMock()
+    mock_lock.acquire.return_value = True
+    mock_lock_cls.return_value = mock_lock
 
     # Мокаем Builder, чтобы не поднимались реальные БД
     mock_builder_instance = MagicMock()
@@ -71,13 +76,18 @@ def test_main_keyboard_interrupt(mock_clear, mock_load, mock_builder_cls, mock_o
     instance.stop.assert_awaited_once()
 
 
+@patch("src.main.SystemInstanceLock")
 @patch("src.main.SystemOrchestrator")
 @patch("src.main.SystemBuilder")
 @patch("src.main.load_config")
 @patch("src.main.clear_registry")
-def test_main_critical_exception(mock_clear, mock_load, mock_builder_cls, mock_orchestrator):
+def test_main_critical_exception(mock_clear, mock_load, mock_builder_cls, mock_orchestrator, mock_lock_cls):
     """Тест: main() ловит любые исключения и не падает жестко."""
     mock_load.return_value = (SettingsConfig(), InterfacesConfig())
+
+    mock_lock = MagicMock()
+    mock_lock.acquire.return_value = True
+    mock_lock_cls.return_value = mock_lock
 
     # Мокаем Builder, чтобы не поднимались реальные БД
     mock_builder_instance = MagicMock()

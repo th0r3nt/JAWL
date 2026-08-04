@@ -78,3 +78,25 @@ async def test_react_inject_images_success(mock_dependencies, tmp_path):
     assert isinstance(last_msg_content, list)
     assert last_msg_content[0]["type"] == "text"
     assert last_msg_content[1]["type"] == "image_url"
+
+
+@pytest.mark.asyncio
+@patch("src.l3_agent.react.loop.execute_skill", new_callable=AsyncMock)
+async def test_react_early_termination_on_sleep_skill(mock_execute_skill, mock_dependencies):
+    """Тест: Вызов навыка с terminate_loop=True мгновенно прерывает ReAct-цикл на 1-м шаге."""
+    from src.l3_agent.skills.registry import ExecutionResult
+
+    deps = mock_dependencies
+    deps["agent_state"].max_react_steps = 15
+    loop = ReactLoop(**deps)
+
+    deps["executor"].execute.return_value = (
+        '{"reflection": "Иду спать", "actions": [{"tool_name": "MetaSafe.sleep", "parameters": {}}]}'
+    )
+    mock_execute_skill.return_value = ExecutionResult("Sleeping...", terminate_loop=True)
+
+    await loop.run("TEST", {}, missed_events=[])
+
+    # Должен быть вызван только 1 раз (без лишнего 2-го шага)
+    assert deps["executor"].execute.call_count == 1
+    assert deps["agent_state"].current_step == 1

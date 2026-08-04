@@ -35,6 +35,9 @@ class EventBridge:
         self.container.event_bus.subscribe(
             Events.SYSTEM_DASHBOARD_UPDATE, self._handle_dashboard_update
         )
+        self.container.event_bus.subscribe(
+            Events.SYSTEM_SLEEP_REQUESTED, self._handle_sleep_requested
+        )
 
         # Dynamic Heartbeat subscription mapping
         system_events = {
@@ -64,10 +67,22 @@ class EventBridge:
 
             if self.container.heartbeat:
                 self.container.heartbeat.answer_to_event(
-                    level=evt.level, event_name=evt.name, payload=kwargs
+                    level=evt.level,
+                    event_name=evt.name,
+                    payload=kwargs,
+                    requires_attention=evt.requires_attention,
                 )
 
         return handler
+
+    async def _handle_sleep_requested(self, **kwargs: Any) -> None:
+        """
+        Custom sleep mode request handler.
+        """
+        duration = kwargs.get("duration", 1800)
+        depth = kwargs.get("depth", "deep")
+        if self.container.heartbeat:
+            self.container.heartbeat.set_custom_sleep(duration, depth)
 
     # =========================================================================
     # SYSTEM COMMANDS AND CONFIGURATION CONTROLLERS

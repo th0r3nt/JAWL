@@ -1,3 +1,7 @@
+"""
+E2E тесты жизненного цикла агента и проверки очистки 'зомби'-файлов блокировки (PID/Lock).
+"""
+
 import subprocess
 from unittest.mock import patch
 from pathlib import Path
@@ -7,10 +11,15 @@ from src.utils._tools import is_agent_running
 
 def test_e2e_is_agent_running_cleans_zombie_pid(tmp_path: Path):
     """
-    E2E Тест: Обнаружение "процессов-призраков".
-    Мы создаем реальный процесс Python, записываем его PID.
-    Затем убиваем процесс. Функция is_agent_running должна понять,
-    что процесс мертв, вернуть False и физически удалить мусорный файл agent.pid.
+    E2E тест для проверки корректного обнаружения и очистки 'процессов-призраков'.
+
+    Сценарий:
+    1. Инициализируется реальный дочерний процесс Python.
+    2. Его PID сохраняется в файл, имитируя состояние работы агента.
+    3. Процесс принудительно завершается (имитация сбоя).
+    4. Вызывается 'is_agent_running' для валидации статуса:
+       - Должен вернуть False (процесс неактивен).
+       - Должен инициировать удаление 'зомби'-файлов (agent.pid, agent.lock).
     """
     pid_file = tmp_path / "agent.pid"
     lock_file = tmp_path / "agent.lock"
@@ -54,10 +63,13 @@ def test_e2e_is_agent_running_cleans_zombie_pid(tmp_path: Path):
 
 def test_e2e_is_agent_running_ignores_process_without_lock(tmp_path: Path):
     """
-    E2E Тест: Защита от совпадения PID (PID Collision).
-    Представим, что агент крашнулся, но операционная система выдала
-    тот же самый PID другому случайному Python-процессу (например, pip install).
-    Функция должна вернуть False, так как этот процесс не держит File Lock.
+    E2E тест для проверки устойчивости к совпадению PID (PID Collision).
+
+    Сценарий:
+    1. Процесс крашнулся, PID был переиспользован другим процессом ОС.
+    2. Функция 'is_agent_running' должна вернуть False, так как новый процесс
+       не удерживает обязательную Mutex-блокировку на agent.lock.
+    3. Валидируется корректная очистка старых файлов при отсутствии блокировки.
     """
     pid_file = tmp_path / "agent.pid"
     lock_file = tmp_path / "agent.lock"

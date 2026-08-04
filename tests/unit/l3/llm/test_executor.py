@@ -113,3 +113,32 @@ async def test_executor_all_keys_exhausted(mock_sleep, mock_executor_deps):
 
     assert res == "OK"
     mock_sleep.assert_called_once_with(11)  # wait_time + 1
+
+
+@pytest.mark.asyncio
+@patch("src.l3_agent.llm.executor.asyncio.sleep", new_callable=AsyncMock)
+@patch("src.l3_agent.llm.executor.time.time")
+async def test_executor_min_call_interval_throttling(
+    mock_time, mock_sleep, mock_executor_deps
+):
+    """Тест: Соблюдение минимальной паузы между вызовами LLM API."""
+    llm, tracker = mock_executor_deps
+    mock_session = AsyncMock()
+    mock_response = MagicMock()
+    mock_response.choices[0].message.tool_calls = None
+    mock_response.choices[0].message.content = "OK"
+    mock_session.chat.completions.create.return_value = mock_response
+    llm.get_session.return_value = mock_session
+
+    executor = LLMExecutor(llm, tracker, min_call_interval_sec=2.0)
+
+    # 1-й вызов в t=100.0 (без задержки)
+    mock_time.return_value = 100.0
+    await executor.execute("model", [], 0.7, MagicMock(), "[Log]")
+    mock_sleep.assert_not_called()
+
+    # 2-й вызов в t=101.0 (прошло 1 сек, нужно 2 сек -> вызывается asyncio.sleep(1.0))
+    mock_time.return_value = 101.0
+    await executor.execute("model", [], 0.7, MagicMock(), "[Log]")
+    mock_sleep.assert_called_once()
+    assert abs(mock_sleep.call_args[0][0] - 1.0) < 1e-3

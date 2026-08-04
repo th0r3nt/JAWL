@@ -4,6 +4,8 @@ identity:
 # Подробнее: docs/yaml/settings/llm.md
 llm:
   main_model: unknown # Добавьте свою LLM модель
+  language: "ru" # Целевой язык размышлений и ответов агента ("ru", "en", "auto")
+  min_call_interval_sec: 8.0
   available_models:
     - claude-opus-4.7
     - claude-opus-4.6
@@ -147,12 +149,12 @@ system:
   tree_of_thoughts:
     enabled: false
     llm_model: unknown
-    mode: "hybrid"  # "manual", "auto", "hybrid"
+    mode: "manual"  # "manual", "auto", "hybrid"
 
     auto_interval_steps: 5
     
     branches: 3                # Количество макро-стратегий (Уровень 1)
-    simulations_per_branch: 3  # Количество вложенных сценариев на каждый узел
+    simulations_per_branch: 3  # Количество вложенных сценариев на каждый узел (1.1, 1.2, 1.3, ...)
     max_depth: 4               # Максимальная глубина вложенности (1 -> 1.1 -> 1.1.1)
 
 

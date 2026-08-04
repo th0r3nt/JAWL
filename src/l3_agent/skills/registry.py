@@ -31,14 +31,57 @@ class SkillResult:
 
     is_success: bool
     message: str
+    terminate_loop: bool = False
 
     @classmethod
-    def ok(cls, message: str) -> "SkillResult":
-        return cls(is_success=True, message=message)
+    def ok(cls, message: str, terminate_loop: bool = False) -> "SkillResult":
+        return cls(is_success=True, message=message, terminate_loop=terminate_loop)
 
     @classmethod
     def fail(cls, message: str) -> "SkillResult":
-        return cls(is_success=False, message=message)
+        return cls(is_success=False, message=message, terminate_loop=False)
+
+
+class ExecutionResult(str):
+    """
+    Extends str to carry an optional loop termination flag.
+    Ensures 100% backward compatibility with string operations while
+    allowing the ReAct loop to detect when a skill requests early exit.
+    """
+
+    terminate_loop: bool
+
+    def __new__(cls, value: str, terminate_loop: bool = False):
+        obj = super().__new__(cls, value)
+        obj.terminate_loop = terminate_loop
+        return obj
+
+
+async def execute_skill(
+    actions: List[ActionCall], logger: logging.Logger = agent_logger
+) -> ExecutionResult:
+    """
+    Asynchronously and parallelly executes an array of requested agent actions.
+
+    Args:
+        actions: List of ActionCall objects.
+        logger: Destination logger (defaults to agent_logger).
+    """
+    if not actions:
+        return ExecutionResult("Cycle completed: no actions provided.")
+
+    tasks = []
+    for act in actions:
+        name = act.tool_name
+        params = act.parameters
+        tasks.append(call_skill(name, params, logger=logger))
+
+    results = await asyncio.gather(*tasks)
+
+    should_terminate = any(getattr(res, "terminate_loop", False) for res in results)
+    report = [f"* {actions[i].tool_name}: {res.message}" for i, res in enumerate(results)]
+
+    return ExecutionResult("\n".join(report), terminate_loop=should_terminate)
 
 
 _REGISTRY: Dict[str, Dict[str, Any]] = {}
@@ -304,30 +347,6 @@ def get_skills_library(subconscious_config: Optional[SubconsciousConfig] = None)
     if custom_docs:
         base += "\n\n### CUSTOM SKILLS\n" + "\n".join(custom_docs)
     return base
-
-
-async def execute_skill(
-    actions: List[ActionCall], logger: logging.Logger = agent_logger
-) -> str:
-    """
-    Asynchronously and parallelly executes an array of requested agent actions.
-
-    Args:
-        actions: List of ActionCall objects.
-        logger: Destination logger (defaults to agent_logger).
-    """
-    if not actions:
-        return "Cycle completed: no actions provided."
-
-    tasks = []
-    for act in actions:
-        name = act.tool_name
-        params = act.parameters
-        tasks.append(call_skill(name, params, logger=logger))
-
-    results = await asyncio.gather(*tasks)
-    report = [f"* {actions[i].tool_name}: {res.message}" for i, res in enumerate(results)]
-    return "\n".join(report)
 
 
 async def call_skill(

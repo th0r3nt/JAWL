@@ -114,6 +114,12 @@ class SubagentLoop:
             parsed_response, error_msg = self._parse_response(raw_answer)
 
             if error_msg:
+                log_err = (
+                    f"[Swarm {self.subagent_id}] JSON parse error on step {step}: {error_msg}"
+                )
+                swarm_logger.warning(log_err)
+                swarm_logger.debug(f"[Swarm {self.subagent_id}] Raw answer: {raw_answer}")
+
                 fallback_thoughts = (
                     parsed_response if isinstance(parsed_response, str) else "[JSON Error]"
                 )
@@ -121,7 +127,7 @@ class SubagentLoop:
                     {
                         "thoughts": fallback_thoughts,
                         "actions": "None",
-                        "results": error_msg,
+                        "results": f"[System Error]: Failed to parse JSON response. Details: {error_msg}",
                     }
                 )
                 step += 1

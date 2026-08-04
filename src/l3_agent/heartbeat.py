@@ -8,16 +8,34 @@ from the EventBus, and dynamically adjusting sleep intervals (Event Acceleration
 import asyncio
 import time
 from collections import deque
-from typing import Optional, Dict, Any, TYPE_CHECKING
+from typing import Optional, Dict, Any, Literal, TYPE_CHECKING
 
 from src.utils.logger import main_logger, agent_logger
 from src.utils.event.registry import EventLevel
-from src.utils.dtime import get_now_formatted
+from src.utils.dtime import get_now_formatted, seconds_to_duration_str
 from src.utils._tools import update_last_active_time
 
 if TYPE_CHECKING:
     from src.l3_agent.react.loop import ReactLoop
     from src.utils.settings import EventAccelerationConfig
+
+
+DEPTH_MULTIPLIERS: Dict[str, Dict[EventLevel, float]] = {
+    "deep": {
+        EventLevel.CRITICAL: 0.30,
+        EventLevel.HIGH: 0.80,
+        EventLevel.MEDIUM: 0.85,
+        EventLevel.LOW: 0.90,
+        EventLevel.BACKGROUND: 0.95,
+    },
+    "superficially": {
+        EventLevel.CRITICAL: 0.10,
+        EventLevel.HIGH: 0.70,
+        EventLevel.MEDIUM: 0.75,
+        EventLevel.LOW: 0.80,
+        EventLevel.BACKGROUND: 0.85,
+    },
+}
 
 
 class Heartbeat:
@@ -60,13 +78,54 @@ class Heartbeat:
         self._wake_level: int = 0
 
         self._sleep_memory: deque[Dict[str, Any]] = deque(maxlen=20)
-
         self._active_react_task: Optional[asyncio.Task] = None
-
         self._is_interrupted: bool = False
 
+        self.active_multipliers: Dict[EventLevel, float] = {}
+        self.current_sleep_depth: str = "normal"
+        self._reset_multipliers()
+
+    def _reset_multipliers(self) -> None:
+        """
+        Resets event acceleration multipliers back to settings.yaml defaults.
+        """
+        
+        self.active_multipliers = {
+            EventLevel.CRITICAL: self.accel_config.critical_multiplier,
+            EventLevel.HIGH: self.accel_config.high_multiplier,
+            EventLevel.MEDIUM: self.accel_config.medium_multiplier,
+            EventLevel.LOW: self.accel_config.low_multiplier,
+            EventLevel.BACKGROUND: self.accel_config.background_multiplier,
+        }
+        self.current_sleep_depth = "normal"
+
+    def set_custom_sleep(
+        self, duration_sec: int, depth: Literal["deep", "superficially"] = "deep"
+    ) -> None:
+        """
+        Overrides next wakeup timestamp and applies custom sensitivity depth multipliers.
+
+        Args:
+            duration_sec: Target sleep duration in seconds.
+            depth: Event sensitivity profile ('deep' or 'superficially').
+        """
+        now = time.time()
+        self._next_tick_time = now + duration_sec
+
+        if depth in DEPTH_MULTIPLIERS:
+            self.active_multipliers = DEPTH_MULTIPLIERS[depth].copy()
+            self.current_sleep_depth = depth
+
+        duration_str = seconds_to_duration_str(duration_sec)
+        log = f"[Heartbeat] Custom sleep mode engaged for {duration_str} (depth: '{depth}')."
+        agent_logger.info(log)
+
     def answer_to_event(
-        self, level: EventLevel, event_name: str, payload: Optional[Dict[str, Any]] = None
+        self,
+        level: EventLevel,
+        event_name: str,
+        payload: Optional[Dict[str, Any]] = None,
+        requires_attention: bool = True,
     ) -> None:
         """
         Analyzes incoming events and schedules/accelerates wakeups.
@@ -75,6 +134,7 @@ class Heartbeat:
             level: Event severity level.
             event_name: Triggering event name identifier.
             payload: Event parameters.
+            requires_attention: Whether the event should be explicitly injected into the agent's context.
         """
 
         now = time.time()
@@ -88,22 +148,8 @@ class Heartbeat:
             "payload": payload,
         }
 
-        # Determine event level multiplier
-        multiplier = 1.0
-        if level == EventLevel.CRITICAL:
-            multiplier = self.accel_config.critical_multiplier
-
-        elif level == EventLevel.HIGH:
-            multiplier = self.accel_config.high_multiplier
-
-        elif level == EventLevel.MEDIUM:
-            multiplier = self.accel_config.medium_multiplier
-
-        elif level == EventLevel.LOW:
-            multiplier = self.accel_config.low_multiplier
-
-        elif level == EventLevel.BACKGROUND:
-            multiplier = self.accel_config.background_multiplier
+        # Look up active multiplier based on current depth profile
+        multiplier = self.active_multipliers.get(level, 1.0)
 
         is_awake = self._active_react_task and not self._active_react_task.done()
 
@@ -112,11 +158,12 @@ class Heartbeat:
         # ---------------------------------------------------------------------
 
         if is_awake:
-            # Inject event directly into the active cycle
-            self.react_loop.add_realtime_event(event_data)
+            # Inject event directly into the active cycle ONLY if it requires attention
+            if requires_attention:
+                self.react_loop.add_realtime_event(event_data)
 
-            log = f"[Heartbeat] Incoming event '{event_name}' ({level.name}) received during agent execution. Data appended to context."
-            agent_logger.info(log)
+                log = f"[Heartbeat] Incoming event '{event_name}' ({level.name}) received during agent execution. Data appended to context."
+                agent_logger.info(log)
 
             # If multiplier is 0.0, perform a hard interruption
             if multiplier <= 0.01:
@@ -128,7 +175,6 @@ class Heartbeat:
                 self._wake_level = level.value
                 self._is_interrupted = True
 
-                # Set timer to zero to restart the cycle immediately after cancel()
                 self._next_tick_time = time.time()
                 self._wake_event.set()
 
@@ -140,7 +186,8 @@ class Heartbeat:
         # Logic for currently sleeping agent
         # ---------------------------------------------------------------------
 
-        self._sleep_memory.append(event_data)
+        if requires_attention:
+            self._sleep_memory.append(event_data)
 
         remaining = self._next_tick_time - now
 
@@ -153,9 +200,7 @@ class Heartbeat:
             self._next_tick_time = now + new_remaining
             self._wake_event.set()
 
-            # If remaining sleep is cut to zero, execute urgent wakeup
             if new_remaining <= 0.01:
-                # Override primary reason only if the new event is of equal or higher priority
                 if level.value >= self._wake_level:
                     log = f"[Heartbeat] Incoming wakeup event: '{event_name}' ({level.name}). Invoking LLM."
                     agent_logger.info(log)
@@ -204,6 +249,9 @@ class Heartbeat:
                             self._wake_reason = "HEARTBEAT"
                             self._wake_payload = {}
 
+            if not self._is_running:
+                break
+
             if self.continuous_cycle or time.time() >= self._next_tick_time:
                 missed_events = list(self._sleep_memory)
                 self._sleep_memory.clear()
@@ -217,7 +265,10 @@ class Heartbeat:
                             missed_events.pop(i)
                             break
 
-                self._next_tick_time = time.time() + self.heartbeat_interval
+                has_custom_sleep = self.current_sleep_depth != "normal"
+                if not has_custom_sleep:
+                    self._next_tick_time = time.time() + self.heartbeat_interval
+                    self._reset_multipliers()
 
                 try:
                     self._active_react_task = asyncio.create_task(
@@ -230,7 +281,13 @@ class Heartbeat:
                     await self._active_react_task
                     self._wake_reason = "HEARTBEAT"
                     self._wake_payload = {}
-                    
+
+                    if has_custom_sleep:
+                        self.current_sleep_depth = "normal"
+                    else:
+                        self._next_tick_time = time.time() + self.heartbeat_interval
+                        self._reset_multipliers()
+
                 except asyncio.CancelledError:
                     if self._is_interrupted:
                         main_logger.info(
@@ -245,6 +302,7 @@ class Heartbeat:
                     self._next_tick_time = time.time() + self.heartbeat_interval
                     self._wake_reason = "HEARTBEAT"
                     self._wake_payload = {}
+                    self._reset_multipliers()
                 finally:
                     self._active_react_task = None
 

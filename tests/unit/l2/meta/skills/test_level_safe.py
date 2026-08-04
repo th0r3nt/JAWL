@@ -1,5 +1,6 @@
 import pytest
 from src.l2_interfaces.meta.skills.level_safe import MetaSafe
+from src.utils.event.registry import Events
 
 
 @pytest.mark.asyncio
@@ -65,3 +66,28 @@ async def test_meta_safe_set_current_goal(meta_client):
     assert res_clear.is_success is True
     assert meta_client.agent_state.current_goal == ""
     # assert "сброшена" in res_clear.message
+
+
+@pytest.mark.asyncio
+async def test_meta_safe_sleep_skill(meta_client):
+    """Тест: Навык sleep корректно публикует событие в EventBus и запрашивает завершение цикла."""
+    skills = MetaSafe(meta_client)
+
+    # 1. Валидный вызов
+    res = await skills.sleep(duration=3600, depth="deep")
+    assert res.is_success is True
+    assert res.terminate_loop is True
+    assert "3600 seconds" in res.message
+    meta_client.bus.publish.assert_called_with(
+        Events.SYSTEM_SLEEP_REQUESTED, duration=3600, depth="deep"
+    )
+
+    # 2. Невалидная глубина
+    res_bad_depth = await skills.sleep(duration=60, depth="invalid")
+    assert res_bad_depth.is_success is False
+    assert res_bad_depth.terminate_loop is False
+
+    # 3. Невалидная длительность
+    res_bad_dur = await skills.sleep(duration=-5)
+    assert res_bad_dur.is_success is False
+    assert res_bad_dur.terminate_loop is False

@@ -298,6 +298,13 @@ class Events:
         requires_attention=False,
     )
 
+    SYSTEM_SLEEP_REQUESTED = EventConfig(
+        name="SYSTEM_SLEEP_REQUESTED",
+        description="Agent requested custom sleep duration and event sensitivity depth.",
+        level=EventLevel.INFO,
+        requires_attention=False,
+    )
+
     REACT_TICK_SAVED = EventConfig(
         name="REACT_TICK_SAVED",
         description="Reasoning step successfully completed.",

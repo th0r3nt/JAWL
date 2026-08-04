@@ -106,7 +106,7 @@ class APIKeyRotator:
 
         if key in self.keys:
             self._cooldowns[key] = time.time() + seconds
-            masked = key[:6] + "***" if len(key) > 6 else "***"
+            masked = key[:8] + "***" if len(key) > 8 else "***"
 
             reason = "Quota Exceeded" if seconds > 3600 else "Rate Limit"
             main_logger.warning(

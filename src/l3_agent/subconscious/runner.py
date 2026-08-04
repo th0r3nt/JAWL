@@ -86,6 +86,10 @@ class SubconsciousRunner:
 
             parsed, error = self._parse_response(raw_answer)
             if error:
+                log_err = f"[Subconscious] Pattern {pattern.value.upper()} JSON parse error: {error}"
+                subc_logger.warning(log_err)
+                subc_logger.debug(f"[Subconscious] Raw answer: {raw_answer}")
+
                 messages.append({"role": "assistant", "content": raw_answer})
                 messages.append({"role": "user", "content": f"System Error: {error}"})
                 continue

@@ -6,6 +6,7 @@ Encapsulates the logic of communicating with OpenAI-compatible APIs:
 - Handling Rate Limits and extracting cooldown time from response headers
 - Banning dead or invalid keys (HTTP 401)
 - Counting and tracking token usage
+- Enforcing minimum call intervals (throttling)
 
 Adheres strictly to Single Responsibility Principle (SRP): agent reasoning loops
 (ReAct, Swarm) remain completely unaware of raw HTTP errors.
@@ -29,15 +30,43 @@ class LLMExecutor:
     Hides all complexity of handling network and API errors.
     """
 
-    def __init__(self, llm_client: LLMClient, token_tracker: TokenTracker) -> None:
+    def __init__(
+        self,
+        llm_client: LLMClient,
+        token_tracker: TokenTracker,
+        min_call_interval_sec: float = 0.0,
+    ) -> None:
         """
         Args:
             llm_client: Client for retrieving HTTP sessions (AsyncOpenAI).
             token_tracker: Tool for tracking input and output tokens.
+            min_call_interval_sec: Minimum delay in seconds required between API calls.
         """
 
         self.llm = llm_client
         self.tracker = token_tracker
+        self.min_call_interval_sec = min_call_interval_sec
+        self._last_call_time: float = 0.0
+
+    async def _enforce_min_call_interval(
+        self, logger: logging.Logger, log_prefix: str
+    ) -> None:
+        """
+        Enforces a minimum time delay between consecutive LLM requests.
+        """
+        if self.min_call_interval_sec <= 0.0:
+            return
+
+        now = time.time()
+        elapsed = now - self._last_call_time
+        if self._last_call_time > 0.0 and elapsed < self.min_call_interval_sec:
+            delay = self.min_call_interval_sec - elapsed
+            logger.info(
+                f"{log_prefix} Throttling request: waiting {delay:.2f}s to respect min_call_interval_sec ({self.min_call_interval_sec})."
+            )
+            await asyncio.sleep(delay)
+
+        self._last_call_time = time.time()
 
     async def execute(
         self,
@@ -47,12 +76,12 @@ class LLMExecutor:
         logger: logging.Logger,
         log_prefix: str,
         tools: Optional[List[Dict[str, Any]]] = None,
-        tool_choice: Optional[str] = None, 
+        tool_choice: Optional[str] = None,
         max_retries: int = 1,
         max_timeout_retries: int = 1,
     ) -> Optional[str]:
         """
-        Executes a request to the LLM with a robust retry system.
+        Executes a request to the LLM with a robust retry system and call throttling.
 
         Args:
             model_name: Name of the target model (e.g., 'gemini-3.1-flash-lite').
@@ -75,6 +104,9 @@ class LLMExecutor:
 
         for attempt in range(max_retries):
             try:
+                # Respect minimum interval between calls before obtaining a session
+                await self._enforce_min_call_interval(logger, log_prefix)
+
                 # Retrieve an active authenticated session
                 session = self.llm.get_session()
 

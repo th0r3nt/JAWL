@@ -1,6 +1,6 @@
 import pytest
 import time
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 
 from src.utils.event.registry import EventLevel
 from src.l3_agent.heartbeat import Heartbeat
@@ -162,3 +162,30 @@ def test_heartbeat_priority_overwriting(mock_react_loop, mock_accel_config):
     hb.answer_to_event(EventLevel.LOW, "LOW_EVENT")
     assert hb._wake_level == EventLevel.CRITICAL.value
     assert hb._wake_reason == "CRITICAL_EVENT"
+
+
+def test_heartbeat_ignores_events_without_requires_attention(mock_react_loop, mock_accel_config):
+    """Тест: События с requires_attention=False не должны попадать в realtime_event или sleep_memory."""
+    hb = Heartbeat(
+        mock_react_loop,
+        heartbeat_interval=60,
+        continuous_cycle=False,
+        accel_config=mock_accel_config,
+        timezone=3,
+    )
+    
+    # 1. Симулируем, что агент бодрствует
+    hb._active_react_task = MagicMock()
+    hb._active_react_task.done.return_value = False
+
+    # Отправляем REACT_TICK_SAVED (requires_attention=False)
+    hb.answer_to_event(
+        level=EventLevel.INFO, 
+        event_name="REACT_TICK_SAVED", 
+        payload={}, 
+        requires_attention=False
+    )
+
+    # Ивент НЕ должен быть передан в реакт-цикл
+    mock_react_loop.add_realtime_event.assert_not_called()
+    assert len(hb._sleep_memory) == 0

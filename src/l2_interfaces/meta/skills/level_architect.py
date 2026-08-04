@@ -89,7 +89,9 @@ class MetaArchitect:
 
         main_logger.info(f"[Meta] Shutdown requested. Reason: {reason}")
         await self.client.bus.publish(Events.SYSTEM_SHUTDOWN_REQUESTED, reason=reason)
-        return SkillResult.ok("Shutdown command accepted. Stopping processes.")
+        return SkillResult.ok(
+            "Shutdown command accepted. Stopping processes.", terminate_loop=True
+        )
 
     @skill()
     async def reboot_system(self, reason: str = "Configuration update") -> SkillResult:
@@ -99,4 +101,7 @@ class MetaArchitect:
 
         main_logger.info(f"[Meta] Reboot requested. Reason: {reason}")
         await self.client.bus.publish(Events.SYSTEM_REBOOT_REQUESTED, reason=reason)
-        return SkillResult.ok("Reboot command accepted. Initializing reboot. I'll be back.")
+        return SkillResult.ok(
+            "Reboot command accepted. Initializing reboot. I'll be back.",
+            terminate_loop=True,
+        )

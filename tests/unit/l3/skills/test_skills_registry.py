@@ -158,3 +158,18 @@ async def test_guard_validation_error_feedback(mock_typed_func):
     assert "my_list" in report
     # Ошибка Pydantic о том, что ожидался массив
     assert "valid array" in report.lower() or "valid list" in report.lower()
+
+
+@pytest.mark.asyncio
+async def test_execute_skill_early_termination():
+    """Тест: execute_skill прокидывает флаг terminate_loop в ExecutionResult."""
+
+    @skill(name_override="mock.sleep_func")
+    async def dummy_sleep_func() -> SkillResult:
+        return SkillResult.ok("Sleeping", terminate_loop=True)
+
+    actions = [ActionCall(tool_name="mock.sleep_func", parameters={})]
+    result = await execute_skill(actions=actions)
+
+    assert result.terminate_loop is True
+    assert "Sleeping" in result

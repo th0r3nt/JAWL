@@ -51,7 +51,7 @@ class AgentState(BaseModel):
 
     context_high_ticks: int = 3
     context_medium_ticks: int = 7
-    context_low_ticks: int = 20
+    context_low_ticks: int = 15
 
     start_time: float = Field(default_factory=time.time)
     last_input_tokens: int = 0

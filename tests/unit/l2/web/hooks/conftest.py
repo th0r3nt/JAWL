@@ -13,7 +13,7 @@ def hooks_state():
 
 @pytest.fixture
 def hooks_config():
-    return WebHooksConfig(enabled=True, host="127.0.0.1", port=8080, history_limit=5)
+    return WebHooksConfig(enabled=True, host="127.0.0.1", port=58088, history_limit=5)
 
 
 @pytest.fixture

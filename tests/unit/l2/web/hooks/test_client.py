@@ -10,7 +10,7 @@ async def test_hooks_get_context_block(hooks_client):
     block = await hooks_client.get_context_block()
 
     assert "WEB HOOKS [ON]" in block
-    assert "127.0.0.1:8080" in block
+    assert f"127.0.0.1:{hooks_client.config.port}" in block
     assert "preview text" in block
 
     hooks_client.state.is_online = False
