@@ -6,6 +6,7 @@ The project is built around the concept of an autonomous agent operating within 
 
 The framework is designed for native execution on the host machine with a flexible access control policy via a built-in Gatekeeper, ensuring safe agent interaction with the OS, file system, and local network without mandatory Docker isolation.
 
+Russian README [is here](https://github.com/th0r3nt/JAWL/blob/main/README_RU.md).
 ---
 
 ## 🏗 Key Architectural Solutions
