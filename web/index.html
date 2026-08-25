@@ -1,0 +1,1077 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>JAWL · Консоль агента V.E.G.A.</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="app">
+
+<!-- ============ ЛЕВАЯ ПАНЕЛЬ ============ -->
+<aside class="rail">
+  <div class="brand">
+    <div class="brand-top">
+      <span class="brand-mark">JAWL</span>
+      <span class="brand-ver" id="brandVer"></span>
+    </div>
+    <div class="brand-sub">Just A While Loop</div>
+  </div>
+
+  <div class="agent">
+    <div class="agent-name" id="railName">V.E.G.A.</div>
+    <div class="agent-meta">
+      <div><b>модель</b> <span id="railModel"></span></div>
+      <div><b>доступ</b> <span id="railAccess"></span></div>
+      <div><b>в работе</b> <span id="railUptime">—</span></div>
+    </div>
+  </div>
+
+  <nav class="nav" role="tablist" aria-label="Разделы консоли">
+    <div class="nav-eyebrow">Разделы</div>
+    <button class="tab" role="tab" aria-selected="true" data-tab="settings">
+      <span class="code">SYS</span><span class="label">Параметры</span><span class="count">L3</span>
+    </button>
+    <button class="tab" role="tab" aria-selected="false" data-tab="interfaces">
+      <span class="code">IFC</span><span class="label">Интерфейсы</span><span class="count" id="ifcTabCount">0/0</span>
+    </button>
+    <button class="tab" role="tab" aria-selected="false" data-tab="chat">
+      <span class="code">CHT</span><span class="label">Чат с агентом</span><span class="count">•</span>
+    </button>
+    <button class="tab" role="tab" aria-selected="false" data-tab="db">
+      <span class="code">DAT</span><span class="label">База данных</span><span class="count"></span>
+    </button>
+    <button class="tab" role="tab" aria-selected="false" data-tab="logs">
+      <span class="code">LOG</span><span class="label">Логи</span><span class="count" id="logTabCount"></span>
+    </button>
+  </nav>
+</aside>
+
+<!-- ============ ОСНОВНОЙ ЭКРАН ============ -->
+<main class="main">
+
+  <!-- лента такта -->
+  <div class="pulse">
+    <div class="pulse-left">
+      <div class="pulse-state">
+        <span class="dot live" id="pulseDot"></span>
+        <span class="pulse-word" id="pulseWord">—</span>
+        <span class="pulse-act" id="pulseAct" hidden></span>
+      </div>
+      <div class="pulseline" id="pulseline" data-state="sleep" role="img"
+           aria-label="Пульс такта: всплеск — пробуждение агента">
+        <svg viewBox="0 0 600 30" preserveAspectRatio="none" aria-hidden="true">
+          <defs>
+            <linearGradient id="traceFade" x1="0" x2="1" y1="0" y2="0">
+              <stop offset="0"   stop-color="currentColor" stop-opacity="0"/>
+              <stop offset=".45" stop-color="currentColor" stop-opacity=".35"/>
+              <stop offset="1"   stop-color="currentColor" stop-opacity="1"/>
+            </linearGradient>
+          </defs>
+          <line class="axis" x1="0" y1="15" x2="600" y2="15"/>
+          <polyline class="trace" id="trace" points=""/>
+        </svg>
+        <span class="pulse-head" id="pulseHead"></span>
+      </div>
+    </div>
+    <div class="pulse-right">
+      <div class="stat"><div class="k" id="wakeKey">Пробуждение через</div><div class="v amber" id="wakeIn">—</div></div>
+      <div class="stat"><div class="k">Шаг ReAct</div><div class="v" id="reactStep">—</div></div>
+      <div class="runctl">
+        <button class="btn-run go" id="btnStart" disabled>Запустить</button>
+        <button class="btn-run halt" id="btnStop">Остановить</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======================================================= 1. ПАРАМЕТРЫ -->
+  <section class="panel" data-panel="settings">
+    <div class="head">
+      <div class="h-title"><h1>Параметры фреймворка</h1></div>
+      <p class="h-desc">Ядро L3: цикл рассуждения, память, рой, симуляция. Изменения применяются на следующем такте — перезапуск не нужен.</p>
+      <div class="seg" role="tablist">
+        <button role="tab" aria-selected="true" data-sub="s-core">Личность и LLM</button>
+        <button role="tab" aria-selected="false" data-sub="s-beat">Такт и события</button>
+        <button role="tab" aria-selected="false" data-sub="s-ctx">Контекст и RAG</button>
+        <button role="tab" aria-selected="false" data-sub="s-mem">Память</button>
+        <button role="tab" aria-selected="false" data-sub="s-drives">Мотиваторы</button>
+        <button role="tab" aria-selected="false" data-sub="s-swarm">Рой</button>
+        <button role="tab" aria-selected="false" data-sub="s-tot">Дерево мыслей</button>
+        <button role="tab" aria-selected="false" data-sub="s-sub">Подсознание</button>
+        <button role="tab" aria-selected="false" data-sub="s-files">Файлы</button>
+      </div>
+    </div>
+    <div class="scroll">
+      <div class="notice" id="cfgNotice">Читаю config/settings.yaml и .env…</div>
+
+      <!-- личность и LLM -->
+      <div class="sub" data-sub="s-core">
+        <div class="grid g2">
+          <div class="card">
+            <header><h3>Личность</h3></header>
+            <div class="body">
+              <div class="field"><div class="fl"><div class="fn">Имя агента</div><div class="fd">Подставляется в системный промпт и в приветствие интерфейсов</div></div>
+                <div class="fc"><input type="text" class="wide" id="agentName" data-cfg="settings:identity.agent_name" placeholder="—" disabled></div></div>
+              <div class="field"><div class="fl"><div class="fn">Язык мышления и ответов</div><div class="fd">prompt/system/languages</div></div>
+                <div class="fc"><select data-cfg="settings:llm.language" disabled><option value="ru">ru — русский</option><option value="en">en — английский</option><option value="auto">auto — по языку собеседника</option></select></div></div>
+              <div class="field"><div class="fl"><div class="fn">Файл характера</div><div class="fd">SOUL.md</div></div>
+                <div class="fc"><button class="btn" title="Показать в проводнике" data-action="reveal" data-path="src/l3_agent/prompt/personality/SOUL.md">Открыть</button></div></div>
+              <div class="field"><div class="fl"><div class="fn">Примеры стиля речи</div><div class="fd">EXAMPLES_OF_STYLE.md</div></div>
+                <div class="fc"><button class="btn" title="Показать в проводнике" data-action="reveal" data-path="src/l3_agent/prompt/personality/EXAMPLES_OF_STYLE.md">Открыть</button></div></div>
+              <div class="field"><div class="fl"><div class="fn">Проактивные подсказки</div><div class="fd">Агент сам предлагает следующий шаг, когда задач нет</div></div>
+                <div class="fc"><span class="sw" role="switch" aria-checked="false" data-cfg="settings:system.proactive_guidance" aria-disabled="true"></span></div></div>
+            </div>
+          </div>
+
+          <div class="card">
+            <header><h3>Языковая модель</h3></header>
+            <div class="body">
+              <div class="field"><div class="fl"><div class="fn">Основная модель</div><div class="fd">Используется в главном цикле ReAct</div></div>
+                <div class="fc"><select data-model-role="main" data-cfg="settings:llm.main_model" data-model-value="" disabled></select></div></div>
+              <div class="field"><div class="fl"><div class="fn">Температура</div><div class="fd">0.10 — исполнительность, 1.00 — обычный режим, 3.00 — свободное мышление</div></div>
+                <div class="fc"><input type="range" id="tempRange" min="0" max="200" step="1" value="100" aria-label="Температура, ползунок" disabled><input type="number" id="tempValue" data-cfg="settings:llm.temperature" min="0.1" max="3" step="0.01" value="" aria-label="Температура" disabled></div></div>
+              <div class="field"><div class="fl"><div class="fn">Пауза между вызовами</div><div class="fd">Защита от лимитов провайдера</div></div>
+                <div class="fc"><input type="number" data-cfg="settings:llm.min_call_interval_sec" min="0" max="600" step="0.5" value="" disabled><span class="unit">сек</span></div></div>
+              <div class="field"><div class="fl"><div class="fn">Максимум шагов ReAct</div><div class="fd">После лимита такт закрывается принудительно</div></div>
+                <div class="fc"><input type="number" data-cfg="settings:llm.max_react_steps" min="1" max="100" value="" disabled><span class="unit">шаг</span></div></div>
+              <div class="field"><div class="fl"><div class="fn">Мультимодальность</div><div class="fd">Передавать в модель изображения и скриншоты</div></div>
+                <div class="fc"><span class="sw" role="switch" aria-checked="false" id="isMultimodal" data-cfg="settings:llm.is_multimodal" aria-disabled="true"></span></div></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid g2 mt">
+          <div class="card">
+            <header><h3>Доступные модели</h3></header>
+            <div class="body">
+              <div id="modelList">
+                <div class="mdl">
+                  <input type="text" value="" aria-label="Название модели" disabled>
+                  <span class="roles"></span>
+                  <button type="button" class="icobtn danger delmodel" aria-label="Удалить модель"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 5l14 14M19 5L5 19"/></svg></button>
+                </div>
+              </div>
+              <div class="sec-add"><button class="btn" id="addModel">Добавить модель</button></div>
+              <div class="hint">Список питает все поля выбора модели. Бейджи показывают, где модель назначена сейчас — одна модель может занимать несколько ролей сразу.</div>
+            </div>
+          </div>
+
+          <div class="card">
+            <header><h3>Подключение к LLM</h3></header>
+            <div class="body">
+              <div class="field"><div class="fl"><div class="fn">LLM_API_URL</div><div class="fd">Адрес провайдера. Для локальной модели — адрес Ollama или LM Studio</div></div></div>
+              <div class="sec-c"><input type="text" data-cfg="env:LLM_API_URL" placeholder="—" disabled></div>
+              <div class="divider"></div>
+              <div class="eyebrow">Ключи · ротация по кругу</div>
+              <div id="keyList">
+                <div class="sec">
+                  <div class="sec-k"><span class="n">LLM_API_KEY_1</span><span class="s">пусто</span></div>
+                  <div class="sec-c">
+                    <input type="password" disabled>
+                    <button type="button" class="icobtn eye" aria-pressed="false" aria-label="Показать значение"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1.5 12S5 5 12 5s10.5 7 10.5 7-3.5 7-10.5 7S1.5 12 1.5 12z"/><circle cx="12" cy="12" r="3.2"/></svg></button><button type="button" class="icobtn danger delkey" aria-label="Удалить ключ"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 5l14 14M19 5L5 19"/></svg></button>
+                  </div>
+                </div>
+              </div>
+              <div class="sec-add">
+                <button class="btn" id="addKey">Добавить ключ</button>
+                <button class="btn" data-action="check-llm-keys">Проверить все</button>
+              </div>
+              <div class="divider"></div>
+                <div class="sec">
+                  <div class="sec-k"><span class="n">PROXY_URL</span><span class="s ">пусто</span></div>
+                  <div class="sec-c">
+                    <input type="password" data-cfg="env:PROXY_URL" placeholder="socks5://логин:пароль@адрес:порт" disabled>
+                    <button type="button" class="icobtn eye" aria-pressed="false" aria-label="Показать значение"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1.5 12S5 5 12 5s10.5 7 10.5 7-3.5 7-10.5 7S1.5 12 1.5 12z"/><circle cx="12" cy="12" r="3.2"/></svg></button>
+                  </div>
+                </div>
+              <div class="hint">Общий прокси для всех исходящих запросов, не только к модели.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- такт -->
+      <div class="sub panel-hidden" data-sub="s-beat">
+        <div class="grid g2">
+          <div class="card">
+            <header><h3>Heartbeat</h3></header>
+            <div class="body">
+              <div class="field"><div class="fl"><div class="fn">Непрерывный цикл</div><div class="fd">Агент продолжает думать без входящих сообщений</div></div>
+                <div class="fc"><span aria-disabled="true" class="sw" data-cfg="settings:system.continuous_cycle" role="switch" aria-checked="false"></span></div></div>
+              <div class="field"><div class="fl"><div class="fn">Интервал сна</div><div class="fd">Базовая пауза между тактами, если нет событий</div></div>
+                <div class="fc"><input data-cfg="settings:system.heartbeat_interval" type="number" min="1" max="86400" value="" disabled><span class="unit">сек</span></div></div>
+              <div class="field"><div class="fl"><div class="fn">Часовой пояс</div><div class="fd">Смещение от UTC для меток времени</div></div>
+                <div class="fc"><input data-cfg="settings:system.timezone" type="number" min="-12" max="14" value="" disabled><span class="unit">UTC</span></div></div>
+            </div>
+          </div>
+
+          <div class="card">
+            <header><h3>Ускорение по приоритету события</h3><span class="sub">× интервала сна</span></header>
+            <div class="body">
+              <div class="field"><div class="fl"><div class="fn"><span class="badge err">critical</span> Критический</div><div class="fd">Личка в Telegram, терминал, старт и остановка ядра</div></div>
+                <div class="fc"><input data-cfg="settings:system.event_acceleration.critical_multiplier" type="number" min="0" max="1" step="0.1" value="" disabled><span class="unit">×</span></div></div>
+              <div class="field"><div class="fl"><div class="fn"><span class="badge warn">high</span> Высокий</div><div class="fd">Упоминания в группах, вебхуки, почта, будильник, отчёт субагента</div></div>
+                <div class="fc"><input data-cfg="settings:system.event_acceleration.high_multiplier" type="number" min="0" max="1" step="0.1" value="" disabled><span class="unit">×</span></div></div>
+              <div class="field"><div class="fl"><div class="fn"><span class="badge acc">medium</span> Средний</div><div class="fd">Новые файлы, открытие терминала, активность в репозитории</div></div>
+                <div class="fc"><input data-cfg="settings:system.event_acceleration.medium_multiplier" type="number" min="0" max="1" step="0.1" value="" disabled><span class="unit">×</span></div></div>
+              <div class="field"><div class="fl"><div class="fn"><span class="badge">low</span> Низкий</div><div class="fd">Реакции, действия в чатах, изменение и удаление файлов</div></div>
+                <div class="fc"><input data-cfg="settings:system.event_acceleration.low_multiplier" type="number" min="0" max="1" step="0.1" value="" disabled><span class="unit">×</span></div></div>
+              <div class="field"><div class="fl"><div class="fn"><span class="badge">background</span> Фоновый</div><div class="fd">Сообщения в каналах и группах, RSS, подсознание</div></div>
+                <div class="fc"><input data-cfg="settings:system.event_acceleration.background_multiplier" type="number" min="0" max="1" step="0.1" value="" disabled><span class="unit">×</span></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- контекст и rag -->
+      <div class="sub panel-hidden" data-sub="s-ctx">
+        <div class="grid g2">
+          <div class="card">
+            <header><h3>Глубина контекста</h3></header>
+            <div class="body">
+              <div class="field"><div class="fl"><div class="fn">Полные такты</div><div class="fd">Сколько последних тактов отдаётся целиком</div></div><div class="fc"><input data-cfg="settings:system.context_depth.high_ticks" type="number" min="0" max="100" value="" disabled></div></div>
+              <div class="field"><div class="fl"><div class="fn">Сжатые такты</div><div class="fd">Мысли и действия в укороченном виде</div></div><div class="fc"><input data-cfg="settings:system.context_depth.medium_ticks" type="number" min="0" max="200" value="" disabled></div></div>
+              <div class="field"><div class="fl"><div class="fn">Заголовки тактов</div><div class="fd">Только тема и результат</div></div><div class="fc"><input data-cfg="settings:system.context_depth.low_ticks" type="number" min="0" max="500" value="" disabled></div></div>
+              <div class="divider"></div>
+              <div class="field"><div class="fl"><div class="fn">Символов на действие</div></div><div class="fc"><input data-cfg="settings:system.context_depth.tick_action_max_chars" type="number" min="0" max="100000" step="100" value="" disabled></div></div>
+              <div class="field"><div class="fl"><div class="fn">Символов на результат</div></div><div class="fc"><input data-cfg="settings:system.context_depth.tick_result_max_chars" type="number" min="0" max="100000" step="100" value="" disabled></div></div>
+              <div class="field"><div class="fl"><div class="fn">Символов на сжатые мысли</div></div><div class="fc"><input data-cfg="settings:system.context_depth.tick_thoughts_short_max_chars" type="number" min="0" max="100000" step="100" value="" disabled></div></div>
+            </div>
+          </div>
+          <div class="card">
+            <header><h3>Гибридный RAG</h3></header>
+            <div class="body">
+              <div class="field"><div class="fl"><div class="fn">Подтягивать память в контекст</div><div class="fd">Векторный поиск + обход графа знаний</div></div><div class="fc"><span aria-disabled="true" class="sw" data-cfg="settings:system.context_depth.rag.enabled" role="switch" aria-checked="false"></span></div></div>
+              <div class="field"><div class="fl"><div class="fn">Глубина обхода графа</div><div class="fd">Число рёбер от найденной сущности</div></div><div class="fc"><input data-cfg="settings:system.context_depth.rag.depth_limit" type="number" min="1" max="10" value="" disabled></div></div>
+              <div class="field"><div class="fl"><div class="fn">Векторных блоков</div></div><div class="fc"><input data-cfg="settings:system.context_depth.rag.max_vector_blocks" type="number" min="0" max="50" value="" disabled></div></div>
+              <div class="field"><div class="fl"><div class="fn">Узлов графа</div></div><div class="fc"><input data-cfg="settings:system.context_depth.rag.max_graph_nodes" type="number" min="0" max="50" value="" disabled></div></div>
+              <div class="field"><div class="fl"><div class="fn">Длина запроса</div><div class="fd">Обрезка текста события перед извлечением сущностей</div></div><div class="fc"><input data-cfg="settings:system.context_depth.rag.max_query_chars" type="number" min="0" max="5000" step="10" value="" disabled><span class="unit">зн</span></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- память -->
+      <div class="sub panel-hidden" data-sub="s-mem">
+        <div class="grid g2">
+          <div class="card">
+            <header><h3>Векторная база</h3></header>
+            <div class="body">
+              <div class="field"><div class="fl"><div class="fn">Модель эмбеддингов</div><div class="fd">Считается локально на процессоре</div></div><div class="fc"><select data-cfg="settings:system.db.vector.embedding_model" id="embModel" disabled><option value="intfloat/multilingual-e5-large">e5-large · 100+ языков, ~2,2 ГБ</option><option value="sentence-transformers/paraphrase-multilingual-mpnet-base-v2">mpnet-base · баланс, ~1,0 ГБ</option><option value="sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2">MiniLM-L12 · лёгкая, ~300 МБ</option></select></div></div>
+              <div class="hint warn-hint" id="embWarn" hidden></div>
+              <div class="field"><div class="fl"><div class="fn">Размерность</div></div><div class="fc"><input data-cfg="settings:system.db.vector.vector_size" type="number" min="1" max="8192" value="" disabled></div></div>
+              <div class="field"><div class="fl"><div class="fn">Порог схожести</div><div class="fd">Выше порога запись считается дубликатом</div></div><div class="fc"><input data-cfg="settings:system.db.vector.similarity_threshold" type="number" min="0" max="1" step="0.01" value="" disabled></div></div>
+            </div>
+          </div>
+          <div class="card">
+            <header><h3>Граф знаний</h3></header>
+            <div class="body">
+              <div class="field"><div class="fl"><div class="fn">Максимум узлов</div></div><div class="fc"><input data-cfg="settings:system.db.graph.max_nodes" type="number" min="1" max="1000000" step="100" value="" disabled></div></div>
+              <div class="field"><div class="fl"><div class="fn">Рёбер на узел</div><div class="fd">Слабые связи вытесняются первыми</div></div><div class="fc"><input data-cfg="settings:system.db.graph.max_edges_per_node" type="number" min="1" max="200" value="" disabled></div></div>
+            </div>
+          </div>
+          <div class="card">
+            <header><h3>Реляционная база</h3></header>
+            <div class="body">
+              <div class="field"><div class="fl"><div class="fn">Задачи в контексте</div><div class="fd">Матрица Эйзенхауэра</div></div><div class="fc"><input data-cfg="settings:system.db.sql.tasks.max_tasks" type="number" id="maxTasks" min="0" max="100" value="" disabled></div></div>
+              <div class="field"><div class="fl"><div class="fn">Заметок</div></div><div class="fc"><input data-cfg="settings:system.db.sql.notes.max_notes" type="number" min="0" max="100" value="" disabled></div></div>
+              <div class="field"><div class="fl"><div class="fn">Черт характера</div></div><div class="fc"><input data-cfg="settings:system.db.sql.personality_traits.max_traits" type="number" id="maxTraits" min="0" max="100" value="" disabled></div></div>
+              <div class="field"><div class="fl"><div class="fn">Отслеживаемых сущностей</div><div class="fd">Mental states</div></div><div class="fc"><input data-cfg="settings:system.db.sql.mental_states.max_entities" type="number" id="maxEntities" min="0" max="100" value="" disabled></div></div>
+            </div>
+          </div>
+          <div class="card">
+            <header><h3>Гипотезы</h3></header>
+            <div class="body">
+              <div class="field"><div class="fl"><div class="fn">Модуль включён</div><div class="fd">Расследование причин ошибок и неопределённости</div></div><div class="fc"><span aria-disabled="true" class="sw" data-cfg="settings:system.db.sql.hypotheses.enabled" role="switch" aria-checked="false"></span></div></div>
+              <div class="field"><div class="fl"><div class="fn">Кластеров расследований</div></div><div class="fc"><input data-cfg="settings:system.db.sql.hypotheses.max_clusters" type="number" min="0" max="50" value="" disabled></div></div>
+              <div class="field"><div class="fl"><div class="fn">Гипотез в кластере</div></div><div class="fc"><input data-cfg="settings:system.db.sql.hypotheses.max_hypotheses" type="number" min="0" max="100" value="" disabled></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- мотиваторы -->
+      <div class="sub panel-hidden" data-sub="s-drives">
+        <div class="grid g2">
+          <div class="card">
+            <header><h3>Мотиваторы</h3></header>
+            <div class="body" id="drivesBox">
+              <div class="notice" id="drivesNote" hidden></div>
+              <div class="drive" data-on="true" data-key="curiosity">
+                <div class="drive-head">
+                  <div class="drive-t"><span class="dn">Любопытство</span><span class="dv"></span></div>
+                  <span aria-disabled="true" class="sw" data-cfg="settings:system.db.sql.drives.fundamental.curiosity.enabled" role="switch" aria-checked="false"></span>
+                </div>
+                <div class="meter"><i class="sage" style="width:0%"></i></div>
+                <div class="hint dsc"></div>
+                <div class="drive-cfg">
+                  <label>Рост дефицита <input data-cfg="settings:system.db.sql.drives.fundamental.curiosity.decay.rate" type="number" min="0" max="100" step="0.5" value="" disabled><span class="unit">%</span></label>
+                  <label>Интервал <input data-cfg="settings:system.db.sql.drives.fundamental.curiosity.decay.interval_sec" type="number" min="60" max="86400" step="60" value="" disabled><span class="unit">сек</span></label>
+                </div>
+              </div>
+              <div class="drive" data-on="true" data-key="social">
+                <div class="drive-head">
+                  <div class="drive-t"><span class="dn">Общение</span><span class="dv"></span></div>
+                  <span aria-disabled="true" class="sw" data-cfg="settings:system.db.sql.drives.fundamental.social.enabled" role="switch" aria-checked="false"></span>
+                </div>
+                <div class="meter"><i class="sage" style="width:0%"></i></div>
+                <div class="hint dsc"></div>
+                <div class="drive-cfg">
+                  <label>Рост дефицита <input data-cfg="settings:system.db.sql.drives.fundamental.social.decay.rate" type="number" min="0" max="100" step="0.5" value="" disabled><span class="unit">%</span></label>
+                  <label>Интервал <input data-cfg="settings:system.db.sql.drives.fundamental.social.decay.interval_sec" type="number" min="60" max="86400" step="60" value="" disabled><span class="unit">сек</span></label>
+                </div>
+              </div>
+              <div class="drive" data-on="true" data-key="mastery">
+                <div class="drive-head">
+                  <div class="drive-t"><span class="dn">Мастерство</span><span class="dv"></span></div>
+                  <span aria-disabled="true" class="sw" data-cfg="settings:system.db.sql.drives.fundamental.mastery.enabled" role="switch" aria-checked="false"></span>
+                </div>
+                <div class="meter"><i class="sage" style="width:0%"></i></div>
+                <div class="hint dsc"></div>
+                <div class="drive-cfg">
+                  <label>Рост дефицита <input data-cfg="settings:system.db.sql.drives.fundamental.mastery.decay.rate" type="number" min="0" max="100" step="0.5" value="" disabled><span class="unit">%</span></label>
+                  <label>Интервал <input data-cfg="settings:system.db.sql.drives.fundamental.mastery.decay.interval_sec" type="number" min="60" max="86400" step="60" value="" disabled><span class="unit">сек</span></label>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="card">
+            <header><h3>Правила мотивации</h3></header>
+            <div class="body">
+              <div class="field"><div class="fl"><div class="fn">Мотиваторы включены</div><div class="fd">Общий выключатель подсистемы</div></div><div class="fc"><span aria-disabled="true" class="sw" data-cfg="settings:system.db.sql.drives.enabled" role="switch" aria-checked="false"></span></div></div>
+              <div class="field"><div class="fl"><div class="fn">Нелинейное накопление</div><div class="fd">Чем выше дефицит, тем медленнее он растёт дальше</div></div><div class="fc"><span aria-disabled="true" class="sw" data-cfg="settings:system.db.sql.drives.dynamic_reduction" role="switch" aria-checked="false"></span></div></div>
+              <div class="field"><div class="fl"><div class="fn">Компенсация простоя</div><div class="fd">После выключения таймеры сдвигаются, дефицит не скачет разом</div></div><div class="fc"><span aria-disabled="true" class="sw" data-cfg="settings:system.db.sql.drives.pause_on_offline" role="switch" aria-checked="false"></span></div></div>
+              <div class="field"><div class="fl"><div class="fn">История рефлексий</div></div><div class="fc"><input data-cfg="settings:system.db.sql.drives.max_reflections_history" type="number" min="0" max="50" value="" disabled></div></div>
+              <div class="field"><div class="fl"><div class="fn">Своих мотиваторов</div><div class="fd">Агент может завести до 5 собственных</div></div><div class="fc"><input data-cfg="settings:system.db.sql.drives.max_custom_drives" type="number" id="maxCustomDrives" min="0" max="50" value="" disabled></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- рой -->
+      <div class="sub panel-hidden" data-sub="s-swarm">
+        <div class="card">
+          <header><h3>Оркестрация роя</h3></header>
+          <div class="body">
+            <div class="grid g2">
+              <div>
+                <div class="eyebrow">Запуск</div>
+                <div class="field"><div class="fl"><div class="fn">Рой включён</div><div class="fd">Делегирование объёмных задач фоновым субагентам</div></div><div class="fc"><span aria-disabled="true" class="sw" data-cfg="settings:system.swarm.enabled" role="switch" aria-checked="false"></span></div></div>
+                <div class="field"><div class="fl"><div class="fn">Модель субагентов</div><div class="fd">Может отличаться от модели главного агента</div></div><div class="fc"><select data-model-role="swarm" data-cfg="settings:system.swarm.subagent_model" data-model-value="" disabled></select></div></div>
+                <div class="field"><div class="fl"><div class="fn">Параллельных рабочих</div><div class="fd">Сколько субагентов работает одновременно</div></div><div class="fc"><input data-cfg="settings:system.swarm.max_concurrent_workers" type="number" min="1" max="32" value="" disabled></div></div>
+                <div class="divider"></div>
+                <div class="eyebrow">Контекст субагента</div>
+                <div class="field"><div class="fl"><div class="fn">Шагов на субагента</div><div class="fd">После лимита работа обрывается принудительно</div></div><div class="fc"><input data-cfg="settings:system.swarm.context_depth.max_steps" type="number" min="1" max="200" value="" disabled></div></div>
+                <div class="field"><div class="fl"><div class="fn">Подробных шагов в отчёте</div><div class="fd">Остальные сжимаются до заголовков</div></div><div class="fc"><input data-cfg="settings:system.swarm.context_depth.detailed_steps" type="number" min="0" max="100" value="" disabled></div></div>
+              </div>
+              <div>
+                <div class="eyebrow">Свой провайдер</div>
+                <div class="hint lead">Пусто — субагенты берут URL и ключи главного агента. Отдельный провайдер полезен, когда рой жжёт лимиты быстрее основного цикла.</div>
+                <div class="sec">
+                  <div class="sec-k"><span class="n">SUB_LLM_API_URL</span><span class="s">пусто</span></div>
+                  <div class="sec-c"><input data-cfg="env:SUB_LLM_API_URL" type="text" placeholder="https://…" disabled></div>
+                </div>
+                <div class="sec">
+                  <div class="sec-k"><span class="n">SUB_LLM_API_KEY_1</span><span class="s">пусто</span></div>
+                  <div class="sec-c">
+                    <input data-cfg="env:SUB_LLM_API_KEY_1" type="password" disabled>
+                    <button type="button" class="icobtn eye" aria-pressed="false" aria-label="Показать значение"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1.5 12S5 5 12 5s10.5 7 10.5 7-3.5 7-10.5 7S1.5 12 1.5 12z"/><circle cx="12" cy="12" r="3.2"/></svg></button>
+                  </div>
+                </div>
+                <div class="divider"></div>
+                <div class="hint">Субагенты работают в stateless-петле: своей памяти у них нет, доступа к основной они не имеют и возвращают один Markdown-отчёт.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- дерево мыслей -->
+      <div class="sub panel-hidden" data-sub="s-tot">
+        <div class="card">
+          <header><h3>Фрактальное дерево мыслей</h3></header>
+          <div class="body">
+            <div class="grid g2">
+              <div>
+                <div class="field"><div class="fl"><div class="fn">Симуляция включена</div><div class="fd">Проигрывать сценарии до действия в реальной среде</div></div><div class="fc"><span aria-disabled="true" class="sw" data-cfg="settings:system.tree_of_thoughts.enabled" role="switch" aria-checked="false"></span></div></div>
+                <div class="field"><div class="fl"><div class="fn">Модель симуляции</div></div><div class="fc"><select data-model-role="tot" data-cfg="settings:system.tree_of_thoughts.llm_model" data-model-value="" disabled></select></div></div>
+                <div class="field"><div class="fl"><div class="fn">Режим запуска</div><div class="fd">auto — по расписанию, manual — по решению агента</div></div><div class="fc"><select data-cfg="settings:system.tree_of_thoughts.mode" disabled><option>manual</option><option selected>auto</option><option>hybrid</option></select></div></div>
+              </div>
+              <div>
+                <div class="field"><div class="fl"><div class="fn">Интервал автозапуска</div></div><div class="fc"><input data-cfg="settings:system.tree_of_thoughts.auto_interval_steps" type="number" min="1" max="100" value="" disabled><span class="unit">шаг</span></div></div>
+                <div class="field"><div class="fl"><div class="fn">Макро-стратегий</div></div><div class="fc"><input data-cfg="settings:system.tree_of_thoughts.branches" type="number" min="1" max="10" value="" disabled></div></div>
+                <div class="field"><div class="fl"><div class="fn">Сценариев на ветку</div></div><div class="fc"><input data-cfg="settings:system.tree_of_thoughts.simulations_per_branch" type="number" min="1" max="10" value="" disabled></div></div>
+                <div class="field"><div class="fl"><div class="fn">Глубина вложенности</div></div><div class="fc"><input data-cfg="settings:system.tree_of_thoughts.max_depth" type="number" min="1" max="10" value="" disabled></div></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- подсознание -->
+      <div class="sub panel-hidden" data-sub="s-sub">
+        <div class="card">
+          <header><h3>Фоновые процессы памяти</h3></header>
+          <div class="body">
+            <div class="field"><div class="fl"><div class="fn">Подсознание включено</div><div class="fd">Обработка памяти между тактами отдельной моделью</div></div><div class="fc"><span aria-disabled="true" class="sw" data-cfg="settings:system.subconscious.enabled" role="switch" aria-checked="false"></span></div></div>
+            <div class="field"><div class="fl"><div class="fn">Модель</div></div><div class="fc"><select data-model-role="sub" data-cfg="settings:system.subconscious.llm_model" data-model-value="" disabled></select></div></div>
+            <div class="divider"></div>
+            <div class="grid g3">
+              <div class="card nested">
+                <header><h3>Консолидация</h3></header>
+                <div class="body">
+                  <div class="field"><div class="fl"><div class="fd">Склеивает похожие мысли в факты и кладёт в граф</div></div><div class="fc"><span aria-disabled="true" class="sw" data-cfg="settings:system.subconscious.patterns.consolidation.enabled" role="switch" aria-checked="false"></span></div></div>
+                </div>
+              </div>
+              <div class="card nested">
+                <header><h3>Рефлексия</h3></header>
+                <div class="body">
+                  <div class="field"><div class="fl"><div class="fd">Переоценивает черты характера и мотиваторы</div></div><div class="fc"><span aria-disabled="true" class="sw" data-cfg="settings:system.subconscious.patterns.reflection.enabled" role="switch" aria-checked="false"></span></div></div>
+                </div>
+              </div>
+              <div class="card nested">
+                <header><h3>Забывание</h3></header>
+                <div class="body">
+                  <div class="field"><div class="fl"><div class="fd">Удаляет мысли с низкой значимостью и старые связи</div></div><div class="fc"><span aria-disabled="true" class="sw" data-cfg="settings:system.subconscious.patterns.forgetting.enabled" role="switch" aria-checked="false"></span></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- yaml -->
+      <div class="sub panel-hidden" data-sub="s-files">
+        <p class="hint lead">Файлы, которые фреймворк читает при запуске. Открываются в редакторе консоли; в прототипе кнопки ещё не подключены.</p>
+        <div class="card">
+          <div class="body tight"><div class="tbl-wrap"><table>
+            <thead><tr><th>Файл</th><th>Что внутри</th><th>Тип</th><th></th></tr></thead>
+            <tbody>
+              <tr>
+                <td><div>Параметры фреймворка</div><div class="path">config/settings.yaml</div></td>
+                <td class="dim">Всё, что правится на вкладках слева. Комментарии в файле сохраняются.</td>
+                <td><span class="badge acc">yaml</span></td>
+                <td><button class="btn" title="Показать в проводнике" data-action="reveal" data-path="config/settings.yaml">Открыть</button></td>
+              </tr>
+              <tr>
+                <td><div>Интерфейсы</div><div class="path">config/interfaces.yaml</div></td>
+                <td class="dim">Плагины, их лимиты и уровни доступа.</td>
+                <td><span class="badge acc">yaml</span></td>
+                <td><button class="btn" title="Показать в проводнике" data-action="reveal" data-path="config/interfaces.yaml">Открыть</button></td>
+              </tr>
+              <tr>
+                <td><div>Секреты</div><div class="path">.env</div></td>
+                <td class="dim">Ключи, токены и прокси. Значения не показываются в списке.</td>
+                <td><span class="badge warn">env</span></td>
+                <td><button class="btn" title="Показать в проводнике" data-action="reveal" data-path=".env">Открыть</button></td>
+              </tr>
+              <tr>
+                <td><div>Характер</div><div class="path">src/l3_agent/prompt/personality/SOUL.md</div></td>
+                <td class="dim">Ядро личности агента: кто он, как думает, чего не делает.</td>
+                <td><span class="badge vio">md</span></td>
+                <td><button class="btn" title="Показать в проводнике" data-action="reveal" data-path="src/l3_agent/prompt/personality/SOUL.md">Открыть</button></td>
+              </tr>
+              <tr>
+                <td><div>Примеры стиля речи</div><div class="path">src/l3_agent/prompt/personality/EXAMPLES_OF_STYLE.md</div></td>
+                <td class="dim">Образцы реплик, по которым агент держит манеру разговора.</td>
+                <td><span class="badge vio">md</span></td>
+                <td><button class="btn" title="Показать в проводнике" data-action="reveal" data-path="src/l3_agent/prompt/personality/EXAMPLES_OF_STYLE.md">Открыть</button></td>
+              </tr>
+              <tr>
+                <td><div>Системные инструкции</div><div class="path">src/l3_agent/prompt/system/INSTRUCTIONS.md</div></td>
+                <td class="dim">Правила цикла рассуждения. Меняйте, только понимая последствия.</td>
+                <td><span class="badge vio">md</span></td>
+                <td><button class="btn" title="Показать в проводнике" data-action="reveal" data-path="src/l3_agent/prompt/system/INSTRUCTIONS.md">Открыть</button></td>
+              </tr>
+              <tr>
+                <td><div>Формат вызова навыков</div><div class="path">src/l3_agent/prompt/system/FUNCTION_CALL.md</div></td>
+                <td class="dim">Схема, по которой агент оформляет действия.</td>
+                <td><span class="badge vio">md</span></td>
+                <td><button class="btn" title="Показать в проводнике" data-action="reveal" data-path="src/l3_agent/prompt/system/FUNCTION_CALL.md">Открыть</button></td>
+              </tr>
+            </tbody></table></div></div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ======================================================= 2. ИНТЕРФЕЙСЫ -->
+  <section class="panel panel-hidden" data-panel="interfaces">
+    <div class="head">
+      <div class="h-title"><h1>Интерфейсы</h1></div>
+      <p class="h-desc">Плагины, через которые агент видит мир и действует в нём. Каждый даёт навыки в реестр и поставляет события в шину.</p>
+    </div>
+    <div class="scroll">
+
+      <div class="sub" data-sub="i-all">
+        <div class="toolbar">
+          <div class="search"><input type="search" placeholder="Найти интерфейс или навык" id="ifcSearch" aria-label="Поиск по интерфейсам и навыкам"></div>
+          <button class="chip" aria-pressed="true" data-ifc="all">Все · <b class="n">0</b></button>
+          <button class="chip" aria-pressed="false" data-ifc="on">Активные · <b class="n">0</b></button>
+          <button class="chip" aria-pressed="false" data-ifc="off">Выключенные · <b class="n">0</b></button>
+          <button class="chip" aria-pressed="false" data-ifc="events">С событиями · <b class="n">0</b></button>
+          <div class="spacer"></div>
+          <button class="btn" data-action="reload-interfaces">Перезагрузить плагины</button>
+        </div>
+
+        <div class="ifc-split">
+          <div class="ifc-list" id="ifcList" role="tablist" aria-label="Список интерфейсов">
+            <div class="empty" id="ifcEmpty" hidden>Под фильтр ничего не подошло</div>
+          </div>
+          <div class="ifc-detail" id="ifcGrid">
+          <!-- host.os -->
+          <div class="card ifc" data-events="true" data-name="host.os операционная система файлы деплой gatekeeper доступ телеметрия">
+            <header><h3>Хост · ОС</h3><button type="button" class="badge tgl on" role="switch" data-cfg="interfaces:host.os.enabled" aria-checked="false" disabled>вкл</button></header>
+            <div class="body">
+              <div class="hint lead">Файлы, процессы, терминал, сеть, деплой самого фреймворка.</div>
+              <div class="grid g2">
+              <div>
+              <div class="eyebrow">Права</div>
+              <div class="field"><div class="fl"><div class="fn">Уровень доступа</div><div class="fd">Шкала Gatekeeper для файловой системы</div></div>
+                <div class="fc"><select data-cfg="interfaces:host.os.access_level" class="lvl" data-hint="hostLvl" disabled><option value="0">0 · SANDBOX</option><option value="1">1 · OBSERVER</option><option value="2" selected>2 · OPERATOR</option><option value="3">3 · ROOT</option></select></div></div>
+              <div class="hint" id="hostLvl"></div>
+              <div class="field"><div class="fl"><div class="fn">Доступ к .env</div><div class="fd">Чтение и правка файла с ключами</div></div>
+                <div class="fc"><span aria-disabled="true" class="sw" data-cfg="interfaces:host.os.env_access" role="switch" aria-checked="false"></span></div></div>
+              <div class="field"><div class="fl"><div class="fn">Управление рабочим столом</div><div class="fd">Скриншоты, клавиатура, мышь</div></div>
+                <div class="fc"><span aria-disabled="true" class="sw" data-cfg="interfaces:host.os.desktop_interactions" role="switch" aria-checked="false"></span></div></div>
+              <div class="divider"></div>
+              <div class="eyebrow">Deploy-сессии</div>
+              <div class="field"><div class="fl"><div class="fn">Обязательны</div><div class="fd">Правки исходников только через транзакцию с бэкапом</div></div>
+                <div class="fc"><span aria-disabled="true" class="sw" data-cfg="interfaces:host.os.require_deploy_sessions" role="switch" aria-checked="false"></span></div></div>
+              <div class="field"><div class="fl"><div class="fn">Попыток до отката</div><div class="fd">После лимита файлы восстанавливаются</div></div>
+                <div class="fc"><input data-cfg="interfaces:host.os.deploy_max_retries" type="number" min="1" max="20" value="" disabled></div></div>
+              <div class="divider"></div>
+              <div class="eyebrow">Наблюдение</div>
+              <div class="field"><div class="fl"><div class="fn">Глубина дерева фреймворка</div><div class="fd">1 — только корень, 2 — с вложенными</div></div>
+                <div class="fc"><input data-cfg="interfaces:host.os.framework_tree_depth" type="number" min="1" max="10" value="" disabled><span class="unit">ур</span></div></div>
+              <div class="field"><div class="fl"><div class="fn">Опрос телеметрии</div><div class="fd">ЦП, память и изменения файлов</div></div>
+                <div class="fc"><input data-cfg="interfaces:host.os.monitoring_interval_sec" type="number" min="1" max="3600" value="" disabled><span class="unit">сек</span></div></div>
+              <div class="field"><div class="fl"><div class="fn">Процессов в телеметрии</div><div class="fd">Сортировка по расходу памяти</div></div>
+                <div class="fc"><input data-cfg="interfaces:host.os.top_processes_limit" type="number" min="1" max="100" value="" disabled></div></div>
+              </div>
+              <div>
+              <div class="eyebrow">Лимиты чтения</div>
+              <div class="field"><div class="fl"><div class="fn">Таймаут команды</div><div class="fd">Выполнение оболочки</div></div>
+                <div class="fc"><input data-cfg="interfaces:host.os.execution_timeout_sec" type="number" min="1" max="3600" value="" disabled><span class="unit">сек</span></div></div>
+              <div class="field"><div class="fl"><div class="fn">Символов при чтении файла</div><div class="fd">Больше — файл обрезается</div></div>
+                <div class="fc"><input data-cfg="interfaces:host.os.file_read_max_chars" type="number" min="0" max="200000" step="100" value="" disabled></div></div>
+              <div class="field"><div class="fl"><div class="fn">Файлов в списке каталога</div></div>
+                <div class="fc"><input data-cfg="interfaces:host.os.file_list_limit" type="number" min="1" max="1000" value="" disabled></div></div>
+              <div class="field"><div class="fl"><div class="fn">Символов в git-diff</div><div class="fd">Врезка в дашборд после правки</div></div>
+                <div class="fc"><input data-cfg="interfaces:host.os.file_diff_max_chars" type="number" min="0" max="20000" step="10" value="" disabled></div></div>
+              <div class="divider"></div>
+              <div class="eyebrow">Рабочее пространство</div>
+              <div class="field"><div class="fl"><div class="fn">Открытых файлов</div><div class="fd">Вкладки редактора в контексте агента</div></div>
+                <div class="fc"><input data-cfg="interfaces:host.os.workspace_max_opened_files" type="number" min="1" max="100" value="" disabled></div></div>
+              <div class="field"><div class="fl"><div class="fn">Последних правок в памяти</div><div class="fd">MRU-кэш диффов</div></div>
+                <div class="fc"><input data-cfg="interfaces:host.os.recent_file_changes_limit" type="number" min="0" max="50" value="" disabled></div></div>
+              <div class="field"><div class="fl"><div class="fn">Символов на открытый файл</div></div>
+                <div class="fc"><input data-cfg="interfaces:host.os.workspace_max_file_chars" type="number" min="0" max="200000" step="100" value="" disabled></div></div>
+              <div class="divider"></div>
+              <div class="kv"><span class="k">Навыков в реестре</span><span class="v dim">38</span></div>
+              </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- host.terminal -->
+          <div class="card ifc" data-events="true" data-name="terminal терминал чат пользователь">
+            <header><h3>Терминал</h3><button type="button" class="badge tgl on" role="switch" data-cfg="interfaces:host.terminal.enabled" aria-checked="false" disabled>вкл</button></header>
+            <div class="body">
+              <div class="hint lead">Прямой чат с пользователем из CLI-меню.</div>
+              <div class="field"><div class="fl"><div class="fn">История сообщений</div><div class="fd">Сколько реплик хранится</div></div>
+                <div class="fc"><input data-cfg="interfaces:host.terminal.history_limit" type="number" min="1" max="1000" value="" disabled></div></div>
+              <div class="field"><div class="fl"><div class="fn">Сообщений в контексте</div><div class="fd">Сколько уходит в промпт</div></div>
+                <div class="fc"><input data-cfg="interfaces:host.terminal.context_limit" type="number" min="1" max="200" value="" disabled></div></div>
+              <div class="divider"></div>
+              <div class="kv"><span class="k">Навыков в реестре</span><span class="v dim">3</span></div>
+            </div>
+          </div>
+
+          <!-- code_graph -->
+          <div class="card ifc" data-name="code_graph граф кода ast индексация">
+            <header><h3>Граф кода</h3><button type="button" class="badge tgl on" role="switch" data-cfg="interfaces:code_graph.enabled" aria-checked="false" disabled>вкл</button></header>
+            <div class="body">
+              <div class="hint lead">AST-карта репозитория для навигации и самомодификации.</div>
+              <div class="field"><div class="fl"><div class="fn">Результатов поиска</div><div class="fd">Отдаёт search_code_semantic</div></div>
+                <div class="fc"><input data-cfg="interfaces:code_graph.max_search_results" type="number" min="1" max="100" value="" disabled></div></div>
+              <div class="field"><div class="fl"><div class="fn">Элементов структуры</div><div class="fd">Лимит get_file_structure</div></div>
+                <div class="fc"><input data-cfg="interfaces:code_graph.max_structure_items" type="number" min="1" max="5000" step="10" value="" disabled></div></div>
+              <div class="divider"></div>
+              <div class="eyebrow">Каталоги вне индексации</div>
+              <div class="lst" id="lstExcludeDirs" data-cols="1">
+                <div class="lst-row"><input type="text" value="venv" placeholder="имя каталога" aria-label="имя каталога"><button type="button" class="icobtn danger lst-del" aria-label="Удалить строку"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 5l14 14M19 5L5 19"/></svg></button></div>
+                <div class="lst-row"><input type="text" value=".venv" placeholder="имя каталога" aria-label="имя каталога"><button type="button" class="icobtn danger lst-del" aria-label="Удалить строку"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 5l14 14M19 5L5 19"/></svg></button></div>
+                <div class="lst-row"><input type="text" value="env" placeholder="имя каталога" aria-label="имя каталога"><button type="button" class="icobtn danger lst-del" aria-label="Удалить строку"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 5l14 14M19 5L5 19"/></svg></button></div>
+                <div class="lst-row"><input type="text" value="__pycache__" placeholder="имя каталога" aria-label="имя каталога"><button type="button" class="icobtn danger lst-del" aria-label="Удалить строку"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 5l14 14M19 5L5 19"/></svg></button></div>
+                <div class="lst-row"><input type="text" value=".git" placeholder="имя каталога" aria-label="имя каталога"><button type="button" class="icobtn danger lst-del" aria-label="Удалить строку"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 5l14 14M19 5L5 19"/></svg></button></div>
+                <div class="lst-row"><input type="text" value="node_modules" placeholder="имя каталога" aria-label="имя каталога"><button type="button" class="icobtn danger lst-del" aria-label="Удалить строку"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 5l14 14M19 5L5 19"/></svg></button></div>
+                <div class="lst-row"><input type="text" value=".pytest_cache" placeholder="имя каталога" aria-label="имя каталога"><button type="button" class="icobtn danger lst-del" aria-label="Удалить строку"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 5l14 14M19 5L5 19"/></svg></button></div>
+                <div class="lst-row"><input type="text" value="dist" placeholder="имя каталога" aria-label="имя каталога"><button type="button" class="icobtn danger lst-del" aria-label="Удалить строку"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 5l14 14M19 5L5 19"/></svg></button></div>
+                <div class="lst-row"><input type="text" value="build" placeholder="имя каталога" aria-label="имя каталога"><button type="button" class="icobtn danger lst-del" aria-label="Удалить строку"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 5l14 14M19 5L5 19"/></svg></button></div>
+              </div>
+              <div class="sec-add"><button class="btn lst-add" data-list="lstExcludeDirs">Добавить каталог</button></div>
+              <div class="hint">Индексация venv или node_modules забьёт базу чужими функциями и замедлит поиск.</div>
+              <div class="divider"></div>
+              <div class="kv"><span class="k">Навыков в реестре</span><span class="v dim">5</span></div>
+            </div>
+          </div>
+
+          <!-- telegram.telethon -->
+          <div class="card ifc" data-events="true" data-name="telegram telethon аккаунт чаты юзербот">
+            <header><h3>Telegram · Telethon</h3><button type="button" class="badge tgl on" role="switch" data-cfg="interfaces:telegram.telethon.enabled" aria-checked="false" disabled>вкл</button></header>
+            <div class="body">
+              <div class="hint lead">Личный аккаунт: чаты, реакции, опросы, модерация.</div>
+              <div class="field"><div class="fl"><div class="fn">Имя сессии</div><div class="fd">При смене потребуется новый код подтверждения</div></div>
+                <div class="fc"><input data-cfg="interfaces:telegram.telethon.session_name" type="text" class="wide" value="" disabled></div></div>
+              <div class="field"><div class="fl"><div class="fn">Чатов на дашборде</div><div class="fd">Защита контекста от сотен диалогов</div></div>
+                <div class="fc"><input data-cfg="interfaces:telegram.telethon.recent_chats_limit" type="number" min="1" max="200" value="" disabled></div></div>
+              <div class="field"><div class="fl"><div class="fn">История лички</div><div class="fd">Сообщений при открытии диалога</div></div>
+                <div class="fc"><input data-cfg="interfaces:telegram.telethon.private_chat_history_limit" type="number" min="1" max="100" value="" disabled></div></div>
+              <div class="field"><div class="fl"><div class="fn">Входящих в памяти</div><div class="fd">MRU-кэш последних сообщений</div></div>
+                <div class="fc"><input data-cfg="interfaces:telegram.telethon.incoming_history_limit" type="number" min="1" max="200" value="" disabled></div></div>
+              <div class="divider"></div>
+              <div class="eyebrow">Секреты · my.telegram.org</div>
+              <div class="sec">
+                <div class="sec-k"><span class="n">TELETHON_API_ID</span><span class="s set">задан</span></div>
+                <div class="sec-c"><input data-cfg="env:TELETHON_API_ID" type="password" value="" disabled><button type="button" class="icobtn eye" aria-pressed="false" aria-label="Показать значение"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1.5 12S5 5 12 5s10.5 7 10.5 7-3.5 7-10.5 7S1.5 12 1.5 12z"/><circle cx="12" cy="12" r="3.2"/></svg></button></div>
+              </div>
+              <div class="sec">
+                <div class="sec-k"><span class="n">TELETHON_API_HASH</span><span class="s set">задан</span></div>
+                <div class="sec-c"><input data-cfg="env:TELETHON_API_HASH" type="password" value="" disabled><button type="button" class="icobtn eye" aria-pressed="false" aria-label="Показать значение"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1.5 12S5 5 12 5s10.5 7 10.5 7-3.5 7-10.5 7S1.5 12 1.5 12z"/><circle cx="12" cy="12" r="3.2"/></svg></button></div>
+              </div>
+              <div class="divider"></div>
+              <div class="kv"><span class="k">Навыков в реестре</span><span class="v dim">21</span></div>
+            </div>
+          </div>
+
+          <!-- telegram.aiogram -->
+          <div class="card ifc" data-events="true" data-name="telegram aiogram бот">
+            <header><h3>Telegram · Бот</h3><button type="button" class="badge tgl on" role="switch" data-cfg="interfaces:telegram.aiogram.enabled" aria-checked="false" disabled>вкл</button></header>
+            <div class="body">
+              <div class="hint lead">Bot API: команды и уведомления. Историю до запуска бот не видит.</div>
+              <div class="field"><div class="fl"><div class="fn">Чатов на дашборде</div><div class="fd">Лимит списка активных групп</div></div>
+                <div class="fc"><input data-cfg="interfaces:telegram.aiogram.recent_chats_limit" type="number" min="1" max="200" value="" disabled></div></div>
+              <div class="divider"></div>
+              <div class="eyebrow">Секрет · @BotFather</div>
+              <div class="sec">
+                <div class="sec-k"><span class="n">AIOGRAM_BOT_TOKEN</span><span class="s set">задан</span></div>
+                <div class="sec-c"><input data-cfg="env:AIOGRAM_BOT_TOKEN" type="password" value="" disabled><button type="button" class="icobtn eye" aria-pressed="false" aria-label="Показать значение"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1.5 12S5 5 12 5s10.5 7 10.5 7-3.5 7-10.5 7S1.5 12 1.5 12z"/><circle cx="12" cy="12" r="3.2"/></svg></button></div>
+              </div>
+              <div class="divider"></div>
+              <div class="kv"><span class="k">Навыков в реестре</span><span class="v dim">9</span></div>
+            </div>
+          </div>
+
+          <!-- github -->
+          <div class="card ifc" data-events="true" data-name="github репозитории issues pull requests">
+            <header><h3>GitHub</h3><button type="button" class="badge tgl off" role="switch" data-cfg="interfaces:github.enabled" aria-checked="false" disabled>выкл</button></header>
+            <div class="body">
+              <div class="hint lead">REST API: репозитории, Issues, Pull Requests, уведомления.</div>
+              <div class="field"><div class="fl"><div class="fn">Аккаунт агента</div><div class="fd">Выкл — только публичное чтение, 60 запросов в час</div></div>
+                <div class="fc"><span aria-disabled="true" class="sw" data-cfg="interfaces:github.agent_account" role="switch" aria-checked="false" id="ghAgentAccount"></span></div></div>
+              <div class="hint" id="ghHint"></div>
+              <div class="field"><div class="fl"><div class="fn">Таймаут запроса</div></div>
+                <div class="fc"><input data-cfg="interfaces:github.request_timeout_sec" type="number" min="1" max="300" value="" disabled><span class="unit">сек</span></div></div>
+              <div class="field"><div class="fl"><div class="fn">Действий в истории</div><div class="fd">MRU-кэш на дашборде</div></div>
+                <div class="fc"><input data-cfg="interfaces:github.history_limit" type="number" min="1" max="100" value="" disabled></div></div>
+              <div class="field"><div class="fl"><div class="fn">Опрос уведомлений</div><div class="fd">Упоминания и события отслеживаемых репозиториев</div></div>
+                <div class="fc"><input data-cfg="interfaces:github.polling_interval_sec" type="number" min="1" max="86400" value="" disabled><span class="unit">сек</span></div></div>
+              <div class="divider"></div>
+              <div class="eyebrow">Секрет · scopes repo, read:user</div>
+              <div class="sec">
+                <div class="sec-k"><span class="n">GITHUB_TOKEN</span><span class="s ">пусто</span></div>
+                <div class="sec-c"><input data-cfg="env:GITHUB_TOKEN" type="password" placeholder="ghp_…" disabled><button type="button" class="icobtn eye" aria-pressed="false" aria-label="Показать значение"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1.5 12S5 5 12 5s10.5 7 10.5 7-3.5 7-10.5 7S1.5 12 1.5 12z"/><circle cx="12" cy="12" r="3.2"/></svg></button></div>
+              </div>
+              <div class="divider"></div>
+              <div class="kv"><span class="k">Навыков в реестре</span><span class="v dim">24</span></div>
+            </div>
+          </div>
+
+          <!-- email -->
+          <div class="card ifc" data-events="true" data-name="email почта imap smtp">
+            <header><h3>Почта</h3><button type="button" class="badge tgl off" role="switch" data-cfg="interfaces:email.enabled" aria-checked="false" disabled>выкл</button></header>
+            <div class="body">
+              <div class="hint lead">IMAP и SMTP определяются по домену: gmail, yandex, mail.ru, outlook.</div>
+              <div class="field"><div class="fl"><div class="fn">Опрос сервера</div></div>
+                <div class="fc"><input data-cfg="interfaces:email.polling_interval_sec" type="number" min="1" max="86400" value="" disabled><span class="unit">сек</span></div></div>
+              <div class="field"><div class="fl"><div class="fn">Писем на дашборде</div><div class="fd">Темы и отправители подставляются сами</div></div>
+                <div class="fc"><input data-cfg="interfaces:email.recent_limit" type="number" min="1" max="100" value="" disabled></div></div>
+              <div class="divider"></div>
+              <div class="eyebrow">Секреты · нужен пароль приложения, не основной</div>
+              <div class="sec">
+                <div class="sec-k"><span class="n">EMAIL_ACCOUNT</span><span class="s ">пусто</span></div>
+                <div class="sec-c"><input data-cfg="env:EMAIL_ACCOUNT" type="password" placeholder="agent.jawl@gmail.com" disabled><button type="button" class="icobtn eye" aria-pressed="false" aria-label="Показать значение"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1.5 12S5 5 12 5s10.5 7 10.5 7-3.5 7-10.5 7S1.5 12 1.5 12z"/><circle cx="12" cy="12" r="3.2"/></svg></button></div>
+              </div>
+              <div class="sec">
+                <div class="sec-k"><span class="n">EMAIL_PASSWORD</span><span class="s ">пусто</span></div>
+                <div class="sec-c"><input data-cfg="env:EMAIL_PASSWORD" type="password" placeholder="пароль приложения (с 2FA)" disabled><button type="button" class="icobtn eye" aria-pressed="false" aria-label="Показать значение"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1.5 12S5 5 12 5s10.5 7 10.5 7-3.5 7-10.5 7S1.5 12 1.5 12z"/><circle cx="12" cy="12" r="3.2"/></svg></button></div>
+              </div>
+              <div class="divider"></div>
+              <div class="kv"><span class="k">Навыков в реестре</span><span class="v dim">6</span></div>
+            </div>
+          </div>
+
+          <!-- web.search -->
+          <div class="card ifc" data-name="web search поиск tavily duckduckgo deep research">
+            <header><h3>Поиск и исследование</h3><button type="button" class="badge tgl on" role="switch" data-cfg="interfaces:web.search.enabled" aria-checked="false" disabled>вкл</button></header>
+            <div class="body">
+              <div class="hint lead">Поиск ссылок и вычитка страниц, включая массовое исследование.</div>
+              <div class="field"><div class="fl"><div class="fn">Поисковик</div><div class="fd">tavily стабильнее, duckduckgo без ключа</div></div>
+                <div class="fc"><select data-cfg="interfaces:web.search.search_engine" id="searchEngine" disabled><option>duckduckgo</option><option selected>tavily</option></select></div></div>
+              <div class="hint" id="searchHint"></div>
+              <div class="field"><div class="fl"><div class="fn">Читалка страниц</div><div class="fd">trafilatura локально, jina через прокси-сервис</div></div>
+                <div class="fc"><select data-cfg="interfaces:web.search.reader_engine" disabled><option selected>trafilatura</option><option>jina</option></select></div></div>
+              <div class="field"><div class="fl"><div class="fn">Таймаут запроса</div></div>
+                <div class="fc"><input data-cfg="interfaces:web.search.request_timeout_sec" type="number" min="1" max="300" value="" disabled><span class="unit">сек</span></div></div>
+              <div class="field"><div class="fl"><div class="fn">Символов на страницу</div></div>
+                <div class="fc"><input data-cfg="interfaces:web.search.max_page_chars" type="number" min="0" max="200000" step="100" value="" disabled></div></div>
+              <div class="divider"></div>
+              <div class="eyebrow">Глубокое исследование</div>
+              <div class="field"><div class="fl"><div class="fn">Параллельных запросов</div><div class="fd">Защита от банов по IP и API</div></div>
+                <div class="fc"><input data-cfg="interfaces:web.search.deep_research.max_queries" type="number" min="1" max="100" value="" disabled></div></div>
+              <div class="field"><div class="fl"><div class="fn">Ссылок на запрос</div></div>
+                <div class="fc"><input data-cfg="interfaces:web.search.deep_research.max_results_per_query" type="number" min="1" max="50" value="" disabled></div></div>
+              <div class="field"><div class="fl"><div class="fn">Страниц на вычитку</div></div>
+                <div class="fc"><input data-cfg="interfaces:web.search.deep_research.max_pages_to_read" type="number" min="1" max="200" value="" disabled></div></div>
+              <div class="field"><div class="fl"><div class="fn">Символов всего</div><div class="fd">Бюджет делится между страницами</div></div>
+                <div class="fc"><input data-cfg="interfaces:web.search.deep_research.total_max_chars" type="number" min="0" max="500000" step="1000" value="" disabled></div></div>
+              <div class="divider"></div>
+              <div class="eyebrow">Секрет · нужен только для tavily</div>
+              <div class="sec">
+                <div class="sec-k"><span class="n">TAVILY_API_KEY</span><span class="s set">задан</span></div>
+                <div class="sec-c"><input data-cfg="env:TAVILY_API_KEY" type="password" value="" disabled><button type="button" class="icobtn eye" aria-pressed="false" aria-label="Показать значение"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1.5 12S5 5 12 5s10.5 7 10.5 7-3.5 7-10.5 7S1.5 12 1.5 12z"/><circle cx="12" cy="12" r="3.2"/></svg></button></div>
+              </div>
+              <div class="divider"></div>
+              <div class="kv"><span class="k">Навыков в реестре</span><span class="v dim">4</span></div>
+            </div>
+          </div>
+
+          <!-- web.browser -->
+          <div class="card ifc" data-name="web browser браузер playwright chromium">
+            <header><h3>Браузер</h3><button type="button" class="badge tgl on" role="switch" data-cfg="interfaces:web.browser.enabled" aria-checked="false" disabled>вкл</button></header>
+            <div class="body">
+              <div class="hint lead">Chromium через Playwright: JS, куки, сложные SPA.</div>
+              <div class="field"><div class="fl"><div class="fn">Фоновый режим</div><div class="fd">Выкл — окно видно на экране, удобно для отладки</div></div>
+                <div class="fc"><span aria-disabled="true" class="sw" data-cfg="interfaces:web.browser.headless" role="switch" aria-checked="false"></span></div></div>
+              <div class="field"><div class="fl"><div class="fn">Таймаут элемента</div><div class="fd">Ожидание загрузки</div></div>
+                <div class="fc"><input data-cfg="interfaces:web.browser.timeout_sec" type="number" min="1" max="600" value="" disabled><span class="unit">сек</span></div></div>
+              <div class="field"><div class="fl"><div class="fn">Простой до закрытия</div><div class="fd">Демон гасит Chromium и освобождает память</div></div>
+                <div class="fc"><input data-cfg="interfaces:web.browser.idle_timeout_sec" type="number" min="1" max="86400" value="" disabled><span class="unit">сек</span></div></div>
+              <div class="divider"></div>
+              <div class="kv"><span class="k">Навыков в реестре</span><span class="v dim">12</span></div>
+            </div>
+          </div>
+
+          <!-- web.http -->
+          <div class="card ifc" data-name="web http запросы api загрузка файлов">
+            <header><h3>HTTP-клиент</h3><button type="button" class="badge tgl on" role="switch" data-cfg="interfaces:web.http.enabled" aria-checked="false" disabled>вкл</button></header>
+            <div class="body">
+              <div class="hint lead">Сырые запросы и загрузка файлов без запуска браузера.</div>
+              <div class="field"><div class="fl"><div class="fn">Таймаут запроса</div></div>
+                <div class="fc"><input data-cfg="interfaces:web.http.request_timeout_sec" type="number" min="1" max="300" value="" disabled><span class="unit">сек</span></div></div>
+              <div class="field"><div class="fl"><div class="fn">Символов в ответе</div><div class="fd">Гигантский JSON обрежется, а не уронит контекст</div></div>
+                <div class="fc"><input data-cfg="interfaces:web.http.max_response_chars" type="number" min="0" max="200000" step="100" value="" disabled></div></div>
+              <div class="divider"></div>
+              <div class="kv"><span class="k">Навыков в реестре</span><span class="v dim">3</span></div>
+            </div>
+          </div>
+
+          <!-- web.hooks -->
+          <div class="card ifc" data-events="true" data-name="web hooks вебхуки входящие сервер">
+            <header><h3>Вебхуки</h3><button type="button" class="badge tgl on" role="switch" data-cfg="interfaces:web.hooks.enabled" aria-checked="false" disabled>вкл</button></header>
+            <div class="body">
+              <div class="hint lead">Локальный сервер для входящих POST и GET от внешних сервисов.</div>
+              <div class="field"><div class="fl"><div class="fn">Адрес</div><div class="fd">0.0.0.0 открывает порт наружу — лучше обратный прокси</div></div>
+                <div class="fc"><input data-cfg="interfaces:web.hooks.host" type="text" class="" value="" disabled></div></div>
+              <div class="field"><div class="fl"><div class="fn">Порт</div></div>
+                <div class="fc"><input data-cfg="interfaces:web.hooks.port" type="number" min="1" max="65535" value="" disabled></div></div>
+              <div class="field"><div class="fl"><div class="fn">Вызовов в истории</div></div>
+                <div class="fc"><input data-cfg="interfaces:web.hooks.history_limit" type="number" min="1" max="200" value="" disabled></div></div>
+              <div class="field"><div class="fl"><div class="fn">Символов превью тела</div></div>
+                <div class="fc"><input data-cfg="interfaces:web.hooks.preview_max_chars" type="number" min="0" max="20000" step="10" value="" disabled></div></div>
+              <div class="divider"></div>
+              <div class="eyebrow">Секрет · токен в ?token= или Authorization: Bearer</div>
+              <div class="sec">
+                <div class="sec-k"><span class="n">WEBHOOK_SECRET</span><span class="s set">задан</span></div>
+                <div class="sec-c"><input data-cfg="env:WEBHOOK_SECRET" type="password" value="" disabled><button type="button" class="icobtn eye" aria-pressed="false" aria-label="Показать значение"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1.5 12S5 5 12 5s10.5 7 10.5 7-3.5 7-10.5 7S1.5 12 1.5 12z"/><circle cx="12" cy="12" r="3.2"/></svg></button></div>
+              </div>
+              <div class="divider"></div>
+              <div class="kv"><span class="k">Навыков в реестре</span><span class="v dim">2</span></div>
+            </div>
+          </div>
+
+          <!-- web.rss -->
+          <div class="card ifc" data-events="true" data-name="web rss ленты хабр arxiv atom">
+            <header><h3>RSS-ленты</h3><button type="button" class="badge tgl on" role="switch" data-cfg="interfaces:web.rss.enabled" aria-checked="false" disabled>вкл</button></header>
+            <div class="body">
+              <div class="hint lead">Фоновый опрос лент; новая запись поднимает событие BACKGROUND.</div>
+              <div class="field"><div class="fl"><div class="fn">Опрос лент</div></div>
+                <div class="fc"><input data-cfg="interfaces:web.rss.polling_interval_sec" type="number" min="60" max="86400" step="60" value="" disabled><span class="unit">сек</span></div></div>
+              <div class="field"><div class="fl"><div class="fn">Записей на дашборде</div></div>
+                <div class="fc"><input data-cfg="interfaces:web.rss.recent_limit" type="number" min="1" max="100" value="" disabled></div></div>
+              <div class="divider"></div>
+              <div class="eyebrow">Ленты</div>
+              <div class="lst" id="lstFeeds" data-cols="2">
+                <div class="lst-row"><input type="text" value="Habr" placeholder="название" aria-label="название"><input type="text" value="https://habr.com/ru/rss/hub/artificial_intelligence/" placeholder="адрес ленты" aria-label="адрес ленты"><button type="button" class="icobtn danger lst-del" aria-label="Удалить строку"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 5l14 14M19 5L5 19"/></svg></button></div>
+              </div>
+              <div class="sec-add"><button class="btn lst-add" data-list="lstFeeds">Добавить ленту</button></div>
+              <div class="divider"></div>
+              <div class="kv"><span class="k">Навыков в реестре</span><span class="v dim">2</span></div>
+            </div>
+          </div>
+
+          <!-- meta -->
+          <div class="card ifc" data-name="meta самомодификация навыки архитектор конфигурация">
+            <header><h3>Мета-интерфейс</h3><button type="button" class="badge tgl on" role="switch" data-cfg="interfaces:meta.enabled" aria-checked="false" disabled>вкл</button></header>
+            <div class="body">
+              <div class="hint lead">Правка конфигурации в рантайме без перезапуска.</div>
+              <div class="field"><div class="fl"><div class="fn">Уровень доступа</div><div class="fd">Своя шкала, не путать с доступом к файлам</div></div>
+                <div class="fc"><select data-cfg="interfaces:meta.access_level" class="lvl" data-hint="metaLvl" disabled><option value="0" selected>0 · SAFE</option><option value="1">1 · CONFIGURATOR</option><option value="2">2 · ARCHITECT</option><option value="3">3 · CREATOR</option></select></div></div>
+              <div class="hint" id="metaLvl"></div>
+              <div class="field"><div class="fl"><div class="fn">Свои навыки</div><div class="fd">Агент пишет скрипты и регистрирует их в ядре</div></div>
+                <div class="fc"><span aria-disabled="true" class="sw" data-cfg="interfaces:meta.custom_skills_enabled" role="switch" aria-checked="false"></span></div></div>
+              <div class="divider"></div>
+              <div class="kv"><span class="k">Навыков в реестре</span><span class="v dim">7</span></div>
+            </div>
+          </div>
+
+          <!-- multimodality -->
+          <div class="card ifc" data-name="multimodality зрение изображения скриншоты">
+            <header><h3>Зрение</h3><button type="button" class="badge tgl on" role="switch" data-cfg="interfaces:multimodality.enabled" aria-checked="false" disabled>вкл</button></header>
+            <div class="body">
+              <div class="hint lead">Подмешивает изображения в контекст модели через Base64.</div>
+              <div class="hint" id="visionHint"></div>
+              <div class="divider"></div>
+              <div class="kv"><span class="k">Навыков в реестре</span><span class="v dim">2</span></div>
+            </div>
+          </div>
+
+          <!-- calendar -->
+          <div class="card ifc" data-events="true" data-name="calendar календарь события будильник таймер">
+            <header><h3>Календарь</h3><button type="button" class="badge tgl on" role="switch" data-cfg="interfaces:calendar.enabled" aria-checked="false" disabled>вкл</button></header>
+            <div class="body">
+              <div class="hint lead">Разовые, интервальные и повторяющиеся будильники; событие будит агента.</div>
+              <div class="field"><div class="fl"><div class="fn">Опрос таймеров</div><div class="fd">Демон сверяет время с events.json</div></div>
+                <div class="fc"><input data-cfg="interfaces:calendar.polling_interval_sec" type="number" min="1" max="86400" value="" disabled><span class="unit">сек</span></div></div>
+              <div class="field"><div class="fl"><div class="fn">Событий на дашборде</div><div class="fd">Ближайшие планы в контексте</div></div>
+                <div class="fc"><input data-cfg="interfaces:calendar.upcoming_events_limit" type="number" min="1" max="100" value="" disabled></div></div>
+              <div class="divider"></div>
+              <div class="kv"><span class="k">Навыков в реестре</span><span class="v dim">5</span></div>
+            </div>
+          </div>
+
+          <!-- voice.tts.elevenlabs -->
+          <div class="card ifc" data-name="voice tts синтез речи elevenlabs голос">
+            <header><h3>Синтез речи · ElevenLabs</h3><button type="button" class="badge tgl off" role="switch" aria-checked="false" data-cfg="interfaces:voice.tts.cloud.elevenlabs.enabled" disabled>выкл</button></header>
+            <div class="body">
+              <div class="hint lead">Платный сервис с живой интонацией. Нужен ключ.</div>
+              <div class="field"><div class="fl"><div class="fn">Модель</div></div><div class="fc"><input data-cfg="interfaces:voice.tts.cloud.elevenlabs.tts_model" type="text" class="wide" value="" disabled></div></div>
+              <div class="field"><div class="fl"><div class="fn">Основной голос</div><div class="fd">ID из панели ElevenLabs</div></div><div class="fc"><input data-cfg="interfaces:voice.tts.cloud.elevenlabs.main_voice" type="text" class="wide" value="" disabled></div></div>
+              <div class="field"><div class="fl"><div class="fn">Стабильность</div><div class="fd">0.0 — живее, 1.0 — ровнее</div></div><div class="fc"><input data-cfg="interfaces:voice.tts.cloud.elevenlabs.stability" type="number" min="0" max="1" step="0.05" value="" disabled></div></div>
+              <div class="field"><div class="fl"><div class="fn">Похожесть на голос</div></div><div class="fc"><input data-cfg="interfaces:voice.tts.cloud.elevenlabs.similarity_boost" type="number" min="0" max="1" step="0.05" value="" disabled></div></div>
+              <div class="divider"></div>
+              <div class="eyebrow">Дополнительные голоса</div>
+              <div class="lst" id="lstElevenVoices" data-cols="1">
+              </div>
+              <div class="sec-add"><button class="btn lst-add" data-list="lstElevenVoices">Добавить голос</button></div>
+              <div class="divider"></div>
+                <div class="sec">
+                  <div class="sec-k"><span class="n">ELEVENLABS_API_KEY</span><span class="s">пусто</span></div>
+                  <div class="sec-c"><input data-cfg="env:ELEVENLABS_API_KEY" type="password" disabled><button type="button" class="icobtn eye" aria-pressed="false" aria-label="Показать значение"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1.5 12S5 5 12 5s10.5 7 10.5 7-3.5 7-10.5 7S1.5 12 1.5 12z"/><circle cx="12" cy="12" r="3.2"/></svg></button></div>
+                </div>
+              <div class="field"><div class="fl"><div class="fn">Свой эндпоинт</div><div class="fd">Пусто — официальный API</div></div><div class="fc"><input data-cfg="env:ELEVENLABS_API_URL" type="text" class="wide" placeholder="—" disabled></div></div>
+              <div class="divider"></div>
+              <div class="kv"><span class="k">Навыков в реестре</span><span class="v dim" data-demo="skills">3</span></div>
+            </div>
+          </div>
+
+          <!-- voice.tts.edge -->
+          <div class="card ifc" data-name="voice tts edge синтез речи бесплатный голос">
+            <header><h3>Синтез речи · Edge</h3><button type="button" class="badge tgl off" role="switch" aria-checked="false" data-cfg="interfaces:voice.tts.cloud.edge.enabled" disabled>выкл</button></header>
+            <div class="body">
+              <div class="hint lead">Публичный API браузера Microsoft Edge. Бесплатно, ключи не нужны.</div>
+              <div class="field"><div class="fl"><div class="fn">Основной голос</div></div><div class="fc"><input data-cfg="interfaces:voice.tts.cloud.edge.main_voice" type="text" class="wide" value="" disabled></div></div>
+              <div class="field"><div class="fl"><div class="fn">Темп</div><div class="fd">Формат +10%, -5%</div></div><div class="fc"><input data-cfg="interfaces:voice.tts.cloud.edge.rate" type="text" value="" disabled></div></div>
+              <div class="field"><div class="fl"><div class="fn">Громкость</div></div><div class="fc"><input data-cfg="interfaces:voice.tts.cloud.edge.volume" type="text" value="" disabled></div></div>
+              <div class="field"><div class="fl"><div class="fn">Тон</div><div class="fd">Формат +5Hz</div></div><div class="fc"><input data-cfg="interfaces:voice.tts.cloud.edge.pitch" type="text" value="" disabled></div></div>
+              <div class="divider"></div>
+              <div class="eyebrow">Доступные голоса</div>
+              <div class="lst" id="lstEdgeVoices" data-cols="1">
+              </div>
+              <div class="sec-add"><button class="btn lst-add" data-list="lstEdgeVoices">Добавить голос</button></div>
+            </div>
+          </div>
+
+          <!-- voice.stt -->
+          <div class="card ifc" data-events="true" data-name="voice stt whisper распознавание речи аудио">
+            <header><h3>Распознавание речи</h3><button type="button" class="badge tgl off" role="switch" data-cfg="interfaces:voice.stt.cloud.whisper.enabled" aria-checked="false" disabled>выкл</button></header>
+            <div class="body">
+              <div class="hint lead">Расшифровка голосовых и видео через Whisper API или совместимый эндпоинт.</div>
+              <div class="field"><div class="fl"><div class="fn">Модель</div></div>
+                <div class="fc"><input data-cfg="interfaces:voice.stt.cloud.whisper.model" type="text" class="wide" value="" disabled></div></div>
+              <div class="field"><div class="fl"><div class="fn">Температура</div><div class="fd">0.0 — максимальная точность</div></div>
+                <div class="fc"><input data-cfg="interfaces:voice.stt.cloud.whisper.temperature" type="number" min="0" max="1" step="0.1" value="" disabled></div></div>
+              <div class="field"><div class="fl"><div class="fn">Таймаут API</div></div>
+                <div class="fc"><input data-cfg="interfaces:voice.stt.cloud.whisper.timeout_sec" type="number" min="1" max="3600" value="" disabled><span class="unit">сек</span></div></div>
+              <div class="divider"></div>
+              <div class="sec">
+                <div class="sec-k"><span class="n">CLOUD_WHISPER_API_KEY</span><span class="s ">пусто</span></div>
+                <div class="sec-c"><input data-cfg="env:CLOUD_WHISPER_API_KEY" type="password" placeholder="пусто — возьмётся основной ключ LLM" disabled><button type="button" class="icobtn eye" aria-pressed="false" aria-label="Показать значение"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1.5 12S5 5 12 5s10.5 7 10.5 7-3.5 7-10.5 7S1.5 12 1.5 12z"/><circle cx="12" cy="12" r="3.2"/></svg></button></div>
+              </div>
+              <div class="field"><div class="fl"><div class="fn">Свой эндпоинт</div><div class="fd">Пусто — официальный API</div></div>
+                <div class="fc"><input data-cfg="env:CLOUD_WHISPER_API_URL" type="text" class="wide" placeholder="—" disabled></div></div>
+              <div class="divider"></div>
+              <div class="kv"><span class="k">Навыков в реестре</span><span class="v dim">2</span></div>
+            </div>
+          </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ======================================================= 4. ЧАТ -->
+  <section class="panel panel-hidden" data-panel="chat">
+    <div class="head">
+      <div class="h-title"><h1>Чат с агентом</h1></div>
+    </div>
+    <div class="scroll flush">
+
+      <div class="chatwrap">
+        <div class="chatcol">
+          <div class="chatlog" id="chatlog">
+            <div class="empty" id="chatEmpty">Загружаю переписку…</div>
+          </div>
+          <div class="notice" id="chatNotice" hidden></div>
+          <div class="composer">
+            <textarea id="chatInput" disabled placeholder="Сообщение агенту — Enter отправит, Shift+Enter перенесёт строку"></textarea>
+            <button class="btn primary" id="chatSend" disabled>Отправить</button>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ======================================================= 6. ЛОГИ -->
+  <!-- ======================================================= 4. БАЗА ДАННЫХ -->
+  <section class="panel panel-hidden" data-panel="db">
+    <div class="head">
+      <div class="h-title"><h1>База данных</h1></div>
+      <p class="h-desc">Память агента на диске. Очистка необратима и подтверждается вторым нажатием. Включение самих модулей — на вкладке «Параметры → Память».</p>
+    </div>
+    <div class="scroll">
+      <div class="notice" id="dbNotice" hidden></div>
+      <div class="grid g2">
+
+        <div class="card">
+          <header><h3>Реляционная база</h3><button class="btn opendir" data-dir="src/utils/local/data/sql/db">Открыть папку</button></header>
+          <div class="body">
+              <div class="field"><div class="fl"><div class="fn">Mental states</div><div class="fd">Отслеживаемые сущности</div></div>
+                <div class="fc"><span class="dbcount" id="dbMental"></span><button class="btn danger wipe" disabled data-scope="sql.mental_states">Очистить</button></div></div>
+              <div class="field"><div class="fl"><div class="fn">Задачи</div><div class="fd">Матрица Эйзенхауэра</div></div>
+                <div class="fc"><span class="dbcount" id="dbTasks"></span><button class="btn danger wipe" disabled data-scope="sql.tasks">Очистить</button></div></div>
+              <div class="field"><div class="fl"><div class="fn">Заметки</div><div class="fd">Оперативная память тактов</div></div>
+                <div class="fc"><span class="dbcount" id="dbNotes"></span><button class="btn danger wipe" disabled data-scope="sql.notes">Очистить</button></div></div>
+              <div class="field"><div class="fl"><div class="fn">Черты характера</div></div>
+                <div class="fc"><span class="dbcount" id="dbTraits"></span><button class="btn danger wipe" disabled data-scope="sql.personality_traits">Очистить</button></div></div>
+              <div class="field"><div class="fl"><div class="fn">Мотиваторы</div><div class="fd">Фундаментальные и собственные</div></div>
+                <div class="fc"><span class="dbcount" id="dbDrives"></span><button class="btn danger wipe" disabled data-scope="sql.drives">Очистить</button></div></div>
+            <div class="divider"></div>
+            <div class="sec-add"><button class="btn danger wipe" disabled data-scope="sql.all">Стереть базу</button></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <header><h3>Векторная база</h3><button class="btn opendir" data-dir="src/utils/local/data/vector/db">Открыть папку</button></header>
+          <div class="body">
+              <div class="field"><div class="fl"><div class="fn">Knowledge</div><div class="fd">Факты, извлечённые подсознанием</div></div>
+                <div class="fc"><span class="dbcount" id="dbKnowledge"></span><button class="btn danger wipe" disabled data-scope="vector.knowledge">Очистить</button></div></div>
+              <div class="field"><div class="fl"><div class="fn">Thoughts</div><div class="fd">Мысли агента по тактам</div></div>
+                <div class="fc"><span class="dbcount" id="dbThoughts"></span><button class="btn danger wipe" disabled data-scope="vector.thoughts">Очистить</button></div></div>
+            <div class="divider"></div>
+            <div class="eyebrow">Скачанные модели эмбеддингов</div>
+            <div class="hint lead">Веса остаются на диске после смены модели в «Память → Векторная база». Неиспользуемые можно удалить — нужная скачается заново при запуске.</div>
+            <div id="embList"></div>
+            <div class="divider"></div>
+            <div class="sec-add"><button class="btn danger wipe" disabled data-scope="vector.all">Стереть базу</button></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <header><h3>Граф знаний</h3><button class="btn opendir" data-dir="src/utils/local/data/graph">Открыть папку</button></header>
+          <div class="body">
+              <div class="field"><div class="fl"><div class="fn">Concepts</div><div class="fd">Сущности и связи между ними</div></div>
+                <div class="fc"><span class="dbcount" id="dbConcepts"></span><button class="btn danger wipe" disabled data-scope="graph.concepts">Очистить</button></div></div>
+            <div class="divider"></div>
+            <div class="sec-add"><button class="btn danger wipe" disabled data-scope="graph.all">Стереть базу</button></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <header><h3>Кэш интерфейсов и песочница</h3><button class="btn opendir" data-dir="src/utils/local/data/interfaces">Открыть папку</button></header>
+          <div class="body">
+            <div class="hint lead">Сотрёт историю браузера, сессии Telegram, отслеживание папок, пользовательские дашборды и всё содержимое каталога агента.</div>
+            <div class="field"><div class="fl"><div class="fn">Кэш интерфейсов</div></div>
+              <div class="fc"><span class="dbcount" id="dbCache"></span><button class="btn opendir" data-dir="src/utils/local/data/interfaces">Открыть папку</button></div></div>
+            <div class="field"><div class="fl"><div class="fn">Песочница агента</div></div>
+              <div class="fc"><span class="dbcount" id="dbSandbox"></span><button class="btn opendir" data-dir="sandbox">Открыть папку</button></div></div>
+            <div class="divider"></div>
+            <div class="sec-add"><button class="btn danger wipe" disabled data-scope="interfaces.all">Очистить оба каталога</button></div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <section class="panel panel-hidden" data-panel="logs">
+    <div class="head">
+      <div class="h-title"><h1>Логи</h1></div>
+      <p class="h-desc">Живой поток из logs/main.log. Новые записи дописываются снизу; пока окно прокручено вниз, оно следует за ними.</p>
+    </div>
+    <div class="scroll">
+
+      <div class="toolbar">
+        <div class="search"><input type="search" placeholder="Фильтр по тексту" id="logSearch" aria-label="Фильтр логов по тексту"></div>
+        <button class="chip" aria-pressed="true" data-lv="all">Все · <b class="n">0</b></button>
+        <button class="chip" aria-pressed="false" data-lv="ERROR">Ошибки · <b class="n">0</b></button>
+        <button class="chip" aria-pressed="false" data-lv="WARNING">Предупреждения · <b class="n">0</b></button>
+        <button class="chip" aria-pressed="false" data-lv="DEBUG">Отладка · <b class="n">0</b></button>
+        <div class="spacer"></div>
+        <button class="chip" id="logPause" aria-pressed="false">Пауза</button>
+        <button class="btn" data-action="download-logs">Выгрузить файл</button>
+      </div>
+      <div class="logwrap">
+        <div class="logview" id="logBox" tabindex="0" role="log" aria-label="Журнал logs/main.log"></div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- панель несохранённых изменений -->
+  <div class="savebar" id="savebar" role="region" aria-label="Несохранённые изменения" hidden>
+    <span class="sb-dot"></span>
+    <span class="sb-text">Не сохранено: <b id="saveCount">0 полей</b></span>
+    <span class="sb-where" id="saveWhere"></span>
+    <div class="spacer"></div>
+    <button class="btn" id="saveReset">Отменить</button>
+    <button class="btn primary" id="saveApply">Применить</button>
+  </div>
+
+</main>
+
+</div>
+
+<script src="console.js" defer></script>
+</body>
+</html>
