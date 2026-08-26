@@ -115,5 +115,11 @@ python jawl.py
 ## 📜 License
 The project is distributed under the [MIT](LICENSE) license.
 
+## 👥 Authors & Contributors
+
+* **[th0r3nt](https://t.me/th0r3nt)** — Creator & Lead System Architect of JAWL.
+* **[IceSondu](https://github.com/IceSondu)**— Web control panel developer and designer.
+
+* 
 ## Other
 The author of this framework (th0r3nt) has a [Telegram channel](https://t.me/VEGA_and_other_heresy), which often describes technical details and development updates.
