@@ -38,11 +38,15 @@ def test_existing_file_opens_its_folder_and_gets_selected():
 
 def test_missing_file_falls_back_to_nearest_existing_folder():
     """
-    SOUL.md и EXAMPLES_OF_STYLE.md появляются только после первого запуска
-    агента — в репозитории лежат лишь .example-заготовки. Кнопка обещает
-    показать папку, значит «не найдено» здесь неуместно.
+    Часть файлов на вкладке «Исходные файлы» может ещё не существовать. Кнопка
+    обещает показать папку — значит «не найдено» здесь неуместно, надо открыть
+    ближайший существующий каталог.
+
+    Файл берём заведомо отсутствующий: SOUL.md и EXAMPLES_OF_STYLE.md для этого
+    больше не годятся — консоль создаёт их при запуске, и тест проверял бы
+    подсветку существующего файла вместо отката к папке.
     """
-    raw = "src/l3_agent/prompt/personality/EXAMPLES_OF_STYLE.md"
+    raw = "src/l3_agent/prompt/personality/НЕТ_ТАКОГО.md"
     select, folder, err = server.resolve_target(raw)
     assert err is None
     assert select is None

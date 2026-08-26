@@ -166,3 +166,49 @@ def test_env_ignores_commented_variables(sandbox_config):
     with io.open(env, "a", encoding="utf-8") as fh:
         fh.write('\n# GHOST_KEY="value"\n')
     assert "GHOST_KEY" not in cio.load_env()
+
+
+def test_personality_files_are_created_too(tmp_path, monkeypatch):
+    """
+    Без `SOUL.md` агент поднимается и работает, но **без всякого описания
+    характера**: сборщик промпта отбрасывает `*.example.md`, и каталог личности
+    не даёт в промпт ничего. Потеря молчаливая — заметить её можно только по
+    тому, что агент отвечает не своим голосом.
+    """
+    monkeypatch.setattr(cio, "ROOT_DIR", tmp_path)
+
+    personality = tmp_path / "src" / "l3_agent" / "prompt" / "personality"
+    personality.mkdir(parents=True)
+    (personality / "SOUL.example.md").write_text("## SOUL\nтекст", encoding="utf-8")
+    (personality / "EXAMPLES_OF_STYLE.example.md").write_text("", encoding="utf-8")
+
+    monkeypatch.setattr(cio, "PERSONALITY_DIR", personality)
+    monkeypatch.setattr(cio, "SOUL_FILE", personality / "SOUL.md")
+    monkeypatch.setattr(cio, "SOUL_EXAMPLE", personality / "SOUL.example.md")
+    monkeypatch.setattr(cio, "STYLE_FILE", personality / "EXAMPLES_OF_STYLE.md")
+    monkeypatch.setattr(cio, "STYLE_EXAMPLE", personality / "EXAMPLES_OF_STYLE.example.md")
+    monkeypatch.setattr(cio, "EXAMPLES", (
+        (cio.SOUL_FILE, cio.SOUL_EXAMPLE),
+        (cio.STYLE_FILE, cio.STYLE_EXAMPLE),
+    ))
+
+    created = cio.ensure_config_files()
+
+    assert set(created) == {"SOUL.md", "EXAMPLES_OF_STYLE.md"}
+    assert (personality / "SOUL.md").read_text(encoding="utf-8") == "## SOUL\nтекст"
+
+
+def test_existing_files_are_never_overwritten(tmp_path, monkeypatch):
+    """Свой характер, написанный пользователем, затирать нельзя."""
+    monkeypatch.setattr(cio, "ROOT_DIR", tmp_path)
+
+    personality = tmp_path / "personality"
+    personality.mkdir()
+    (personality / "SOUL.example.md").write_text("заготовка", encoding="utf-8")
+    (personality / "SOUL.md").write_text("мой характер", encoding="utf-8")
+    monkeypatch.setattr(cio, "EXAMPLES", (
+        (personality / "SOUL.md", personality / "SOUL.example.md"),
+    ))
+
+    assert cio.ensure_config_files() == []
+    assert (personality / "SOUL.md").read_text(encoding="utf-8") == "мой характер"

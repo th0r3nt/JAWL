@@ -34,10 +34,23 @@ SETTINGS_EXAMPLE = ROOT_DIR / "config" / "settings.example.yaml"
 INTERFACES_EXAMPLE = ROOT_DIR / "config" / "interfaces.example.yaml"
 ENV_EXAMPLE = ROOT_DIR / ".env.example"
 
+# Личность агента. Тоже пользовательские файлы: перечислены в `.gitignore`,
+# в репозитории лежат только заготовки. Но, в отличие от конфигов, их не
+# создаёт никто — ни онбординг, ни мастер настройки. А сборщик промпта явно
+# отбрасывает `*.example.md` (`_gather_markdown` в l3_agent/prompt/builder.py),
+# поэтому без них агент работает вообще без описания характера — и молча.
+PERSONALITY_DIR = ROOT_DIR / "src" / "l3_agent" / "prompt" / "personality"
+SOUL_FILE = PERSONALITY_DIR / "SOUL.md"
+SOUL_EXAMPLE = PERSONALITY_DIR / "SOUL.example.md"
+STYLE_FILE = PERSONALITY_DIR / "EXAMPLES_OF_STYLE.md"
+STYLE_EXAMPLE = PERSONALITY_DIR / "EXAMPLES_OF_STYLE.example.md"
+
 EXAMPLES = (
     (SETTINGS_FILE, SETTINGS_EXAMPLE),
     (INTERFACES_FILE, INTERFACES_EXAMPLE),
     (ENV_FILE, ENV_EXAMPLE),
+    (SOUL_FILE, SOUL_EXAMPLE),
+    (STYLE_FILE, STYLE_EXAMPLE),
 )
 
 
@@ -61,12 +74,17 @@ def framework_version() -> str:
 
 def ensure_config_files() -> list:
     """
-    Создаёт недостающие конфиги из образцов.
+    Создаёт недостающие рабочие файлы из образцов.
 
     В свежем клоне есть только `*.example`: рабочие файлы перечислены в
-    `.gitignore`. Без этого консоль падала бы при первом же чтении, хотя
-    чинится всё копированием — ровно так поступает и мастер настройки в CLI
-    (`_ensure_base_files_exist` в `src/cli/screens/onboarding.py`).
+    `.gitignore`. Для конфигов так же поступает мастер настройки в CLI
+    (`_ensure_base_files_exist` в `src/cli/screens/onboarding.py`) — без них
+    консоль падала бы при первом же чтении.
+
+    Файлы личности он не создаёт, а нужны они не меньше: без `SOUL.md` агент
+    поднимается и работает, но без всякого описания характера, потому что
+    заготовки `*.example.md` сборщик промпта отбрасывает. Молчаливая потеря,
+    поэтому чиним здесь же.
 
     Возвращает список созданных файлов, чтобы об этом можно было сказать вслух.
     """

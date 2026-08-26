@@ -223,6 +223,9 @@ async def test_offline_when_the_agent_is_not_running(tmp_path, monkeypatch):
     monkeypatch.setattr(chat, "PORT_FILE", tmp_path / "нет.port")
     monkeypatch.setattr(chat, "RETRY_PAUSE_SEC", 0.05)
     monkeypatch.setattr(chat, "terminal_enabled", lambda: True)
+    # состояние настоящей машины сюда попадать не должно: если на компьютере
+    # окажется живой агент, ответ будет другим, и тест начнёт «мигать»
+    monkeypatch.setattr(chat, "agent_running", lambda: False)
 
     link = chat.ChatBridge()
     await link.acquire()
@@ -502,16 +505,27 @@ async def test_stale_port_file_reads_as_agent_not_answering(tmp_path, monkeypatc
         await link.close()
 
 
-async def test_missing_port_file_says_agent_is_stopped(tmp_path, monkeypatch):
+@pytest.mark.parametrize("running, expected", [
+    (False, "агент не запущен"),
+    (True, "агент запущен без терминала — перезапустите его"),
+])
+async def test_missing_port_file_explains_the_reason(tmp_path, monkeypatch,
+                                                     running, expected):
+    """
+    Порта нет по двум разным причинам, и подсказки нужны разные: интерфейсы
+    поднимаются при старте, поэтому включённый уже после запуска терминал
+    заработает только со следующего.
+    """
     monkeypatch.setattr(chat, "PORT_FILE", tmp_path / "нет.port")
     monkeypatch.setattr(chat, "terminal_enabled", lambda: True)
     monkeypatch.setattr(chat, "RETRY_PAUSE_SEC", 0.05)
+    monkeypatch.setattr(chat, "agent_running", lambda: running)
 
     link = chat.ChatBridge()
     await link.acquire()
     try:
         assert await until(lambda: link.status()["state"] == "offline")
-        assert link.status()["error"] == "агент не запущен"
+        assert link.status()["error"] == expected
     finally:
         await link.close()
 

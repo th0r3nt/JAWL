@@ -480,10 +480,10 @@ def main() -> None:
                         help="не останавливать агента при закрытии консоли")
     args = parser.parse_args()
 
-    # На свежей установке рабочих конфигов ещё нет — только образцы
+    # На свежей установке рабочих файлов ещё нет — только образцы
     created = cio.ensure_config_files()
     if created:
-        print("Созданы конфиги из образцов: %s" % ", ".join(created))
+        print("Созданы из образцов: %s" % ", ".join(created))
 
     token = args.token
     if args.host not in ("127.0.0.1", "localhost", "::1") and not token:

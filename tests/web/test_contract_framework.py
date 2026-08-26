@@ -305,8 +305,13 @@ def test_console_lives_only_in_its_own_folders():
     """Обещание из PROMPT_FRONTEND.md: код консоли не расползается по проекту."""
     import subprocess
 
-    result = subprocess.run(["git", "status", "--porcelain"],
-                            cwd=str(ROOT), capture_output=True, text=True)
+    try:
+        result = subprocess.run(["git", "status", "--porcelain"],
+                                cwd=str(ROOT), capture_output=True, text=True)
+    except OSError:
+        # git может отсутствовать в PATH — например, при запуске из PowerShell,
+        # где нет окружения Git Bash. Это не повод валить прогон.
+        pytest.skip("git не найден")
     if result.returncode != 0:
         pytest.skip("git недоступен")
 
@@ -477,3 +482,46 @@ def test_batch_file_lives_with_the_tests():
     text = script.read_text(encoding="utf-8")
     assert '%~dp0..\..' in text, "скрипт не переходит в корень проекта"
     assert "pytest tests/web" in text
+
+
+def test_no_example_is_left_without_its_working_file():
+    """
+    Каждая заготовка `*.example` в проекте (кроме шаблонов для разработчика
+    интерфейсов) должна иметь пару, которую кто-то создаёт. Появится новая —
+    тест напомнит добавить её в `ensure_config_files`.
+    """
+    known = {target.name for target, _ex in cio.EXAMPLES}
+
+    orphans = []
+    for example in ROOT.rglob("*.example.*"):
+        if "venv" in example.parts or "_interface_example" in example.parts:
+            continue                     # шаблоны для написания своих интерфейсов
+        real = example.with_name(example.name.replace(".example", ""))
+        if real.name not in known:
+            orphans.append(example.relative_to(ROOT).as_posix())
+
+    assert not orphans, (
+        "заготовки без рабочей пары: %s. Их никто не создаёт — добавьте в "
+        "cio.EXAMPLES или объясните здесь, почему не нужно" % orphans)
+
+
+def test_personality_is_empty_without_the_working_files():
+    """
+    Сборщик промпта отбрасывает `*.example.md`. Значит, каталог личности с
+    одними заготовками не даёт в промпт ничего — и агент работает без
+    характера. Пока это так, файлы обязан кто-то создавать.
+    """
+    text = source("src/l3_agent/prompt/builder.py")
+
+    assert 'endswith(".example.md")' in text, \
+        "фильтр заготовок изменился — проверьте, нужны ли ещё SOUL.md и EXAMPLES_OF_STYLE.md"
+    assert cio.SOUL_FILE.name == "SOUL.md"
+    assert cio.SOUL_EXAMPLE.exists(), "заготовка личности исчезла из репозитория"
+
+
+def test_personality_files_stay_out_of_git():
+    """Это пользовательский текст: в PR он попасть не должен."""
+    ignored = (ROOT / ".gitignore").read_text(encoding="utf-8")
+
+    for name in ("SOUL.md", "EXAMPLES_OF_STYLE.md"):
+        assert name in ignored, "%s не в .gitignore — утечёт в коммит" % name
