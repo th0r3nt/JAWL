@@ -99,11 +99,13 @@ def ensure_config_files() -> list:
         created.append(target.name)
     return created
 
+
 _yaml = YAML()
 _yaml.preserve_quotes = True
 
 
 # ---------------------------------------------------------------- общее
+
 
 def detect_newline(path: Path) -> str:
     """Файлы проекта в CRLF; записать их в LF — показать git весь файл изменённым."""
@@ -125,6 +127,7 @@ def _write_lines(path: Path, lines: List[str]) -> None:
 
 # ---------------------------------------------------------------- чтение YAML
 
+
 def load_yaml(path: Path):
     if not path.exists():
         raise FileNotFoundError(path)
@@ -143,7 +146,7 @@ def get_path(data, dotted: str, default=None):
 
 # ---------------------------------------------------------------- поиск строки ключа
 
-_KEY_RE = re.compile(r'^(\s*)([A-Za-z_][\w-]*)\s*:(.*)$')
+_KEY_RE = re.compile(r"^(\s*)([A-Za-z_][\w-]*)\s*:(.*)$")
 
 
 def _find_key(lines: List[str], dotted: str) -> Tuple[Optional[int], Optional[re.Match]]:
@@ -179,9 +182,9 @@ def _split_comment(rest: str) -> Tuple[str, str]:
             quote = ch
         elif ch == "#" and (i == 0 or rest[i - 1] in " \t"):
             value = rest[:i].rstrip()
-            return value, rest[len(value):]
+            return value, rest[len(value) :]
     value = rest.rstrip()
-    tail = rest[len(value):]
+    tail = rest[len(value) :]
     return value, tail if tail.strip() else ""
 
 
@@ -191,13 +194,17 @@ def _format_value(old_raw: str, value: Any) -> str:
     quote = old[0] if len(old) >= 2 and old[0] == old[-1] and old[0] in "\"'" else ""
 
     if isinstance(value, bool) or old in ("true", "false"):
-        flag = value if isinstance(value, bool) else str(value).strip().lower() in ("1", "true", "yes", "on")
+        flag = (
+            value
+            if isinstance(value, bool)
+            else str(value).strip().lower() in ("1", "true", "yes", "on")
+        )
         return "true" if flag else "false"
 
     # число с точкой должно остаться числом с точкой: 1.0 не превращается в 1
-    if re.fullmatch(r'-?\d+\.\d+', old):
+    if re.fullmatch(r"-?\d+\.\d+", old):
         return repr(float(value))
-    if re.fullmatch(r'-?\d+', old):
+    if re.fullmatch(r"-?\d+", old):
         return str(int(float(value)))
 
     text = "" if value is None else str(value)
@@ -211,7 +218,7 @@ def set_scalar(lines: List[str], dotted: str, value: Any) -> bool:
         return False
     old_value, tail = _split_comment(m.group(3))
     if not old_value.strip():
-        return False                     # это узел-словарь, а не лист
+        return False  # это узел-словарь, а не лист
     new_value = _format_value(old_value, value)
     lines[i] = "%s%s: %s%s" % (m.group(1), m.group(2), new_value, tail)
     return True
@@ -235,42 +242,45 @@ def set_list(lines: List[str], dotted: str, items: List[str]) -> bool:
             return True
         lines[i] = "%s%s:%s" % (m.group(1), m.group(2), tail)
         block = ["%s  - %s" % (m.group(1), x) for x in items]
-        lines[i + 1:i + 1] = block
+        lines[i + 1 : i + 1] = block
         return True
 
     item_idx: List[int] = []
     item_prefix = " " * (key_indent + 2) + "- "
-    quote = ""                            # элементы могли быть в кавычках
+    quote = ""  # элементы могли быть в кавычках
     j = i + 1
     while j < len(lines):
         line = lines[j]
-        lm = re.match(r'^(\s*)-\s?(.*)$', line)
-        if lm and len(lm.group(1)) > key_indent:
-            if not item_idx:
-                item_prefix = lm.group(1) + "- "
-                raw = lm.group(2).strip()
-                if len(raw) >= 2 and raw[0] == raw[-1] and raw[0] in "\"'":
-                    quote = raw[0]
-            item_idx.append(j)
-            j += 1
-            continue
         if line.strip() == "" or line.lstrip().startswith("#"):
-            j += 1                        # комментарий или пустая строка внутри блока
+            j += 1  # комментарий или пустая строка внутри блока
             continue
+        lm = re.match(r"^(\s*)-\s?(.*)$", line)
+        if lm:
+            indent = len(lm.group(1))
+            # В YAML элементы списка могут быть как с дополнительным отступом, так и вровень с ключом
+            if indent >= key_indent:
+                if not item_idx:
+                    item_prefix = lm.group(1) + "- "
+                    raw = lm.group(2).strip()
+                    if len(raw) >= 2 and raw[0] == raw[-1] and raw[0] in "\"'":
+                        quote = raw[0]
+                item_idx.append(j)
+                j += 1
+                continue
         break
 
     if not items:
         # пустой список записываем в строку, иначе получится ключ без значения
         if item_idx:
-            del lines[item_idx[0]:item_idx[-1] + 1]
+            del lines[item_idx[0] : item_idx[-1] + 1]
         lines[i] = "%s%s: []%s" % (m.group(1), m.group(2), tail)
         return True
 
     block = [item_prefix + "%s%s%s" % (quote, x, quote) for x in items]
     if item_idx:
-        lines[item_idx[0]:item_idx[-1] + 1] = block
+        lines[item_idx[0] : item_idx[-1] + 1] = block
     else:
-        lines[i + 1:i + 1] = block
+        lines[i + 1 : i + 1] = block
     return True
 
 
@@ -293,22 +303,41 @@ def set_object_list(lines: List[str], dotted: str, items: List[dict], keys: List
     start = i + 1
     end = i + 1
     item_indent = " " * (key_indent + 2)
+    found_item = False
+    first_item_indent_len = key_indent + 2
+
     while end < len(lines):
         line = lines[end]
-        if not line.strip():
+        if not line.strip() or line.lstrip().startswith("#"):
             end += 1
             continue
         indent = len(line) - len(line.lstrip())
-        if indent <= key_indent:
-            break
-        if line.lstrip().startswith("- "):
-            item_indent = " " * indent
-        end += 1
+
+        if not found_item:
+            if line.lstrip().startswith("- ") and indent >= key_indent:
+                found_item = True
+                first_item_indent_len = indent
+                item_indent = line[: line.index("- ")]
+                start = end
+                end += 1
+                continue
+            else:
+                break
+        else:
+            if indent < key_indent:
+                break
+            if indent <= key_indent and not line.lstrip().startswith("- "):
+                break
+            if line.lstrip().startswith("- ") and indent < first_item_indent_len:
+                break
+            end += 1
+
     while end > start and not lines[end - 1].strip():
-        end -= 1                          # пустые строки после блока не трогаем
+        end -= 1  # пустые строки после блока не трогаем
 
     if not items:
-        del lines[start:end]
+        if found_item:
+            del lines[start:end]
         lines[i] = "%s%s: []%s" % (m.group(1), m.group(2), tail)
         return True
 
@@ -319,13 +348,17 @@ def set_object_list(lines: List[str], dotted: str, items: List[dict], keys: List
             value = str(item.get(key, ""))
             prefix = item_indent + ("- " if n == 0 else "  ")
             block.append('%s%s: "%s"' % (prefix, key, value))
-    lines[start:end] = block
+
+    if found_item:
+        lines[start:end] = block
+    else:
+        lines[i + 1 : i + 1] = block
     return True
 
 
 # ---------------------------------------------------------------- .env
 
-_ENV_LINE = re.compile(r'^(\s*)(#\s*)?([A-Z][A-Z0-9_]*)\s*=\s*(.*)$')
+_ENV_LINE = re.compile(r"^(\s*)(#\s*)?([A-Z][A-Z0-9_]*)\s*=\s*(.*)$")
 
 
 def _unquote(raw: str) -> str:
@@ -356,7 +389,7 @@ def env_prefixed(prefix: str) -> List[str]:
     """
     found: List[Tuple[int, str]] = []
     for key, value in load_env().items():
-        m = re.match(r'^' + re.escape(prefix) + r'(\d+)$', key)
+        m = re.match(r"^" + re.escape(prefix) + r"(\d+)$", key)
         if m:
             found.append((int(m.group(1)), value))
     found.sort()
@@ -388,7 +421,7 @@ def save_env(values: Dict[str, str], prefixed: Optional[Dict[str, List[str]]] = 
         lines.append('%s="%s"' % (key, value))
 
     for prefix, items in prefixed.items():
-        pat = re.compile(r'^\s*(#\s*)?' + re.escape(prefix) + r'\d+\s*=')
+        pat = re.compile(r"^\s*(#\s*)?" + re.escape(prefix) + r"\d+\s*=")
         hits = [i for i, l in enumerate(lines) if pat.match(l)]
         block = ['%s%d="%s"' % (prefix, n + 1, v) for n, v in enumerate(items)]
         if not hits:
@@ -404,10 +437,13 @@ def save_env(values: Dict[str, str], prefixed: Optional[Dict[str, List[str]]] = 
 
 # ---------------------------------------------------------------- фасад для settings.yaml
 
-def apply_yaml(path: Path,
-               scalars: Dict[str, Any],
-               lists: Optional[Dict[str, List[str]]] = None,
-               object_lists: Optional[Dict[str, tuple]] = None) -> List[str]:
+
+def apply_yaml(
+    path: Path,
+    scalars: Dict[str, Any],
+    lists: Optional[Dict[str, List[str]]] = None,
+    object_lists: Optional[Dict[str, tuple]] = None,
+) -> List[str]:
     """
     Применяет правки к YAML-файлу. Возвращает пути, которых в файле не нашлось.
 

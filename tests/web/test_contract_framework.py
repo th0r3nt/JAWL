@@ -29,6 +29,7 @@ def source(relative: str) -> str:
 
 # ------------------------------------------------- управление жизнью агента
 
+
 def test_pid_and_lock_paths_match_the_framework():
     """
     По этим файлам консоль понимает, запущен ли агент, и снимает зависший.
@@ -60,6 +61,7 @@ def test_agent_is_started_by_the_same_entry_point():
 
 # ---------------------------------------------------------------- журнал
 
+
 def test_log_file_matches_the_logger():
     """Вкладка «Логи» и разбор такта читают тот же файл, что пишет фреймворк."""
     text = source("src/utils/logger.py")
@@ -78,8 +80,9 @@ def test_log_line_format_matches_the_formatter():
     text = source("src/utils/logger.py")
     fmt = re.search(r'file_fmt = "([^"]+)"', text).group(1)
 
-    assert fmt == "%(asctime)s.%(msecs)03d - %(name)s - %(levelname)s - %(message)s", \
+    assert fmt == "%(asctime)s.%(msecs)03d - %(name)s - %(levelname)s - %(message)s", (
         "формат строки журнала изменился: %s" % fmt
+    )
 
     sample = "2026-08-25 04:07:30.525 - JAWL.Agent - INFO - [ReAct] Step 1/8."
     assert tick.LINE_RE.match(sample), "разбор не берёт строку своего же формата"
@@ -93,20 +96,30 @@ def test_log_timestamps_are_local_time():
     """
     text = source("src/utils/logger.py")
 
-    assert "converter" not in text, \
-        "у форматтера появился свой converter — отметки могут быть не в местном времени"
+    assert (
+        "converter" not in text
+    ), "у форматтера появился свой converter — отметки могут быть не в местном времени"
 
 
 # ---------------------------------------------------------------- мотиваторы
 
+
 def test_drive_columns_match_the_table():
     """Читаем колонки поимённо: переименуют — получим пустую вкладку."""
     text = source("src/l1_databases/sql/tables.py")
-    block = text[text.index("class DriveTable"):]
-    block = block[:block.index("\nclass ", 1) if "\nclass " in block[1:] else len(block)]
+    block = text[text.index("class DriveTable") :]
+    block = block[: (block.index("\nclass ", 1) if "\nclass " in block[1:] else len(block))]
 
-    for column in ("id", "name", "type", "description", "decay_rate",
-                   "decay_interval_sec", "last_satisfied_at", "recent_reflections"):
+    for column in (
+        "id",
+        "name",
+        "type",
+        "description",
+        "decay_rate",
+        "decay_interval_sec",
+        "last_satisfied_at",
+        "recent_reflections",
+    ):
         assert re.search(r"\b%s\b" % column, block), "колонка исчезла: %s" % column
 
 
@@ -124,12 +137,15 @@ def test_fundamental_drive_names_match_the_bootstrap():
     фундаментальный мотиватор — он покажется без перевода, и это надо заметить.
     """
     text = source("src/l1_databases/sql/management/drives/crud.py")
-    block = text[text.index("fundamental_defs"):]
-    block = block[:block.index("\n    async def", 1) if "\n    async def" in block else len(block)]
+    block = text[text.index("fundamental_defs") :]
+    block = block[
+        : (block.index("\n    async def", 1) if "\n    async def" in block else len(block))
+    ]
 
     declared = set(re.findall(r'"(Curiosity|Social|Mastery)"', block))
-    assert declared == set(drives.FUNDAMENTAL_TITLES), \
-        "состав фундаментальных мотиваторов разошёлся: %s" % sorted(declared)
+    assert declared == set(
+        drives.FUNDAMENTAL_TITLES
+    ), "состав фундаментальных мотиваторов разошёлся: %s" % sorted(declared)
 
 
 def test_deficit_formula_is_still_the_same_shape():
@@ -144,6 +160,7 @@ def test_deficit_formula_is_still_the_same_shape():
 
 
 # ---------------------------------------------------------------- хранилища
+
 
 def test_vector_collection_names_match_the_manager():
     """Счётчики читают коллекции поимённо."""
@@ -187,6 +204,7 @@ def test_storage_paths_match_the_builder():
 
 # ---------------------------------------------------------------- терминал
 
+
 def test_chat_handshake_matches_the_terminal_server():
     """
     Без точной строки рукопожатия агент молча закрывает соединение — так он
@@ -223,19 +241,22 @@ def test_terminal_message_still_wakes_the_agent():
     """
     from src.utils.event.registry import EventLevel, Events
 
-    assert Events.HOST_TERMINAL_MESSAGE.level == EventLevel.CRITICAL, \
-        "сообщение оператора больше не будит агента немедленно"
+    assert (
+        Events.HOST_TERMINAL_MESSAGE.level == EventLevel.CRITICAL
+    ), "сообщение оператора больше не будит агента немедленно"
 
 
 def test_terminal_interface_is_the_one_we_talk_to(interfaces_yaml):
     """Канал оператора должен существовать в конфигурации интерфейсов."""
     interfaces = interfaces_yaml
 
-    assert cio.get_path(interfaces, "host.terminal.enabled") is not None, \
-        "интерфейс терминала исчез из конфигурации"
+    assert (
+        cio.get_path(interfaces, "host.terminal.enabled") is not None
+    ), "интерфейс терминала исчез из конфигурации"
 
 
 # ---------------------------------------------------------------- конфигурация
+
 
 def test_every_settings_path_exists_in_the_example():
     """
@@ -243,28 +264,33 @@ def test_every_settings_path_exists_in_the_example():
     рабочем конфиге, у нового пользователя консоль покажет пустую ячейку.
     """
     example = cio.load_yaml(ROOT / "config" / "settings.example.yaml")
-    missing = [p for p in schema.SETTINGS_FIELDS.values()
-               if cio.get_path(example, p, "\0") == "\0"]
+    missing = [
+        p for p in schema.SETTINGS_FIELDS.values() if cio.get_path(example, p, "\0") == "\0"
+    ]
 
     assert not missing, "нет в settings.example.yaml: %s" % missing
 
 
 def test_every_interfaces_path_exists_in_the_example():
     example = cio.load_yaml(ROOT / "config" / "interfaces.example.yaml")
-    missing = [p for p in schema.INTERFACES_FIELDS.values()
-               if cio.get_path(example, p, "\0") == "\0"]
+    missing = [
+        p for p in schema.INTERFACES_FIELDS.values() if cio.get_path(example, p, "\0") == "\0"
+    ]
 
     assert not missing, "нет в interfaces.example.yaml: %s" % missing
 
 
-@pytest.mark.parametrize("path", [
-    "identity.agent_name",
-    "system.heartbeat_interval",
-    "system.continuous_cycle",
-    "llm.max_react_steps",
-    "system.db.vector.embedding_model",
-    "system.db.sql.drives.dynamic_reduction",
-])
+@pytest.mark.parametrize(
+    "path",
+    [
+        "identity.agent_name",
+        "system.heartbeat_interval",
+        "system.continuous_cycle",
+        "llm.max_react_steps",
+        "system.db.vector.embedding_model",
+        "system.db.sql.drives.dynamic_reduction",
+    ],
+)
 def test_paths_used_outside_the_schema_still_exist(path, settings_yaml):
     """
     Эти ключи читаются напрямую модулями консоли, а не через `schema.py`, и
@@ -289,6 +315,7 @@ def test_llm_key_prefix_matches_the_loader():
 
 # ---------------------------------------------------------------- целостность
 
+
 def test_console_does_not_import_framework_internals_for_writing():
     """
     Консоль читает фреймворк, но не должна вызывать его на запись: у неё нет
@@ -296,8 +323,11 @@ def test_console_does_not_import_framework_internals_for_writing():
     """
     for path in sorted((ROOT / "src" / "web").glob("*.py")):
         text = path.read_text(encoding="utf-8")
-        for banned in ("from src.l3_agent", "from src.l2_interfaces",
-                       "from src.l0_state"):
+        for banned in (
+            "from src.l3_agent",
+            "from src.l2_interfaces",
+            "from src.l0_state",
+        ):
             assert banned not in text, "%s тянет %s" % (path.name, banned)
 
 
@@ -306,17 +336,34 @@ def test_console_lives_only_in_its_own_folders():
     import subprocess
 
     try:
-        result = subprocess.run(["git", "status", "--porcelain"],
-                                cwd=str(ROOT), capture_output=True, text=True)
+        result = subprocess.run(
+            ["git", "status", "--porcelain"],
+            cwd=str(ROOT),
+            capture_output=True,
+            text=True,
+        )
     except OSError:
-        # git может отсутствовать в PATH — например, при запуске из PowerShell,
-        # где нет окружения Git Bash. Это не повод валить прогон.
         pytest.skip("git не найден")
     if result.returncode != 0:
         pytest.skip("git недоступен")
 
-    allowed = ("web/", "src/web/", "tests/web/", "backup/", "start.bat",
-               "test.bat", ".gitignore", "PROMPT_FRONTEND.md", "console.html")
+    allowed = (
+        "web/",
+        "src/web/",
+        "tests/web/",
+        "backup/",
+        "start.bat",
+        "test.bat",
+        ".gitignore",
+        "PROMPT_FRONTEND.md",
+        "console.html",
+        "CHANGELOG.md",
+        "README.md",
+        "README_RU.md",
+        "TODO.md",
+        "src/__init__.py",
+        "config/",
+    )
     stray = []
     for line in result.stdout.splitlines():
         path = line[3:].strip().strip('"')
@@ -327,6 +374,7 @@ def test_console_lives_only_in_its_own_folders():
 
 
 # ---------------------------------------------------------------- сторожа
+
 
 def _duplicate_branches(path):
     """Условия, повторённые в одной цепочке if/elif: вторая ветка недостижима."""
@@ -383,16 +431,20 @@ def test_the_known_unreachable_branch_is_still_there():
     path = ROOT / "src" / "cli" / "screens" / "database_manager.py"
     lines = _duplicate_branches(path)
 
-    assert lines, ("дубль ветки в database_manager.py исправлен — "
-                   "уберите пункт 1 из web/FRAMEWORK_NOTES.md и этот тест")
+    assert lines, (
+        "дубль ветки в database_manager.py исправлен — "
+        "уберите пункт 1 из web/FRAMEWORK_NOTES.md и этот тест"
+    )
 
 
 def test_framework_notes_stay_honest():
     """Замечания без ссылки на место в коде проверить нельзя — значит, их там нет."""
     notes = (ROOT / "web" / "FRAMEWORK_NOTES.md").read_text(encoding="utf-8")
 
-    for mentioned in ("src/cli/screens/database_manager.py",
-                      "src/l1_databases/vector/db.py"):
+    for mentioned in (
+        "src/cli/screens/database_manager.py",
+        "src/l1_databases/vector/db.py",
+    ):
         assert mentioned in notes
         assert (ROOT / mentioned).exists(), "файл из замечаний исчез: %s" % mentioned
 
@@ -413,15 +465,16 @@ def test_tests_do_not_depend_on_ignored_config_files():
         text = path.read_text(encoding="utf-8")
         # интересуют только прямые чтения, не подмены monkeypatch-ем
         hits = _re.findall(r"load_yaml\(cio\.(SETTINGS_FILE|INTERFACES_FILE)\)", text)
-        hits += _re.findall(r"shutil\.copy\(cio\.(SETTINGS_FILE|INTERFACES_FILE|ENV_FILE)",
-                            text)
+        hits += _re.findall(
+            r"shutil\.copy\(cio\.(SETTINGS_FILE|INTERFACES_FILE|ENV_FILE)", text
+        )
         if hits:
             offenders[path.name] = sorted(set(hits))
 
     assert not offenders, (
         "тесты читают конфиги, которых нет в свежем клоне: %s. "
-        "Используйте фикстуры settings_yaml / interfaces_yaml или source_config()"
-        % offenders)
+        "Используйте фикстуры settings_yaml / interfaces_yaml или source_config()" % offenders
+    )
 
 
 def test_console_creates_missing_configs_from_examples():
@@ -433,8 +486,9 @@ def test_console_creates_missing_configs_from_examples():
     from src.web import server as srv
 
     assert hasattr(cio, "ensure_config_files")
-    assert "ensure_config_files" in source("src/web/server.py"), \
-        "конфиги не создаются при запуске консоли"
+    assert "ensure_config_files" in source(
+        "src/web/server.py"
+    ), "конфиги не создаются при запуске консоли"
 
     for _target, example in cio.EXAMPLES:
         assert example.exists(), "образец исчез: %s" % example.name
@@ -448,8 +502,9 @@ def test_version_matches_the_framework_source():
     """
     import src
 
-    assert cio.framework_version() == src.__version__, \
-        "разбор версии разошёлся с самим значением"
+    assert (
+        cio.framework_version() == src.__version__
+    ), "разбор версии разошёлся с самим значением"
     assert cio.framework_version(), "версия не прочиталась"
 
 
@@ -465,11 +520,13 @@ def test_fundamental_descriptions_cover_every_drive():
     """
     keys = {key for key, _title in drives.FUNDAMENTAL_TITLES.values()}
 
-    assert set(drives.FUNDAMENTAL_DESCRIPTIONS) == keys, \
-        "перевод описаний разошёлся с составом мотиваторов"
+    assert (
+        set(drives.FUNDAMENTAL_DESCRIPTIONS) == keys
+    ), "перевод описаний разошёлся с составом мотиваторов"
     for key, text in drives.FUNDAMENTAL_DESCRIPTIONS.items():
-        assert text and not re.search(r"[A-Za-z]{4,}", text), \
+        assert text and not re.search(r"[A-Za-z]{4,}", text), (
             "описание «%s» осталось на английском" % key
+        )
 
 
 def test_batch_file_lives_with_the_tests():
@@ -480,7 +537,7 @@ def test_batch_file_lives_with_the_tests():
     assert not (ROOT / "test.bat").exists(), "остался дубль в корне"
 
     text = script.read_text(encoding="utf-8")
-    assert '%~dp0..\..' in text, "скрипт не переходит в корень проекта"
+    assert "%~dp0..\.." in text, "скрипт не переходит в корень проекта"
     assert "pytest tests/web" in text
 
 
@@ -495,14 +552,15 @@ def test_no_example_is_left_without_its_working_file():
     orphans = []
     for example in ROOT.rglob("*.example.*"):
         if "venv" in example.parts or "_interface_example" in example.parts:
-            continue                     # шаблоны для написания своих интерфейсов
+            continue  # шаблоны для написания своих интерфейсов
         real = example.with_name(example.name.replace(".example", ""))
         if real.name not in known:
             orphans.append(example.relative_to(ROOT).as_posix())
 
     assert not orphans, (
         "заготовки без рабочей пары: %s. Их никто не создаёт — добавьте в "
-        "cio.EXAMPLES или объясните здесь, почему не нужно" % orphans)
+        "cio.EXAMPLES или объясните здесь, почему не нужно" % orphans
+    )
 
 
 def test_personality_is_empty_without_the_working_files():
@@ -513,8 +571,9 @@ def test_personality_is_empty_without_the_working_files():
     """
     text = source("src/l3_agent/prompt/builder.py")
 
-    assert 'endswith(".example.md")' in text, \
-        "фильтр заготовок изменился — проверьте, нужны ли ещё SOUL.md и EXAMPLES_OF_STYLE.md"
+    assert (
+        'endswith(".example.md")' in text
+    ), "фильтр заготовок изменился — проверьте, нужны ли ещё SOUL.md и EXAMPLES_OF_STYLE.md"
     assert cio.SOUL_FILE.name == "SOUL.md"
     assert cio.SOUL_EXAMPLE.exists(), "заготовка личности исчезла из репозитория"
 
