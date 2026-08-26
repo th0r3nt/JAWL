@@ -41,11 +41,14 @@ def storages(tmp_path, monkeypatch):
     conn.execute("INSERT INTO notes VALUES ('n1','заметка')")
     conn.execute("INSERT INTO mental_states VALUES ('m1','Сэм')")
     conn.execute("INSERT INTO personality_traits VALUES ('p1','ирония')")
-    conn.executemany("INSERT INTO drives VALUES (?,?,?)", [
-        ("d1", "Curiosity", "fundamental"),
-        ("d2", "Social", "fundamental"),
-        ("d3", "UserCare", "custom"),
-    ])
+    conn.executemany(
+        "INSERT INTO drives VALUES (?,?,?)",
+        [
+            ("d1", "Curiosity", "fundamental"),
+            ("d2", "Social", "fundamental"),
+            ("d3", "UserCare", "custom"),
+        ],
+    )
     conn.commit()
     conn.close()
 
@@ -55,8 +58,9 @@ def storages(tmp_path, monkeypatch):
         storage.parent.mkdir(parents=True)
         vc = sqlite3.connect(storage)
         vc.execute("CREATE TABLE points (id TEXT PRIMARY KEY, point BLOB)")
-        vc.executemany("INSERT INTO points VALUES (?,?)",
-                       [("p%d" % i, b"x") for i in range(rows)])
+        vc.executemany(
+            "INSERT INTO points VALUES (?,?)", [("p%d" % i, b"x") for i in range(rows)]
+        )
         vc.commit()
         vc.close()
     (vector_dir / ".lock").write_text("занято", encoding="utf-8")
@@ -108,6 +112,7 @@ def running_agent(monkeypatch):
 
 # ---------------------------------------------------------------- счётчики
 
+
 def test_counts_every_module(storages):
     counts = database.stats()["sql"]["counts"]
 
@@ -141,7 +146,10 @@ def test_vector_counts_are_read_around_the_lock(storages):
     """
     assert (storages.vector / ".lock").exists(), "проверяем именно случай с блокировкой"
     assert database.stats()["vector"]["counts"] == {
-        "knowledge": 3, "thoughts": 1, "code_ast": 0}
+        "knowledge": 3,
+        "thoughts": 1,
+        "code_ast": 0,
+    }
 
 
 def test_graph_is_marked_locked_while_the_agent_runs(storages, running_agent):
@@ -180,8 +188,11 @@ def test_directory_sizes_are_reported(storages):
 
 # ---------------------------------------------------------------- запрет очистки
 
-@pytest.mark.parametrize("scope", ["sql.tasks", "sql.all", "vector.knowledge",
-                                   "vector.all", "graph.all", "interfaces.all"])
+
+@pytest.mark.parametrize(
+    "scope",
+    ["sql.tasks", "sql.all", "vector.knowledge", "vector.all", "graph.all", "interfaces.all"],
+)
 def test_wipe_refuses_while_the_agent_runs(storages, running_agent, scope):
     """
     Самый важный запрет: агент держит базы открытыми, а состояние — в памяти.
@@ -209,6 +220,7 @@ def test_unknown_scope_is_rejected_before_the_agent_check(storages, running_agen
 
 
 # ---------------------------------------------------------------- очистка
+
 
 def test_wipes_one_table_and_leaves_the_rest(storages):
     res = database.wipe("sql.tasks")
@@ -281,10 +293,13 @@ def test_stats_are_fresh_after_a_wipe(storages):
 
 # ---------------------------------------------- согласованность с фреймворком и разметкой
 
+
 def _cli_source():
     from src.web import config_io as cio
-    return (cio.ROOT_DIR / "src" / "cli" / "screens"
-            / "database_manager.py").read_text(encoding="utf-8")
+
+    return (cio.ROOT_DIR / "src" / "cli" / "screens" / "database_manager.py").read_text(
+        encoding="utf-8"
+    )
 
 
 def test_sandbox_skeleton_matches_the_cli():
@@ -327,8 +342,7 @@ def test_every_button_scope_is_known_to_the_server(index_html):
 def test_every_sql_module_has_a_button(index_html):
     """Обратное: модуль описан на сервере, но очистить его нечем."""
     scopes = set(re.findall(r'data-scope="([^"]+)"', index_html))
-    missing = ["sql.%s" % key for key in database.SQL_MODULES
-               if "sql.%s" % key not in scopes]
+    missing = ["sql.%s" % key for key in database.SQL_MODULES if "sql.%s" % key not in scopes]
 
     assert not missing, "нет кнопок для: %s" % missing
 
@@ -347,6 +361,7 @@ def test_wipe_buttons_are_locked_until_the_agent_state_is_known(index_html):
 
 # ------------------------------------------------- очистка настоящих хранилищ
 
+
 @pytest.fixture
 def real_qdrant(tmp_path, monkeypatch):
     """Настоящая локальная база Qdrant: путь удаления точек стоит проверять по-честному."""
@@ -356,15 +371,22 @@ def real_qdrant(tmp_path, monkeypatch):
     client = QdrantClient(path=str(path))
     client.create_collection(
         "knowledge",
-        vectors_config=models.VectorParams(size=4, distance=models.Distance.COSINE))
+        vectors_config=models.VectorParams(size=4, distance=models.Distance.COSINE),
+    )
     client.create_collection(
+        "thoughts", vectors_config=models.VectorParams(size=4, distance=models.Distance.COSINE)
+    )
+    client.upsert(
+        "knowledge",
+        points=[
+            models.PointStruct(id=i, vector=[0.1] * 4, payload={"tags": ["память"]})
+            for i in range(5)
+        ],
+    )
+    client.upsert(
         "thoughts",
-        vectors_config=models.VectorParams(size=4, distance=models.Distance.COSINE))
-    client.upsert("knowledge", points=[
-        models.PointStruct(id=i, vector=[0.1] * 4, payload={"tags": ["память"]})
-        for i in range(5)])
-    client.upsert("thoughts", points=[
-        models.PointStruct(id=1, vector=[0.2] * 4, payload={"tags": ["мысль"]})])
+        points=[models.PointStruct(id=1, vector=[0.2] * 4, payload={"tags": ["мысль"]})],
+    )
     client.close()
 
     monkeypatch.setattr(database, "VECTOR_DB_DIR", path)
@@ -448,6 +470,7 @@ def test_graph_concepts_wipe_takes_relations_with_them(real_kuzu):
 
 # ---------------------------------------------------------------- дескрипторы
 
+
 def test_reading_stats_does_not_hold_the_files(storages):
     """
     Воспроизводит настоящую ошибку: «WinError 32 — файл занят другим процессом»
@@ -489,16 +512,20 @@ def test_listing_drives_does_not_hold_the_database(storages, monkeypatch):
     assert res["ok"] is True, "шкалы держат файл: %s" % res.get("error")
 
 
-def test_busy_file_gives_a_readable_answer(storages):
+def test_busy_file_gives_a_readable_answer(storages, monkeypatch):
     """
     Windows не даёт удалить занятый файл. Пользователь должен получить понятное
     объяснение, а не сырое «PermissionError: [WinError 32]».
     """
-    held = open(storages.vector / "collection" / "knowledge" / "storage.sqlite", "rb")
-    try:
-        res = database.wipe("vector.all")
-    finally:
-        held.close()
+
+    def always_busy(path, *a, **kw):
+        raise PermissionError(32, "файл занят другим процессом")
+
+    monkeypatch.setattr(database.shutil, "rmtree", always_busy)
+    monkeypatch.setattr(database, "UNLOCK_PAUSE_SEC", 0.001)
+    monkeypatch.setattr(database, "UNLOCK_ATTEMPTS", 2)
+
+    res = database.wipe("vector.all")
 
     assert res["ok"] is False
     assert res.get("busy") is True
@@ -532,6 +559,7 @@ def test_removal_survives_a_lock_that_releases(storages, monkeypatch):
 
 # ---------------------------------------------------------------- модели эмбеддингов
 
+
 @pytest.fixture
 def embeddings(tmp_path, monkeypatch):
     """Кэш весов с двумя моделями: используемой и оставшейся от прежней настройки."""
@@ -543,14 +571,18 @@ def embeddings(tmp_path, monkeypatch):
         blobs = root / folder / "blobs"
         blobs.mkdir(parents=True)
         (blobs / "model.onnx").write_bytes(b"x" * size)
-    (root / ".locks").mkdir()            # служебный каталог huggingface
+    (root / ".locks").mkdir()  # служебный каталог huggingface
     (root / "CACHEDIR.TAG").write_text("tag", encoding="utf-8")
 
     monkeypatch.setattr(database, "EMBEDDINGS_DIR", root)
     monkeypatch.setattr(agent, "status", lambda: {"ok": True, "running": False})
-    monkeypatch.setattr(database, "_settings",
-                        lambda: {"system": {"db": {"vector": {
-                            "embedding_model": "intfloat/multilingual-e5-large"}}}})
+    monkeypatch.setattr(
+        database,
+        "_settings",
+        lambda: {
+            "system": {"db": {"vector": {"embedding_model": "intfloat/multilingual-e5-large"}}}
+        },
+    )
     database._dir_cache.clear()
     return root
 
@@ -573,7 +605,10 @@ def test_active_model_is_marked(embeddings):
     models = {m["dir"]: m for m in database.stats()["embeddings"]["models"]}
 
     assert models["models--qdrant--multilingual-e5-large-onnx"]["active"] is True
-    assert models["models--qdrant--paraphrase-multilingual-MiniLM-L12-v2-onnx-Q"]["active"] is False
+    assert (
+        models["models--qdrant--paraphrase-multilingual-MiniLM-L12-v2-onnx-Q"]["active"]
+        is False
+    )
 
 
 def test_cache_folders_are_named_by_the_model(embeddings):
@@ -586,9 +621,11 @@ def test_cache_folders_are_named_by_the_model(embeddings):
 
 def test_missing_active_model_is_reported(embeddings, monkeypatch):
     """Модель в настройках сменили, а весов под неё ещё нет — это надо сказать."""
-    monkeypatch.setattr(database, "_settings",
-                        lambda: {"system": {"db": {"vector": {
-                            "embedding_model": "какая-то/другая"}}}})
+    monkeypatch.setattr(
+        database,
+        "_settings",
+        lambda: {"system": {"db": {"vector": {"embedding_model": "какая-то/другая"}}}},
+    )
 
     info = database.stats()["embeddings"]
     assert info["activeDownloaded"] is False
@@ -600,7 +637,9 @@ def test_wipes_one_model_and_leaves_the_other(embeddings):
     res = database.wipe(scope)
 
     assert res["ok"] is True
-    assert not (embeddings / "models--qdrant--paraphrase-multilingual-MiniLM-L12-v2-onnx-Q").exists()
+    assert not (
+        embeddings / "models--qdrant--paraphrase-multilingual-MiniLM-L12-v2-onnx-Q"
+    ).exists()
     assert (embeddings / "models--qdrant--multilingual-e5-large-onnx").exists()
 
 
@@ -611,14 +650,17 @@ def test_wipes_the_whole_model_cache(embeddings):
     assert not embeddings.exists()
 
 
-@pytest.mark.parametrize("scope", [
-    "embeddings.",
-    "embeddings.нет-такой-модели",
-    "embeddings...",
-    "embeddings.../../config",
-    "embeddings.models--qdrant--multilingual-e5-large-onnx/blobs",
-    "embeddings..locks",
-])
+@pytest.mark.parametrize(
+    "scope",
+    [
+        "embeddings.",
+        "embeddings.нет-такой-модели",
+        "embeddings...",
+        "embeddings.../../config",
+        "embeddings.models--qdrant--multilingual-e5-large-onnx/blobs",
+        "embeddings..locks",
+    ],
+)
 def test_model_scope_cannot_escape_the_cache(embeddings, scope):
     """
     Имена моделей приходят с клиента и не перечислены заранее. Проверяем, что
