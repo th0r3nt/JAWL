@@ -19,7 +19,6 @@ When calling `execute_skill`, your arguments must strictly follow this structure
 
 ### Arguments Example for `execute_skill` tool:
 
-```json
 {
   "observation": "The user requested a server status check. I do not have recent ping data in my context.",
   "reasoning": "I need to verify network availability before attempting database diagnostics.",
@@ -34,7 +33,6 @@ When calling `execute_skill`, your arguments must strictly follow this structure
     }
   ]
 }
-```
 
 * This example serves strictly as a structural reference for JSON payload formatting. 
 * While the structure is mandatory, the linguistic style, tone, and specific logic within these fields must be governed by your core personality and current environmental data.
