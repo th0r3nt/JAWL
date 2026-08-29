@@ -77,8 +77,8 @@ class LLMExecutor:
         log_prefix: str,
         tools: Optional[List[Dict[str, Any]]] = None,
         tool_choice: Optional[str] = None,
-        max_retries: int = 1,
-        max_timeout_retries: int = 1,
+        max_retries: int = 5,
+        max_timeout_retries: int = 3,
     ) -> Optional[str]:
         """
         Executes a request to the LLM with a robust retry system and call throttling.
@@ -121,8 +121,13 @@ class LLMExecutor:
                     kwargs["tools"] = tools
                 if tool_choice is not None:
                     kwargs["tool_choice"] = tool_choice
-
+                
+                kwargs["response_format"] = {"type": "json_object"}
+                
                 response = await session.chat.completions.create(**kwargs)
+                
+                # --- ПЕРЕХВАТ СЫРОГО ОТВЕТА ---
+                #logger.error(f"{log_prefix} RAW API DUMP: {response.model_dump_json() if hasattr(response, 'model_dump_json') else response}")
 
                 # Extract content and count tokens
                 raw_answer = self._extract_response_text(response)
@@ -175,13 +180,18 @@ class LLMExecutor:
                 continue
 
             except Exception as e:
-                # Pause briefly before retry on unexpected system/network errors
+                # Если это была последняя из разрешенных попыток — падаем с концами
                 if attempt == max_retries - 1:
-                    logger.error(f"{log_prefix} Fatal API error: {e}")
+                    logger.error(f"{log_prefix} Fatal API error after {max_retries} attempts: {e}")
                     return None
 
-                logger.error(f"{log_prefix} Internal API error: {e}. Retrying request.")
-                await asyncio.sleep(2)
+                # Экспоненциальный бэкофф: 2, 4, 8, 16... секунд
+                backoff_time = 2 ** (attempt + 1)
+                
+                logger.warning(
+                    f"{log_prefix} Internal API error: {e}. Retrying ({attempt + 1}/{max_retries}) in {backoff_time}s..."
+                )
+                await asyncio.sleep(backoff_time)
                 continue
 
         return None
@@ -194,10 +204,18 @@ class LLMExecutor:
         """
         Extracts raw text content or tool JSON arguments from the OpenAI response.
         """
+        # 1. Ловим вложенные ошибки провайдера (когда API не упало по HTTP, но прислало мусор)
+        api_error = getattr(response, "error", None)
+        if api_error:
+            raise ValueError(f"Upstream Provider Error: {api_error}")
+
+        # 2. Защита от пустого массива (наш изначальный предохранитель)
+        if not getattr(response, "choices", None):
+            raise ValueError("Provider API shit the bed: 'choices' array is missing or None.")
 
         message_obj = response.choices[0].message
 
-        if message_obj.tool_calls:
+        if getattr(message_obj, "tool_calls", None):
             return str(message_obj.tool_calls[0].function.arguments)
 
         return message_obj.content or ""
