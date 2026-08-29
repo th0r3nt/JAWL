@@ -135,6 +135,13 @@ def parse_llm_json(
     raw_answer: str, _depth: int = 0
 ) -> Tuple[Optional[AgentResponse], Optional[str]]:
     clean_answer = raw_answer.strip()
+    
+    # --- БРОНЯ ОТ ДВОЙНЫХ СКОБОК (LLM Format Glitch) ---
+    # Вырезаем анонимные внешние скобки, если нейронка выдала {{ ... }}
+    clean_answer = re.sub(r"^\{\s*\{", "{", clean_answer)
+    clean_answer = re.sub(r"\}\s*\}$", "}", clean_answer)
+    # ---------------------------------------------------
+    
     json_str = ""
 
     # Attempt 1: Strict parsing (looking for Markdown block)
@@ -157,6 +164,15 @@ def parse_llm_json(
     if json_str:
         try:
             data = json.loads(json_str, strict=False)
+            
+            # --- ФИКС МАТРЕШКИ ---
+            # Если модель завернула всё в один корневой ключ (например, {"response": {...}})
+            if isinstance(data, dict) and len(data) == 1:
+                inner_val = list(data.values())[0]
+                if isinstance(inner_val, dict) and "actions" in inner_val:
+                    data = inner_val
+            # ---------------------
+            
             parsed_response = AgentResponse(**data)
         except Exception as e:
             error_msg = str(e)
@@ -168,10 +184,9 @@ def parse_llm_json(
         try:
             actions_raw = _extract_json_array(clean_answer)
             if actions_raw:
-                clean_actions = (
-                    actions_raw.replace('\\"', '"').replace("\\'", "'").replace("\\n", "\n")
-                )
-                actions_list = json.loads(clean_actions, strict=False)
+                # УБРАНА ТОКСИЧНАЯ ЗАМЕНА КАВЫЧЕК
+                # Отдаем в json.loads сырую строку, сохраняя оригинальное экранирование от LLM
+                actions_list = json.loads(actions_raw, strict=False)
 
                 parsed_response = AgentResponse(
                     observation="[Heuristic parse]",
