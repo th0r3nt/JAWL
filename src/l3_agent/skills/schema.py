@@ -173,6 +173,17 @@ def parse_llm_json(
                     data = inner_val
             # ---------------------
             
+            # --- ФИКС СТРОКОВОГО МАССИВА (Double-encoding) ---
+            if isinstance(data, dict):
+                actions_val = data.get("actions")
+                if isinstance(actions_val, str):
+                    try:
+                        # Вскрываем строку в нативный питоновский list
+                        data["actions"] = json.loads(actions_val, strict=False)
+                    except Exception:
+                        pass # Если внутри невалидный мусор - оставляем строкой, Pydantic упадет и отдаст в Attempt 3
+            # -------------------------------------------------
+            
             parsed_response = AgentResponse(**data)
         except Exception as e:
             error_msg = str(e)
