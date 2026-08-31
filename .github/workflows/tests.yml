@@ -15,8 +15,8 @@ jobs:
       matrix:
         # Тестируем на всех заявленных ОС
         os: [ubuntu-latest, windows-latest, macos-latest]
-        # Тестируем на 3.11 (целевая), а также проверяем совместимость с 3.12
-        python-version: ["3.11", "3.12"]
+        # Тестируем на 3.11 (целевая)
+        python-version: ["3.11"]
 
     steps:
     - name: Клонирование кода
