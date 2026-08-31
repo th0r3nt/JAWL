@@ -206,7 +206,7 @@ class LLMExecutor:
         """
         # 1. Ловим вложенные ошибки провайдера (когда API не упало по HTTP, но прислало мусор)
         api_error = getattr(response, "error", None)
-        if api_error:
+        if api_error and isinstance(api_error, (dict, str)):
             raise ValueError(f"Upstream Provider Error: {api_error}")
 
         # 2. Защита от пустого массива (наш изначальный предохранитель)
